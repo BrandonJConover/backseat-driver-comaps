@@ -113,6 +113,7 @@ jobs:
             DEVELOPMENT_TEAM="$TEAM" \
             OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH" \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            MARKETING_VERSION=0.1.0 \
             2>&1 | tee "$RUNNER_TEMP/build.log" | grep -E "error:|warning: .*sign|BUILD|ARCHIVE" || true
           test -d "$RUNNER_TEMP/BackseatDriver.xcarchive"
 
