@@ -6,6 +6,7 @@ add_executable(${PROJECT_NAME}
   check.hpp
   engine_test.cpp
   main.cpp
+  navigator_test.cpp
   parity_test.cpp
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)

@@ -15,6 +15,8 @@ set(
   lines.hpp
   lines_data.cpp
   lines_data.hpp
+  navigator.cpp
+  navigator.hpp
   report.cpp
   report.hpp
   rundown.cpp

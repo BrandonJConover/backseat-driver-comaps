@@ -1,0 +1,75 @@
+name: Backseat Driver Android
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'backseat/**'
+    paths:
+      - 3party/**
+      - android/**
+      - cmake/**
+      - CMakeLists.txt
+      - configure.sh
+      - libs/**
+      - .gitmodules
+      - .github/workflows/backseat-android.yaml
+
+env:
+  JAVA_HOME: /usr/lib/jvm/temurin-21-jdk-amd64  # Java 21 is required for Android Gradle 8 plugin
+
+jobs:
+  engine-tests:
+    name: Critique engine tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - name: Build and test libs/backseat on its own
+        run: |
+          cmake -S libs/backseat -B build/backseat -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-Wall -Wextra -fsanitize=address,undefined"
+          cmake --build build/backseat -j"$(nproc)"
+          build/backseat/backseat_tests/backseat_tests
+
+  android:
+    name: Build Android debug APK
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+
+      - name: Install build tools and dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build python3-pip zlib1g-dev optipng
+          pip install "protobuf<3.21" --break-system-packages
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Parallel submodules checkout
+        run: git submodule update --depth 1 --init --recursive --jobs=$(($(nproc) * 20))
+
+      - name: Configure ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.workflow }}
+
+      - name: Compile FdroidDebug (arm64)
+        working-directory: android
+        env:
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+        run: ./gradlew -Parm64 assembleFdroidDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: backseat-driver-android-debug
+          path: android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error

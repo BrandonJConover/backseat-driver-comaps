@@ -1,5 +1,6 @@
 #pragma once
 
+#include "map/backseat_adapter.hpp"
 #include "map/extrapolation/extrapolator.hpp"
 #include "map/routing_mark.hpp"
 #include "map/transit/transit_display.hpp"
@@ -236,6 +237,8 @@ public:
   /// \note Current notifications will be deleted after call and second call
   /// will not return previous data, only newer.
   void GenerateNotifications(std::vector<std::string> & notifications, bool announceStreets);
+  /// Title of the route's finish point, as Backseat Driver should call it.
+  std::string GetBackseatDestinationName() const;
 
   void AddRoutePoint(RouteMarkData && markData, bool reorderIntermediatePoints = true);
   void ContinueRouteToPoint(RouteMarkData && markData);
@@ -400,6 +403,8 @@ private:
 
   BookmarkManager * m_bmManager = nullptr;
   extrapolation::Extrapolator m_extrapolator;
+  /// Backseat Driver: replaces the stock voice prompts with the critique engine's lines.
+  BackseatAdapter m_backseat;
 
   std::vector<dp::DrapeID> m_drapeSubroutes;
   mutable std::mutex m_drapeSubroutesMutex;

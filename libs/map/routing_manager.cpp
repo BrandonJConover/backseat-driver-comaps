@@ -489,6 +489,16 @@ void RoutingManager::OnRoutePointPassed(RouteMarkType type, size_t intermediateI
 void RoutingManager::OnLocationUpdate(location::GpsInfo const & info)
 {
   m_extrapolator.OnLocationUpdate(info);
+  // Only real fixes go to Backseat Driver: extrapolated ones would fake hard braking.
+  m_backseat.OnLocationUpdate(info, m_routingSession, GetBackseatDestinationName());
+}
+
+std::string RoutingManager::GetBackseatDestinationName() const
+{
+  for (auto const & point : GetRoutePoints())
+    if (point.m_pointType == RouteMarkType::Finish)
+      return point.m_title;
+  return {};
 }
 
 RouterType RoutingManager::GetBestRouter(m2::PointD const & startPoint, m2::PointD const & finalPoint) const
@@ -1148,7 +1158,13 @@ void RoutingManager::ReorderIntermediatePoints()
 
 void RoutingManager::GenerateNotifications(vector<string> & turnNotifications, bool announceStreets)
 {
-  m_routingSession.GenerateNotifications(turnNotifications, announceStreets);
+  // Keep the stock notification state moving, but say Backseat Driver's lines instead.
+  vector<string> stock;
+  m_routingSession.GenerateNotifications(stock, announceStreets);
+  if (m_currentRouterType == RouterType::Vehicle)
+    turnNotifications = m_backseat.TakeNotifications(m_routingSession, GetBackseatDestinationName());
+  else
+    turnNotifications = std::move(stock);
 }
 
 void RoutingManager::BuildRoute(uint32_t timeoutSec)
