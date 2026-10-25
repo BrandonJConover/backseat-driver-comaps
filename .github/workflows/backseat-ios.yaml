@@ -12,6 +12,18 @@ on:
       - configure.sh
       - .gitmodules
       - .github/workflows/backseat-ios.yaml
+  # Pull requests into the Backseat branches build too (they don't publish).
+  pull_request:
+    branches:
+      - 'backseat/**'
+    paths:
+      - 3party/**
+      - iphone/**
+      - xcode/**
+      - libs/**
+      - configure.sh
+      - .gitmodules
+      - .github/workflows/backseat-ios.yaml
 
 jobs:
   ios:
