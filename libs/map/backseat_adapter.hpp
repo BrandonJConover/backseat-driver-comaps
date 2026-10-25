@@ -7,6 +7,7 @@
 #include "geometry/point2d.hpp"
 
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -42,6 +43,8 @@ public:
   /// Traffic lights on the route just built (mercator points). A left turn off a side street
   /// with no light there is treated as a stop sign, since stop signs aren't in the map data.
   void SetTrafficLights(std::vector<m2::PointD> points);
+  /// The platform's on-device language model, for rewording roasts in real time.
+  void SetRewriter(std::shared_ptr<backseat::LineRewriter> rewriter) { m_navigator.SetRewriter(std::move(rewriter)); }
 
 private:
   backseat::RouteSnapshot Snapshot(routing::RoutingSession const & session, std::string const & destinationName) const;

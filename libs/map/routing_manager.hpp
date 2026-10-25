@@ -239,6 +239,8 @@ public:
   void GenerateNotifications(std::vector<std::string> & notifications, bool announceStreets);
   /// Title of the route's finish point, as Backseat Driver should call it.
   std::string GetBackseatDestinationName() const;
+  /// Lets the platform plug in its on-device model to reword Backseat Driver's roasts.
+  void SetBackseatRewriter(std::shared_ptr<backseat::LineRewriter> rewriter) { m_backseat.SetRewriter(std::move(rewriter)); }
 
   void AddRoutePoint(RouteMarkData && markData, bool reorderIntermediatePoints = true);
   void ContinueRouteToPoint(RouteMarkData && markData);
