@@ -65,7 +65,18 @@ jobs:
         env:
           CMAKE_C_COMPILER_LAUNCHER: ccache
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
-        run: ./gradlew -Parm64 assembleFdroidDebug
+        run: |
+          set -o pipefail
+          ./gradlew -Parm64 assembleFdroidDebug 2>&1 | tee ../build.log
+
+      - name: Report build errors as annotations
+        if: failure()
+        run: |
+          # Surface the errors where the API can read them (check-run annotations).
+          grep -nE "error:|error G|FAILED|What went wrong|Could not|undefined reference|fatal" build.log | tail -40 > errors.txt || true
+          tail -25 build.log >> errors.txt
+          msg=$(sed -e 's/%/%25/g' errors.txt | awk '{printf "%s%%0A", $0}')
+          echo "::error title=Android build log::${msg}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v6
