@@ -129,6 +129,8 @@ dependencies {
     implementation("com.google.mlkit:genai-prompt:1.0.0-beta4") {
         // The F-Droid flavor already ships microG's drop-in copy of these classes.
         exclude(group = "com.google.android.gms", module = "play-services-tasks")
+        exclude(group = "com.google.android.gms", module = "play-services-basement")
+        exclude(group = "com.google.android.gms", module = "play-services-base")
     }
     implementation("com.google.guava:guava:33.3.1-android")
     testImplementation(libs.junit)

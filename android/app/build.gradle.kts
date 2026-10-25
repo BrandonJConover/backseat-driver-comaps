@@ -356,10 +356,12 @@ androidComponents {
   }
 }
 
-// ML Kit (Backseat Driver's Gemini Nano) pulls in Google's Tasks classes, which microG
-// already provides; keep a single copy.
+// ML Kit (Backseat Driver's Gemini Nano) pulls in Google's base/basement/tasks libraries,
+// which microG already provides for location; keep microG's single copy.
 configurations.configureEach {
     exclude(group = "com.google.android.gms", module = "play-services-tasks")
+    exclude(group = "com.google.android.gms", module = "play-services-basement")
+    exclude(group = "com.google.android.gms", module = "play-services-base")
 }
 
 dependencies {
