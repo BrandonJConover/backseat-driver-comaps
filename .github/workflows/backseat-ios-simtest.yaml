@@ -23,6 +23,7 @@ jobs:
       LC_ALL: en_US.UTF-8
       BUNDLE: com.brandonjconover.backseatdriver.debug
       MAP_VERSION: '261004'
+      MAP_SERIES: '2026.06.28'
       MAP_FILE: US_Colorado_Denver.mwm
       # East on Colfax from Broadway to Colorado Blvd, then north a few blocks.
       START: '39.74010,-104.98720'
@@ -67,9 +68,12 @@ jobs:
         run: |
           for server in https://cdn-us-2.comaps.tech https://cdn-fi-1.comaps.app https://comaps.openstreetmap.fr \
                         https://comaps.firewall-gateway.de https://mapgen-fi-1.comaps.app; do
-            if curl -fL --retry 2 -o "$MAP_FILE" "$server/maps/$MAP_VERSION/$MAP_FILE"; then
+            # Same layout the app uses: maps/<series>/<version>/<file> (defines.hpp, downloader_utils.cpp).
+            if curl -fL --retry 2 -o "$MAP_FILE" "$server/maps/$MAP_SERIES/$MAP_VERSION/$MAP_FILE" &&
+               [ "$(stat -f%z "$MAP_FILE")" -gt 1000000 ]; then
               echo "Got the map from $server"; ls -la "$MAP_FILE"; exit 0
             fi
+            echo "$server: no usable map ($(stat -f%z "$MAP_FILE" 2>/dev/null || echo 0) bytes)"
           done
           echo "::error title=Map download::No mirror served $MAP_FILE for $MAP_VERSION"; exit 1
 
