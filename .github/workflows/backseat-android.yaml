@@ -45,7 +45,21 @@ jobs:
       - name: Install build tools and dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y ninja-build python3-pip zlib1g-dev optipng
+          # configure.sh builds host tools (style compiler etc.) that need Qt.
+          sudo apt-get install -y ninja-build \
+            qt6-base-dev \
+            qt6-declarative-dev \
+            qt6-positioning-dev \
+            libqt6svg6-dev \
+            optipng \
+            libfreetype-dev \
+            libharfbuzz-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            python3-pip \
+            zlib1g-dev
           pip install "protobuf<3.21" --break-system-packages
 
       - uses: actions/checkout@v6
