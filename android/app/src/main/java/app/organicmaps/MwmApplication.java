@@ -15,6 +15,7 @@ import androidx.lifecycle.LifecycleObserver;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.ProcessLifecycleOwner;
 import androidx.preference.PreferenceManager;
+import app.organicmaps.backseat.KokoroVoice;
 import app.organicmaps.background.OsmUploadWork;
 import app.organicmaps.downloader.DownloaderNotifier;
 import app.organicmaps.location.LocationProviderFactoryImpl;
@@ -151,6 +152,8 @@ public class MwmApplication extends Application implements Application.ActivityL
       ThemeSwitcher.INSTANCE.initialize(this);
       ThemeSwitcher.INSTANCE.restart(false);
       ProcessLifecycleOwner.get().getLifecycle().addObserver(mProcessLifecycleObserver);
+      // Backseat Driver: the Kokoro voice, with the system voice as fallback.
+      KokoroVoice.install(this);
       onComplete.run();
     });
   }

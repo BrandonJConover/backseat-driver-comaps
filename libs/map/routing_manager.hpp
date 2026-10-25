@@ -241,6 +241,8 @@ public:
   std::string GetBackseatDestinationName() const;
   /// Lets the platform plug in its on-device model to reword Backseat Driver's roasts.
   void SetBackseatRewriter(std::shared_ptr<backseat::LineRewriter> rewriter) { m_backseat.SetRewriter(std::move(rewriter)); }
+  /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.
+  BackseatAdapter const & GetBackseat() const { return m_backseat; }
 
   void AddRoutePoint(RouteMarkData && markData, bool reorderIntermediatePoints = true);
   void ContinueRouteToPoint(RouteMarkData && markData);

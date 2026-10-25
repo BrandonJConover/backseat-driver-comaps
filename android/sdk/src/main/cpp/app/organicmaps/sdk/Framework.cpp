@@ -1336,6 +1336,30 @@ JNIEXPORT jobjectArray JNICALL Java_app_organicmaps_sdk_Framework_nativeGenerate
   return jni::ToJavaStringArray(env, notifications);
 }
 
+JNIEXPORT jbooleanArray JNICALL Java_app_organicmaps_sdk_Framework_nativeLastNotificationsAreNav(JNIEnv * env, jclass)
+{
+  auto const & voices = frm()->GetRoutingManager().GetBackseat().LastLineVoices();
+  jbooleanArray result = env->NewBooleanArray(static_cast<jsize>(voices.size()));
+  for (size_t i = 0; i < voices.size(); ++i)
+  {
+    jboolean const nav = voices[i].nav ? JNI_TRUE : JNI_FALSE;
+    env->SetBooleanArrayRegion(result, static_cast<jsize>(i), 1, &nav);
+  }
+  return result;
+}
+
+JNIEXPORT jfloatArray JNICALL Java_app_organicmaps_sdk_Framework_nativeLastNotificationSpeeds(JNIEnv * env, jclass)
+{
+  auto const & voices = frm()->GetRoutingManager().GetBackseat().LastLineVoices();
+  jfloatArray result = env->NewFloatArray(static_cast<jsize>(voices.size()));
+  for (size_t i = 0; i < voices.size(); ++i)
+  {
+    jfloat const speed = static_cast<jfloat>(voices[i].speed);
+    env->SetFloatArrayRegion(result, static_cast<jsize>(i), 1, &speed);
+  }
+  return result;
+}
+
 JNIEXPORT void JNICALL Java_app_organicmaps_sdk_Framework_nativeSetSpeedCamManagerMode(JNIEnv * env, jclass, jint mode)
 {
   frm()->GetRoutingManager().GetSpeedCamManager().SetMode(static_cast<routing::SpeedCameraManagerMode>(mode));

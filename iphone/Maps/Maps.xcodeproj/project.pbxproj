@@ -692,6 +692,8 @@
 		FA85D44E279B738F00B858E9 /* CopyableLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA85D44D279B738F00B858E9 /* CopyableLabel.swift */; };
 		FA8E808925F412E2002A1434 /* FirstSession.mm in Sources */ = {isa = PBXBuildFile; fileRef = FA8E808825F412E2002A1434 /* FirstSession.mm */; };
 		FAF9DDA32A86DC54000D7037 /* libharfbuzz.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FAF9DDA22A86DC54000D7037 /* libharfbuzz.a */; };
+		BD5EA7000000000000000003 /* KokoroVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000002 /* KokoroVoice.swift */; };
+		BD5EA7000000000000000006 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = BD5EA7000000000000000005 /* FluidAudio */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1838,6 +1840,7 @@
 		FAF9A8A82CE0CEC000F6604D /* lv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.stringsdict; name = lv; path = lv.lproj/Localizable.stringsdict; sourceTree = "<group>"; };
 		FAF9DDA22A86DC54000D7037 /* libharfbuzz.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libharfbuzz.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAFF42291347F101009BBB14 /* World.mwm */ = {isa = PBXFileReference; lastKnownFileType = file; name = World.mwm; path = ../../data/World.mwm; sourceTree = "<group>"; };
+		BD5EA7000000000000000002 /* KokoroVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KokoroVoice.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1845,6 +1848,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BD5EA7000000000000000006 /* FluidAudio in Frameworks */,
 				FAF9DDA32A86DC54000D7037 /* libharfbuzz.a in Frameworks */,
 				FA456C3C26BDC6AD00B83C20 /* Chart.framework in Frameworks */,
 				FA853BF326BC5DE50026D455 /* libshaders.a in Frameworks */,
@@ -2581,6 +2585,7 @@
 				34763EEA1F2F3AD700F4D2D3 /* MWMTextToSpeechObserver.h */,
 				4B83AE472C2E59F800B0C3BC /* TTSTester.h */,
 				4B83AE482C2E59F800B0C3BC /* TTSTester.mm */,
+				BD5EA7000000000000000001 /* Kokoro */,
 			);
 			path = TextToSpeech;
 			sourceTree = "<group>";
@@ -4094,6 +4099,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		BD5EA7000000000000000001 /* Kokoro */ = {
+			isa = PBXGroup;
+			children = (
+				BD5EA7000000000000000002 /* KokoroVoice.swift */,
+			);
+			path = Kokoro;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -4116,6 +4129,9 @@
 				ED46DDE02D098A0C007CACD6 /* PBXTargetDependency */,
 			);
 			name = CoMaps;
+			packageProductDependencies = (
+				BD5EA7000000000000000005 /* FluidAudio */,
+			);
 			productName = Maps;
 			productReference = 6741AA5D1BF340DE002C974C /* CoMaps (Debug).app */;
 			productType = "com.apple.product-type.application";
@@ -4239,6 +4255,9 @@
 				af,
 			);
 			mainGroup = 29B97314FDCFA39411CA2CEA /* Maps */;
+			packageReferences = (
+				BD5EA7000000000000000004 /* XCRemoteSwiftPackageReference "FluidAudio" */,
+			);
 			productRefGroup = 19C28FACFE9D520D11CA2CBB /* Products */;
 			projectDirPath = "";
 			projectReferences = (
@@ -4464,6 +4483,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BD5EA7000000000000000003 /* KokoroVoice.swift in Sources */,
 				ED914ABE2D351FF800973C45 /* UILabel+SetFontStyle.swift in Sources */,
 				34845DB71E166084003D55B9 /* Common.swift in Sources */,
 				47F4F21323A6EC420022FD56 /* DownloadMapsViewController.swift in Sources */,
@@ -5249,7 +5269,7 @@
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UIStatusBarHidden = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -5285,7 +5305,7 @@
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UIStatusBarHidden = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -5517,6 +5537,23 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+/* Begin XCRemoteSwiftPackageReference section */
+		BD5EA7000000000000000004 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/FluidInference/FluidAudio";
+			requirement = {
+				kind = exactVersion;
+				version = 0.17.7;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+/* Begin XCSwiftPackageProductDependency section */
+		BD5EA7000000000000000005 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BD5EA7000000000000000004 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 29B97313FDCFA39411CA2CEA /* Project object */;
 }

@@ -13,6 +13,19 @@ on:
       - libs/**
       - .gitmodules
       - .github/workflows/backseat-android.yaml
+  # Pull requests into the Backseat branches build too (they don't publish).
+  pull_request:
+    branches:
+      - 'backseat/**'
+    paths:
+      - 3party/**
+      - android/**
+      - cmake/**
+      - CMakeLists.txt
+      - configure.sh
+      - libs/**
+      - .gitmodules
+      - .github/workflows/backseat-android.yaml
 
 env:
   JAVA_HOME: /usr/lib/jvm/temurin-21-jdk-amd64  # Java 21 is required for Android Gradle 8 plugin
