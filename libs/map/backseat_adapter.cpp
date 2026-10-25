@@ -44,7 +44,7 @@ backseat::TurnKind ToTurnKind(routing::turns::CarDirection d)
   }
 }
 
-backseat::LatLon ToLatLon(m2::PointD const & p)
+backseat::LatLon ToBackseatLatLon(m2::PointD const & p)
 {
   auto const ll = mercator::ToLatLon(p);
   return {ll.m_lat, ll.m_lon};
@@ -171,8 +171,8 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
   auto const & poly = route->GetPoly();
   if (poly.GetSize() > 0)
   {
-    snap.origin = ToLatLon(poly.Front());
-    snap.destinationPoint = ToLatLon(poly.Back());
+    snap.origin = ToBackseatLatLon(poly.Front());
+    snap.destinationPoint = ToBackseatLatLon(poly.Back());
   }
 
   if (snap.state == backseat::RouteState::OnRoute && session.IsNavigable())

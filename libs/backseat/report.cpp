@@ -29,7 +29,7 @@ double HeatWeight(IncidentKind k)
   return 1;
 }
 
-double Clamp(double n, double lo, double hi) { return std::min(hi, std::max(lo, n)); }
+double ClampScore(double n, double lo, double hi) { return std::min(hi, std::max(lo, n)); }
 
 std::string Letter(double score)
 {
@@ -116,10 +116,10 @@ TripReport BuildReport(std::vector<Incident> const & incidents, TripStats const 
   int const maneuvers = r.onTime + r.late + r.missed + r.wrongWay;
   int const extraReroutes = std::max(0, r.reroutes - r.missed - r.wrongWay);
   double const instrScore =
-      maneuvers == 0 ? 100 : Clamp(100 * (r.onTime + 0.6 * r.late) / maneuvers - extraReroutes * 5, 0, 100);
+      maneuvers == 0 ? 100 : ClampScore(100 * (r.onTime + 0.6 * r.late) / maneuvers - extraReroutes * 5, 0, 100);
 
   double const minutes = std::max(1.0, (stats.endedAt.value_or(stats.startedAt) - stats.startedAt) / 60000);
-  double const drivingScore = Clamp(100 - (stats.speedingSeconds / (minutes * 60)) * 60  // share of the trip spent speeding
+  double const drivingScore = ClampScore(100 - (stats.speedingSeconds / (minutes * 60)) * 60  // share of the trip spent speeding
                                         - stats.maxOverLimit * 1.5 - count(IncidentKind::HardBraking) * 6 -
                                         count(IncidentKind::HardAccel) * 4 - count(IncidentKind::TooSlow) * 2,
                                     0, 100);

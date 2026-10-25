@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 1
       - name: Build and test libs/backseat on its own
         run: |
-          cmake -S libs/backseat -B build/backseat -DCMAKE_BUILD_TYPE=Debug \
+          cmake -S libs/backseat -B build/backseat -DCMAKE_BUILD_TYPE=Debug -DCMAKE_UNITY_BUILD=ON \
             -DCMAKE_CXX_FLAGS="-Wall -Wextra -fsanitize=address,undefined"
           cmake --build build/backseat -j"$(nproc)"
           build/backseat/backseat_tests/backseat_tests
