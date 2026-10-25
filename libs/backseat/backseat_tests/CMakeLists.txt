@@ -8,6 +8,7 @@ add_executable(${PROJECT_NAME}
   main.cpp
   navigator_test.cpp
   parity_test.cpp
+  rewriter_test.cpp
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
 target_compile_definitions(${PROJECT_NAME} PRIVATE BACKSEAT_TRACE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/parity_trace.txt")

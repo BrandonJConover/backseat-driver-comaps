@@ -104,7 +104,7 @@ jobs:
       # A fixed pre-release always holds the newest test build, so it can be installed
       # straight from a phone's browser without signing in or unzipping.
       - name: Publish to the poc-latest pre-release
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: github.ref == 'refs/heads/backseat/engine'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

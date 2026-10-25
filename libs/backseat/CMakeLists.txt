@@ -19,6 +19,8 @@ set(
   navigator.hpp
   report.cpp
   report.hpp
+  rewriter.cpp
+  rewriter.hpp
   rundown.cpp
   rundown.hpp
   types.cpp

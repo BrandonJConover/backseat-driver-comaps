@@ -96,10 +96,12 @@ std::string InstructionText(TurnKind turn, std::string const & street, std::stri
   return text;
 }
 
-Navigator::Navigator(EngineConfig config, std::vector<TripRecord> history, TripRecorded onTripRecorded)
+Navigator::Navigator(EngineConfig config, std::vector<TripRecord> history, TripRecorded onTripRecorded,
+                     RewriteGate gate)
   : m_config(std::move(config))
   , m_history(std::move(history))
   , m_onTripRecorded(std::move(onTripRecorded))
+  , m_gate(std::move(gate))
 {
   if (!m_config.rng)
   {
@@ -214,12 +216,7 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
   }
 }
 
-std::vector<Commentary> Navigator::TakeLines()
-{
-  std::vector<Commentary> out;
-  out.swap(m_queue);
-  return out;
-}
+std::vector<Commentary> Navigator::TakeLines() { return m_gate.Take(); }
 
 void Navigator::Update(double t, RouteSnapshot const & route)
 {
@@ -242,7 +239,7 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   if (route.state == RouteState::Finished)
   {
     m_arrived = true;
-    Say(m_engine->OnNav(NavEvent::Arrived(t)));
+    Say(m_engine->OnNav(NavEvent::Arrived(t)), false /* mayRewrite */);
     TripRecord const record = RecordTrip(*m_engine, m_plan);
     m_history.push_back(record);
     if (m_onTripRecorded)
@@ -313,9 +310,14 @@ void Navigator::ResetTrip()
   m_stopSince.reset();
   m_speeds.clear();
   m_inTraffic = false;
+  m_gate.Clear();
 }
 
-void Navigator::Say(std::vector<Commentary> const & lines) { m_queue.insert(m_queue.end(), lines.begin(), lines.end()); }
+void Navigator::Say(std::vector<Commentary> const & lines, bool mayRewrite)
+{
+  for (auto const & line : lines)
+    m_gate.Push(line, mayRewrite);
+}
 
 void Navigator::SayNav(double t, std::string const & text)
 {
@@ -325,6 +327,6 @@ void Navigator::SayNav(double t, std::string const & text)
   c.text = text;
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = Priority::Nav;
-  m_queue.push_back(std::move(c));
+  m_gate.Push(std::move(c));
 }
 }  // namespace backseat

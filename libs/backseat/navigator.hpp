@@ -8,6 +8,7 @@
 #include "backseat/engine.hpp"
 #include "backseat/history.hpp"
 #include "backseat/report.hpp"
+#include "backseat/rewriter.hpp"
 
 #include <functional>
 #include <memory>
@@ -89,7 +90,8 @@ class Navigator
 public:
   using TripRecorded = std::function<void(TripRecord const &, TripReport const &)>;
 
-  explicit Navigator(EngineConfig config = {}, std::vector<TripRecord> history = {}, TripRecorded onTripRecorded = {});
+  explicit Navigator(EngineConfig config = {}, std::vector<TripRecord> history = {}, TripRecorded onTripRecorded = {},
+                     RewriteGate gate = RewriteGate());
 
   /// A real GPS fix (not an extrapolated one) and the route state at that moment.
   void OnFix(Fix const & fix, RouteSnapshot const & route);
@@ -99,6 +101,8 @@ public:
   void OnBattery(double tMs, double level, bool charging);
   /// Lets the navigator name the place of an unplanned stop ("Why are we stopping for gas?").
   void SetPlaceLookup(PlaceLookup lookup) { m_placeLookup = std::move(lookup); }
+  /// On-device model that rewords roasts in real time. Without one, canned lines are spoken.
+  void SetRewriter(std::shared_ptr<LineRewriter> rewriter) { m_gate.SetRewriter(std::move(rewriter)); }
 
   /// Everything queued to be spoken since the last call, oldest first.
   std::vector<Commentary> TakeLines();
@@ -109,7 +113,7 @@ public:
 private:
   void Update(double tMs, RouteSnapshot const & route);
   void StartTrip(double tMs, RouteSnapshot const & route);
-  void Say(std::vector<Commentary> const & lines);
+  void Say(std::vector<Commentary> const & lines, bool mayRewrite = true);
   void SayNav(double tMs, std::string const & text);
   void TrackStop(Fix const & fix, RouteSnapshot const & route);
   void TrackTraffic(Fix const & fix, RouteSnapshot const & route);
@@ -119,7 +123,7 @@ private:
   std::vector<TripRecord> m_history;
   TripRecorded m_onTripRecorded;
   std::unique_ptr<CritiqueEngine> m_engine;
-  std::vector<Commentary> m_queue;
+  RewriteGate m_gate;
 
   double m_lastT = 0;
   RouteState m_lastState = RouteState::Inactive;
