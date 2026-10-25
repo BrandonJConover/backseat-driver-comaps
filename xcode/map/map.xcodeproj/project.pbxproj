@@ -7,6 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		163DCF5BB1EE109297A13D5A /* backseat_adapter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2C3A071C6981D6B998C023AD /* backseat_adapter.cpp */; };
+		F11BF20A5A3BB95017624EE3 /* engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 05C1E20C2C5E4448BAEF6EBA /* engine.cpp */; };
+		04F00EF4C224802967A012B9 /* history.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E9032D35E8B7064CB7132AD /* history.cpp */; };
+		D11B0EA0545E2DA5C39B6197 /* lines.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7AA0F37DC5A858FEA309EA24 /* lines.cpp */; };
+		72027DDB55B38E72CFD39F30 /* lines_data.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AED2163B829158668F83E65D /* lines_data.cpp */; };
+		A536FAD0269DF941156830D4 /* navigator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5306268E5455315BD345F2F4 /* navigator.cpp */; };
+		C89D8B6EF2308693739EE381 /* report.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6CE5A2A08126DE31C7382DE0 /* report.cpp */; };
+		0B15F328F38640D19B5B9AE4 /* rundown.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7EAB14BB4E72F7FF55D24A6B /* rundown.cpp */; };
+		6F25F49E7AC78E5D71CFF831 /* types.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 90A5740BA6726E771AAA944C /* types.cpp */; };
+		00AE49ABF03B388CF5C6B109 /* units.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FD2C377F4DEE4F0B06AC7E14 /* units.cpp */; };
 		0831F23C200E53600034C365 /* bookmarks_search_params.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 0831F23B200E53600034C365 /* bookmarks_search_params.hpp */; };
 		34583BCF1C88556800F94664 /* place_page_info.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 34583BCD1C88556800F94664 /* place_page_info.cpp */; };
 		34583BD01C88556800F94664 /* place_page_info.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 34583BCE1C88556800F94664 /* place_page_info.hpp */; };
@@ -150,6 +160,16 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2C3A071C6981D6B998C023AD /* backseat_adapter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = backseat_adapter.cpp; sourceTree = "<group>"; };
+		05C1E20C2C5E4448BAEF6EBA /* engine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = engine.cpp; path = ../backseat/engine.cpp; sourceTree = "<group>"; };
+		2E9032D35E8B7064CB7132AD /* history.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = history.cpp; path = ../backseat/history.cpp; sourceTree = "<group>"; };
+		7AA0F37DC5A858FEA309EA24 /* lines.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = lines.cpp; path = ../backseat/lines.cpp; sourceTree = "<group>"; };
+		AED2163B829158668F83E65D /* lines_data.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = lines_data.cpp; path = ../backseat/lines_data.cpp; sourceTree = "<group>"; };
+		5306268E5455315BD345F2F4 /* navigator.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = navigator.cpp; path = ../backseat/navigator.cpp; sourceTree = "<group>"; };
+		6CE5A2A08126DE31C7382DE0 /* report.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = report.cpp; path = ../backseat/report.cpp; sourceTree = "<group>"; };
+		7EAB14BB4E72F7FF55D24A6B /* rundown.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = rundown.cpp; path = ../backseat/rundown.cpp; sourceTree = "<group>"; };
+		90A5740BA6726E771AAA944C /* types.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = types.cpp; path = ../backseat/types.cpp; sourceTree = "<group>"; };
+		FD2C377F4DEE4F0B06AC7E14 /* units.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = units.cpp; path = ../backseat/units.cpp; sourceTree = "<group>"; };
 		0831F23B200E53600034C365 /* bookmarks_search_params.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = bookmarks_search_params.hpp; sourceTree = "<group>"; };
 		34583BCD1C88556800F94664 /* place_page_info.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = place_page_info.cpp; sourceTree = "<group>"; };
 		34583BCE1C88556800F94664 /* place_page_info.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = place_page_info.hpp; sourceTree = "<group>"; };
@@ -436,6 +456,16 @@
 				3DEE1AD921EE03B400054A91 /* power_management */,
 				F6D2CE7C1EDEB7F500636DFD /* routing_manager.cpp */,
 				F6D2CE7D1EDEB7F500636DFD /* routing_manager.hpp */,
+				2C3A071C6981D6B998C023AD /* backseat_adapter.cpp */,
+				05C1E20C2C5E4448BAEF6EBA /* engine.cpp */,
+				2E9032D35E8B7064CB7132AD /* history.cpp */,
+				7AA0F37DC5A858FEA309EA24 /* lines.cpp */,
+				AED2163B829158668F83E65D /* lines_data.cpp */,
+				5306268E5455315BD345F2F4 /* navigator.cpp */,
+				6CE5A2A08126DE31C7382DE0 /* report.cpp */,
+				7EAB14BB4E72F7FF55D24A6B /* rundown.cpp */,
+				90A5740BA6726E771AAA944C /* types.cpp */,
+				FD2C377F4DEE4F0B06AC7E14 /* units.cpp */,
 				BBD9E2C41EE9D01900DF189A /* routing_mark.cpp */,
 				BBD9E2C51EE9D01900DF189A /* routing_mark.hpp */,
 				45F6EE9C1FB1C77500019892 /* search_api.cpp */,
@@ -702,6 +732,16 @@
 				45201E931CE4AC90008A4842 /* api_mark_point.cpp in Sources */,
 				BBA014AD2073C784007402E4 /* bookmark_helpers.cpp in Sources */,
 				F6D2CE7E1EDEB7F500636DFD /* routing_manager.cpp in Sources */,
+				163DCF5BB1EE109297A13D5A /* backseat_adapter.cpp in Sources */,
+				F11BF20A5A3BB95017624EE3 /* engine.cpp in Sources */,
+				04F00EF4C224802967A012B9 /* history.cpp in Sources */,
+				D11B0EA0545E2DA5C39B6197 /* lines.cpp in Sources */,
+				72027DDB55B38E72CFD39F30 /* lines_data.cpp in Sources */,
+				A536FAD0269DF941156830D4 /* navigator.cpp in Sources */,
+				C89D8B6EF2308693739EE381 /* report.cpp in Sources */,
+				0B15F328F38640D19B5B9AE4 /* rundown.cpp in Sources */,
+				6F25F49E7AC78E5D71CFF831 /* types.cpp in Sources */,
+				00AE49ABF03B388CF5C6B109 /* units.cpp in Sources */,
 				F6B283071C1B03320081957A /* gps_track_storage.cpp in Sources */,
 				670E39401C46C5C700E9C0A6 /* gps_tracker.cpp in Sources */,
 				BBA014B220754997007402E4 /* user_mark_id_storage.cpp in Sources */,

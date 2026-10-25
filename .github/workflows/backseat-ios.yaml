@@ -1,0 +1,54 @@
+name: Backseat Driver iOS
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'backseat/**'
+    paths:
+      - 3party/**
+      - iphone/**
+      - xcode/**
+      - libs/**
+      - configure.sh
+      - .gitmodules
+      - .github/workflows/backseat-ios.yaml
+
+jobs:
+  ios:
+    name: Build iOS (simulator, unsigned)
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.1.app/Contents/Developer
+      LANG: en_US.UTF-8
+      LANGUAGE: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Install dependencies
+        run: |
+          brew install qt optipng
+          pip3 install "protobuf<3.21" --break-system-packages
+          xcodebuild -downloadComponent metalToolchain
+          xcodebuild -downloadPlatform iOS
+
+      - uses: actions/checkout@v6
+
+      - name: Parallel submodules checkout
+        run: git submodule update --depth 1 --init --recursive --jobs=$(($(sysctl -n hw.logicalcpu) * 20))
+
+      - name: Configure repository
+        run: ./configure.sh
+
+      - name: Build
+        run: |
+          xcodebuild build \
+            -workspace xcode/CoMaps.xcworkspace \
+            -scheme CoMaps \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -quiet \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
