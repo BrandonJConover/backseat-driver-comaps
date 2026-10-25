@@ -120,6 +120,13 @@ using Observers = NSHashTable<Observer>;
     [NSUserDefaults.standardUserDefaults registerDefaults:dictionary];
 
     [MWMRouter enableTurnNotifications:self.allowsTurnInstructions];
+
+    // Backseat Driver: the Kokoro voice, with the system voice as fallback.
+    __weak MWMTextToSpeech * weakSelf = self;
+    BackseatKokoroVoice.shared.systemIsSpeaking = ^BOOL {
+      return weakSelf.speechSynthesizer.isSpeaking;
+    };
+    [BackseatKokoroVoice.shared start];
   }
   return self;
 }
@@ -335,7 +342,7 @@ using Observers = NSHashTable<Observer>;
 
 - (void)playRouteNotifications:(NSArray<NSString *> *)routeNotifications {
   auto stopSession = ^{
-    if (self.speechSynthesizer.isSpeaking)
+    if (self.speechSynthesizer.isSpeaking || BackseatKokoroVoice.shared.isBusy)
       return;
     [[AVAudioSession sharedInstance]
           setActive:NO
@@ -366,8 +373,26 @@ using Observers = NSHashTable<Observer>;
       return;
     }
 
-    for (NSString * notification in routeNotifications)
-      [self speakOneString:notification];
+    // Backseat Driver: Kokoro says the lines when it's ready. Navigation lines never wait on it:
+    // if Kokoro can't start one quickly, the system voice says it.
+    auto const & voices = GetFramework().GetRoutingManager().GetBackseat().LastLineVoices();
+    BOOL const hinted = self.allowsTurnInstructions && voices.size() == routeNotifications.count;
+    BackseatKokoroVoice * kokoro = BackseatKokoroVoice.shared;
+    for (NSUInteger i = 0; i < routeNotifications.count; ++i)
+    {
+      NSString * notification = routeNotifications[i];
+      if (!kokoro.isReady)
+      {
+        [self speakOneString:notification];
+        continue;
+      }
+      BOOL const nav = hinted ? voices[i].nav : YES;
+      float const speed = hinted ? static_cast<float>(voices[i].speed) : 1.0f;
+      __weak MWMTextToSpeech * weakSelf = self;
+      [kokoro speak:notification nav:nav speed:speed fallback:^{
+        [weakSelf speakOneString:notification];
+      }];
+    }
   }
 }
 

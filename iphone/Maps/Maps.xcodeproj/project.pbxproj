@@ -692,6 +692,56 @@
 		FA85D44E279B738F00B858E9 /* CopyableLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA85D44D279B738F00B858E9 /* CopyableLabel.swift */; };
 		FA8E808925F412E2002A1434 /* FirstSession.mm in Sources */ = {isa = PBXBuildFile; fileRef = FA8E808825F412E2002A1434 /* FirstSession.mm */; };
 		FAF9DDA32A86DC54000D7037 /* libharfbuzz.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FAF9DDA22A86DC54000D7037 /* libharfbuzz.a */; };
+		BD5EA7000000000000000003 /* KokoroAssets in Resources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000002 /* KokoroAssets */; };
+		BD5EA7000000000000000005 /* KokoroSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000004 /* KokoroSupport.swift */; };
+		BD5EA7000000000000000007 /* KokoroVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000006 /* KokoroVoice.swift */; };
+		BD5EA700000000000000000B /* AlbertEmbeddings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000000A /* AlbertEmbeddings.swift */; };
+		BD5EA700000000000000000D /* AlbertEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000000C /* AlbertEncoder.swift */; };
+		BD5EA700000000000000000F /* AlbertErrors.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000000E /* AlbertErrors.swift */; };
+		BD5EA7000000000000000011 /* AlbertIntermediate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000010 /* AlbertIntermediate.swift */; };
+		BD5EA7000000000000000013 /* AlbertLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000012 /* AlbertLayer.swift */; };
+		BD5EA7000000000000000015 /* AlbertLayerGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000014 /* AlbertLayerGroup.swift */; };
+		BD5EA7000000000000000017 /* AlbertModelArgs.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000016 /* AlbertModelArgs.swift */; };
+		BD5EA7000000000000000019 /* AlbertOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000018 /* AlbertOutput.swift */; };
+		BD5EA700000000000000001B /* AlbertSelfAttention.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000001A /* AlbertSelfAttention.swift */; };
+		BD5EA700000000000000001D /* AlbertSelfOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000001C /* AlbertSelfOutput.swift */; };
+		BD5EA700000000000000001F /* CustomAlbert.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000001E /* CustomAlbert.swift */; };
+		BD5EA7000000000000000022 /* AdaIN1d.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000021 /* AdaIN1d.swift */; };
+		BD5EA7000000000000000024 /* AdaINResBlock1.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000023 /* AdaINResBlock1.swift */; };
+		BD5EA7000000000000000026 /* AdaLayerNorm.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000025 /* AdaLayerNorm.swift */; };
+		BD5EA7000000000000000028 /* AdainResBlk1d.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000027 /* AdainResBlk1d.swift */; };
+		BD5EA700000000000000002A /* Conv1dInference.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000029 /* Conv1dInference.swift */; };
+		BD5EA700000000000000002C /* ConvWeighted.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000002B /* ConvWeighted.swift */; };
+		BD5EA700000000000000002E /* DecoderErrors.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000002D /* DecoderErrors.swift */; };
+		BD5EA7000000000000000030 /* InstanceNorm1d.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000002F /* InstanceNorm1d.swift */; };
+		BD5EA7000000000000000032 /* Interpolate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000031 /* Interpolate.swift */; };
+		BD5EA7000000000000000034 /* LSTM.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000033 /* LSTM.swift */; };
+		BD5EA7000000000000000036 /* LayerNormInference.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000035 /* LayerNormInference.swift */; };
+		BD5EA7000000000000000038 /* ReflectionPad1d.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000037 /* ReflectionPad1d.swift */; };
+		BD5EA700000000000000003A /* UpSample1d.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000039 /* UpSample1d.swift */; };
+		BD5EA700000000000000003D /* Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000003C /* Decoder.swift */; };
+		BD5EA700000000000000003F /* Generator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000003E /* Generator.swift */; };
+		BD5EA7000000000000000041 /* MLXSTFT.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000040 /* MLXSTFT.swift */; };
+		BD5EA7000000000000000043 /* SineGen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000042 /* SineGen.swift */; };
+		BD5EA7000000000000000045 /* SourceModuleHnNSF.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000044 /* SourceModuleHnNSF.swift */; };
+		BD5EA7000000000000000048 /* DurationEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000047 /* DurationEncoder.swift */; };
+		BD5EA700000000000000004A /* KokoroConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000049 /* KokoroConfig.swift */; };
+		BD5EA700000000000000004C /* KokoroTTS.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000004B /* KokoroTTS.swift */; };
+		BD5EA700000000000000004E /* ProsodyPredictor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000004D /* ProsodyPredictor.swift */; };
+		BD5EA7000000000000000050 /* TextEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000004F /* TextEncoder.swift */; };
+		BD5EA7000000000000000052 /* VoiceLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000051 /* VoiceLoader.swift */; };
+		BD5EA7000000000000000054 /* WeightLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000053 /* WeightLoader.swift */; };
+		BD5EA7000000000000000057 /* ESpeakNGEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000056 /* ESpeakNGEngine.swift */; };
+		BD5EA7000000000000000059 /* MisakiPhonemizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000058 /* MisakiPhonemizer.swift */; };
+		BD5EA700000000000000005B /* Tokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000005A /* Tokenizer.swift */; };
+		BD5EA700000000000000005E /* BenchmarkTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000005D /* BenchmarkTimer.swift */; };
+		BD5EA7000000000000000060 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000000005F /* Log.swift */; };
+		BD5EA7000000000000000064 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = BD5EA7000000000000000063 /* MLX */; };
+		BD5EA7000000000000000066 /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = BD5EA7000000000000000065 /* MLXNN */; };
+		BD5EA7000000000000000068 /* MLXRandom in Frameworks */ = {isa = PBXBuildFile; productRef = BD5EA7000000000000000067 /* MLXRandom */; };
+		BD5EA700000000000000006A /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = BD5EA7000000000000000069 /* MLXFFT */; };
+		BD5EA700000000000000006C /* MLXFast in Frameworks */ = {isa = PBXBuildFile; productRef = BD5EA700000000000000006B /* MLXFast */; };
+		BD5EA700000000000000006E /* MisakiSwift in Frameworks */ = {isa = PBXBuildFile; productRef = BD5EA700000000000000006D /* MisakiSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1838,6 +1888,50 @@
 		FAF9A8A82CE0CEC000F6604D /* lv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.stringsdict; name = lv; path = lv.lproj/Localizable.stringsdict; sourceTree = "<group>"; };
 		FAF9DDA22A86DC54000D7037 /* libharfbuzz.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libharfbuzz.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAFF42291347F101009BBB14 /* World.mwm */ = {isa = PBXFileReference; lastKnownFileType = file; name = World.mwm; path = ../../data/World.mwm; sourceTree = "<group>"; };
+		BD5EA7000000000000000002 /* KokoroAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = KokoroAssets; sourceTree = "<group>"; };
+		BD5EA7000000000000000004 /* KokoroSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KokoroSupport.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000006 /* KokoroVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KokoroVoice.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000000A /* AlbertEmbeddings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbertEmbeddings.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000000C /* AlbertEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbertEncoder.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000000E /* AlbertErrors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbertErrors.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000010 /* AlbertIntermediate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbertIntermediate.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000012 /* AlbertLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbertLayer.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000014 /* AlbertLayerGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbertLayerGroup.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000016 /* AlbertModelArgs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbertModelArgs.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000018 /* AlbertOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbertOutput.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000001A /* AlbertSelfAttention.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbertSelfAttention.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000001C /* AlbertSelfOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbertSelfOutput.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000001E /* CustomAlbert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomAlbert.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000021 /* AdaIN1d.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaIN1d.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000023 /* AdaINResBlock1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaINResBlock1.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000025 /* AdaLayerNorm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaLayerNorm.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000027 /* AdainResBlk1d.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdainResBlk1d.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000029 /* Conv1dInference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conv1dInference.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000002B /* ConvWeighted.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvWeighted.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000002D /* DecoderErrors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecoderErrors.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000002F /* InstanceNorm1d.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstanceNorm1d.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000031 /* Interpolate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Interpolate.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000033 /* LSTM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LSTM.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000035 /* LayerNormInference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerNormInference.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000037 /* ReflectionPad1d.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflectionPad1d.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000039 /* UpSample1d.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpSample1d.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000003C /* Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Decoder.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000003E /* Generator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Generator.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000040 /* MLXSTFT.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXSTFT.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000042 /* SineGen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SineGen.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000044 /* SourceModuleHnNSF.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceModuleHnNSF.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000047 /* DurationEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DurationEncoder.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000049 /* KokoroConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KokoroConfig.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000004B /* KokoroTTS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KokoroTTS.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000004D /* ProsodyPredictor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProsodyPredictor.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000004F /* TextEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextEncoder.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000051 /* VoiceLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLoader.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000053 /* WeightLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightLoader.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000056 /* ESpeakNGEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESpeakNGEngine.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000058 /* MisakiPhonemizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MisakiPhonemizer.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000005A /* Tokenizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokenizer.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000005D /* BenchmarkTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkTimer.swift; sourceTree = "<group>"; };
+		BD5EA700000000000000005F /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1845,6 +1939,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BD5EA7000000000000000064 /* MLX in Frameworks */,
+				BD5EA7000000000000000066 /* MLXNN in Frameworks */,
+				BD5EA7000000000000000068 /* MLXRandom in Frameworks */,
+				BD5EA700000000000000006A /* MLXFFT in Frameworks */,
+				BD5EA700000000000000006C /* MLXFast in Frameworks */,
+				BD5EA700000000000000006E /* MisakiSwift in Frameworks */,
 				FAF9DDA32A86DC54000D7037 /* libharfbuzz.a in Frameworks */,
 				FA456C3C26BDC6AD00B83C20 /* Chart.framework in Frameworks */,
 				FA853BF326BC5DE50026D455 /* libshaders.a in Frameworks */,
@@ -2581,6 +2681,7 @@
 				34763EEA1F2F3AD700F4D2D3 /* MWMTextToSpeechObserver.h */,
 				4B83AE472C2E59F800B0C3BC /* TTSTester.h */,
 				4B83AE482C2E59F800B0C3BC /* TTSTester.mm */,
+				BD5EA7000000000000000001 /* Kokoro */,
 			);
 			path = TextToSpeech;
 			sourceTree = "<group>";
@@ -4094,6 +4195,113 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		BD5EA7000000000000000009 /* Albert */ = {
+			isa = PBXGroup;
+			children = (
+				BD5EA700000000000000000A /* AlbertEmbeddings.swift */,
+				BD5EA700000000000000000C /* AlbertEncoder.swift */,
+				BD5EA700000000000000000E /* AlbertErrors.swift */,
+				BD5EA7000000000000000010 /* AlbertIntermediate.swift */,
+				BD5EA7000000000000000012 /* AlbertLayer.swift */,
+				BD5EA7000000000000000014 /* AlbertLayerGroup.swift */,
+				BD5EA7000000000000000016 /* AlbertModelArgs.swift */,
+				BD5EA7000000000000000018 /* AlbertOutput.swift */,
+				BD5EA700000000000000001A /* AlbertSelfAttention.swift */,
+				BD5EA700000000000000001C /* AlbertSelfOutput.swift */,
+				BD5EA700000000000000001E /* CustomAlbert.swift */,
+			);
+			path = Albert;
+			sourceTree = "<group>";
+		};
+		BD5EA7000000000000000020 /* BuildingBlocks */ = {
+			isa = PBXGroup;
+			children = (
+				BD5EA7000000000000000021 /* AdaIN1d.swift */,
+				BD5EA7000000000000000023 /* AdaINResBlock1.swift */,
+				BD5EA7000000000000000025 /* AdaLayerNorm.swift */,
+				BD5EA7000000000000000027 /* AdainResBlk1d.swift */,
+				BD5EA7000000000000000029 /* Conv1dInference.swift */,
+				BD5EA700000000000000002B /* ConvWeighted.swift */,
+				BD5EA700000000000000002D /* DecoderErrors.swift */,
+				BD5EA700000000000000002F /* InstanceNorm1d.swift */,
+				BD5EA7000000000000000031 /* Interpolate.swift */,
+				BD5EA7000000000000000033 /* LSTM.swift */,
+				BD5EA7000000000000000035 /* LayerNormInference.swift */,
+				BD5EA7000000000000000037 /* ReflectionPad1d.swift */,
+				BD5EA7000000000000000039 /* UpSample1d.swift */,
+			);
+			path = BuildingBlocks;
+			sourceTree = "<group>";
+		};
+		BD5EA700000000000000003B /* Decoder */ = {
+			isa = PBXGroup;
+			children = (
+				BD5EA700000000000000003C /* Decoder.swift */,
+				BD5EA700000000000000003E /* Generator.swift */,
+				BD5EA7000000000000000040 /* MLXSTFT.swift */,
+				BD5EA7000000000000000042 /* SineGen.swift */,
+				BD5EA7000000000000000044 /* SourceModuleHnNSF.swift */,
+			);
+			path = Decoder;
+			sourceTree = "<group>";
+		};
+		BD5EA7000000000000000046 /* TTSEngine */ = {
+			isa = PBXGroup;
+			children = (
+				BD5EA7000000000000000047 /* DurationEncoder.swift */,
+				BD5EA7000000000000000049 /* KokoroConfig.swift */,
+				BD5EA700000000000000004B /* KokoroTTS.swift */,
+				BD5EA700000000000000004D /* ProsodyPredictor.swift */,
+				BD5EA700000000000000004F /* TextEncoder.swift */,
+				BD5EA7000000000000000051 /* VoiceLoader.swift */,
+				BD5EA7000000000000000053 /* WeightLoader.swift */,
+			);
+			path = TTSEngine;
+			sourceTree = "<group>";
+		};
+		BD5EA7000000000000000055 /* TextProcessing */ = {
+			isa = PBXGroup;
+			children = (
+				BD5EA7000000000000000056 /* ESpeakNGEngine.swift */,
+				BD5EA7000000000000000058 /* MisakiPhonemizer.swift */,
+				BD5EA700000000000000005A /* Tokenizer.swift */,
+			);
+			path = TextProcessing;
+			sourceTree = "<group>";
+		};
+		BD5EA700000000000000005C /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				BD5EA700000000000000005D /* BenchmarkTimer.swift */,
+				BD5EA700000000000000005F /* Log.swift */,
+			);
+			path = Utils;
+			sourceTree = "<group>";
+		};
+		BD5EA7000000000000000008 /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				BD5EA7000000000000000009 /* Albert */,
+				BD5EA7000000000000000020 /* BuildingBlocks */,
+				BD5EA700000000000000003B /* Decoder */,
+				BD5EA7000000000000000046 /* TTSEngine */,
+				BD5EA7000000000000000055 /* TextProcessing */,
+				BD5EA700000000000000005C /* Utils */,
+			);
+			path = Model;
+			sourceTree = "<group>";
+		};
+		BD5EA7000000000000000001 /* Kokoro */ = {
+			isa = PBXGroup;
+			children = (
+				BD5EA7000000000000000002 /* KokoroAssets */,
+				BD5EA7000000000000000004 /* KokoroSupport.swift */,
+				BD5EA7000000000000000006 /* KokoroVoice.swift */,
+				BD5EA7000000000000000008 /* Model */,
+			);
+			path = Kokoro;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -4116,6 +4324,14 @@
 				ED46DDE02D098A0C007CACD6 /* PBXTargetDependency */,
 			);
 			name = CoMaps;
+			packageProductDependencies = (
+				BD5EA7000000000000000063 /* MLX */,
+				BD5EA7000000000000000065 /* MLXNN */,
+				BD5EA7000000000000000067 /* MLXRandom */,
+				BD5EA7000000000000000069 /* MLXFFT */,
+				BD5EA700000000000000006B /* MLXFast */,
+				BD5EA700000000000000006D /* MisakiSwift */,
+			);
 			productName = Maps;
 			productReference = 6741AA5D1BF340DE002C974C /* CoMaps (Debug).app */;
 			productType = "com.apple.product-type.application";
@@ -4239,6 +4455,10 @@
 				af,
 			);
 			mainGroup = 29B97314FDCFA39411CA2CEA /* Maps */;
+			packageReferences = (
+				BD5EA7000000000000000061 /* XCRemoteSwiftPackageReference "mlx-swift" */,
+				BD5EA7000000000000000062 /* XCRemoteSwiftPackageReference "MisakiSwift" */,
+			);
 			productRefGroup = 19C28FACFE9D520D11CA2CBB /* Products */;
 			projectDirPath = "";
 			projectReferences = (
@@ -4285,6 +4505,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BD5EA7000000000000000003 /* KokoroAssets in Resources */,
 				165953742CB1D85500CFED7C /* fonts in Resources */,
 				165953942CB44B5600CFED7C /* symbols in Resources */,
 				271186872F19467400FD7FF3 /* countries_meta.txt in Resources */,
@@ -4464,6 +4685,49 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BD5EA7000000000000000005 /* KokoroSupport.swift in Sources */,
+				BD5EA7000000000000000007 /* KokoroVoice.swift in Sources */,
+				BD5EA700000000000000000B /* AlbertEmbeddings.swift in Sources */,
+				BD5EA700000000000000000D /* AlbertEncoder.swift in Sources */,
+				BD5EA700000000000000000F /* AlbertErrors.swift in Sources */,
+				BD5EA7000000000000000011 /* AlbertIntermediate.swift in Sources */,
+				BD5EA7000000000000000013 /* AlbertLayer.swift in Sources */,
+				BD5EA7000000000000000015 /* AlbertLayerGroup.swift in Sources */,
+				BD5EA7000000000000000017 /* AlbertModelArgs.swift in Sources */,
+				BD5EA7000000000000000019 /* AlbertOutput.swift in Sources */,
+				BD5EA700000000000000001B /* AlbertSelfAttention.swift in Sources */,
+				BD5EA700000000000000001D /* AlbertSelfOutput.swift in Sources */,
+				BD5EA700000000000000001F /* CustomAlbert.swift in Sources */,
+				BD5EA7000000000000000022 /* AdaIN1d.swift in Sources */,
+				BD5EA7000000000000000024 /* AdaINResBlock1.swift in Sources */,
+				BD5EA7000000000000000026 /* AdaLayerNorm.swift in Sources */,
+				BD5EA7000000000000000028 /* AdainResBlk1d.swift in Sources */,
+				BD5EA700000000000000002A /* Conv1dInference.swift in Sources */,
+				BD5EA700000000000000002C /* ConvWeighted.swift in Sources */,
+				BD5EA700000000000000002E /* DecoderErrors.swift in Sources */,
+				BD5EA7000000000000000030 /* InstanceNorm1d.swift in Sources */,
+				BD5EA7000000000000000032 /* Interpolate.swift in Sources */,
+				BD5EA7000000000000000034 /* LSTM.swift in Sources */,
+				BD5EA7000000000000000036 /* LayerNormInference.swift in Sources */,
+				BD5EA7000000000000000038 /* ReflectionPad1d.swift in Sources */,
+				BD5EA700000000000000003A /* UpSample1d.swift in Sources */,
+				BD5EA700000000000000003D /* Decoder.swift in Sources */,
+				BD5EA700000000000000003F /* Generator.swift in Sources */,
+				BD5EA7000000000000000041 /* MLXSTFT.swift in Sources */,
+				BD5EA7000000000000000043 /* SineGen.swift in Sources */,
+				BD5EA7000000000000000045 /* SourceModuleHnNSF.swift in Sources */,
+				BD5EA7000000000000000048 /* DurationEncoder.swift in Sources */,
+				BD5EA700000000000000004A /* KokoroConfig.swift in Sources */,
+				BD5EA700000000000000004C /* KokoroTTS.swift in Sources */,
+				BD5EA700000000000000004E /* ProsodyPredictor.swift in Sources */,
+				BD5EA7000000000000000050 /* TextEncoder.swift in Sources */,
+				BD5EA7000000000000000052 /* VoiceLoader.swift in Sources */,
+				BD5EA7000000000000000054 /* WeightLoader.swift in Sources */,
+				BD5EA7000000000000000057 /* ESpeakNGEngine.swift in Sources */,
+				BD5EA7000000000000000059 /* MisakiPhonemizer.swift in Sources */,
+				BD5EA700000000000000005B /* Tokenizer.swift in Sources */,
+				BD5EA700000000000000005E /* BenchmarkTimer.swift in Sources */,
+				BD5EA7000000000000000060 /* Log.swift in Sources */,
 				ED914ABE2D351FF800973C45 /* UILabel+SetFontStyle.swift in Sources */,
 				34845DB71E166084003D55B9 /* Common.swift in Sources */,
 				47F4F21323A6EC420022FD56 /* DownloadMapsViewController.swift in Sources */,
@@ -5249,7 +5513,7 @@
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UIStatusBarHidden = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -5285,7 +5549,7 @@
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UIStatusBarHidden = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -5517,6 +5781,58 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BD5EA7000000000000000061 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift";
+			requirement = {
+				kind = exactVersion;
+				version = 0.31.6;
+			};
+		};
+		BD5EA7000000000000000062 /* XCRemoteSwiftPackageReference "MisakiSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/BrandonJConover/MisakiSwift";
+			requirement = {
+				kind = revision;
+				revision = 237b3d2e1d0241b731830495cbd02c1e710559f0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BD5EA7000000000000000063 /* MLX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BD5EA7000000000000000061 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLX;
+		};
+		BD5EA7000000000000000065 /* MLXNN */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BD5EA7000000000000000061 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXNN;
+		};
+		BD5EA7000000000000000067 /* MLXRandom */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BD5EA7000000000000000061 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXRandom;
+		};
+		BD5EA7000000000000000069 /* MLXFFT */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BD5EA7000000000000000061 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXFFT;
+		};
+		BD5EA700000000000000006B /* MLXFast */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BD5EA7000000000000000061 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXFast;
+		};
+		BD5EA700000000000000006D /* MisakiSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BD5EA7000000000000000062 /* XCRemoteSwiftPackageReference "MisakiSwift" */;
+			productName = MisakiSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 29B97313FDCFA39411CA2CEA /* Project object */;
 }
