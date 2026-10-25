@@ -256,7 +256,10 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
   m_navigator.Poll(Snapshot(session, destinationName));
   std::vector<std::string> out;
   for (auto const & c : m_navigator.TakeLines())
+  {
+    LOG(LINFO, ("Backseat says:", c.text));
     out.push_back(c.text);
+  }
   return out;
 }
 

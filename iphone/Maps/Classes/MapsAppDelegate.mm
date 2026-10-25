@@ -15,6 +15,7 @@
 #import "MapViewController.h"
 #import "NSDate+TimeDistance.h"
 #import "SwiftBridge.h"
+#import "MWMBackseatTestDrive.h"
 
 
 #import <CarPlay/CarPlay.h>
@@ -123,6 +124,7 @@ void InitLocalizedStrings() {
 
   [self commonInit];
   [BackseatLLM install];
+  [MWMBackseatTestDrive startIfRequested];
 
   if ([FirstSession isFirstSession]) {
     [self firstLaunchSetup];

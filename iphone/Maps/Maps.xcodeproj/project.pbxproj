@@ -144,6 +144,7 @@
 		3472B5E1200F86C800DC6CD5 /* MWMEditorHelper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3472B5DF200F86C800DC6CD5 /* MWMEditorHelper.mm */; };
 		34763EE71F2F392300F4D2D3 /* MWMTextToSpeech.mm in Sources */ = {isa = PBXBuildFile; fileRef = 34763EE51F2F392300F4D2D3 /* MWMTextToSpeech.mm */; };
 		563A9DD993C1192095F00911 /* MWMBackseatRewriter.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0CBA5579CD04841A09E00696 /* MWMBackseatRewriter.mm */; };
+		6BDF13DF3D46F27095EBC5E3 /* MWMBackseatTestDrive.mm in Sources */ = {isa = PBXBuildFile; fileRef = 52B06F3EF2E413E793E4938C /* MWMBackseatTestDrive.mm */; };
 		5CB2DD731D55FAF37F276ABC /* BackseatLLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3771351F90A1F053385C4151 /* BackseatLLM.swift */; };
 		34845DAF1E1649F6003D55B9 /* DownloaderNoResultsEmbedViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DAD1E1649F6003D55B9 /* DownloaderNoResultsEmbedViewController.swift */; };
 		34845DB31E165E24003D55B9 /* SearchNoResultsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DB11E165E24003D55B9 /* SearchNoResultsViewController.swift */; };
@@ -969,6 +970,8 @@
 		34763EE51F2F392300F4D2D3 /* MWMTextToSpeech.mm */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMTextToSpeech.mm; sourceTree = "<group>"; tabWidth = 2; };
 		E26D17103928978C28885B55 /* MWMBackseatRewriter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MWMBackseatRewriter.h; sourceTree = "<group>"; };
 		0CBA5579CD04841A09E00696 /* MWMBackseatRewriter.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatRewriter.mm; sourceTree = "<group>"; };
+		A81B8A62C7102ECAD1FED099 /* MWMBackseatTestDrive.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MWMBackseatTestDrive.h; sourceTree = "<group>"; };
+		52B06F3EF2E413E793E4938C /* MWMBackseatTestDrive.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatTestDrive.mm; sourceTree = "<group>"; };
 		3771351F90A1F053385C4151 /* BackseatLLM.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatLLM.swift; sourceTree = "<group>"; };
 		34763EE91F2F394D00F4D2D3 /* MWMTextToSpeech+CPP.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = "MWMTextToSpeech+CPP.h"; sourceTree = "<group>"; tabWidth = 2; };
 		34763EEA1F2F3AD700F4D2D3 /* MWMTextToSpeechObserver.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMTextToSpeechObserver.h; sourceTree = "<group>"; tabWidth = 2; };
@@ -2563,6 +2566,8 @@
 				3771351F90A1F053385C4151 /* BackseatLLM.swift */,
 				E26D17103928978C28885B55 /* MWMBackseatRewriter.h */,
 				0CBA5579CD04841A09E00696 /* MWMBackseatRewriter.mm */,
+				A81B8A62C7102ECAD1FED099 /* MWMBackseatTestDrive.h */,
+				52B06F3EF2E413E793E4938C /* MWMBackseatTestDrive.mm */,
 			);
 			path = Backseat;
 			sourceTree = "<group>";
@@ -4833,6 +4838,7 @@
 				4767CDA820AB401000BD8166 /* LinkTextView.swift in Sources */,
 				34763EE71F2F392300F4D2D3 /* MWMTextToSpeech.mm in Sources */,
 				563A9DD993C1192095F00911 /* MWMBackseatRewriter.mm in Sources */,
+				6BDF13DF3D46F27095EBC5E3 /* MWMBackseatTestDrive.mm in Sources */,
 				5CB2DD731D55FAF37F276ABC /* BackseatLLM.swift in Sources */,
 				F6E2FE221E097BA00083EBEC /* MWMOpeningHoursEditorViewController.mm in Sources */,
 				ED79A5D72BDF8D6100952D1F /* SynchronizationStateResolver.swift in Sources */,
