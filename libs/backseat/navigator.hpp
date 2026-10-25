@@ -55,6 +55,8 @@ struct RouteSnapshot
   /// Street after the next maneuver, if known.
   std::string nextStreet;
   double distToTurnM = 0;
+  /// What controls the next maneuver's junction, if the host can tell (stop sign, light).
+  Control control = Control::None;
   /// What the router estimates for the whole trip, read when the trip starts.
   double etaSeconds = 0;
   std::string destination;
@@ -63,6 +65,9 @@ struct RouteSnapshot
   LatLon origin;
   LatLon destinationPoint;
 };
+
+/// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
+using PlaceLookup = std::function<std::optional<Place>(LatLon const &)>;
 
 struct Fix
 {
@@ -90,6 +95,10 @@ public:
   void OnFix(Fix const & fix, RouteSnapshot const & route);
   /// Route state changes between fixes, e.g. right before the host speaks.
   void Poll(RouteSnapshot const & route);
+  /// Battery level 0..1. Cheap to call often; only changes reach the engine.
+  void OnBattery(double tMs, double level, bool charging);
+  /// Lets the navigator name the place of an unplanned stop ("Why are we stopping for gas?").
+  void SetPlaceLookup(PlaceLookup lookup) { m_placeLookup = std::move(lookup); }
 
   /// Everything queued to be spoken since the last call, oldest first.
   std::vector<Commentary> TakeLines();
@@ -102,6 +111,9 @@ private:
   void StartTrip(double tMs, RouteSnapshot const & route);
   void Say(std::vector<Commentary> const & lines);
   void SayNav(double tMs, std::string const & text);
+  void TrackStop(Fix const & fix, RouteSnapshot const & route);
+  void TrackTraffic(Fix const & fix, RouteSnapshot const & route);
+  void ResetTrip();
 
   EngineConfig m_config;
   std::vector<TripRecord> m_history;
@@ -116,5 +128,25 @@ private:
   bool m_rerouting = false;
   bool m_arrived = false;
   TripPlan m_plan;
+  PlaceLookup m_placeLookup;
+
+  // Stops: where and when the car stopped, and whether the phone wandered off meanwhile.
+  std::optional<double> m_stopSince;
+  LatLon m_stopAt;
+  double m_stopWanderM = 0;
+  bool m_stopAnnounced = false;
+
+  // Traffic: recent (time, speed, limit) to judge a crawl, and whether we're in one.
+  struct SpeedSample
+  {
+    double t;
+    double mps;
+    double limitMps;
+  };
+  std::vector<SpeedSample> m_speeds;
+  bool m_inTraffic = false;
+
+  std::optional<int> m_batteryPercent;
+  std::optional<bool> m_charging;
 };
 }  // namespace backseat

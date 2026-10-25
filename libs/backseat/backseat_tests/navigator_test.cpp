@@ -1,7 +1,10 @@
 #include "check.hpp"
 
 #include "backseat/navigator.hpp"
+#include "backseat/lines.hpp"
 #include "backseat/units.hpp"
+
+#include <cmath>
 
 using namespace backseat;
 
@@ -133,4 +136,158 @@ TEST(NavigatorArrivesOnceAndRecordsTheTrip)
   CHECK_EQUAL(recorded, 1);
   nav.Poll(RouteSnapshot{});
   CHECK(!nav.InTrip());
+}
+
+namespace
+{
+Fix AtPos(double tMs, double mps, double lat, double lon, std::optional<double> limit = std::nullopt)
+{
+  Fix f = At(tMs, mps, limit);
+  f.lat = lat;
+  f.lon = lon;
+  return f;
+}
+
+/// Whether `text` came from one of `key`'s line templates: every fixed piece of the template
+/// (the parts between placeholders) appears in it, in order.
+bool SaidLineOf(std::string const & text, std::string const & key)
+{
+  for (int tier = 0; tier < 3; ++tier)
+    for (auto const & line : LinesFor(key, tier))
+    {
+      size_t at = 0;
+      bool match = true;
+      for (size_t i = 0; i < line.size() && match;)
+      {
+        size_t const open = std::min(line.find('{', i), line.size());
+        std::string const piece = line.substr(i, open - i);
+        size_t const found = piece.empty() ? at : text.find(piece, at);
+        match = found != std::string::npos;
+        at = match ? found + piece.size() : at;
+        size_t const close = line.find('}', open);
+        i = close == std::string::npos ? line.size() : close + 1;
+      }
+      if (match)
+        return true;
+    }
+  return false;
+}
+
+RouteSnapshot Far()
+{
+  RouteSnapshot r = OnRoute(1, TurnKind::Left, 2000);
+  r.destinationPoint = {39.8, -105};  // ~11 km north of the test fixes
+  return r;
+}
+}  // namespace
+
+TEST(NavigatorCallsOutAStopForGasAndNamesIt)
+{
+  Navigator nav(Config());
+  nav.SetPlaceLookup([](LatLon const &) { return Place{PlaceKind::Gas, std::string("Shell")}; });
+  nav.OnFix(At(0, 10), Far());
+  nav.TakeLines();
+  for (double t = 1000; t <= 200000; t += 1000)
+    nav.OnFix(At(t, 0), Far());
+  auto const lines = nav.TakeLines();
+  CHECK(Has(lines, Category::UnplannedStop));
+  CHECK(nav.Engine()->Incidents().back().kind == IncidentKind::UnplannedStop);
+}
+
+TEST(NavigatorKnowsThePhoneWasLeftInTheCar)
+{
+  Navigator nav(Config());
+  nav.OnFix(At(0, 10), Far());
+  for (double t = 1000; t <= 300000; t += 1000)
+    nav.OnFix(At(t, 0), Far());  // never moves an inch
+  nav.TakeLines();
+  nav.OnFix(At(301000, 10), Far());
+  auto const lines = nav.TakeLines();
+  CHECK(Has(lines, Category::Abandoned));
+  CHECK(SaidLineOf(lines.back().text, "abandoned"));
+}
+
+TEST(NavigatorKnowsThePhoneCameAlong)
+{
+  Navigator nav(Config());
+  nav.OnFix(At(0, 10), Far());
+  nav.OnFix(At(1000, 0), Far());
+  // A walk into the store and back, at walking pace.
+  for (double t = 2000; t <= 120000; t += 1000)
+    nav.OnFix(AtPos(t, 1.4, 39.7 + 0.0005 * std::sin(t / 20000), -105), Far());
+  nav.TakeLines();
+  nav.OnFix(At(121000, 10), Far());
+  auto const lines = nav.TakeLines();
+  CHECK(SaidLineOf(lines.back().text, "broughtAlong"));
+}
+
+TEST(NavigatorIgnoresStopsAtTheDestination)
+{
+  Navigator nav(Config());
+  RouteSnapshot r = Far();
+  r.destinationPoint = {39.7005, -105};  // ~55 m away
+  nav.OnFix(At(0, 10), r);
+  for (double t = 1000; t <= 200000; t += 1000)
+    nav.OnFix(At(t, 0), r);
+  CHECK(!Has(nav.TakeLines(), Category::UnplannedStop));
+}
+
+TEST(NavigatorBlamesTheRouteInACrawl)
+{
+  Navigator nav(Config());
+  double const limit = FromDisplay(65, Units::Mph);
+  nav.OnFix(At(0, limit, limit), Far());
+  nav.TakeLines();
+  bool blamed = false;
+  for (double t = 1000; t <= 120000; t += 1000)
+  {
+    nav.OnFix(At(t, FromDisplay(10, Units::Mph), limit), Far());
+    blamed = blamed || Has(nav.TakeLines(), Category::Traffic);
+  }
+  CHECK(blamed);
+}
+
+TEST(NavigatorLeavesSlowSideStreetsAlone)
+{
+  Navigator nav(Config());
+  double const limit = FromDisplay(25, Units::Mph);
+  for (double t = 0; t <= 120000; t += 1000)
+    nav.OnFix(At(t, FromDisplay(5, Units::Mph), limit), Far());
+  CHECK(!Has(nav.TakeLines(), Category::Traffic));
+}
+
+TEST(NavigatorWarnsAboutTheBatteryOnce)
+{
+  Navigator nav(Config());
+  nav.OnFix(At(0, 10), Far());
+  nav.TakeLines();
+  nav.OnBattery(1000, 0.19, false);
+  CHECK(Has(nav.TakeLines(), Category::Battery));
+  nav.OnBattery(2000, 0.18, false);
+  CHECK(!Has(nav.TakeLines(), Category::Battery));
+  nav.OnBattery(3000, 0.18, true);
+  CHECK(Has(nav.TakeLines(), Category::Battery));  // thanks for the charge
+}
+
+TEST(NavigatorMentionsALowBatteryAtTheStart)
+{
+  Navigator nav(Config());
+  nav.OnBattery(0, 0.08, false);
+  nav.OnFix(At(0, 10), Far());
+  CHECK(Has(nav.TakeLines(), Category::Battery));
+}
+
+TEST(NavigatorPassesStopSignsThroughForPayback)
+{
+  Navigator nav(Config());
+  nav.OnFix(At(0, 10), OnRoute(1, TurnKind::Right, 400));
+  nav.OnFix(At(1000, 10), OnRoute(1, TurnKind::Right, 20));
+  RouteSnapshot off = OnRoute(1, TurnKind::Right, 20);
+  off.state = RouteState::OffRoute;
+  nav.OnFix(At(2000, 10), off);  // a missed turn: something to pay back
+  nav.TakeLines();
+  RouteSnapshot stop = OnRoute(2, TurnKind::Left, 150, "2nd Avenue");
+  stop.control = Control::StopSign;
+  nav.OnFix(At(40000, 10), stop);
+  CHECK(Has(nav.TakeLines(), Category::Payback));
 }

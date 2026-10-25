@@ -4,11 +4,19 @@
 
 #include "platform/location.hpp"
 
+#include "geometry/point2d.hpp"
+
+#include <functional>
+#include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
+class DataSource;
+
 namespace routing
 {
+class Route;
 class RoutingSession;
 }
 
@@ -29,8 +37,21 @@ public:
   std::vector<std::string> TakeNotifications(routing::RoutingSession const & session,
                                              std::string const & destinationName);
 
+  /// Map data, for naming the place of an unplanned stop ("Why are we stopping for gas?").
+  void SetDataSource(std::function<DataSource &()> getter);
+  /// Traffic lights on the route just built (mercator points). A left turn off a side street
+  /// with no light there is treated as a stop sign, since stop signs aren't in the map data.
+  void SetTrafficLights(std::vector<m2::PointD> points);
+
 private:
   backseat::RouteSnapshot Snapshot(routing::RoutingSession const & session, std::string const & destinationName) const;
+  backseat::Control GuessControl(routing::Route const & route, uint32_t turnIndex) const;
+  std::optional<backseat::Place> PlaceAt(backseat::LatLon const & at) const;
+  void CheckBattery(double tMs);
 
   backseat::Navigator m_navigator;
+  std::function<DataSource &()> m_dataSource;
+  mutable std::mutex m_lightsMutex;
+  std::vector<m2::PointD> m_trafficLights;
+  double m_lastBatteryCheckMs = 0;
 };

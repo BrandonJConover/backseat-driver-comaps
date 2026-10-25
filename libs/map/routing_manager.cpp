@@ -334,6 +334,7 @@ RoutingManager::RoutingManager(Callbacks && callbacks, Delegate & delegate)
   , m_extrapolator([this](location::GpsInfo const & gpsInfo) { this->OnExtrapolatedLocationUpdate(gpsInfo); })
 {
   m_extrapolator.Enable(true);  // Keeps smooth arrow movement whether routing or not
+  m_backseat.SetDataSource(m_callbacks.m_dataSourceGetter);
   m_routingSession.Init(
 #ifdef SHOW_ROUTE_DEBUG_MARKS
       [this](m2::PointD const & pt)
@@ -890,6 +891,14 @@ bool RoutingManager::InsertRoute(Route const & route)
   bool const hasWarnings = !roadWarnings.empty();
   if (hasWarnings && m_currentRouterType == RouterType::Vehicle)
     CreateRoadWarningMarks(std::move(roadWarnings));
+
+  if (m_currentRouterType == RouterType::Vehicle)
+  {
+    std::vector<m2::PointD> lights;
+    for (auto const & light : trafficLights)
+      lights.push_back(light.first);
+    m_backseat.SetTrafficLights(std::move(lights));
+  }
 
   if (!trafficLights.empty() && m_currentRouterType == RouterType::Vehicle)
     CreateTrafficLightMarks(std::move(trafficLights));
