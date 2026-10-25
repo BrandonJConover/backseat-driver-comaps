@@ -1,18 +1,18 @@
-// Backseat Driver's Kokoro voice on iOS: EpubToM4B's MLX port of Kokoro with MisakiSwift G2P.
-//
-// Kokoro runs on the CPU only. A navigation app speaks with the screen off, iOS refuses GPU work
-// from the background, and switching devices mid-trip is what crashed EpubToM4B; the CPU path
-// avoids that whole class of crash.
+// Backseat Driver's Kokoro voice on iOS: Kokoro-82M on Core ML (Neural Engine + CPU) through
+// FluidAudio, the same engine EpubToM4B narrates with.
 //
 // Navigation lines never wait on Kokoro: one that isn't ready to play within `navDeadline` goes to
 // the system voice, and its Kokoro audio is kept for the next time the same line comes up. Roasts
 // queue, go stale after `roastMaxAge`, and are cut off when a navigation line needs the speaker.
+//
+// Apple's BNNS can crash inside Core ML on iOS 26.4 and later (FluidAudio #817/#844). That can't be
+// caught, so `CoreMLCrashGuard` notices it at the next launch and keeps the system voice for that
+// iOS build: a crash while driving should happen at most once.
 
 import AVFoundation
-import CryptoKit
+import FluidAudio
 import Foundation
-import MLX
-import MLXRandom
+import Network
 import os
 
 @objc(BackseatKokoroVoice)
@@ -26,12 +26,9 @@ final class KokoroVoice: NSObject {
   private static let navDeadline: TimeInterval = 1.2
   private static let roastMaxAge: TimeInterval = 15
   private static let cacheLines = 32
-  private static let voice = TTSVoice.afHeart
-
-  // The weights EpubToM4B uses, pinned to an immutable revision and checked after download.
-  private static let modelURL = URL(string:
-    "https://huggingface.co/mlx-community/Kokoro-82M-bf16/resolve/a71e4d38b236d968966a2002c4c895dbd12b1c3c/kokoro-v1_0.safetensors")!
-  private static let modelSHA256 = "4e9ecdf03b8b6cf906070390237feda473dc13327cb8d56a43deaa374c02acd8"
+  private static let voice = "af_heart"
+  /// Set once the Core ML models have downloaded, so later launches don't wait for Wi-Fi.
+  private static let installedKey = "backseat.kokoro.coreMLInstalled"
 
   private enum State { case waiting, playing, fellBack }
 
@@ -57,16 +54,18 @@ final class KokoroVoice: NSObject {
   private var navJobs: [Job] = []
   private var roastJobs: [Job] = []
   private var generation = 0
-  private let jobsReady = DispatchSemaphore(value: 0)
+  private var wake: AsyncStream<Void>.Continuation?
   private var cache: [String: Data] = [:]
   private var cacheOrder: [String] = []
-  private var tts: KokoroTTS?
+  private var primary: KokoroAneManager?
+  private var fallbackEngine: KokoroAneManager?
+  private var pathMonitor: NWPathMonitor?
   private var started = false
   private let player = ClipPlayer()
 
   @objc var isReady: Bool {
     lock.lock(); defer { lock.unlock() }
-    return tts != nil
+    return primary != nil
   }
 
   /// True while Kokoro has a line queued or playing, so the audio session must stay active.
@@ -78,27 +77,54 @@ final class KokoroVoice: NSObject {
     return queued || player.isPlaying
   }
 
-  /// Downloads the weights once (Wi-Fi only) and loads Kokoro in the background.
+  /// Downloads the Core ML models once (on Wi-Fi) and loads Kokoro in the background.
   @objc func start() {
-    #if targetEnvironment(simulator)
-    // MLX can't run in the Simulator; the system voice speaks there.
-    return
-    #else
     lock.lock()
     if started { lock.unlock(); return }
     started = true
     lock.unlock()
+    if CoreMLCrashGuard.checkAtLaunch() {
+      Self.log.error("Core ML crashed during the last Kokoro line")
+    }
+    guard !CoreMLCrashGuard.isDisabledForThisOS() else {
+      Self.log.info("Kokoro is off on this iOS build after a Core ML crash; the system voice speaks")
+      return
+    }
     player.systemIsSpeaking = { [weak self] in self?.systemIsSpeaking?() ?? false }
+    if UserDefaults.standard.bool(forKey: Self.installedKey) {
+      load()
+      return
+    }
+    // The first download is a few hundred MB: wait for a network that isn't cellular or Low Data.
+    let monitor = NWPathMonitor()
+    monitor.pathUpdateHandler = { [weak self] path in
+      guard let self, path.status == .satisfied, !path.isExpensive, !path.isConstrained else { return }
+      monitor.cancel()
+      self.load()
+    }
+    pathMonitor = monitor
+    Self.log.info("Waiting for Wi-Fi to download the Kokoro voice")
+    monitor.start(queue: DispatchQueue(label: "KokoroNetwork"))
+  }
+
+  private func load() {
     Task.detached(priority: .utility) { [self] in
       do {
-        try await ensureModel()
+        // CPU + Neural Engine with the noise and tail stages on the CPU: iOS refuses GPU work from
+        // the background, where a navigation app spends most of its time.
+        let engine = KokoroAneManager(computeUnits: .aneTailCpu)
+        try await engine.initialize(preloadVoices: [Self.voice])
+        UserDefaults.standard.set(true, forKey: Self.installedKey)
+        // The first line compiles the Neural Engine graph; pay for it now, not on a turn.
+        _ = try await render("Hello.", speed: 1, with: engine)
+        lock.lock(); primary = engine; lock.unlock()
+        Self.log.info("Kokoro voice ready")
         startWorker()
       } catch {
         Self.log.error("Kokoro unavailable, the system voice stays on: \(error.localizedDescription, privacy: .public)")
         allowRetry()
       }
     }
-    #endif
   }
 
   /// Lets the next start() try the download again.
@@ -109,7 +135,7 @@ final class KokoroVoice: NSObject {
   /// Says `text` with Kokoro, or calls `fallback` (on the main queue) to say it with the system voice.
   @objc func speak(_ text: String, nav: Bool, speed: Float, fallback: @escaping () -> Void) {
     lock.lock()
-    guard tts != nil else {
+    guard primary != nil else {
       lock.unlock()
       DispatchQueue.main.async(execute: fallback)
       return
@@ -124,7 +150,7 @@ final class KokoroVoice: NSObject {
     let job = Job(text: text, nav: nav, speed: speed, fallback: fallback, generation: generation)
     if nav { navJobs.append(job) } else { roastJobs.append(job) }
     lock.unlock()
-    jobsReady.signal()
+    wake?.yield()
 
     guard nav else { return }
     DispatchQueue.main.asyncAfter(deadline: .now() + Self.navDeadline) { [self] in
@@ -150,85 +176,20 @@ final class KokoroVoice: NSObject {
     DispatchQueue.main.async { self.player.stop() }
   }
 
-  // MARK: - Model
-
-  private static var modelFile: URL {
-    let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-    // WeightLoader looks here.
-    return support.appendingPathComponent("kokoro_models/kokoro-v1_0.safetensors")
-  }
-
-  private func ensureModel() async throws {
-    let file = Self.modelFile
-    if FileManager.default.fileExists(atPath: file.path) { return }
-    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-
-    let config = URLSessionConfiguration.default
-    // About 330 MB: wait for Wi-Fi rather than use cellular data.
-    config.allowsCellularAccess = false
-    config.allowsExpensiveNetworkAccess = false
-    config.allowsConstrainedNetworkAccess = false
-    config.waitsForConnectivity = true
-    config.timeoutIntervalForResource = 24 * 60 * 60
-    let session = URLSession(configuration: config)
-    Self.log.info("Downloading the Kokoro model")
-    let (downloaded, response) = try await session.download(from: Self.modelURL)
-    defer { try? FileManager.default.removeItem(at: downloaded) }
-    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-      throw URLError(.badServerResponse)
-    }
-    guard try Self.sha256(of: downloaded) == Self.modelSHA256 else {
-      throw URLError(.cannotDecodeContentData)
-    }
-    let partial = file.appendingPathExtension("partial")
-    try? FileManager.default.removeItem(at: partial)
-    try FileManager.default.moveItem(at: downloaded, to: partial)
-    var values = URLResourceValues()
-    values.isExcludedFromBackup = true
-    var partialURL = partial
-    try? partialURL.setResourceValues(values)
-    try FileManager.default.moveItem(at: partial, to: file)
-    Self.log.info("Kokoro model installed")
-  }
-
-  private static func sha256(of url: URL) throws -> String {
-    let handle = try FileHandle(forReadingFrom: url)
-    defer { try? handle.close() }
-    var hasher = SHA256()
-    while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
-      hasher.update(data: chunk)
-    }
-    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
-  }
-
   // MARK: - Synthesis
 
   private func startWorker() {
-    let thread = Thread { [self] in
-      // CPU only, and no compiled MLX functions: iOS has no CPU compiler for them.
-      MLX.compile(enable: false)
-      Device.setDefault(device: .cpu)
-      Memory.cacheLimit = 32 * 1024 * 1024
-      do {
-        let engine = try KokoroMLXErrors.capture { try KokoroTTS() }
-        // The first synthesis is slow; pay for it now, not on a turn.
-        engine.warmUp()
-        lock.lock(); tts = engine; lock.unlock()
-        Self.log.info("Kokoro voice ready")
-      } catch {
-        Self.log.error("Could not load Kokoro: \(error.localizedDescription, privacy: .public)")
-        return
-      }
-      while true {
-        jobsReady.wait()
-        guard let job = nextJob() else { continue }
-        synthesize(job)
+    let (stream, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    lock.lock(); wake = continuation; lock.unlock()
+    continuation.yield()
+    // One line at a time: concurrent Core ML renders are what made BNNS crash in EpubToM4B.
+    Task.detached(priority: .userInitiated) { [self] in
+      for await _ in stream {
+        while let job = nextJob() {
+          await synthesize(job)
+        }
       }
     }
-    thread.name = "KokoroSynth"
-    thread.qualityOfService = .userInitiated
-    thread.stackSize = 8 << 20
-    thread.start()
   }
 
   private func nextJob() -> Job? {
@@ -241,27 +202,35 @@ final class KokoroVoice: NSObject {
     return nil
   }
 
-  private func synthesize(_ job: Job) {
+  private func render(_ text: String, speed: Float, with engine: KokoroAneManager) async throws -> Data {
+    CoreMLCrashGuard.begin()
+    defer { CoreMLCrashGuard.end() }
+    return try await engine.synthesize(text: text, voice: Self.voice, speed: speed)
+  }
+
+  /// The CPU-only route, for a line the Neural Engine route failed on.
+  private func cpuEngine() async throws -> KokoroAneManager {
+    if let fallbackEngine { return fallbackEngine }
+    let engine = KokoroAneManager(computeUnits: .cpuOnly)
+    try await engine.initialize(preloadVoices: [Self.voice])
+    fallbackEngine = engine
+    return engine
+  }
+
+  private func synthesize(_ job: Job) async {
     lock.lock()
     let current = job.generation == generation
-    let engine = tts
+    let engine = primary
     lock.unlock()
     guard current, let engine else { return }
 
     let wav: Data
     do {
-      wav = try autoreleasepool {
-        let samples: [Float] = try Device.withDefaultDevice(.cpu) {
-          try withRandomState(MLXRandom.RandomState()) {
-            try KokoroMLXErrors.capture {
-              let audio = try engine.generateAudio(voice: Self.voice, text: job.text, speed: job.speed)
-              audio.eval()
-              return audio.asArray(Float.self)
-            }
-          }
-        }
-        Memory.clearCache()
-        return Self.wavData(samples, sampleRate: 24000)
+      do {
+        wav = try await render(job.text, speed: job.speed, with: engine)
+      } catch {
+        Self.log.error("Kokoro (Neural Engine) failed, retrying on the CPU: \(error.localizedDescription, privacy: .public)")
+        wav = try await render(job.text, speed: job.speed, with: try await cpuEngine())
       }
     } catch {
       Self.log.error("Kokoro failed on a line: \(error.localizedDescription, privacy: .public)")
@@ -294,18 +263,6 @@ final class KokoroVoice: NSObject {
   }
 
   private static func key(_ text: String, _ speed: Float) -> String { "\(speed)|\(text)" }
-
-  private static func wavData(_ samples: [Float], sampleRate: Int) -> Data {
-    var data = Data(capacity: 44 + samples.count * 2)
-    func append<T: FixedWidthInteger>(_ value: T) { withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) } }
-    data.append(contentsOf: Array("RIFF".utf8)); append(UInt32(36 + samples.count * 2))
-    data.append(contentsOf: Array("WAVE".utf8))
-    data.append(contentsOf: Array("fmt ".utf8)); append(UInt32(16)); append(UInt16(1)); append(UInt16(1))
-    append(UInt32(sampleRate)); append(UInt32(sampleRate * 2)); append(UInt16(2)); append(UInt16(16))
-    data.append(contentsOf: Array("data".utf8)); append(UInt32(samples.count * 2))
-    for sample in samples { append(Int16(max(-1, min(1, sample)) * Float(Int16.max))) }
-    return data
-  }
 }
 
 /// Plays clips one at a time on the main queue: navigation clips first, and they cut off a roast.
@@ -385,5 +342,50 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
       current = nil
       playNext()
     }
+  }
+}
+
+/// A Core ML crash can't be caught, so a marker file is written before each render and removed
+/// after; finding it at launch means Core ML crashed mid-line. After `crashLimit` crashes within
+/// `window` on one iOS build, Kokoro stays off for that build; an iOS update tries again.
+/// (EpubToM4B's guard, with a lower limit because this app is used while driving.)
+enum CoreMLCrashGuard {
+  static let crashesKey = "backseat.coreML.crashes"  // [String: [Double]]: OS build → crash times
+  static let crashLimit = 1
+  static let window: TimeInterval = 30 * 24 * 3600
+
+  private static var markerURL: URL {
+    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("BackseatKokoroRender.inflight")
+  }
+
+  static var currentOSBuild: String { ProcessInfo.processInfo.operatingSystemVersionString }
+
+  static func begin() {
+    let url = markerURL
+    try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try? Data(currentOSBuild.utf8).write(to: url, options: .atomic)
+  }
+
+  static func end() {
+    try? FileManager.default.removeItem(at: markerURL)
+  }
+
+  /// Records a crash if the last render never returned. Returns true then.
+  @discardableResult
+  static func checkAtLaunch(defaults: UserDefaults = .standard, now: Date = Date()) -> Bool {
+    let marker = markerURL
+    guard FileManager.default.fileExists(atPath: marker.path) else { return false }
+    let build = (try? String(contentsOf: marker, encoding: .utf8)) ?? currentOSBuild
+    var crashes = defaults.dictionary(forKey: crashesKey) as? [String: [Double]] ?? [:]
+    crashes[build, default: []].append(now.timeIntervalSince1970)
+    defaults.set(crashes, forKey: crashesKey)
+    try? FileManager.default.removeItem(at: marker)
+    return true
+  }
+
+  static func isDisabledForThisOS(defaults: UserDefaults = .standard, now: Date = Date()) -> Bool {
+    let crashes = (defaults.dictionary(forKey: crashesKey) as? [String: [Double]])?[currentOSBuild] ?? []
+    return crashes.filter { now.timeIntervalSince1970 - $0 <= window }.count >= crashLimit
   }
 }
