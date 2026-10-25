@@ -31,8 +31,8 @@ java {
     }
 }
 
-val appName = "CoMaps"
-val appId = "app.comaps"
+val appName = "Backseat Driver"
+val appId = "com.brandonjconover.backseatdriver"
 // These are properly set in the 'secure.properties.*' files but must be declared here for build sync to succeed.
 project.ext["secretTestStoreFile"] = "comaps-test.keystore"
 project.ext["secretTestStorePassword"] = ""
