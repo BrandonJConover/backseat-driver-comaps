@@ -264,7 +264,7 @@ object KokoroVoice : NeuralVoice
       @Volatile var interrupted = false
     }
 
-    private val lock = Object()
+    private val lock = java.lang.Object()
     private val navQueue = ArrayDeque<Item>()
     private val roastQueue = ArrayDeque<Item>()
     private var current: Item? = null
