@@ -235,6 +235,15 @@ public class Framework
   @Nullable
   public static native String[] nativeGenerateNotifications(boolean announceStreets);
 
+  /// Backseat Driver: for each line of the last nativeGenerateNotifications() batch, whether it is a
+  /// navigation line that must be said right away.
+  @NonNull
+  public static native boolean[] nativeLastNotificationsAreNav();
+
+  /// Backseat Driver: suggested speech rate for each line of the last batch, 1 = normal.
+  @NonNull
+  public static native float[] nativeLastNotificationSpeeds();
+
   private static native void nativeSetSpeedCamManagerMode(int mode);
 
   public static native void nativeSetRoutingListener(@NonNull RoutingListener listener);
