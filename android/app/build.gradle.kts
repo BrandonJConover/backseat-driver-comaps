@@ -356,6 +356,12 @@ androidComponents {
   }
 }
 
+// ML Kit (Backseat Driver's Gemini Nano) pulls in Google's Tasks classes, which microG
+// already provides; keep a single copy.
+configurations.configureEach {
+    exclude(group = "com.google.android.gms", module = "play-services-tasks")
+}
+
 dependencies {
     implementation(project(":sdk"))
     coreLibraryDesugaring(libs.android.tools.desugar)
