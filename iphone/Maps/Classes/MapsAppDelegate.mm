@@ -122,6 +122,7 @@ void InitLocalizedStrings() {
   [MWMThemeManager invalidate];
 
   [self commonInit];
+  [BackseatLLM install];
 
   if ([FirstSession isFirstSession]) {
     [self firstLaunchSetup];

@@ -143,6 +143,8 @@
 		3472B5D3200F501500DC6CD5 /* BackgroundFetchTaskFrameworkType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3472B5D1200F501500DC6CD5 /* BackgroundFetchTaskFrameworkType.swift */; };
 		3472B5E1200F86C800DC6CD5 /* MWMEditorHelper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3472B5DF200F86C800DC6CD5 /* MWMEditorHelper.mm */; };
 		34763EE71F2F392300F4D2D3 /* MWMTextToSpeech.mm in Sources */ = {isa = PBXBuildFile; fileRef = 34763EE51F2F392300F4D2D3 /* MWMTextToSpeech.mm */; };
+		563A9DD993C1192095F00911 /* MWMBackseatRewriter.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0CBA5579CD04841A09E00696 /* MWMBackseatRewriter.mm */; };
+		5CB2DD731D55FAF37F276ABC /* BackseatLLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3771351F90A1F053385C4151 /* BackseatLLM.swift */; };
 		34845DAF1E1649F6003D55B9 /* DownloaderNoResultsEmbedViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DAD1E1649F6003D55B9 /* DownloaderNoResultsEmbedViewController.swift */; };
 		34845DB31E165E24003D55B9 /* SearchNoResultsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DB11E165E24003D55B9 /* SearchNoResultsViewController.swift */; };
 		34845DB71E166084003D55B9 /* Common.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DB51E166084003D55B9 /* Common.swift */; };
@@ -965,6 +967,9 @@
 		347526FB1DC0B00F00918CF5 /* common-release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "common-release.xcconfig"; path = "../../xcode/common-release.xcconfig"; sourceTree = "<group>"; };
 		34763EE41F2F392300F4D2D3 /* MWMTextToSpeech.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMTextToSpeech.h; sourceTree = "<group>"; tabWidth = 2; };
 		34763EE51F2F392300F4D2D3 /* MWMTextToSpeech.mm */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMTextToSpeech.mm; sourceTree = "<group>"; tabWidth = 2; };
+		E26D17103928978C28885B55 /* MWMBackseatRewriter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MWMBackseatRewriter.h; sourceTree = "<group>"; };
+		0CBA5579CD04841A09E00696 /* MWMBackseatRewriter.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatRewriter.mm; sourceTree = "<group>"; };
+		3771351F90A1F053385C4151 /* BackseatLLM.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatLLM.swift; sourceTree = "<group>"; };
 		34763EE91F2F394D00F4D2D3 /* MWMTextToSpeech+CPP.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = "MWMTextToSpeech+CPP.h"; sourceTree = "<group>"; tabWidth = 2; };
 		34763EEA1F2F3AD700F4D2D3 /* MWMTextToSpeechObserver.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMTextToSpeechObserver.h; sourceTree = "<group>"; tabWidth = 2; };
 		34763F0B1F30CCAC00F4D2D3 /* MWMEditorCellType.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMEditorCellType.h; sourceTree = "<group>"; tabWidth = 2; };
@@ -2250,6 +2255,7 @@
 				340475391E081A4600C92850 /* Search */,
 				3404753F1E081A4600C92850 /* Settings */,
 				340475421E081A4600C92850 /* Storage */,
+				0C0A9FC062CAF6A0ABA31EE1 /* Backseat */,
 				34763EE31F2F392300F4D2D3 /* TextToSpeech */,
 			);
 			path = Core;
@@ -2549,6 +2555,16 @@
 				3472B5CD200F4A2B00DC6CD5 /* BackgroundFetchTask.swift */,
 			);
 			path = BackgroundFetchTask;
+			sourceTree = "<group>";
+		};
+		0C0A9FC062CAF6A0ABA31EE1 /* Backseat */ = {
+			isa = PBXGroup;
+			children = (
+				3771351F90A1F053385C4151 /* BackseatLLM.swift */,
+				E26D17103928978C28885B55 /* MWMBackseatRewriter.h */,
+				0CBA5579CD04841A09E00696 /* MWMBackseatRewriter.mm */,
+			);
+			path = Backseat;
 			sourceTree = "<group>";
 		};
 		34763EE31F2F392300F4D2D3 /* TextToSpeech */ = {
@@ -4816,6 +4832,8 @@
 				ED7CCC4F2C1362E300E2A737 /* FileType.swift in Sources */,
 				4767CDA820AB401000BD8166 /* LinkTextView.swift in Sources */,
 				34763EE71F2F392300F4D2D3 /* MWMTextToSpeech.mm in Sources */,
+				563A9DD993C1192095F00911 /* MWMBackseatRewriter.mm in Sources */,
+				5CB2DD731D55FAF37F276ABC /* BackseatLLM.swift in Sources */,
 				F6E2FE221E097BA00083EBEC /* MWMOpeningHoursEditorViewController.mm in Sources */,
 				ED79A5D72BDF8D6100952D1F /* SynchronizationStateResolver.swift in Sources */,
 				999FC12B23ABB4B800B0E6F9 /* FontStyleSheet.swift in Sources */,
