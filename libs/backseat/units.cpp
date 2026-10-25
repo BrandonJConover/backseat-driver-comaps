@@ -1,8 +1,8 @@
 #include "backseat/units.hpp"
 
-#include <charconv>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 namespace backseat
 {
@@ -49,9 +49,16 @@ std::string JsNumber(double x)
     return "NaN";
   if (x == std::floor(x) && std::fabs(x) < 1e15)
     return std::to_string(static_cast<long long>(x));
+  // Shortest representation that reads back as the same double, like JavaScript.
+  // (snprintf rather than std::to_chars, which older Android NDKs lack for doubles.)
   char buf[32];
-  auto const res = std::to_chars(buf, buf + sizeof(buf), x);
-  return std::string(buf, res.ptr);
+  for (int precision = 1; precision <= 17; ++precision)
+  {
+    std::snprintf(buf, sizeof(buf), "%.*g", precision, x);
+    if (std::strtod(buf, nullptr) == x)
+      break;
+  }
+  return buf;
 }
 
 std::string ToFixed(double x, int digits)
