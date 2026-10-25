@@ -10194,7 +10194,7 @@ P	121000	408.3
 T	122000	1.269	22.4	39.840236	-105.000842	-
 P	122000	404.8
 X	122000	gas	-
->	unplannedStop	roast	51	1.2	Why are we stopping for gas? I said nothing about stopping. I said it like four times.
+>	unplannedStop	roast	51	1.2	Why are we stopping for gas? I said nothing about stopping. Not one word about gas.
 T	123000	6.966	22.4	39.840225	-105.000761	100.01
 >	hardAccel	roast	57	1.23	You launched off that like it was a drag strip. It's a Trader Joe's parking lot.
 P	123000	393.7
@@ -16079,7 +16079,7 @@ P	148000	407.4
 T	149000	16.652	13.4	39.936148	-105.000095	352.65
 P	149000	386.5
 T	179000	16.448	13.4	39.936295	-105.00012	352.56
->	speeding	roast	70	1.28	STILL. 37. I'm going to start reading the speed limit to you like a bedtime story.
+>	speeding	roast	70	1.28	30. 30! It's the only number I need you to know!
 P	179000	366.8
 T	180000	6.504	13.4	39.936352	-105.000132	350.54
 >	hardBraking	roast	78	1.31	Every time you do that, a little piece of my GPS chip dies. I'm running out of pieces.
@@ -20365,7 +20365,7 @@ T	95000	3.537	22.4	39.990226	-105.002391	273.92
 T	96000	3.228	22.4	39.990228	-105.002429	273.69
 T	97000	3.847	22.4	39.990231	-105.002474	275.19
 X	97000	gas	Grandma's
->	unplannedStop	roast	54	1.22	Why are we stopping for gas? I said nothing about stopping. I said it like four times.
+>	unplannedStop	roast	54	1.22	Why are we stopping for gas? I said nothing about stopping. Not one word about gas.
 T	98000	3.184	22.4	39.990232	-105.002511	-
 T	99000	3.861	22.4	39.990235	-105.002556	274.42
 T	100000	4.095	22.4	39.990237	-105.002605	-

@@ -75,6 +75,51 @@ backseat::TurnKind ToTurnKind(routing::turns::CarDirection d)
   }
 }
 
+/// The router formats street names for the screen: "[2] North Colorado Boulevard" or, at
+/// exits, "[I 25] > Denver". Shields are drawn as signs there, but read aloud they come out
+/// as "bracket two". Keep the name, or the bare route number when there is no name.
+std::string SpeakableStreetName(std::string const & formatted)
+{
+  std::string name, refs;
+  bool inShield = false;
+  for (char const c : formatted)
+  {
+    if (c == '[')
+      inShield = true;
+    else if (c == ']')
+    {
+      inShield = false;
+      refs += ' ';
+    }
+    else
+      (inShield ? refs : name) += c;
+  }
+  auto const tidy = [](std::string s)
+  {
+    size_t const gt = s.find('>');
+    if (gt != std::string::npos)
+      s = "toward " + s.substr(gt + 1);
+    std::string out;
+    for (char const c : s)
+    {
+      if (c == ':' || (c == ' ' && (out.empty() || out.back() == ' ')))
+        continue;
+      out += c;
+    }
+    while (!out.empty() && out.back() == ' ')
+      out.pop_back();
+    return out;
+  };
+  name = tidy(name);
+  if (name.empty() || name.rfind("toward ", 0) == 0)
+  {
+    std::string const r = tidy(refs);
+    if (!r.empty())
+      name = name.empty() ? r : r + " " + name;
+  }
+  return name;
+}
+
 backseat::LatLon ToBackseatLatLon(m2::PointD const & p)
 {
   auto const ll = mercator::ToLatLon(p);
@@ -316,7 +361,7 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
       snap.turnId = turn.m_index;
       snap.turn = ToTurnKind(turn.m_turn);
       snap.distToTurnM = distanceToTurnM;
-      snap.nextStreet = info.m_nextStreetName;
+      snap.nextStreet = SpeakableStreetName(info.m_nextStreetName);
       snap.control = GuessControl(*route, turn.m_index);
     }
   }

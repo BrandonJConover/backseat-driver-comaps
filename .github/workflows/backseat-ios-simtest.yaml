@@ -25,9 +25,10 @@ jobs:
       MAP_VERSION: '261004'
       MAP_SERIES: '2026.06.28'
       MAP_FILE: US_Colorado_Denver.mwm
-      # East on Colfax from Broadway to Colorado Blvd, then north a few blocks.
+      # East on Colfax from Broadway to Colorado Blvd, then north a few blocks. The destination sits
+      # on the northbound side so the route doesn't send us around to the far carriageway.
       START: '39.74010,-104.98720'
-      DESTINATION: '39.74700,-104.94090'
+      DESTINATION: '39.74600,-104.94075'
       OUT: ${{ github.workspace }}/simtest
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
@@ -127,7 +128,7 @@ jobs:
           sleep 95
 
           # Leg 2: north on Colorado Blvd to the destination.
-          xcrun simctl location "$DEVICE" start --speed=15 39.74010,-104.94094 39.74700,-104.94090
+          xcrun simctl location "$DEVICE" start --speed=15 39.74010,-104.94094 39.74300,-104.94080 39.74750,-104.94075
           sleep 75
           shot 4-arrived
           sleep 10
