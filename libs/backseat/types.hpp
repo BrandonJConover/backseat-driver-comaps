@@ -219,6 +219,8 @@ enum class Category
   PlateGame,
   /// Pulled over at the roadside, or by the police (navigator only).
   PullOver,
+  /// Scared on a bridge or in a sharp curve (navigator only).
+  Fear,
   Count
 };
 

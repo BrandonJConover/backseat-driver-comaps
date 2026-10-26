@@ -73,6 +73,7 @@ private:
   backseat::Control GuessControl(routing::Route const & route, uint32_t turnIndex) const;
   std::optional<backseat::Place> PlaceAt(backseat::LatLon const & at) const;
   bool InParkingLot(backseat::LatLon const & at) const;
+  backseat::Bridge BridgeAt(backseat::LatLon const & at, double bearingDeg) const;
   void CheckBattery(double tMs);
 
   backseat::Navigator m_navigator;

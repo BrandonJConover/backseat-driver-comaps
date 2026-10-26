@@ -145,6 +145,7 @@ char const * ToString(Category c)
   case Category::Arrived: return "arrived";
   case Category::PlateGame: return "plateGame";
   case Category::PullOver: return "pullOver";
+  case Category::Fear: return "fear";
   case Category::Count: break;
   }
   return "?";

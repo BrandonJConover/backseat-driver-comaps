@@ -18,10 +18,12 @@
 #include "storage/country_info_getter.hpp"
 
 #include "geometry/mercator.hpp"
+#include "geometry/parametrized_segment.hpp"
 
 #include "base/logging.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 
@@ -240,6 +242,7 @@ void BackseatAdapter::SetDataSource(std::function<DataSource &()> getter)
   m_dataSource = std::move(getter);
   m_navigator.SetPlaceLookup([this](backseat::LatLon const & at) { return PlaceAt(at); });
   m_navigator.SetParkingLookup([this](backseat::LatLon const & at) { return InParkingLot(at); });
+  m_navigator.SetBridgeLookup([this](backseat::LatLon const & at, double bearing) { return BridgeAt(at, bearing); });
   // A stop within a light's queue is a red light, not pulling over.
   m_navigator.SetTrafficLightLookup([this](backseat::LatLon const & at)
   {
@@ -300,6 +303,82 @@ backseat::Control BackseatAdapter::GuessControl(routing::Route const & route, ui
   if (from >= RoadRank(ftypes::HighwayClass::Tertiary) && to >= 0 && to < from)
     return backseat::Control::StopSign;
   return backseat::Control::None;
+}
+
+backseat::Bridge BackseatAdapter::BridgeAt(backseat::LatLon const & at, double bearingDeg) const
+{
+  if (!m_dataSource)
+    return backseat::Bridge::None;
+  auto const & c = classif();
+  static uint32_t const kHighway = c.GetTypeByPath({"highway"});
+  static std::vector<std::string> const kCarRoads = {
+      "motorway",      "trunk",          "primary",      "secondary",      "tertiary",
+      "unclassified",  "residential",    "living_street", "service",       "motorway_link",
+      "trunk_link",    "primary_link",   "secondary_link", "tertiary_link", "road"};
+  static std::vector<uint32_t> const kWater = {
+      c.GetTypeByPath({"natural", "water"}), c.GetTypeByPath({"waterway", "river"}),
+      c.GetTypeByPath({"waterway", "canal"}), c.GetTypeByPath({"natural", "bay"})};
+
+  // Are we driving along a road bridge? Close to it and heading the same way (or the opposite
+  // way on a two-way road), so passing under an overpass doesn't count.
+  double constexpr kOnBridgeM = 12;
+  double constexpr kAlongDeg = 35;
+  m2::PointD const center = mercator::FromLatLon(at.lat, at.lon);
+  bool onBridge = false;
+  m_dataSource().ForEachInRect([&](FeatureType & ft)
+  {
+    if (onBridge || ft.GetGeomType() != feature::GeomType::Line)
+      return;
+    bool isBridge = false;
+    for (uint32_t const type : feature::TypesHolder(ft))
+    {
+      if (ftype::GetLevel(type) != 3)
+        continue;
+      uint32_t top = type;
+      ftype::TruncValue(top, 1);
+      if (top != kHighway)
+        continue;
+      ClassifObject const * road = c.GetRoot()->GetObject(ftype::GetValue(type, 0))->GetObject(ftype::GetValue(type, 1));
+      ClassifObject const * kind = road->GetObject(ftype::GetValue(type, 2));
+      if (kind->GetName() == "bridge" &&
+          std::find(kCarRoads.begin(), kCarRoads.end(), road->GetName()) != kCarRoads.end())
+        isBridge = true;
+    }
+    if (!isBridge)
+      return;
+    ft.ParseGeometry(scales::GetUpperScale());
+    for (size_t i = 1; i < ft.GetPointsCount() && !onBridge; ++i)
+    {
+      m2::PointD const a = ft.GetPoint(i - 1);
+      m2::PointD const b = ft.GetPoint(i);
+      m2::ParametrizedSegment<m2::PointD> const segment(a, b);
+      if (mercator::DistanceOnEarth(center, segment.ClosestPointTo(center)) > kOnBridgeM)
+        continue;
+      // Mercator y points north, so this is a compass bearing.
+      double const segBearing = std::atan2(b.x - a.x, b.y - a.y) * 180 / M_PI;
+      double diff = std::fmod(std::fabs(segBearing - bearingDeg), 180.0);
+      diff = std::min(diff, 180 - diff);
+      onBridge = diff <= kAlongDeg;
+    }
+  }, mercator::RectByCenterXYAndSizeInMeters(center, 2 * kOnBridgeM), scales::GetUpperScale());
+  if (!onBridge)
+    return backseat::Bridge::None;
+
+  // Any river, lake or bay right around the bridge makes it a water crossing.
+  double constexpr kWaterSearchM = 150;
+  bool water = false;
+  m_dataSource().ForEachInRect([&](FeatureType & ft)
+  {
+    if (water)
+      return;
+    for (uint32_t type : feature::TypesHolder(ft))
+    {
+      ftype::TruncValue(type, 2);
+      if (std::find(kWater.begin(), kWater.end(), type) != kWater.end())
+        water = true;
+    }
+  }, mercator::RectByCenterXYAndSizeInMeters(center, kWaterSearchM), scales::GetUpperScale());
+  return water ? backseat::Bridge::Water : backseat::Bridge::Land;
 }
 
 bool BackseatAdapter::InParkingLot(backseat::LatLon const & at) const

@@ -33,6 +33,14 @@ double constexpr kPullOverAfterMs = 45000;
 double constexpr kPoliceAfterSpeedingMs = 120000;
 /// "Serious" speeding: this far over the limit (~10 mph).
 double constexpr kSeriousOverMps = 4.5;
+/// Sharp curve: sideways acceleration (speed x turn rate) at least this, at highway-ish
+/// speed, over two fixes in a row. ~0.35 g is well past a comfortable curve.
+double constexpr kScaryLateralMps2 = 3.5;
+double constexpr kScaryCurveMinMps = 11;  // ~25 mph; slower is just a turn
+double constexpr kCurveYelpEveryMs = 90000;
+/// Regular bridges are everywhere in a city (every overpass); water is always worth a scream.
+double constexpr kLandBridgeYelpEveryMs = 600000;
+double constexpr kWaterBridgeYelpEveryMs = 60000;
 /// Traffic: judged over this window, a crawl is under kCrawlShare of the limit on average,
 /// and it's over once the average is back above kClearShare.
 double constexpr kTrafficWindowMs = 90000;
@@ -147,6 +155,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   }
   TrackStop(fix, route);
   TrackTraffic(fix, route);
+  TrackFear(fix, route);
   TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
   m_lastFix = fix;
 }
@@ -205,10 +214,10 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
       if (m_lastBadSpeedingT && fix.tMs - *m_lastBadSpeedingT < kPoliceAfterSpeedingMs)
         SayPolice(fix.tMs);
       else if (m_lastLimitMps)
-        SayPullOver(fix.tMs, "pullOver.limit",
+        SayLine(fix.tMs, Category::PullOver, "pullOver.limit",
                     {{"limit", std::to_string(static_cast<int>(std::lround(ToDisplay(*m_lastLimitMps, m_config.units))))}});
       else
-        SayPullOver(fix.tMs, "pullOver");
+        SayLine(fix.tMs, Category::PullOver, "pullOver");
     }
   }
   if (!m_stopAnnounced && !nearDestination && fix.tMs - *m_stopSince >= kUnplannedStopAfterMs)
@@ -361,6 +370,8 @@ void Navigator::ResetTrip()
   m_pullOverSaid = false;
   m_policeSaid = false;
   m_lastBadSpeedingT.reset();
+  m_onBridge = false;
+  m_hardCurveSamples = 0;
   m_gate.Clear();
 }
 
@@ -438,19 +449,70 @@ bool Navigator::Parked() const
   return m_parkingLookup({m_lastFix->lat, m_lastFix->lon});
 }
 
-void Navigator::SayPullOver(double tMs, std::string const & key, Vars vars)
+void Navigator::SayLine(double tMs, Category category, std::string const & key, Vars vars)
 {
   auto const & options = LinesFor(key, Tier());
   double const r = m_config.rng ? m_config.rng() : 0;
   Commentary c;
   c.t = tMs;
-  c.category = Category::PullOver;
+  c.category = category;
   c.text = Fill(options[std::min(options.size() - 1, static_cast<size_t>(r * options.size()))], vars);
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = Priority::Roast;
   c.voiceSpeed = 1 + c.frustration / 250.0;
   // Brandon's lines; the rewording model leaves them alone.
   m_gate.Push(std::move(c), false);
+}
+
+static std::string CarWeight(Units units)
+{
+  // A typical car or small SUV.
+  return units == Units::Mph ? "4,000 pounds" : "1,800 kilograms";
+}
+
+void Navigator::TrackFear(Fix const & fix, RouteSnapshot const & route)
+{
+  if (route.state != RouteState::OnRoute || fix.speedMps < 0)
+    return;
+  Vars const weight = {{"weight", CarWeight(m_config.units)}};
+
+  // Bridges: checked every couple of seconds while moving.
+  if (m_bridgeLookup && fix.speedMps >= kResumedMps && fix.bearingDeg >= 0 && fix.tMs - m_lastBridgeCheckT >= 2000)
+  {
+    m_lastBridgeCheckT = fix.tMs;
+    Bridge const bridge = m_bridgeLookup({fix.lat, fix.lon}, fix.bearingDeg);
+    if (bridge == Bridge::None)
+      m_onBridge = false;
+    else if (!m_onBridge)
+    {
+      m_onBridge = true;
+      double const every = bridge == Bridge::Water ? kWaterBridgeYelpEveryMs : kLandBridgeYelpEveryMs;
+      if (fix.tMs - m_lastBridgeYelpT >= every)
+      {
+        m_lastBridgeYelpT = fix.tMs;
+        SayLine(fix.tMs, Category::Fear, bridge == Bridge::Water ? "fear.bridgeWater" : "fear.bridge", weight);
+      }
+    }
+  }
+
+  // Curves: sideways acceleration from the change in heading between fixes.
+  if (m_lastFix && m_lastFix->bearingDeg >= 0 && fix.bearingDeg >= 0 && fix.tMs > m_lastFix->tMs)
+  {
+    double turn = std::fabs(fix.bearingDeg - m_lastFix->bearingDeg);
+    turn = std::min(turn, 360 - turn);
+    double const dt = (fix.tMs - m_lastFix->tMs) / 1000;
+    double const speed = std::min(fix.speedMps, m_lastFix->speedMps);
+    double const lateral = speed * (turn * M_PI / 180) / dt;
+    // At a maneuver, turning is the point.
+    bool const atManeuver = route.turnId && route.distToTurnM < 60;
+    bool const scary = dt <= 3 && speed >= kScaryCurveMinMps && lateral >= kScaryLateralMps2 && !atManeuver;
+    m_hardCurveSamples = scary ? m_hardCurveSamples + 1 : 0;
+    if (m_hardCurveSamples >= 2 && fix.tMs - m_lastCurveYelpT >= kCurveYelpEveryMs)
+    {
+      m_lastCurveYelpT = fix.tMs;
+      SayLine(fix.tMs, Category::Fear, "fear.curve", weight);
+    }
+  }
 }
 
 void Navigator::SayPolice(double tMs)
@@ -460,9 +522,9 @@ void Navigator::SayPolice(double tMs)
   m_policeSaid = true;
   switch (m_pronouns)
   {
-  case Pronouns::He: SayPullOver(tMs, "police", {{"them", "him"}, {"theycap", "He"}, {"their", "his"}}); break;
-  case Pronouns::She: SayPullOver(tMs, "police", {{"them", "her"}, {"theycap", "She"}, {"their", "her"}}); break;
-  case Pronouns::They: SayPullOver(tMs, "police", {{"them", "them"}, {"theycap", "They"}, {"their", "their"}}); break;
+  case Pronouns::He: SayLine(tMs, Category::PullOver, "police", {{"them", "him"}, {"theycap", "He"}, {"their", "his"}}); break;
+  case Pronouns::She: SayLine(tMs, Category::PullOver, "police", {{"them", "her"}, {"theycap", "She"}, {"their", "her"}}); break;
+  case Pronouns::They: SayLine(tMs, Category::PullOver, "police", {{"them", "them"}, {"theycap", "They"}, {"their", "their"}}); break;
   }
 }
 

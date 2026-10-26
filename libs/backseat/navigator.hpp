@@ -73,6 +73,16 @@ using PlaceLookup = std::function<std::optional<Place>(LatLon const &)>;
 /// Whether there's a traffic light (or similar reason to wait) right by a point.
 using TrafficLightLookup = std::function<bool(LatLon const &)>;
 
+enum class Bridge
+{
+  None,
+  Land,
+  /// Over a river, lake or the sea.
+  Water
+};
+/// Whether the car is on a bridge, given where it is and which way it's heading.
+using BridgeLookup = std::function<Bridge(LatLon const &, double bearingDeg)>;
+
 /// How the GPS refers to the driver when it throws them under the bus ("It was them, officer").
 enum class Pronouns
 {
@@ -124,6 +134,8 @@ public:
   /// Stops next to a traffic light are red lights, not pulling over.
   void SetTrafficLightLookup(TrafficLightLookup lookup) { m_lightLookup = std::move(lookup); }
   void SetDriverPronouns(Pronouns p) { m_pronouns = p; }
+  /// Lets the GPS panic on bridges.
+  void SetBridgeLookup(BridgeLookup lookup) { m_bridgeLookup = std::move(lookup); }
   /// Plates spotted on earlier trips, and where to save the log when it changes.
   void SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange);
   PlateLog const & GetPlateLog() const { return m_plates.Log(); }
@@ -149,7 +161,8 @@ private:
   void ResetTrip();
   void TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot const & route);
   void SayPlate(double tMs, PlateGame::Reply const & reply);
-  void SayPullOver(double tMs, std::string const & key, Vars vars = {});
+  void SayLine(double tMs, Category category, std::string const & key, Vars vars = {});
+  void TrackFear(Fix const & fix, RouteSnapshot const & route);
   void SayPolice(double tMs);
   int Tier() const;
   bool Parked() const;
@@ -181,6 +194,14 @@ private:
   std::optional<double> m_lastBadSpeedingT;
   TrafficLightLookup m_lightLookup;
   Pronouns m_pronouns = Pronouns::They;
+
+  // Fear: bridges and sharp curves.
+  BridgeLookup m_bridgeLookup;
+  double m_lastBridgeCheckT = -1e18;
+  bool m_onBridge = false;
+  double m_lastBridgeYelpT = -1e18;
+  double m_lastCurveYelpT = -1e18;
+  int m_hardCurveSamples = 0;
 
   // Traffic: recent (time, speed, limit) to judge a crawl, and whether we're in one.
   struct SpeedSample

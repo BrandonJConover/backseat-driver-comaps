@@ -366,3 +366,61 @@ TEST(NavigatorHearsAboutThePoliceAndUsesThePronouns)
   nav.OnDriverSaid(7000, "copy that");
   CHECK(PullOverLines(nav.TakeLines()).empty());
 }
+
+namespace
+{
+std::vector<Commentary> FearLines(std::vector<Commentary> const & lines)
+{
+  std::vector<Commentary> out;
+  for (auto const & l : lines)
+    if (l.category == Category::Fear)
+      out.push_back(l);
+  return out;
+}
+
+Fix Heading(double tMs, double mps, double bearing)
+{
+  Fix f = At(tMs, mps);
+  f.bearingDeg = bearing;
+  return f;
+}
+}  // namespace
+
+TEST(NavigatorPanicsOverWater)
+{
+  Navigator nav(Config());
+  bool bridge = false;
+  nav.SetBridgeLookup([&](LatLon const &, double) { return bridge ? Bridge::Water : Bridge::None; });
+  for (int i = 0; i < 10; ++i)
+    nav.OnFix(Heading(i * 1000, 20, 90), Far());
+  CHECK(FearLines(nav.TakeLines()).empty());
+  bridge = true;
+  for (int i = 10; i < 20; ++i)
+    nav.OnFix(Heading(i * 1000, 20, 90), Far());
+  auto lines = FearLines(nav.TakeLines());
+  CHECK_EQUAL(lines.size(), size_t(1));  // once per bridge
+  CHECK(SaidLineOf(lines[0].text, "fear.bridgeWater"));
+}
+
+TEST(NavigatorYelpsInASharpCurveButNotAtATurn)
+{
+  // 25 m/s (~56 mph) swinging 10 degrees a second: ~4.4 m/s^2 sideways.
+  Navigator nav(Config());
+  for (int i = 0; i < 6; ++i)
+    nav.OnFix(Heading(i * 1000, 25, 10.0 * i), Far());
+  auto lines = FearLines(nav.TakeLines());
+  CHECK_EQUAL(lines.size(), size_t(1));
+  CHECK(lines[0].text.find("4,000 pounds") != std::string::npos || SaidLineOf(lines[0].text, "fear.curve"));
+
+  // A gentle highway curve: 2 degrees a second.
+  Navigator calm(Config());
+  for (int i = 0; i < 6; ++i)
+    calm.OnFix(Heading(i * 1000, 25, 2.0 * i), Far());
+  CHECK(FearLines(calm.TakeLines()).empty());
+
+  // Slow, sharp swing at the maneuver itself: that's the turn.
+  Navigator turning(Config());
+  for (int i = 0; i < 6; ++i)
+    turning.OnFix(Heading(i * 1000, 12, 30.0 * i), OnRoute(1, TurnKind::Left, 20));
+  CHECK(FearLines(turning.TakeLines()).empty());
+}
