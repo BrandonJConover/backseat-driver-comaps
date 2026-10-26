@@ -531,9 +531,16 @@ LineTable const & LineData()
        {"{PLATE}. That's NEXT DOOR. I want MILES. Logged.",
         "Next door doesn't impress me. Logged anyway. Under protest."},
      }}},
+    {"plateGame.repeatFirst",
+     {{
+       {"We already have that one champ. Sometimes I wish I wasn't in this car."},
+       {"We already have that one champ. Sometimes I wish I wasn't in this car."},
+       {"We already have that one champ. Sometimes I wish I wasn't in this car."},
+     }}},
     {"plateGame.repeat",
      {{
-       {"We already have {plate}. Keep up.",
+       {"We already have that one champ. Sometimes I wish I wasn't in this car.",
+        "We already have {plate}. Keep up.",
         "{plate} again? I have a list. It's on the list."},
        {"{plate} is logged. I told you that. Did you hear me? You never hear me.",
         "Already got {plate}. Find a new one."},

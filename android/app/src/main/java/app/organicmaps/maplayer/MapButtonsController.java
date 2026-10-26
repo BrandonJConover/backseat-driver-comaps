@@ -142,6 +142,13 @@ public class MapButtonsController extends Fragment
     // Used to get the maximum height the buttons will evolve in
     mFrame.addOnLayoutChangeListener(new MapButtonsController.ContentViewLayoutChangeListener(mFrame));
 
+    final View backseatTalk = mFrame.findViewById(R.id.backseat_talk);
+    if (backseatTalk != null)
+    {
+      backseatTalk.setOnClickListener((v) -> mMapButtonClickListener.onMapButtonClick(MapButtons.backseatTalk));
+      mButtonsMap.put(MapButtons.backseatTalk, backseatTalk);
+    }
+
     mButtonsMap.put(MapButtons.zoom, zoomFrame);
     mButtonsMap.put(MapButtons.myPosition, myPosition);
 
@@ -246,6 +253,8 @@ public class MapButtonsController extends Fragment
     case trackRecordingStatus:
       UiUtils.showIf(show, buttonView);
       animateIconBlinking(show, (FloatingActionButton) buttonView);
+      break;
+    case backseatTalk: UiUtils.showIf(show, buttonView); break;
     }
   }
 
@@ -525,7 +534,8 @@ public class MapButtonsController extends Fragment
     bookmarks,
     menu,
     help,
-    trackRecordingStatus
+    trackRecordingStatus,
+    backseatTalk
   }
 
   public interface MapButtonClickListener

@@ -110,6 +110,8 @@ private:
   State m_state = State::Idle;
   /// New plates this trip, in the order spotted.
   std::vector<std::string> m_trip;
+  /// The first repeat of a trip always gets Brandon's line ("We already have that one champ...").
+  bool m_repeatedThisTrip = false;
   std::map<std::string, std::string> m_lastPicked;
 };
 }  // namespace backseat

@@ -18,6 +18,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Dialog;
 import android.app.PendingIntent;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
@@ -33,6 +34,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.speech.RecognizerIntent;
 import android.widget.Toast;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
@@ -83,6 +85,7 @@ import app.organicmaps.routing.RoutingPlanFragment;
 import app.organicmaps.routing.RoutingPlanInplaceController;
 import app.organicmaps.sdk.ChoosePositionMode;
 import app.organicmaps.sdk.Framework;
+import app.organicmaps.sdk.backseat.Backseat;
 import app.organicmaps.sdk.Map;
 import app.organicmaps.sdk.MapController;
 import app.organicmaps.sdk.MapRenderingListener;
@@ -163,6 +166,18 @@ public class MwmActivity extends BaseMwmFragmentActivity
       registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), activityResult -> {
         if (activityResult.getResultCode() == Activity.RESULT_OK)
           rebuildLastRoute();
+      });
+
+  // Backseat Driver: the driver talks back. The phone's own speech recognizer (offline when
+  // it can) turns it into text for the navigator, e.g. "I see a Texas plate".
+  private final ActivityResultLauncher<Intent> mBackseatListen =
+      registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), activityResult -> {
+        final Intent data = activityResult.getData();
+        if (activityResult.getResultCode() != Activity.RESULT_OK || data == null)
+          return;
+        final java.util.ArrayList<String> heard = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+        if (heard != null && !heard.isEmpty())
+          Backseat.driverSaid(heard.get(0));
       });
 
   private static final String MAIN_MENU_ID = "MAIN_MENU_BOTTOM_SHEET";
@@ -918,6 +933,24 @@ public class MwmActivity extends BaseMwmFragmentActivity
     }
     case help -> showHelp();
     case trackRecordingStatus -> showTrackSaveDialog();
+    case backseatTalk -> listenToDriver();
+    }
+  }
+
+  private void listenToDriver()
+  {
+    final Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                              .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                              .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                              .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                              .putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.backseat_listening_prompt));
+    try
+    {
+      mBackseatListen.launch(intent);
+    }
+    catch (ActivityNotFoundException e)
+    {
+      Toast.makeText(this, R.string.backseat_no_speech, Toast.LENGTH_LONG).show();
     }
   }
 

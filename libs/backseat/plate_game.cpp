@@ -265,6 +265,7 @@ void PlateGame::NewTrip(std::string routeKey)
   m_routeKey = std::move(routeKey);
   m_state = State::Idle;
   m_trip.clear();
+  m_repeatedThisTrip = false;
 }
 
 bool PlateGame::ShouldOffer(int tripsOnRoute, double distToManeuverM, int frustration)
@@ -326,7 +327,11 @@ PlateGame::Reply PlateGame::Plate(std::string const & code, int tier)
     return Make("plateGame.sameState", tier, vars);
   auto & commute = m_log.byRoute[m_routeKey];
   if (commute.count(code))
-    return Make("plateGame.repeat", tier, vars);
+  {
+    bool const first = !m_repeatedThisTrip;
+    m_repeatedThisTrip = true;
+    return Make(first ? "plateGame.repeatFirst" : "plateGame.repeat", tier, vars);
+  }
   commute.insert(code);
   m_log.lifetime.insert(code);
   m_trip.push_back(code);

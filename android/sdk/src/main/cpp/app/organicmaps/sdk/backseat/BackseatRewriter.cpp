@@ -92,4 +92,9 @@ JNIEXPORT void JNICALL Java_app_organicmaps_sdk_backseat_BackseatRewriter_native
   if (auto const & rewriter = Rewriter())
     rewriter->Answer(id, jni::ToNativeString(env, text));
 }
+
+JNIEXPORT void JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeDriverSaid(JNIEnv * env, jclass, jstring text)
+{
+  frm()->GetRoutingManager().BackseatDriverSaid(jni::ToNativeString(env, text));
+}
 }  // extern "C"

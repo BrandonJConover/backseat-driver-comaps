@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Backseat Driver strings (English only for now). -->
+<resources>
+  <string name="backseat_talk">Talk to Backseat Driver</string>
+  <string name="backseat_listening_prompt">Which plate? Or talk back.</string>
+  <string name="backseat_no_speech">This phone has no speech recognition app.</string>
+</resources>

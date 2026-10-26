@@ -127,7 +127,10 @@ TEST(PlateGameJudgesEveryPlate)
   CHECK(game.Log().lifetime.empty());
 
   CHECK_EQUAL(game.OnDriverSaid("New Mexico", 0)->key, std::string("plateGame.neighbor"));
-  CHECK_EQUAL(game.OnDriverSaid("another new mexico one", 0)->key, std::string("plateGame.repeat"));
+  auto again = game.OnDriverSaid("another new mexico one", 0);
+  CHECK_EQUAL(again->key, std::string("plateGame.repeatFirst"));
+  CHECK_EQUAL(again->text, std::string("We already have that one champ. Sometimes I wish I wasn't in this car."));
+  CHECK_EQUAL(game.OnDriverSaid("New Mexico", 0)->key, std::string("plateGame.repeat"));
   CHECK_EQUAL(game.OnDriverSaid("Ohio", 0)->key, std::string("plateGame.newFar"));
   auto rare = game.OnDriverSaid("no way, Hawaii!", 0);
   CHECK_EQUAL(rare->key, std::string("plateGame.rare"));
@@ -148,7 +151,7 @@ TEST(PlateGameJudgesEveryPlate)
   // Next trip on the same commute: New Mexico is old news.
   game.NewTrip("home>work");
   game.Offer(0);
-  CHECK_EQUAL(game.OnDriverSaid("New Mexico", 0)->key, std::string("plateGame.repeat"));
+  CHECK_EQUAL(game.OnDriverSaid("New Mexico", 0)->key, std::string("plateGame.repeatFirst"));
 }
 
 TEST(PlateGameRemembersBeingTurnedDown)
