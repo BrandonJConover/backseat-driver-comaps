@@ -15,6 +15,8 @@
 
 #include "platform/platform.hpp"
 
+#include "storage/country_info_getter.hpp"
+
 #include "geometry/mercator.hpp"
 
 #include "base/logging.hpp"
@@ -25,6 +27,7 @@
 namespace
 {
 std::string const kTripsFile = "backseat_trips.tsv";
+std::string const kPlatesFile = "backseat_plates.txt";
 size_t constexpr kMaxTrips = 200;
 /// A light this close to the turn point controls the junction.
 double constexpr kTrafficLightRadiusM = 30;
@@ -169,6 +172,34 @@ void AppendTrip(backseat::TripRecord const & r)
       << r.actualMinutes << '\t' << r.speedingShare << '\t' << r.missedTurns << '\t' << r.hardBrakes << '\t' << r.grade
       << '\n';
 }
+backseat::PlateLog LoadPlates()
+{
+  std::ifstream in(GetPlatform().SettingsPathForFile(kPlatesFile));
+  std::stringstream text;
+  text << in.rdbuf();
+  return backseat::PlateLog::Parse(text.str());
+}
+
+void SavePlates(backseat::PlateLog const & log)
+{
+  std::ofstream(GetPlatform().SettingsPathForFile(kPlatesFile)) << log.Serialize();
+}
+
+/// "Colorado" for the map region "US_Colorado_Denver", "British Columbia" for
+/// "Canada_British Columbia_Vancouver", "Mexico" for any part of Mexico.
+std::optional<std::string> PlateRegionOfMap(std::string const & countryId)
+{
+  if (countryId.rfind("Mexico", 0) == 0)
+    return std::string("Mexico");
+  for (std::string const prefix : {"US_", "Canada_"})
+  {
+    if (countryId.rfind(prefix, 0) != 0)
+      continue;
+    std::string region = countryId.substr(prefix.size());
+    return region.substr(0, region.find('_'));
+  }
+  return {};
+}
 }  // namespace
 
 BackseatAdapter::BackseatAdapter()
@@ -177,7 +208,9 @@ BackseatAdapter::BackseatAdapter()
   LOG(LINFO, ("Backseat Driver trip to", r.destination, "graded", report.overall.letter));
   AppendTrip(r);
 })
-{}
+{
+  m_navigator.SetPlateLog(LoadPlates(), &SavePlates);
+}
 
 void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::RoutingSession const & session,
                                        std::string const & destinationName)
@@ -205,6 +238,17 @@ void BackseatAdapter::SetDataSource(std::function<DataSource &()> getter)
 {
   m_dataSource = std::move(getter);
   m_navigator.SetPlaceLookup([this](backseat::LatLon const & at) { return PlaceAt(at); });
+}
+
+void BackseatAdapter::SetCountryInfoGetter(std::function<storage::CountryInfoGetter const &()> getter)
+{
+  m_countryInfo = std::move(getter);
+  m_navigator.SetRegionLookup([this](backseat::LatLon const & at) -> std::optional<std::string>
+  {
+    if (!m_countryInfo)
+      return {};
+    return PlateRegionOfMap(m_countryInfo().GetRegionCountryId(mercator::FromLatLon(at.lat, at.lon)));
+  });
 }
 
 void BackseatAdapter::SetTrafficLights(std::vector<m2::PointD> points)

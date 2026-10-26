@@ -335,6 +335,7 @@ RoutingManager::RoutingManager(Callbacks && callbacks, Delegate & delegate)
 {
   m_extrapolator.Enable(true);  // Keeps smooth arrow movement whether routing or not
   m_backseat.SetDataSource(m_callbacks.m_dataSourceGetter);
+  m_backseat.SetCountryInfoGetter(m_callbacks.m_countryInfoGetter);
   m_routingSession.Init(
 #ifdef SHOW_ROUTE_DEBUG_MARKS
       [this](m2::PointD const & pt)

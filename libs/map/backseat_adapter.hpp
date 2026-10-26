@@ -15,6 +15,11 @@
 
 class DataSource;
 
+namespace storage
+{
+class CountryInfoGetter;
+}
+
 namespace routing
 {
 class Route;
@@ -40,6 +45,11 @@ public:
 
   /// Map data, for naming the place of an unplanned stop ("Why are we stopping for gas?").
   void SetDataSource(std::function<DataSource &()> getter);
+  /// Map regions, so the license plate game knows which state the car is in.
+  void SetCountryInfoGetter(std::function<storage::CountryInfoGetter const &()> getter);
+  /// What the driver said out loud (speech recognition), e.g. "I see a Texas plate".
+  /// Call on the same thread as OnLocationUpdate.
+  void OnDriverSaid(std::string const & text) { m_navigator.OnDriverSaid(0, text); }
   /// Traffic lights on the route just built (mercator points). A left turn off a side street
   /// with no light there is treated as a stop sign, since stop signs aren't in the map data.
   void SetTrafficLights(std::vector<m2::PointD> points);
@@ -66,6 +76,7 @@ private:
 
   backseat::Navigator m_navigator;
   std::function<DataSource &()> m_dataSource;
+  std::function<storage::CountryInfoGetter const &()> m_countryInfo;
   mutable std::mutex m_lightsMutex;
   std::vector<m2::PointD> m_trafficLights;
   double m_lastBatteryCheckMs = 0;

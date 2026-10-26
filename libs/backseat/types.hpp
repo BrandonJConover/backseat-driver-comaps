@@ -215,6 +215,8 @@ enum class Category
   TurnCompleted,
   Instruction,
   Arrived,
+  /// The license plate game (plate_game.hpp); not used by the core engine.
+  PlateGame,
   Count
 };
 

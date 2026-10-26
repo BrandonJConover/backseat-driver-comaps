@@ -17,6 +17,8 @@ set(
   lines_data.hpp
   navigator.cpp
   navigator.hpp
+  plate_game.cpp
+  plate_game.hpp
   report.cpp
   report.hpp
   rewriter.cpp

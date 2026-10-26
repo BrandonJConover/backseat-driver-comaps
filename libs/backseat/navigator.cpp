@@ -108,6 +108,7 @@ Navigator::Navigator(EngineConfig config, std::vector<TripRecord> history, TripR
     std::random_device rd;
     m_config.rng = SeededRng(rd());
   }
+  m_plates = PlateGame(m_config.rng);
 }
 
 void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
@@ -130,6 +131,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
     m_plan.origin = {fix.lat, fix.lon};
   TrackStop(fix, route);
   TrackTraffic(fix, route);
+  TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
 }
 
 void Navigator::Poll(RouteSnapshot const & route) { Update(m_lastT, route); }
@@ -240,6 +242,9 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   {
     m_arrived = true;
     Say(m_engine->OnNav(NavEvent::Arrived(t)), false /* mayRewrite */);
+    m_heldPlateLines.clear();
+    if (auto const wrap = m_plates.WrapUp(Tier()))
+      SayPlate(t, *wrap);
     TripRecord const record = RecordTrip(*m_engine, m_plan);
     m_history.push_back(record);
     if (m_onTripRecorded)
@@ -287,6 +292,11 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   m_plan.destinationName = route.destination;
   m_plan.expectedMinutes = route.etaSeconds / 60;
   ResetTrip();
+  m_tripStartT = t;
+  std::string const routeKey = RouteKey(m_plan.origin, m_plan.destination);
+  m_tripsOnRoute = static_cast<int>(
+      std::count_if(m_history.begin(), m_history.end(), [&](TripRecord const & r) { return r.routeKey == routeKey; }));
+  m_plates.NewTrip(routeKey);
 
   SayNav(t, TripGreeting(m_history, m_config.rng));
   // Already low when the trip starts? Say so after the greeting.
@@ -310,7 +320,72 @@ void Navigator::ResetTrip()
   m_stopSince.reset();
   m_speeds.clear();
   m_inTraffic = false;
+  m_heldPlateLines.clear();
   m_gate.Clear();
+}
+
+void Navigator::SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange)
+{
+  m_plates.SetLog(std::move(log));
+  m_onPlateLog = std::move(onChange);
+}
+
+int Navigator::Tier() const
+{
+  int const f = m_engine ? m_engine->Frustration() : 0;
+  return f < 34 ? 0 : f < 67 ? 1 : 2;
+}
+
+void Navigator::TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot const & route)
+{
+  // Which state we're in barely changes; look it up every half minute.
+  if (m_regionLookup && tMs - m_lastRegionCheckT >= 30000)
+  {
+    m_lastRegionCheckT = tMs;
+    auto const name = m_regionLookup(here);
+    m_plates.SetHere(name ? MatchPlateRegion(*name) : std::nullopt);
+  }
+  bool const nearManeuver = route.turnId && route.distToTurnM < PlateGame::kHoldNearManeuverM;
+  if (!nearManeuver && !m_heldPlateLines.empty())
+  {
+    for (auto & line : m_heldPlateLines)
+      m_gate.Push(std::move(line), false);
+    m_heldPlateLines.clear();
+  }
+  // Offer once a trip, after the opening rundown has had its minute, on a long quiet stretch.
+  if (route.state != RouteState::OnRoute || m_plates.OfferedThisTrip() || tMs - m_tripStartT < 60000 || !route.turnId)
+    return;
+  if (PlateGame::ShouldOffer(m_tripsOnRoute, route.distToTurnM, m_engine->Frustration()))
+    SayPlate(tMs, m_plates.Offer(Tier()));
+}
+
+void Navigator::OnDriverSaid(double tMs, std::string const & text)
+{
+  if (!m_engine || m_arrived)
+    return;
+  m_lastT = std::max(m_lastT, tMs);
+  auto const reply = m_plates.OnDriverSaid(text, Tier());
+  if (!reply)
+    return;
+  SayPlate(m_lastT, *reply);
+  if (m_onPlateLog)
+    m_onPlateLog(m_plates.Log());
+}
+
+void Navigator::SayPlate(double tMs, PlateGame::Reply const & reply)
+{
+  Commentary c;
+  c.t = tMs;
+  c.category = Category::PlateGame;
+  c.text = reply.text;
+  c.frustration = m_engine ? m_engine->Frustration() : 0;
+  c.priority = Priority::Roast;
+  c.voiceSpeed = 1 + c.frustration / 250.0;
+  if (m_turnId && m_lastDistToTurnM < PlateGame::kHoldNearManeuverM && !m_arrived)
+    m_heldPlateLines.push_back(std::move(c));
+  else
+    // The driver is waiting for an answer; don't hold it up for the rewording model.
+    m_gate.Push(std::move(c), false);
 }
 
 void Navigator::Say(std::vector<Commentary> const & lines, bool mayRewrite)

@@ -8,6 +8,7 @@ add_executable(${PROJECT_NAME}
   main.cpp
   navigator_test.cpp
   parity_test.cpp
+  plate_game_test.cpp
   rewriter_test.cpp
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)

@@ -143,6 +143,7 @@ char const * ToString(Category c)
   case Category::TurnCompleted: return "turnCompleted";
   case Category::Instruction: return "instruction";
   case Category::Arrived: return "arrived";
+  case Category::PlateGame: return "plateGame";
   case Category::Count: break;
   }
   return "?";

@@ -7,6 +7,7 @@
 
 #include "backseat/engine.hpp"
 #include "backseat/history.hpp"
+#include "backseat/plate_game.hpp"
 #include "backseat/report.hpp"
 #include "backseat/rewriter.hpp"
 
@@ -69,6 +70,8 @@ struct RouteSnapshot
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
 using PlaceLookup = std::function<std::optional<Place>(LatLon const &)>;
+/// The state or province at a point, by name as the map has it ("Colorado"). Empty when unknown.
+using RegionLookup = std::function<std::optional<std::string>(LatLon const &)>;
 
 struct Fix
 {
@@ -101,6 +104,14 @@ public:
   void OnBattery(double tMs, double level, bool charging);
   /// Lets the navigator name the place of an unplanned stop ("Why are we stopping for gas?").
   void SetPlaceLookup(PlaceLookup lookup) { m_placeLookup = std::move(lookup); }
+  /// Lets the license plate game know which state the car is in ("a Colorado plate in Colorado?").
+  void SetRegionLookup(RegionLookup lookup) { m_regionLookup = std::move(lookup); }
+  /// Plates spotted on earlier trips, and where to save the log when it changes.
+  void SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange);
+  PlateLog const & GetPlateLog() const { return m_plates.Log(); }
+  /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate".
+  /// Same thread as OnFix.
+  void OnDriverSaid(double tMs, std::string const & text);
   /// On-device model that rewords roasts in real time. Without one, canned lines are spoken.
   void SetRewriter(std::shared_ptr<LineRewriter> rewriter) { m_gate.SetRewriter(std::move(rewriter)); }
 
@@ -118,6 +129,9 @@ private:
   void TrackStop(Fix const & fix, RouteSnapshot const & route);
   void TrackTraffic(Fix const & fix, RouteSnapshot const & route);
   void ResetTrip();
+  void TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot const & route);
+  void SayPlate(double tMs, PlateGame::Reply const & reply);
+  int Tier() const;
 
   EngineConfig m_config;
   std::vector<TripRecord> m_history;
@@ -149,6 +163,16 @@ private:
   };
   std::vector<SpeedSample> m_speeds;
   bool m_inTraffic = false;
+
+  // License plate game.
+  PlateGame m_plates;
+  RegionLookup m_regionLookup;
+  std::function<void(PlateLog const &)> m_onPlateLog;
+  int m_tripsOnRoute = 0;
+  double m_tripStartT = 0;
+  double m_lastRegionCheckT = -1e18;
+  /// Game lines held back while a maneuver is close; directions come first.
+  std::vector<Commentary> m_heldPlateLines;
 
   std::optional<int> m_batteryPercent;
   std::optional<bool> m_charging;
