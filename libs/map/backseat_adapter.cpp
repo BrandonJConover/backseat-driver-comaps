@@ -529,9 +529,10 @@ std::optional<backseat::Sight> BackseatAdapter::SightAt(backseat::LatLon const &
     }
     if (!sight)
       return;
-    std::string const name = ft.GetTranslatedName().m_primary;
-    if (name.empty())
+    auto const primary = ft.GetTranslatedName().m_primary;
+    if (!primary || primary->empty())
       return;
+    std::string const & name = *primary;
     m2::PointD const where = feature::GetCenter(ft);
     double const distance = mercator::DistanceOnEarth(center, where);
     if (distance > kBesideM)
