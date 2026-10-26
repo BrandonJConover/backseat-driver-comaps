@@ -255,6 +255,8 @@ enum class Category
   Partner,
   /// Asking for music (navigator only).
   Music,
+  /// Holidays, Grinch edition (navigator only).
+  Holiday,
   Count
 };
 

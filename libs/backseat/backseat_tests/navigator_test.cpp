@@ -759,3 +759,40 @@ TEST(NavigatorAsksForMusicThenHatesIt)
   CHECK(SaidLineOf(said[1].text, "music.judge"));
   CHECK(said[1].t >= 17 * 60000 + 45000);
 }
+
+TEST(NavigatorHatesChristmasLights)
+{
+  auto const at = [](int month, int day, int hour)
+  {
+    return [=](double)
+    {
+      std::tm tm{};
+      tm.tm_mon = month - 1;
+      tm.tm_mday = day;
+      tm.tm_hour = hour;
+      return tm;
+    };
+  };
+  auto const stopAtALight = [&](std::function<std::tm(double)> clock)
+  {
+    Navigator nav(Config());
+    nav.SetLocalTime(clock);
+    nav.SetTrafficLightLookup([](LatLon const &) { return true; });
+    nav.OnFix(At(0, 15), Far());
+    nav.OnFix(At(5000, 0), Far());
+    return LinesOf(nav.TakeLines(), Category::Holiday);
+  };
+  auto said = stopAtALight(at(12, 18, 19));
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK_EQUAL(said[0].text, std::string("It's that time of year again. Christmas. I hate lights."));
+  CHECK(stopAtALight(at(12, 18, 13)).empty());  // daytime
+  CHECK(stopAtALight(at(7, 18, 21)).empty());   // July
+
+  // Other holidays open the trip.
+  Navigator nav(Config());
+  nav.SetLocalTime(at(10, 31, 9));
+  nav.OnFix(At(0, 15), Far());
+  said = LinesOf(nav.TakeLines(), Category::Holiday);
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK(SaidLineOf(said[0].text, "holiday.halloween"));
+}

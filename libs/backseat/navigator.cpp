@@ -257,6 +257,18 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
       m_stopWanderM = 0;
       m_stopAnnounced = false;
       m_pullOverSaid = false;
+      // Christmas season, after dark, at a red light: the GPS has had it with lights.
+      if (!m_christmasSaid && m_lightLookup && KnowsTheDate(fix.tMs))
+      {
+        std::tm const tm = LocalTime(fix.tMs);
+        bool const season = tm.tm_mon == 11 || (tm.tm_mon == 10 && tm.tm_mday >= 25);
+        bool const dark = tm.tm_hour >= 17 || tm.tm_hour < 6;
+        if (season && dark && m_lightLookup(here))
+        {
+          m_christmasSaid = true;
+          SayLine(fix.tMs, Category::Holiday, "holiday.christmas");
+        }
+      }
     }
     return;
   }
@@ -444,6 +456,7 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   Say(m_engine->OnNav(NavEvent::DestinationSet(t, route.destination)));
   SayVenue(t, route);
   SayRoutine(t, route);
+  SayHoliday(t);
 }
 
 void Navigator::TrackLongDrive(double tMs, RouteSnapshot const & route)
@@ -535,6 +548,41 @@ void Navigator::TrackMusic(double tMs, RouteSnapshot const & route)
   }
 }
 
+/// Timestamps from before 2001 aren't a wall clock (a replay or a test starting at zero).
+bool Navigator::KnowsTheDate(double ms) const { return m_localTime || ms > 978307200000.0; }
+
+std::tm Navigator::LocalTime(double ms) const
+{
+  if (m_localTime)
+    return m_localTime(ms);
+  std::time_t const s = static_cast<std::time_t>(ms / 1000);
+  std::tm tm{};
+  localtime_r(&s, &tm);
+  return tm;
+}
+
+void Navigator::SayHoliday(double t)
+{
+  if (!KnowsTheDate(t))
+    return;
+  std::tm const tm = LocalTime(t);
+  int const month = tm.tm_mon + 1;
+  int const day = tm.tm_mday;
+  char const * key = nullptr;
+  if (month == 10 && day == 31)
+    key = "holiday.halloween";
+  else if ((month == 1 && day == 1) || (month == 12 && day == 31 && tm.tm_hour >= 18))
+    key = "holiday.newYear";
+  else if (month == 2 && day == 14)
+    key = "holiday.valentines";
+  else if (month == 7 && day == 4)
+    key = "holiday.july4";
+  else if (month == 11 && tm.tm_wday == 4 && day >= 22 && day <= 28)  // fourth Thursday
+    key = "holiday.thanksgiving";
+  if (key)
+    SayLine(t, Category::Holiday, key);
+}
+
 void Navigator::SayVenue(double t, RouteSnapshot const & route)
 {
   if (!m_venueLookup)
@@ -589,6 +637,7 @@ void Navigator::ResetTrip()
   m_gameRefused = false;
   m_sightsSaid.clear();
   m_musicAsked = false;
+  m_christmasSaid = false;
   m_musicJudged = false;
   m_musicPlaying = false;
   m_lastSightT = -1e18;

@@ -11,6 +11,7 @@
 #include "backseat/report.hpp"
 #include "backseat/rewriter.hpp"
 
+#include <ctime>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -163,6 +164,9 @@ public:
   void SetBridgeLookup(BridgeLookup lookup) { m_bridgeLookup = std::move(lookup); }
   /// Lets the GPS ask for music on a quiet drive, and keep it to itself when music is on.
   void SetMusicLookup(MusicLookup lookup) { m_musicLookup = std::move(lookup); }
+  /// Local calendar time for a timestamp (ms since the epoch), for holidays. Defaults to the
+  /// device's time zone; tests swap it.
+  void SetLocalTime(std::function<std::tm(double)> localTime) { m_localTime = std::move(localTime); }
   /// Lets the GPS play tour guide, without enthusiasm ("On your right, there's a Starbucks. That's it.").
   void SetSightLookup(SightLookup lookup) { m_sightLookup = std::move(lookup); }
   /// Lets the GPS comment on where we're going ("Oh, we are getting coffee?").
@@ -204,6 +208,9 @@ private:
   void SayLemon(double tMs);
   void SayVenue(double tMs, RouteSnapshot const & route);
   void SayRoutine(double tMs, RouteSnapshot const & route);
+  void SayHoliday(double tMs);
+  std::tm LocalTime(double ms) const;
+  bool KnowsTheDate(double ms) const;
   void TrackLongDrive(double tMs, RouteSnapshot const & route);
   void TrackSights(Fix const & fix, RouteSnapshot const & route);
   void TrackMusic(double tMs, RouteSnapshot const & route);
@@ -241,6 +248,8 @@ private:
   VenueLookup m_venueLookup;
   SightLookup m_sightLookup;
   MusicLookup m_musicLookup;
+  std::function<std::tm(double)> m_localTime;
+  bool m_christmasSaid = false;
   double m_lastMusicCheckT = -1e18;
   bool m_musicAsked = false;
   bool m_musicJudged = false;
