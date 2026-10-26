@@ -130,6 +130,10 @@ jobs:
           # Leg 2: north on Colorado Blvd to the destination.
           xcrun simctl location "$DEVICE" start --speed=15 39.74010,-104.94094 39.74300,-104.94080 39.74750,-104.94075
           sleep 75
+          # Hand-picked points don't follow the road's curves exactly; finish by pulling up at the
+          # destination itself so the arrival is certain.
+          xcrun simctl location "$DEVICE" start --speed=5 "$DESTINATION" "$DESTINATION"
+          sleep 30
           shot 4-arrived
           sleep 10
           kill $LOGPID || true
