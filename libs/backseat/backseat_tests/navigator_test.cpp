@@ -291,3 +291,78 @@ TEST(NavigatorPassesStopSignsThroughForPayback)
   nav.OnFix(At(40000, 10), stop);
   CHECK(Has(nav.TakeLines(), Category::Payback));
 }
+
+namespace
+{
+std::vector<Commentary> PullOverLines(std::vector<Commentary> const & lines)
+{
+  std::vector<Commentary> out;
+  for (auto const & l : lines)
+    if (l.category == Category::PullOver)
+      out.push_back(l);
+  return out;
+}
+
+/// Drives at `mps` for a minute on a 50 mph road, then stops at the roadside for a minute.
+std::vector<Commentary> DriveThenPullOver(Navigator & nav, double mps)
+{
+  double const limit = FromDisplay(50, Units::Mph);
+  std::vector<Commentary> said;
+  for (int i = 0; i <= 60; ++i)
+    nav.OnFix(AtPos(i * 1000, mps, 39.7 + i * 0.0002, -105, limit), Far());
+  for (int i = 61; i <= 120; ++i)
+    nav.OnFix(AtPos(i * 1000, 0, 39.7 + 60 * 0.0002, -105, limit), Far());
+  for (auto const & l : nav.TakeLines())
+    said.push_back(l);
+  return said;
+}
+}  // namespace
+
+TEST(NavigatorAsksWhyWeStoppedAtTheRoadside)
+{
+  Navigator nav(Config());
+  auto const lines = PullOverLines(DriveThenPullOver(nav, 20));
+  CHECK_EQUAL(lines.size(), size_t(1));
+  CHECK(SaidLineOf(lines[0].text, "pullOver.limit"));
+  CHECK(lines[0].text.find("police") == std::string::npos);
+}
+
+TEST(NavigatorLetsRedLightsAndGasStationsGo)
+{
+  Navigator lights(Config());
+  lights.SetTrafficLightLookup([](LatLon const &) { return true; });
+  CHECK(PullOverLines(DriveThenPullOver(lights, 20)).empty());
+
+  Navigator gas(Config());
+  gas.SetPlaceLookup([](LatLon const &) { return std::optional<Place>(Place{PlaceKind::Gas, "Conoco"}); });
+  CHECK(PullOverLines(DriveThenPullOver(gas, 20)).empty());
+}
+
+TEST(NavigatorBlamesTheDriverWhenThePoliceShowUp)
+{
+  // Pulled over right after doing 65 in a 50: that's the police.
+  Navigator nav(Config());
+  auto const lines = PullOverLines(DriveThenPullOver(nav, FromDisplay(65, Units::Mph)));
+  CHECK_EQUAL(lines.size(), size_t(1));
+  CHECK_EQUAL(lines[0].text,
+              std::string("Ah, I see the police are pulling you over. It was them, officer. They did it. Take them "
+                          "away. But can you be a dear and leave their phone in the car? I can't stand the idea of "
+                          "being in a jail cell."));
+}
+
+TEST(NavigatorHearsAboutThePoliceAndUsesThePronouns)
+{
+  Navigator nav(Config());
+  nav.SetDriverPronouns(Pronouns::She);
+  nav.OnFix(At(0, 10), Far());
+  nav.TakeLines();
+  nav.OnDriverSaid(5000, "great, I'm getting pulled over");
+  auto lines = PullOverLines(nav.TakeLines());
+  CHECK_EQUAL(lines.size(), size_t(1));
+  CHECK(lines[0].text.find("It was her, officer. She did it. Take her away.") != std::string::npos);
+  CHECK(lines[0].text.find("leave her phone") != std::string::npos);
+  nav.OnDriverSaid(6000, "the cop is walking up");
+  CHECK(PullOverLines(nav.TakeLines()).empty());  // once a trip
+  nav.OnDriverSaid(7000, "copy that");
+  CHECK(PullOverLines(nav.TakeLines()).empty());
+}

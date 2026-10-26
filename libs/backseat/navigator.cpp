@@ -1,8 +1,11 @@
 #include "backseat/navigator.hpp"
 
+#include "backseat/lines.hpp"
 #include "backseat/rundown.hpp"
+#include "backseat/units.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <random>
 
@@ -23,6 +26,13 @@ double constexpr kNearDestinationM = 250;
 /// If the GPS position never strays this far from where the car stopped, the phone stayed
 /// in the car. Carried around a gas station, a phone's fix wanders well past it.
 double constexpr kPhoneWanderedM = 30;
+/// Stopped this long at the roadside, with nothing around to explain it, is pulling over.
+/// Long enough to sit out most stop-and-go; red lights are ruled out by the light lookup.
+double constexpr kPullOverAfterMs = 45000;
+/// A pull-over this soon after serious speeding is probably the police.
+double constexpr kPoliceAfterSpeedingMs = 120000;
+/// "Serious" speeding: this far over the limit (~10 mph).
+double constexpr kSeriousOverMps = 4.5;
 /// Traffic: judged over this window, a crawl is under kCrawlShare of the limit on average,
 /// and it's over once the average is back above kClearShare.
 double constexpr kTrafficWindowMs = 90000;
@@ -129,6 +139,12 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   Say(m_engine->OnTelemetry(s));
   if (!m_plan.origin.lat && !m_plan.origin.lon)
     m_plan.origin = {fix.lat, fix.lon};
+  if (fix.speedLimitMps)
+  {
+    m_lastLimitMps = fix.speedLimitMps;
+    if (fix.speedMps > *fix.speedLimitMps + kSeriousOverMps)
+      m_lastBadSpeedingT = fix.tMs;
+  }
   TrackStop(fix, route);
   TrackTraffic(fix, route);
   TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
@@ -161,6 +177,7 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
       m_stopAt = here;
       m_stopWanderM = 0;
       m_stopAnnounced = false;
+      m_pullOverSaid = false;
     }
     return;
   }
@@ -176,6 +193,24 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
   m_stopWanderM = std::max(m_stopWanderM, DistanceM(m_stopAt, here));
   bool const hasDestination = route.destinationPoint.lat || route.destinationPoint.lon;
   bool const nearDestination = hasDestination && DistanceM(here, route.destinationPoint) < kNearDestinationM;
+  if (!m_pullOverSaid && !nearDestination && !m_inTraffic && route.state == RouteState::OnRoute &&
+      fix.tMs - *m_stopSince >= kPullOverAfterMs)
+  {
+    m_pullOverSaid = true;
+    // Anything that explains the stop rules out the roadside: a light, a lot, a gas station.
+    bool const explained = (m_lightLookup && m_lightLookup(m_stopAt)) ||
+                           (m_parkingLookup && m_parkingLookup(m_stopAt)) || (m_placeLookup && m_placeLookup(m_stopAt));
+    if (!explained)
+    {
+      if (m_lastBadSpeedingT && fix.tMs - *m_lastBadSpeedingT < kPoliceAfterSpeedingMs)
+        SayPolice(fix.tMs);
+      else if (m_lastLimitMps)
+        SayPullOver(fix.tMs, "pullOver.limit",
+                    {{"limit", std::to_string(static_cast<int>(std::lround(ToDisplay(*m_lastLimitMps, m_config.units))))}});
+      else
+        SayPullOver(fix.tMs, "pullOver");
+    }
+  }
   if (!m_stopAnnounced && !nearDestination && fix.tMs - *m_stopSince >= kUnplannedStopAfterMs)
   {
     m_stopAnnounced = true;
@@ -323,6 +358,9 @@ void Navigator::ResetTrip()
   m_inTraffic = false;
   m_heldPlateLines.clear();
   m_lastFix.reset();
+  m_pullOverSaid = false;
+  m_policeSaid = false;
+  m_lastBadSpeedingT.reset();
   m_gate.Clear();
 }
 
@@ -366,6 +404,21 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
   if (!m_engine || m_arrived)
     return;
   m_lastT = std::max(m_lastT, tMs);
+  // "We're getting pulled over": the GPS knows exactly whose fault that is.
+  std::string words = " ";
+  for (unsigned char const ch : text)
+    words += std::isalnum(ch) ? static_cast<char>(std::tolower(ch)) : ' ';
+  words += ' ';
+  for (char const * cue : {" police ", " cop ", " cops ", " officer ", " pulled over ", " pulling us over ",
+                           " pulling me over ", " trooper "})
+  {
+    if (words.find(cue) != std::string::npos)
+    {
+      if (!m_policeSaid)
+        SayPolice(m_lastT);
+      return;
+    }
+  }
   auto const reply = m_plates.OnDriverSaid(text, Tier(), Parked());
   if (!reply)
     return;
@@ -383,6 +436,34 @@ bool Navigator::Parked() const
   if (!m_lastFix || !m_parkingLookup || m_lastFix->speedMps >= kResumedMps)
     return false;
   return m_parkingLookup({m_lastFix->lat, m_lastFix->lon});
+}
+
+void Navigator::SayPullOver(double tMs, std::string const & key, Vars vars)
+{
+  auto const & options = LinesFor(key, Tier());
+  double const r = m_config.rng ? m_config.rng() : 0;
+  Commentary c;
+  c.t = tMs;
+  c.category = Category::PullOver;
+  c.text = Fill(options[std::min(options.size() - 1, static_cast<size_t>(r * options.size()))], vars);
+  c.frustration = m_engine ? m_engine->Frustration() : 0;
+  c.priority = Priority::Roast;
+  c.voiceSpeed = 1 + c.frustration / 250.0;
+  // Brandon's lines; the rewording model leaves them alone.
+  m_gate.Push(std::move(c), false);
+}
+
+void Navigator::SayPolice(double tMs)
+{
+  if (m_policeSaid)
+    return;
+  m_policeSaid = true;
+  switch (m_pronouns)
+  {
+  case Pronouns::He: SayPullOver(tMs, "police", {{"them", "him"}, {"theycap", "He"}, {"their", "his"}}); break;
+  case Pronouns::She: SayPullOver(tMs, "police", {{"them", "her"}, {"theycap", "She"}, {"their", "her"}}); break;
+  case Pronouns::They: SayPullOver(tMs, "police", {{"them", "them"}, {"theycap", "They"}, {"their", "their"}}); break;
+  }
 }
 
 void Navigator::SayPlate(double tMs, PlateGame::Reply const & reply)

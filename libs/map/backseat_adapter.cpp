@@ -21,6 +21,7 @@
 
 #include "base/logging.hpp"
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 
@@ -239,6 +240,15 @@ void BackseatAdapter::SetDataSource(std::function<DataSource &()> getter)
   m_dataSource = std::move(getter);
   m_navigator.SetPlaceLookup([this](backseat::LatLon const & at) { return PlaceAt(at); });
   m_navigator.SetParkingLookup([this](backseat::LatLon const & at) { return InParkingLot(at); });
+  // A stop within a light's queue is a red light, not pulling over.
+  m_navigator.SetTrafficLightLookup([this](backseat::LatLon const & at)
+  {
+    double constexpr kRedLightQueueM = 60;
+    m2::PointD const p = mercator::FromLatLon(at.lat, at.lon);
+    std::lock_guard lock(m_lightsMutex);
+    return std::any_of(m_trafficLights.begin(), m_trafficLights.end(), [&](m2::PointD const & light)
+    { return mercator::DistanceOnEarth(p, light) < kRedLightQueueM; });
+  });
 }
 
 void BackseatAdapter::SetCountryInfoGetter(std::function<storage::CountryInfoGetter const &()> getter)

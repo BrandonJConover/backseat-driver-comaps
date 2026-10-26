@@ -70,6 +70,17 @@ struct RouteSnapshot
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
 using PlaceLookup = std::function<std::optional<Place>(LatLon const &)>;
+/// Whether there's a traffic light (or similar reason to wait) right by a point.
+using TrafficLightLookup = std::function<bool(LatLon const &)>;
+
+/// How the GPS refers to the driver when it throws them under the bus ("It was them, officer").
+enum class Pronouns
+{
+  They,
+  He,
+  She
+};
+
 /// Whether a point is in a parking lot (on a parking aisle or inside a parking area).
 using ParkingLookup = std::function<bool(LatLon const &)>;
 /// The state or province at a point, by name as the map has it ("Colorado"). Empty when unknown.
@@ -110,6 +121,9 @@ public:
   void SetRegionLookup(RegionLookup lookup) { m_regionLookup = std::move(lookup); }
   /// Plates called out in a parking lot don't count ("Hey that's cheating").
   void SetParkingLookup(ParkingLookup lookup) { m_parkingLookup = std::move(lookup); }
+  /// Stops next to a traffic light are red lights, not pulling over.
+  void SetTrafficLightLookup(TrafficLightLookup lookup) { m_lightLookup = std::move(lookup); }
+  void SetDriverPronouns(Pronouns p) { m_pronouns = p; }
   /// Plates spotted on earlier trips, and where to save the log when it changes.
   void SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange);
   PlateLog const & GetPlateLog() const { return m_plates.Log(); }
@@ -135,6 +149,8 @@ private:
   void ResetTrip();
   void TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot const & route);
   void SayPlate(double tMs, PlateGame::Reply const & reply);
+  void SayPullOver(double tMs, std::string const & key, Vars vars = {});
+  void SayPolice(double tMs);
   int Tier() const;
   bool Parked() const;
 
@@ -158,6 +174,13 @@ private:
   LatLon m_stopAt;
   double m_stopWanderM = 0;
   bool m_stopAnnounced = false;
+  /// Pulled over at the roadside: said once per stop. The police line once per trip.
+  bool m_pullOverSaid = false;
+  bool m_policeSaid = false;
+  std::optional<double> m_lastLimitMps;
+  std::optional<double> m_lastBadSpeedingT;
+  TrafficLightLookup m_lightLookup;
+  Pronouns m_pronouns = Pronouns::They;
 
   // Traffic: recent (time, speed, limit) to judge a crawl, and whether we're in one.
   struct SpeedSample

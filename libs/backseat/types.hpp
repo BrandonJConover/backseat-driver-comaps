@@ -217,6 +217,8 @@ enum class Category
   Arrived,
   /// The license plate game (plate_game.hpp); not used by the core engine.
   PlateGame,
+  /// Pulled over at the roadside, or by the police (navigator only).
+  PullOver,
   Count
 };
 
