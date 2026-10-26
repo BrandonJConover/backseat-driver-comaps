@@ -80,6 +80,20 @@ enum class PlaceKind
   Other
 };
 
+/// Destinations worth a comment of their own.
+enum class Venue
+{
+  Coffee,
+  ThemePark,
+  Gym,
+  Airport,
+  Mall,
+  Zoo,
+  Beach,
+  Cinema,
+  Electronics
+};
+
 struct Place
 {
   PlaceKind kind = PlaceKind::Other;
@@ -221,6 +235,10 @@ enum class Category
   PullOver,
   /// Scared on a bridge or in a sharp curve (navigator only).
   Fear,
+  /// Where we're headed: coffee, a theme park, the airport (navigator only).
+  Venue,
+  /// A jab after the driver keeps getting lost (navigator only).
+  Autopilot,
   Count
 };
 

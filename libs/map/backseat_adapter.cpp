@@ -242,6 +242,7 @@ void BackseatAdapter::SetDataSource(std::function<DataSource &()> getter)
   m_dataSource = std::move(getter);
   m_navigator.SetPlaceLookup([this](backseat::LatLon const & at) { return PlaceAt(at); });
   m_navigator.SetParkingLookup([this](backseat::LatLon const & at) { return InParkingLot(at); });
+  m_navigator.SetVenueLookup([this](backseat::LatLon const & at) { return VenueAt(at); });
   m_navigator.SetBridgeLookup([this](backseat::LatLon const & at, double bearing) { return BridgeAt(at, bearing); });
   // A stop within a light's queue is a red light, not pulling over.
   m_navigator.SetTrafficLightLookup([this](backseat::LatLon const & at)
@@ -379,6 +380,64 @@ backseat::Bridge BackseatAdapter::BridgeAt(backseat::LatLon const & at, double b
     }
   }, mercator::RectByCenterXYAndSizeInMeters(center, kWaterSearchM), scales::GetUpperScale());
   return water ? backseat::Bridge::Water : backseat::Bridge::Land;
+}
+
+std::optional<backseat::Venue> BackseatAdapter::VenueAt(backseat::LatLon const & at) const
+{
+  if (!m_dataSource)
+    return {};
+  using backseat::Venue;
+  auto const & c = classif();
+  static std::vector<std::pair<uint32_t, Venue>> const kVenues = {
+      {c.GetTypeByPath({"amenity", "cafe"}), Venue::Coffee},
+      {c.GetTypeByPath({"shop", "coffee"}), Venue::Coffee},
+      {c.GetTypeByPath({"tourism", "theme_park"}), Venue::ThemePark},
+      {c.GetTypeByPath({"leisure", "water_park"}), Venue::ThemePark},
+      {c.GetTypeByPath({"leisure", "fitness_centre"}), Venue::Gym},
+      {c.GetTypeByPath({"aeroway", "aerodrome"}), Venue::Airport},
+      {c.GetTypeByPath({"aeroway", "terminal"}), Venue::Airport},
+      {c.GetTypeByPath({"shop", "mall"}), Venue::Mall},
+      {c.GetTypeByPath({"tourism", "zoo"}), Venue::Zoo},
+      {c.GetTypeByPath({"natural", "beach"}), Venue::Beach},
+      {c.GetTypeByPath({"amenity", "cinema"}), Venue::Cinema},
+      {c.GetTypeByPath({"shop", "electronics"}), Venue::Electronics},
+      {c.GetTypeByPath({"shop", "mobile_phone"}), Venue::Electronics}};
+
+  // The place itself, or one whose grounds contain the point (a theme park, an airport). Far
+  // enough to cover parking out front, close enough not to pick up the cafe next door's
+  // neighbor. Points win over areas: a cafe inside a mall is coffee.
+  double constexpr kNearM = 60;
+  m2::PointD const center = mercator::FromLatLon(at.lat, at.lon);
+  std::optional<Venue> best;
+  double bestDistance = 0;
+  m_dataSource().ForEachInRect([&](FeatureType & ft)
+  {
+    std::optional<Venue> venue;
+    for (uint32_t type : feature::TypesHolder(ft))
+    {
+      ftype::TruncValue(type, 2);
+      for (auto const & [t, v] : kVenues)
+        if (t == type)
+          venue = v;
+    }
+    if (!venue)
+      return;
+    double distance = mercator::DistanceOnEarth(center, feature::GetCenter(ft));
+    if (ft.GetGeomType() == feature::GeomType::Area)
+    {
+      if (!ft.GetLimitRect(scales::GetUpperScale()).IsPointInside(center))
+        return;
+      distance += 1000;  // a containing area loses to any point nearby
+    }
+    else if (distance > kNearM)
+      return;
+    if (!best || distance < bestDistance)
+    {
+      best = venue;
+      bestDistance = distance;
+    }
+  }, mercator::RectByCenterXYAndSizeInMeters(center, 2 * kNearM), scales::GetUpperScale());
+  return best;
 }
 
 bool BackseatAdapter::InParkingLot(backseat::LatLon const & at) const

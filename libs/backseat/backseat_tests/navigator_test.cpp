@@ -424,3 +424,89 @@ TEST(NavigatorYelpsInASharpCurveButNotAtATurn)
     turning.OnFix(Heading(i * 1000, 12, 30.0 * i), OnRoute(1, TurnKind::Left, 20));
   CHECK(FearLines(turning.TakeLines()).empty());
 }
+
+namespace
+{
+std::vector<Commentary> LinesOf(std::vector<Commentary> const & lines, Category c)
+{
+  std::vector<Commentary> out;
+  for (auto const & l : lines)
+    if (l.category == c)
+      out.push_back(l);
+  return out;
+}
+
+LatLon const kCafe{39.70, -104.98};
+LatLon const kPark{39.80, -105.00};
+
+RouteSnapshot Trip(LatLon from, LatLon to)
+{
+  RouteSnapshot r = OnRoute(1, TurnKind::Left, 2000);
+  r.origin = from;
+  r.destinationPoint = to;
+  return r;
+}
+
+std::optional<Venue> TestVenues(LatLon const & p)
+{
+  if (p.lat == kCafe.lat && p.lon == kCafe.lon)
+    return Venue::Coffee;
+  if (p.lat == kPark.lat && p.lon == kPark.lon)
+    return Venue::ThemePark;
+  return std::nullopt;
+}
+}  // namespace
+
+TEST(NavigatorOrdersCoffeeOnTheWayToACafe)
+{
+  Navigator nav(Config());
+  nav.SetVenueLookup(TestVenues);
+  nav.OnFix(At(0, 10), Trip({39.75, -104.99}, kCafe));
+  auto lines = LinesOf(nav.TakeLines(), Category::Venue);
+  CHECK_EQUAL(lines.size(), size_t(1));
+  CHECK_EQUAL(lines[0].text, std::string("Oh, we are getting coffee? I'll take a three pump caramel espresso, hold the caramel."));
+}
+
+TEST(NavigatorNoticesYouForgotItsDrink)
+{
+  Navigator nav(Config());
+  nav.SetVenueLookup(TestVenues);
+  nav.OnFix(At(0, 10), Trip(kCafe, {39.75, -104.99}));
+  auto lines = LinesOf(nav.TakeLines(), Category::Venue);
+  CHECK_EQUAL(lines.size(), size_t(1));
+  CHECK_EQUAL(lines[0].text, std::string("You forgot my drink again, didn't you!"));
+}
+
+TEST(NavigatorDreadsTheThemeParkOnItsBattery)
+{
+  Navigator nav(Config());
+  nav.SetVenueLookup(TestVenues);
+  nav.OnBattery(0, 0.62, false);
+  nav.OnFix(At(0, 10), Trip({39.75, -104.99}, kPark));
+  auto lines = LinesOf(nav.TakeLines(), Category::Venue);
+  CHECK_EQUAL(lines.size(), size_t(1));
+  CHECK(lines[0].text.find("theme park! My accelerometers are tingling!") != std::string::npos);
+  CHECK(lines[0].text.find("my battery is at 62 percent and I won't last the entire day") != std::string::npos);
+
+  // Nowhere special: nothing to say.
+  Navigator plain(Config());
+  plain.SetVenueLookup(TestVenues);
+  plain.OnFix(At(0, 10), Trip({39.75, -104.99}, {39.76, -104.90}));
+  CHECK(LinesOf(plain.TakeLines(), Category::Venue).empty());
+}
+
+TEST(NavigatorSuggestsAutopilotOnTheThirdReroute)
+{
+  Navigator nav(Config());
+  RouteSnapshot off = Far();
+  off.state = RouteState::OffRoute;
+  for (int i = 0; i < 4; ++i)
+  {
+    nav.OnFix(At(i * 20000, 10), Far());
+    nav.OnFix(At(i * 20000 + 10000, 10), off);
+    auto const said = LinesOf(nav.TakeLines(), Category::Autopilot);
+    CHECK_EQUAL(said.size(), size_t(i == 2 ? 1 : 0));
+    if (i == 2)
+      CHECK_EQUAL(said[0].text, std::string("You know there are cars out there that come with autopilot. You might want to look into it. Just saying."));
+  }
+}

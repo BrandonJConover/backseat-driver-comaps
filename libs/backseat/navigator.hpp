@@ -83,6 +83,9 @@ enum class Bridge
 /// Whether the car is on a bridge, given where it is and which way it's heading.
 using BridgeLookup = std::function<Bridge(LatLon const &, double bearingDeg)>;
 
+/// What kind of notable place is at a point (a coffee shop, a theme park). Empty when nothing is.
+using VenueLookup = std::function<std::optional<Venue>(LatLon const &)>;
+
 /// How the GPS refers to the driver when it throws them under the bus ("It was them, officer").
 enum class Pronouns
 {
@@ -136,6 +139,8 @@ public:
   void SetDriverPronouns(Pronouns p) { m_pronouns = p; }
   /// Lets the GPS panic on bridges.
   void SetBridgeLookup(BridgeLookup lookup) { m_bridgeLookup = std::move(lookup); }
+  /// Lets the GPS comment on where we're going ("Oh, we are getting coffee?").
+  void SetVenueLookup(VenueLookup lookup) { m_venueLookup = std::move(lookup); }
   /// Plates spotted on earlier trips, and where to save the log when it changes.
   void SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange);
   PlateLog const & GetPlateLog() const { return m_plates.Log(); }
@@ -164,6 +169,7 @@ private:
   void SayLine(double tMs, Category category, std::string const & key, Vars vars = {});
   void TrackFear(Fix const & fix, RouteSnapshot const & route);
   void SayPolice(double tMs);
+  void SayVenue(double tMs, RouteSnapshot const & route);
   int Tier() const;
   bool Parked() const;
 
@@ -194,6 +200,10 @@ private:
   std::optional<double> m_lastBadSpeedingT;
   TrafficLightLookup m_lightLookup;
   Pronouns m_pronouns = Pronouns::They;
+
+  VenueLookup m_venueLookup;
+  /// Reroutes this trip; the third one gets the autopilot line.
+  int m_reroutes = 0;
 
   // Fear: bridges and sharp curves.
   BridgeLookup m_bridgeLookup;

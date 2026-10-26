@@ -41,6 +41,8 @@ double constexpr kCurveYelpEveryMs = 90000;
 /// Regular bridges are everywhere in a city (every overpass); water is always worth a scream.
 double constexpr kLandBridgeYelpEveryMs = 600000;
 double constexpr kWaterBridgeYelpEveryMs = 60000;
+/// Lost this many times in one trip, the GPS suggests a car that drives itself.
+int constexpr kAutopilotAfterReroutes = 3;
 /// Traffic: judged over this window, a crawl is under kCrawlShare of the limit on average,
 /// and it's over once the average is back above kClearShare.
 double constexpr kTrafficWindowMs = 90000;
@@ -305,6 +307,8 @@ void Navigator::Update(double t, RouteSnapshot const & route)
         Say(m_engine->OnNav(NavEvent::MissedTurn(t)));
       Say(m_engine->OnNav(NavEvent::Rerouted(t)));
       m_rerouting = true;
+      if (++m_reroutes == kAutopilotAfterReroutes)
+        SayLine(t, Category::Autopilot, "autopilot");
     }
     return;
   }
@@ -354,6 +358,37 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   if (m_plan.expectedMinutes > 0)
     SayNav(t, PredictTrip(m_history, m_plan, m_config.rng).text);
   Say(m_engine->OnNav(NavEvent::DestinationSet(t, route.destination)));
+  SayVenue(t, route);
+}
+
+void Navigator::SayVenue(double t, RouteSnapshot const & route)
+{
+  if (!m_venueLookup)
+    return;
+  auto const isSet = [](LatLon const & p) { return p.lat || p.lon; };
+  std::optional<Venue> const to = isSet(route.destinationPoint) ? m_venueLookup(route.destinationPoint) : std::nullopt;
+  // Leaving the coffee shop empty-handed (as far as the GPS is concerned).
+  if (to != Venue::Coffee && isSet(route.origin) && m_venueLookup(route.origin) == Venue::Coffee)
+    SayLine(t, Category::Venue, "venue.coffeeForgot");
+  if (!to)
+    return;
+  switch (*to)
+  {
+  case Venue::Coffee: SayLine(t, Category::Venue, "venue.coffee"); break;
+  case Venue::ThemePark:
+    if (m_batteryPercent)
+      SayLine(t, Category::Venue, "venue.themePark", {{"battery", std::to_string(*m_batteryPercent) + " percent"}});
+    else
+      SayLine(t, Category::Venue, "venue.themeParkNoBattery");
+    break;
+  case Venue::Gym: SayLine(t, Category::Venue, "venue.gym"); break;
+  case Venue::Airport: SayLine(t, Category::Venue, "venue.airport"); break;
+  case Venue::Mall: SayLine(t, Category::Venue, "venue.mall"); break;
+  case Venue::Zoo: SayLine(t, Category::Venue, "venue.zoo"); break;
+  case Venue::Beach: SayLine(t, Category::Venue, "venue.beach"); break;
+  case Venue::Cinema: SayLine(t, Category::Venue, "venue.cinema"); break;
+  case Venue::Electronics: SayLine(t, Category::Venue, "venue.electronics"); break;
+  }
 }
 
 void Navigator::ResetTrip()
@@ -372,6 +407,7 @@ void Navigator::ResetTrip()
   m_lastBadSpeedingT.reset();
   m_onBridge = false;
   m_hardCurveSamples = 0;
+  m_reroutes = 0;
   m_gate.Clear();
 }
 
