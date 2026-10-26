@@ -62,7 +62,7 @@ import Speech
       request.requiresOnDeviceRecognition = true
     }
     // Most answers are one place name.
-    request.contextualStrings = ["plate", "Hawaii", "Alaska", "Colorado", "New Mexico", "Texas", "yes", "no"]
+    request.contextualStrings = ["plate", "autopilot", "Hawaii", "Alaska", "Colorado", "New Mexico", "Texas", "yes", "no"]
     self.request = request
     heard = ""
 

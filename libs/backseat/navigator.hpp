@@ -137,6 +137,8 @@ public:
   /// Stops next to a traffic light are red lights, not pulling over.
   void SetTrafficLightLookup(TrafficLightLookup lookup) { m_lightLookup = std::move(lookup); }
   void SetDriverPronouns(Pronouns p) { m_pronouns = p; }
+  /// The driver's car can drive itself; getting lost is then even less forgivable.
+  void SetCarHasAutopilot(bool has) { m_carHasAutopilot = has; }
   /// Lets the GPS panic on bridges.
   void SetBridgeLookup(BridgeLookup lookup) { m_bridgeLookup = std::move(lookup); }
   /// Lets the GPS comment on where we're going ("Oh, we are getting coffee?").
@@ -169,6 +171,7 @@ private:
   void SayLine(double tMs, Category category, std::string const & key, Vars vars = {});
   void TrackFear(Fix const & fix, RouteSnapshot const & route);
   void SayPolice(double tMs);
+  void SayLemon(double tMs);
   void SayVenue(double tMs, RouteSnapshot const & route);
   void TrackLongDrive(double tMs, RouteSnapshot const & route);
   int Tier() const;
@@ -205,6 +208,10 @@ private:
   VenueLookup m_venueLookup;
   /// Reroutes this trip; the third one gets the autopilot line.
   int m_reroutes = 0;
+  bool m_carHasAutopilot = false;
+  /// The driver said the car is driving itself this trip ("it's on autopilot").
+  bool m_autopilotClaimed = false;
+  bool m_lemonSaid = false;
   /// Long-drive remarks said so far this trip.
   size_t m_longDriveSaid = 0;
 

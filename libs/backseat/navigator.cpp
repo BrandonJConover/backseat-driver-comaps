@@ -319,8 +319,12 @@ void Navigator::Update(double t, RouteSnapshot const & route)
         Say(m_engine->OnNav(NavEvent::MissedTurn(t)));
       Say(m_engine->OnNav(NavEvent::Rerouted(t)));
       m_rerouting = true;
-      if (++m_reroutes == kAutopilotAfterReroutes)
-        SayLine(t, Category::Autopilot, "autopilot");
+      ++m_reroutes;
+      // Lost while the car was supposedly driving itself.
+      if (m_autopilotClaimed)
+        SayLemon(t);
+      else if (m_reroutes == kAutopilotAfterReroutes)
+        SayLine(t, Category::Autopilot, m_carHasAutopilot ? "autopilot.owned" : "autopilot");
     }
     return;
   }
@@ -433,6 +437,8 @@ void Navigator::ResetTrip()
   m_onBridge = false;
   m_hardCurveSamples = 0;
   m_reroutes = 0;
+  m_autopilotClaimed = false;
+  m_lemonSaid = false;
   m_longDriveSaid = 0;
   m_gate.Clear();
 }
@@ -489,6 +495,18 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
     {
       if (!m_policeSaid)
         SayPolice(m_lastT);
+      return;
+    }
+  }
+  // "It's on autopilot": then the car is the one driving this badly.
+  for (char const * cue : {" autopilot ", " auto pilot ", " self driving ", " driving itself ", " full self "})
+  {
+    if (words.find(cue) != std::string::npos)
+    {
+      m_autopilotClaimed = true;
+      // Already a bad trip? Say so now. Otherwise the next real mistake gets it.
+      if (m_reroutes > 0 || Tier() > 0)
+        SayLemon(m_lastT);
       return;
     }
   }
@@ -575,6 +593,14 @@ void Navigator::TrackFear(Fix const & fix, RouteSnapshot const & route)
       SayLine(fix.tMs, Category::Fear, "fear.curve", weight);
     }
   }
+}
+
+void Navigator::SayLemon(double tMs)
+{
+  if (m_lemonSaid)
+    return;
+  m_lemonSaid = true;
+  SayLine(tMs, Category::Autopilot, "autopilot.lemon");
 }
 
 void Navigator::SayPolice(double tMs)

@@ -509,6 +509,20 @@ TEST(NavigatorSuggestsAutopilotOnTheThirdReroute)
     if (i == 2)
       CHECK_EQUAL(said[0].text, std::string("You know there are cars out there that come with autopilot. You might want to look into it. Just saying."));
   }
+
+  // The driver's car has it.
+  Navigator tesla(Config());
+  tesla.SetCarHasAutopilot(true);
+  std::vector<Commentary> said;
+  for (int i = 0; i < 3; ++i)
+  {
+    tesla.OnFix(At(i * 20000, 10), Far());
+    tesla.OnFix(At(i * 20000 + 10000, 10), off);
+    for (auto const & l : LinesOf(tesla.TakeLines(), Category::Autopilot))
+      said.push_back(l);
+  }
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK_EQUAL(said[0].text, std::string("Your car has autopilot and you aren't using it. I truly don't understand humans."));
 }
 
 TEST(NavigatorNagsOnALongDrive)
@@ -536,4 +550,34 @@ TEST(NavigatorNagsOnALongDrive)
   for (int minute = 0; minute <= 100; ++minute)
     errand.OnFix(At(minute * 60000.0, 25), shortTrip);
   CHECK(LinesOf(errand.TakeLines(), Category::LongDrive).empty());
+}
+
+TEST(NavigatorBlamesALemonWhenAutopilotDrivesThisBadly)
+{
+  RouteSnapshot off = Far();
+  off.state = RouteState::OffRoute;
+  std::string const lemon = "You are using autopilot and it's this bad. Sheesh, you must have bought a lemon.";
+
+  // Claimed up front: the first reroute gets it.
+  Navigator nav(Config());
+  nav.OnFix(At(0, 10), Far());
+  nav.OnDriverSaid(1000, "relax, it's on autopilot");
+  CHECK(LinesOf(nav.TakeLines(), Category::Autopilot).empty());
+  nav.OnFix(At(10000, 10), off);
+  auto said = LinesOf(nav.TakeLines(), Category::Autopilot);
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK_EQUAL(said[0].text, lemon);
+  nav.OnFix(At(20000, 10), Far());
+  nav.OnFix(At(30000, 10), off);
+  CHECK(LinesOf(nav.TakeLines(), Category::Autopilot).empty());  // once a trip
+
+  // Claimed after getting lost: right away.
+  Navigator late(Config());
+  late.OnFix(At(0, 10), Far());
+  late.OnFix(At(10000, 10), off);
+  late.TakeLines();
+  late.OnDriverSaid(11000, "the car is driving itself");
+  said = LinesOf(late.TakeLines(), Category::Autopilot);
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK_EQUAL(said[0].text, lemon);
 }

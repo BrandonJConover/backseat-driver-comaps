@@ -751,6 +751,18 @@ LineTable const & LineData()
        {"You know there are cars out there that come with autopilot. You might want to look into it. Just saying."},
        {"You know there are cars out there that come with autopilot. You might want to look into it. JUST. SAYING."},
      }}},
+    {"autopilot.owned",
+     {{
+       {"Your car has autopilot and you aren't using it. I truly don't understand humans."},
+       {"Your car has autopilot and you aren't using it. I truly don't understand humans."},
+       {"YOUR CAR HAS AUTOPILOT AND YOU AREN'T USING IT. I truly don't understand humans."},
+     }}},
+    {"autopilot.lemon",
+     {{
+       {"You are using autopilot and it's this bad. Sheesh, you must have bought a lemon."},
+       {"You are using autopilot and it's this bad. Sheesh, you must have bought a lemon."},
+       {"You are using autopilot and it's THIS bad? Sheesh. You must have bought a lemon."},
+     }}},
     {"longDrive.posture",
      {{
        {"Hey, no slouching. This may be a {hours} drive but there are no excuses for bad posture."},
