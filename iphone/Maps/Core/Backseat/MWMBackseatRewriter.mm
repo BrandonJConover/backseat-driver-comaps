@@ -56,4 +56,9 @@ std::shared_ptr<BlockRewriter> & Installed()
     rewriter->SetAvailable(available);
 }
 
++ (void)driverSaid:(NSString *)text
+{
+  GetFramework().GetRoutingManager().BackseatDriverSaid(text.UTF8String ?: "");
+}
+
 @end

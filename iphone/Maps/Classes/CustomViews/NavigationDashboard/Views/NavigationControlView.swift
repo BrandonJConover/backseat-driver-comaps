@@ -35,6 +35,27 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
     })
   }()
 
+  /// Backseat Driver: tap to talk back (license plate game answers, for now).
+  private lazy var talkButton: UIButton = {
+    var config = UIButton.Configuration.filled()
+    config.image = UIImage(systemName: "mic.fill")
+    config.cornerStyle = .capsule
+    config.baseBackgroundColor = .systemBackground
+    config.baseForegroundColor = .label
+    let button = UIButton(configuration: config)
+    button.accessibilityLabel = "Talk to Backseat Driver"
+    button.layer.shadowColor = UIColor.black.cgColor
+    button.layer.shadowOpacity = 0.25
+    button.layer.shadowRadius = 3
+    button.layer.shadowOffset = CGSize(width: 0, height: 1)
+    button.addTarget(self, action: #selector(talkButtonAction), for: .touchUpInside)
+    return button
+  }()
+
+  @objc private func talkButtonAction() {
+    BackseatListener.shared.toggle()
+  }
+
   @objc weak var ownerView: UIView!
   @IBOutlet private weak var extendedView: UIView!
 
@@ -65,6 +86,7 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
       dimBackground.setVisible(isExtended, completion: nil)
       extendedView.isHidden = !isExtended
       mapPositionButton.isHidden = isExtended
+      talkButton.isHidden = isExtended
       superview!.animateConstraints(animations: {
         if (self.isExtended) {
           self.notExtendedConstraint.isActive = false
@@ -129,6 +151,20 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
       trackRecordingController.view.bottomAnchor.constraint(equalTo: activeTrackRecordingButton.bottomAnchor),
     ])
 
+    addSubview(talkButton)
+    talkButton.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([
+      talkButton.widthAnchor.constraint(equalTo: mapPositionButton.widthAnchor),
+      talkButton.heightAnchor.constraint(equalTo: mapPositionButton.heightAnchor),
+      talkButton.centerXAnchor.constraint(equalTo: mapPositionButton.centerXAnchor),
+      talkButton.bottomAnchor.constraint(equalTo: mapPositionButton.topAnchor, constant: -12),
+    ])
+    BackseatListener.shared.onListeningChanged = { [weak self] listening in
+      guard let button = self?.talkButton else { return }
+      button.configuration?.baseBackgroundColor = listening ? .systemRed : .systemBackground
+      button.configuration?.baseForegroundColor = listening ? .white : .label
+    }
+
     trackRecordingButton.accessibilityLabel = L("record_track")
     TrackRecordingManager.shared.addObserver(self) { [weak self] state, _, _ in
       DispatchQueue.main.async {
@@ -142,7 +178,7 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
       return true
     }
 
-    return [mapPositionButton, activeTrackRecordingButton].contains { control in
+    return [mapPositionButton, activeTrackRecordingButton, talkButton].contains { control in
       guard let control, !control.isHidden, control.alpha > 0 else { return false }
       return control.point(inside: convert(point, to: control), with: event)
     }

@@ -12,6 +12,8 @@ typedef void (^MWMBackseatRewriteHandler)(NSString * instructions, NSString * pr
 
 + (void)installWithHandler:(MWMBackseatRewriteHandler)handler;
 + (void)setAvailable:(BOOL)available;
+/// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate". Main thread.
++ (void)driverSaid:(NSString *)text;
 
 @end
 
