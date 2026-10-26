@@ -72,6 +72,7 @@ private:
   backseat::RouteSnapshot Snapshot(routing::RoutingSession const & session, std::string const & destinationName) const;
   backseat::Control GuessControl(routing::Route const & route, uint32_t turnIndex) const;
   std::optional<backseat::Place> PlaceAt(backseat::LatLon const & at) const;
+  bool InParkingLot(backseat::LatLon const & at) const;
   void CheckBattery(double tMs);
 
   backseat::Navigator m_navigator;

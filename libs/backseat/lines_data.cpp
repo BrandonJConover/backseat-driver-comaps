@@ -537,6 +537,12 @@ LineTable const & LineData()
        {"We already have that one champ. Sometimes I wish I wasn't in this car."},
        {"We already have that one champ. Sometimes I wish I wasn't in this car."},
      }}},
+    {"plateGame.parked",
+     {{
+       {"Hey that's cheating. New rule, no parking lots."},
+       {"Hey that's cheating. New rule, no parking lots."},
+       {"Hey that's cheating. New rule, no parking lots."},
+     }}},
     {"plateGame.repeat",
      {{
        {"We already have that one champ. Sometimes I wish I wasn't in this car.",

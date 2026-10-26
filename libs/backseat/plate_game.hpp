@@ -94,7 +94,8 @@ public:
   /// The GPS's invitation. Marks the game offered for this trip.
   Reply Offer(int tier);
   /// The driver said something. Nothing when it isn't for the game (no game going on).
-  std::optional<Reply> OnDriverSaid(std::string const & spoken, int tier);
+  /// `parked`: the car is parked or in a parking lot, where plates are too easy and don't count.
+  std::optional<Reply> OnDriverSaid(std::string const & spoken, int tier, bool parked = false);
   /// The tally at arrival, if the game was played this trip.
   std::optional<Reply> WrapUp(int tier);
 

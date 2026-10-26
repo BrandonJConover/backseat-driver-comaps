@@ -238,6 +238,7 @@ void BackseatAdapter::SetDataSource(std::function<DataSource &()> getter)
 {
   m_dataSource = std::move(getter);
   m_navigator.SetPlaceLookup([this](backseat::LatLon const & at) { return PlaceAt(at); });
+  m_navigator.SetParkingLookup([this](backseat::LatLon const & at) { return InParkingLot(at); });
 }
 
 void BackseatAdapter::SetCountryInfoGetter(std::function<storage::CountryInfoGetter const &()> getter)
@@ -289,6 +290,33 @@ backseat::Control BackseatAdapter::GuessControl(routing::Route const & route, ui
   if (from >= RoadRank(ftypes::HighwayClass::Tertiary) && to >= 0 && to < from)
     return backseat::Control::StopSign;
   return backseat::Control::None;
+}
+
+bool BackseatAdapter::InParkingLot(backseat::LatLon const & at) const
+{
+  if (!m_dataSource)
+    return false;
+  auto const & c = classif();
+  static uint32_t const kParking = c.GetTypeByPath({"amenity", "parking"});
+  static uint32_t const kParkingAisle = c.GetTypeByPath({"highway", "service", "parking_aisle"});
+  // Parking aisles are lines through the lot; within a car's length or so of one counts.
+  double constexpr kAisleSearchM = 20;
+  m2::PointD const center = mercator::FromLatLon(at.lat, at.lon);
+  bool found = false;
+  m_dataSource().ForEachInRect([&](FeatureType & ft)
+  {
+    if (found)
+      return;
+    for (uint32_t const type : feature::TypesHolder(ft))
+    {
+      if (type == kParkingAisle)
+        found = true;
+      else if (type == kParking && ft.GetGeomType() == feature::GeomType::Area &&
+               ft.GetLimitRect(scales::GetUpperScale()).IsPointInside(center))
+        found = true;
+    }
+  }, mercator::RectByCenterXYAndSizeInMeters(center, kAisleSearchM), scales::GetUpperScale());
+  return found;
 }
 
 std::optional<backseat::Place> BackseatAdapter::PlaceAt(backseat::LatLon const & at) const

@@ -224,3 +224,47 @@ TEST(NavigatorSkipsThePlateGameOnNewRoutes)
   nav.OnDriverSaid(95000, "Texas");
   CHECK(PlateLines(nav.TakeLines()).empty());
 }
+
+TEST(PlateGameCallsParkingLotsCheating)
+{
+  PlateGame game(SeededRng(6));
+  game.NewTrip("home>work");
+  game.Offer(0);
+  game.OnDriverSaid("yes", 0);
+  auto r = game.OnDriverSaid("Texas, Ohio, Oregon", 0, true /* parked */);
+  CHECK_EQUAL(r->text, std::string("Hey that's cheating. New rule, no parking lots."));
+  CHECK(game.Log().lifetime.empty());
+  CHECK_EQUAL(game.OnDriverSaid("Texas", 0)->key, std::string("plateGame.newFar"));
+}
+
+TEST(NavigatorKnowsWhenThePlatesComeFromAParkingLot)
+{
+  EngineConfig c;
+  c.rng = SeededRng(7);
+  Navigator nav(c, Commutes(3));
+  bool inLot = false;
+  nav.SetParkingLookup([&](LatLon const &) { return inLot; });
+  nav.OnFix(PlateFix(0), PlateRoute(5000));
+  nav.OnFix(PlateFix(70000), PlateRoute(4800));
+  nav.OnDriverSaid(75000, "sure");
+  nav.TakeLines();
+
+  // Rolling through a parking lot.
+  inLot = true;
+  Fix slow = PlateFix(80000);
+  slow.speedMps = 2;
+  nav.OnFix(slow, PlateRoute(4700));
+  nav.TakeLines();
+  nav.OnDriverSaid(81000, "Texas");
+  auto lines = PlateLines(nav.TakeLines());
+  CHECK_EQUAL(lines.size(), size_t(1));
+  CHECK(lines[0].text.find("cheating") != std::string::npos);
+  CHECK(nav.GetPlateLog().lifetime.empty());
+
+  // Back on the road it counts.
+  inLot = false;
+  nav.OnFix(PlateFix(90000), PlateRoute(4500));
+  nav.TakeLines();
+  nav.OnDriverSaid(91000, "Texas");
+  CHECK(nav.GetPlateLog().lifetime == std::set<std::string>{"TX"});
+}

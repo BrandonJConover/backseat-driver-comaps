@@ -132,6 +132,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackStop(fix, route);
   TrackTraffic(fix, route);
   TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
+  m_lastFix = fix;
 }
 
 void Navigator::Poll(RouteSnapshot const & route) { Update(m_lastT, route); }
@@ -321,6 +322,7 @@ void Navigator::ResetTrip()
   m_speeds.clear();
   m_inTraffic = false;
   m_heldPlateLines.clear();
+  m_lastFix.reset();
   m_gate.Clear();
 }
 
@@ -364,12 +366,23 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
   if (!m_engine || m_arrived)
     return;
   m_lastT = std::max(m_lastT, tMs);
-  auto const reply = m_plates.OnDriverSaid(text, Tier());
+  auto const reply = m_plates.OnDriverSaid(text, Tier(), Parked());
   if (!reply)
     return;
   SayPlate(m_lastT, *reply);
   if (m_onPlateLog)
     m_onPlateLog(m_plates.Log());
+}
+
+/// Parked: stopped long enough to be a stop the driver chose, or crawling through a parking lot.
+/// A red light isn't parking, so a short stop on the road doesn't count.
+bool Navigator::Parked() const
+{
+  if (m_stopSince && m_lastT - *m_stopSince >= kUnplannedStopAfterMs)
+    return true;
+  if (!m_lastFix || !m_parkingLookup || m_lastFix->speedMps >= kResumedMps)
+    return false;
+  return m_parkingLookup({m_lastFix->lat, m_lastFix->lon});
 }
 
 void Navigator::SayPlate(double tMs, PlateGame::Reply const & reply)

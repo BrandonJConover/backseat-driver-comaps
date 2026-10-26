@@ -70,6 +70,8 @@ struct RouteSnapshot
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
 using PlaceLookup = std::function<std::optional<Place>(LatLon const &)>;
+/// Whether a point is in a parking lot (on a parking aisle or inside a parking area).
+using ParkingLookup = std::function<bool(LatLon const &)>;
 /// The state or province at a point, by name as the map has it ("Colorado"). Empty when unknown.
 using RegionLookup = std::function<std::optional<std::string>(LatLon const &)>;
 
@@ -106,6 +108,8 @@ public:
   void SetPlaceLookup(PlaceLookup lookup) { m_placeLookup = std::move(lookup); }
   /// Lets the license plate game know which state the car is in ("a Colorado plate in Colorado?").
   void SetRegionLookup(RegionLookup lookup) { m_regionLookup = std::move(lookup); }
+  /// Plates called out in a parking lot don't count ("Hey that's cheating").
+  void SetParkingLookup(ParkingLookup lookup) { m_parkingLookup = std::move(lookup); }
   /// Plates spotted on earlier trips, and where to save the log when it changes.
   void SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange);
   PlateLog const & GetPlateLog() const { return m_plates.Log(); }
@@ -132,6 +136,7 @@ private:
   void TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot const & route);
   void SayPlate(double tMs, PlateGame::Reply const & reply);
   int Tier() const;
+  bool Parked() const;
 
   EngineConfig m_config;
   std::vector<TripRecord> m_history;
@@ -167,6 +172,9 @@ private:
   // License plate game.
   PlateGame m_plates;
   RegionLookup m_regionLookup;
+  ParkingLookup m_parkingLookup;
+  /// The last real fix, for judging whether the driver is parked when they talk.
+  std::optional<Fix> m_lastFix;
   std::function<void(PlateLog const &)> m_onPlateLog;
   int m_tripsOnRoute = 0;
   double m_tripStartT = 0;

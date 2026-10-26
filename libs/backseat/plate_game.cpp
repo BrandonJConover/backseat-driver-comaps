@@ -279,11 +279,17 @@ PlateGame::Reply PlateGame::Offer(int tier)
   return Make("plateGame.offer", tier);
 }
 
-std::optional<PlateGame::Reply> PlateGame::OnDriverSaid(std::string const & spoken, int tier)
+std::optional<PlateGame::Reply> PlateGame::OnDriverSaid(std::string const & spoken, int tier, bool parked)
 {
   if (m_state == State::Idle || m_state == State::Declined)
     return {};
   auto const code = MatchPlateRegion(spoken);
+  if (code && parked)
+  {
+    // Brandon's rule: a parking lot is a buffet of plates. Nothing counts there.
+    m_state = State::Playing;
+    return Make("plateGame.parked", tier);
+  }
   if (m_state == State::Offered)
   {
     // Naming a plate straight away is a yes.
