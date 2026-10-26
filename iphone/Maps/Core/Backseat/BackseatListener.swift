@@ -6,8 +6,8 @@ import Speech
 @objc final class BackseatListener: NSObject {
   @objc static let shared = BackseatListener()
 
-  /// Called on the main thread when listening starts or stops, to update the button.
-  var onListeningChanged: ((Bool) -> Void)?
+  /// Posted on the main thread when listening starts or stops, to update the mic buttons.
+  static let listeningChanged = Notification.Name("BackseatListeningChanged")
 
   private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
   private let audioEngine = AVAudioEngine()
@@ -17,7 +17,7 @@ import Speech
   private var heard = ""
 
   private(set) var isListening = false {
-    didSet { onListeningChanged?(isListening) }
+    didSet { NotificationCenter.default.post(name: Self.listeningChanged, object: self) }
   }
 
   /// Starts listening, or stops early and sends what was heard so far.
@@ -62,7 +62,7 @@ import Speech
       request.requiresOnDeviceRecognition = true
     }
     // Most answers are one place name.
-    request.contextualStrings = ["plate", "autopilot", "Hawaii", "Alaska", "Colorado", "New Mexico", "Texas", "yes", "no"]
+    request.contextualStrings = ["plate", "autopilot", "take me to", "work", "home", "Hawaii", "Alaska", "Colorado", "New Mexico", "Texas", "yes", "no"]
     self.request = request
     heard = ""
 

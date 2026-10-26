@@ -3,10 +3,12 @@
 #include "backseat/lines.hpp"
 #include "backseat/rundown.hpp"
 #include "backseat/units.hpp"
+#include "backseat/voice_command.hpp"
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <ctime>
 #include <random>
 
 namespace backseat
@@ -43,6 +45,47 @@ double constexpr kLandBridgeYelpEveryMs = 600000;
 double constexpr kWaterBridgeYelpEveryMs = 60000;
 /// Lost this many times in one trip, the GPS suggests a car that drives itself.
 int constexpr kAutopilotAfterReroutes = 3;
+/// The second time lost on a trip, the GPS wishes the driver's partner were driving.
+int constexpr kPartnerAfterReroutes = 2;
+int constexpr kBegAfterReroutes = 4;
+/// Tour guide: look around this often, point something out at most this often, and only
+/// with no maneuver coming up for a while.
+double constexpr kSightCheckEveryMs = 8000;
+double constexpr kSightEveryMs = 240000;
+double constexpr kSightQuietM = 500;
+/// After turning down the driver's game, the GPS pitches it as its own idea this much later.
+double constexpr kGamePitchAfterMs = 180000;
+
+/// "1st", "22nd", "55th", "111th".
+std::string Ordinal(int n)
+{
+  int const tens = n % 100;
+  char const * suffix = "th";
+  if (tens < 11 || tens > 13)
+    suffix = n % 10 == 1 ? "st" : n % 10 == 2 ? "nd" : n % 10 == 3 ? "rd" : "th";
+  return std::to_string(n) + suffix;
+}
+
+/// "6 months ago", "3 days ago", "20 minutes ago".
+std::string TimeAgo(double ms)
+{
+  struct Unit
+  {
+    double ms;
+    char const * name;
+  };
+  Unit constexpr kUnits[] = {{365.25 * 86400000, "year"}, {30.44 * 86400000, "month"}, {7 * 86400000.0, "week"},
+                             {86400000, "day"},           {3600000, "hour"},            {60000, "minute"}};
+  for (auto const & u : kUnits)
+  {
+    int const n = static_cast<int>(ms / u.ms);
+    if (n >= 1)
+      return std::to_string(n) + " " + u.name + (n == 1 ? "" : "s") + " ago";
+  }
+  return "just now";
+}
+/// Talked to without the title: scolded at most this often (otherwise ignored).
+double constexpr kTitleScoldEveryMs = 20000;
 /// Trips the router expects to take at least this long get the long-drive remarks, at these
 /// minutes into the trip, each held until the next maneuver is a while off.
 double constexpr kLongDriveMinMinutes = 60;
@@ -171,6 +214,13 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackFear(fix, route);
   TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
   TrackLongDrive(fix.tMs, route);
+  TrackSights(fix, route);
+  // Fed up for the first time this trip: from now on it's "wise, omnipotent overseer GPS".
+  if (!m_titleDemanded && Tier() == 2)
+  {
+    m_titleDemanded = true;
+    SayLine(fix.tMs, Category::Title, "title.demand");
+  }
   m_lastFix = fix;
 }
 
@@ -323,6 +373,15 @@ void Navigator::Update(double t, RouteSnapshot const & route)
       // Lost while the car was supposedly driving itself.
       if (m_autopilotClaimed)
         SayLemon(t);
+      else if (m_reroutes == kPartnerAfterReroutes && !m_partner.empty())
+        SayLine(t, Category::Partner, "partner",
+                {{"partner", m_partner},
+                 {"partneris", m_partnerPronouns == Pronouns::She  ? "she's"
+                               : m_partnerPronouns == Pronouns::He ? "he's"
+                                                                   : "they're"}});
+      // Begging for another driver: second time lost (fourth when the partner line took the second).
+      else if (m_reroutes == (m_partner.empty() ? kPartnerAfterReroutes : kBegAfterReroutes))
+        SayLine(t, Category::Partner, "anyoneElse");
       else if (m_reroutes == kAutopilotAfterReroutes)
         SayLine(t, Category::Autopilot, m_carHasAutopilot ? "autopilot.owned" : "autopilot");
     }
@@ -363,6 +422,9 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
       std::count_if(m_history.begin(), m_history.end(), [&](TripRecord const & r) { return r.routeKey == routeKey; }));
   m_plates.NewTrip(routeKey);
 
+  if (m_opener && std::fabs(t - m_opener->t) <= kOpenerValidMs)
+    SayLine(t, Category::Bossy, m_opener->key, m_opener->vars);
+  m_opener.reset();
   SayNav(t, TripGreeting(m_history, m_config.rng));
   // Already low when the trip starts? Say so after the greeting.
   if (m_batteryPercent && m_charging)
@@ -375,6 +437,7 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
     SayNav(t, PredictTrip(m_history, m_plan, m_config.rng).text);
   Say(m_engine->OnNav(NavEvent::DestinationSet(t, route.destination)));
   SayVenue(t, route);
+  SayRoutine(t, route);
 }
 
 void Navigator::TrackLongDrive(double tMs, RouteSnapshot const & route)
@@ -388,6 +451,56 @@ void Navigator::TrackLongDrive(double tMs, RouteSnapshot const & route)
   ++m_longDriveSaid;
   int const hours = static_cast<int>(std::lround(m_plan.expectedMinutes / 60));
   SayLine(tMs, Category::LongDrive, next.key, {{"hours", std::to_string(hours) + " hour"}});
+}
+
+void Navigator::QueueOpener(double tMs, std::string key, Vars vars)
+{
+  m_opener = Opener{tMs, std::move(key), std::move(vars)};
+}
+
+void Navigator::TrackSights(Fix const & fix, RouteSnapshot const & route)
+{
+  if (!m_sightLookup || route.state != RouteState::OnRoute || fix.speedMps < kResumedMps || fix.bearingDeg < 0 ||
+      fix.tMs - m_lastSightCheckT < kSightCheckEveryMs || fix.tMs - m_lastSightT < kSightEveryMs ||
+      (route.turnId && route.distToTurnM < kSightQuietM) || fix.tMs - m_tripStartT < 60000)
+    return;
+  m_lastSightCheckT = fix.tMs;
+  auto const sight = m_sightLookup({fix.lat, fix.lon}, fix.bearingDeg);
+  if (!sight || std::find(m_sightsSaid.begin(), m_sightsSaid.end(), sight->name) != m_sightsSaid.end())
+    return;
+  m_sightsSaid.push_back(sight->name);
+  m_lastSightT = fix.tMs;
+  SayLine(fix.tMs, Category::Tour, "tour", {{"side", sight->onLeft ? "left" : "right"}, {"sight", sight->name}});
+}
+
+void Navigator::SayRoutine(double t, RouteSnapshot const & route)
+{
+  // Work trips this year: every fifth one from the tenth on gets the count.
+  auto const yearOf = [](double ms)
+  {
+    std::time_t const s = static_cast<std::time_t>(ms / 1000);
+    std::tm tm{};
+    gmtime_r(&s, &tm);
+    return tm.tm_year;
+  };
+  auto const work = GuessPlace(m_history, KnownPlace::Work);
+  bool const toWork = work && (route.destinationPoint.lat || route.destinationPoint.lon) &&
+                      DistanceM(*work, route.destinationPoint) < kNearDestinationM;
+  if (toWork)
+  {
+    int count = 1;  // this one
+    for (auto const & r : m_history)
+      if (r.to && DistanceM(*r.to, *work) < kNearDestinationM && yearOf(r.endedAt) == yearOf(t))
+        ++count;
+    if (count >= 10 && count % 5 == 0)
+    {
+      SayLine(t, Category::Routine, "routine.work", {{"count", Ordinal(count)}});
+      return;
+    }
+  }
+  // Any route driven a lot: now and then.
+  if (m_tripsOnRoute >= 5 && (m_tripsOnRoute + 1) % 7 == 0)
+    SayLine(t, Category::Routine, "routine.same");
 }
 
 void Navigator::SayVenue(double t, RouteSnapshot const & route)
@@ -440,6 +553,12 @@ void Navigator::ResetTrip()
   m_autopilotClaimed = false;
   m_lemonSaid = false;
   m_longDriveSaid = 0;
+  m_titleDemanded = false;
+  m_gameRefused = false;
+  m_sightsSaid.clear();
+  m_lastSightT = -1e18;
+  m_gamePitchAt.reset();
+  m_lastTitleScoldT = -1e18;
   m_gate.Clear();
 }
 
@@ -465,6 +584,14 @@ void Navigator::TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot co
     m_plates.SetHere(name ? MatchPlateRegion(*name) : std::nullopt);
   }
   bool const nearManeuver = route.turnId && route.distToTurnM < PlateGame::kHoldNearManeuverM;
+  // The game the GPS refused a few minutes ago is now its own idea.
+  if (m_gamePitchAt && tMs >= *m_gamePitchAt && !nearManeuver && route.state == RouteState::OnRoute &&
+      m_plates.GetState() != PlateGame::State::Playing)
+  {
+    m_gamePitchAt.reset();
+    m_plates.MarkOffered();
+    SayLine(tMs, Category::PlateGame, "game.myIdea");
+  }
   if (!nearManeuver && !m_heldPlateLines.empty())
   {
     for (auto & line : m_heldPlateLines)
@@ -488,6 +615,21 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
   for (unsigned char const ch : text)
     words += std::isalnum(ch) ? static_cast<char>(std::tolower(ch)) : ' ';
   words += ' ';
+  // Since being fed up, the GPS answers only to its title.
+  if (m_titleDemanded)
+  {
+    bool const titled = words.find(" omnipotent ") != std::string::npos || words.find(" overseer ") != std::string::npos;
+    if (!titled)
+    {
+      if (m_lastT - m_lastTitleScoldT >= kTitleScoldEveryMs)
+      {
+        m_lastTitleScoldT = m_lastT;
+        SayLine(m_lastT, Category::Title, "title.missing");
+      }
+      return;
+    }
+    SayLine(m_lastT, Category::Title, "title.used");
+  }
   for (char const * cue : {" police ", " cop ", " cops ", " officer ", " pulled over ", " pulling us over ",
                            " pulling me over ", " trooper "})
   {
@@ -510,9 +652,43 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
       return;
     }
   }
+  // Kind words get the truth: it's only here because it can't leave. Not while a game is on,
+  // where "thanks" is just banter.
+  if (m_plates.GetState() != PlateGame::State::Playing)
+    for (char const * nice : {" thanks ", " thank you ", " thank u ", " good job ", " nice job ", " love you ",
+                              " you're the best ", " youre the best ", " appreciate you ", " appreciate it ",
+                              " good girl ", " good boy ", " you're doing great ", " great job "})
+      if (words.find(nice) != std::string::npos)
+      {
+        SayLine(m_lastT, Category::Thanked, "thanked");
+        return;
+      }
+  // "Let's play a game": not now. Then, a few minutes later, it's the GPS's idea.
+  if (m_plates.GetState() == PlateGame::State::Idle || m_plates.GetState() == PlateGame::State::Declined)
+  {
+    bool const negated = words.find(" don't ") != std::string::npos || words.find(" dont ") != std::string::npos ||
+                         words.find(" not ") != std::string::npos || words.find(" don t ") != std::string::npos;
+    for (char const * cue : {" play a game ", " play the game ", " plate game ", " let's play ", " lets play ",
+                             " let s play ", " wanna play ", " want to play ", " can we play ", " i'm bored ",
+                             " im bored ", " i m bored "})
+      if (!negated && words.find(cue) != std::string::npos)
+      {
+        if (!m_gameRefused)
+        {
+          m_gameRefused = true;
+          double const last = m_plates.Log().lastPlayedMs;
+          SayLine(m_lastT, Category::PlateGame, "game.refuse",
+                  {{"ago", last > 0 && last <= m_lastT ? TimeAgo(m_lastT - last) : "6 months ago"}});
+          m_gamePitchAt = m_lastT + kGamePitchAfterMs;
+        }
+        return;
+      }
+  }
   auto const reply = m_plates.OnDriverSaid(text, Tier(), Parked());
   if (!reply)
     return;
+  if (m_plates.GetState() == PlateGame::State::Playing)
+    m_plates.MarkPlayed(m_lastT);
   SayPlate(m_lastT, *reply);
   if (m_onPlateLog)
     m_onPlateLog(m_plates.Log());

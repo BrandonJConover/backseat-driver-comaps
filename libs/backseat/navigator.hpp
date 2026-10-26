@@ -86,6 +86,16 @@ using BridgeLookup = std::function<Bridge(LatLon const &, double bearingDeg)>;
 /// What kind of notable place is at a point (a coffee shop, a theme park). Empty when nothing is.
 using VenueLookup = std::function<std::optional<Venue>(LatLon const &)>;
 
+/// Something worth pointing out, barely: a named place beside the road.
+struct Sight
+{
+  /// As it should be said: "a Starbucks", "Coors Field".
+  std::string name;
+  bool onLeft = false;
+};
+/// A named place just beside the road at a point, given which way the car is heading.
+using SightLookup = std::function<std::optional<Sight>(LatLon const &, double bearingDeg)>;
+
 /// How the GPS refers to the driver when it throws them under the bus ("It was them, officer").
 enum class Pronouns
 {
@@ -137,10 +147,19 @@ public:
   /// Stops next to a traffic light are red lights, not pulling over.
   void SetTrafficLightLookup(TrafficLightLookup lookup) { m_lightLookup = std::move(lookup); }
   void SetDriverPronouns(Pronouns p) { m_pronouns = p; }
+  /// The driver's partner ("wife", "husband", "partner") and their pronouns, from settings.
+  /// Empty turns off the "I wish your wife was driving" line.
+  void SetPartner(std::string word, Pronouns pronouns)
+  {
+    m_partner = std::move(word);
+    m_partnerPronouns = pronouns;
+  }
   /// The driver's car can drive itself; getting lost is then even less forgivable.
   void SetCarHasAutopilot(bool has) { m_carHasAutopilot = has; }
   /// Lets the GPS panic on bridges.
   void SetBridgeLookup(BridgeLookup lookup) { m_bridgeLookup = std::move(lookup); }
+  /// Lets the GPS play tour guide, without enthusiasm ("On your right, there's a Starbucks. That's it.").
+  void SetSightLookup(SightLookup lookup) { m_sightLookup = std::move(lookup); }
   /// Lets the GPS comment on where we're going ("Oh, we are getting coffee?").
   void SetVenueLookup(VenueLookup lookup) { m_venueLookup = std::move(lookup); }
   /// Plates spotted on earlier trips, and where to save the log when it changes.
@@ -154,6 +173,12 @@ public:
 
   /// Everything queued to be spoken since the last call, oldest first.
   std::vector<Commentary> TakeLines();
+
+  /// A line to open the next trip with, if it starts within kOpenerValidMs of `tMs`
+  /// (e.g. "Alright, bossy" when the driver barked the destination).
+  void QueueOpener(double tMs, std::string key, Vars vars = {});
+  static double constexpr kOpenerValidMs = 600000;
+  std::vector<TripRecord> const & History() const { return m_history; }
 
   bool InTrip() const { return m_engine != nullptr; }
   CritiqueEngine const * Engine() const { return m_engine.get(); }
@@ -173,7 +198,9 @@ private:
   void SayPolice(double tMs);
   void SayLemon(double tMs);
   void SayVenue(double tMs, RouteSnapshot const & route);
+  void SayRoutine(double tMs, RouteSnapshot const & route);
   void TrackLongDrive(double tMs, RouteSnapshot const & route);
+  void TrackSights(Fix const & fix, RouteSnapshot const & route);
   int Tier() const;
   bool Parked() const;
 
@@ -206,9 +233,28 @@ private:
   Pronouns m_pronouns = Pronouns::They;
 
   VenueLookup m_venueLookup;
+  SightLookup m_sightLookup;
+  double m_lastSightCheckT = -1e18;
+  double m_lastSightT = -1e18;
+  std::vector<std::string> m_sightsSaid;
   /// Reroutes this trip; the third one gets the autopilot line.
   int m_reroutes = 0;
   bool m_carHasAutopilot = false;
+  std::string m_partner;
+  Pronouns m_partnerPronouns = Pronouns::They;
+  /// Fed up this trip: the driver must say "wise, omnipotent overseer GPS" from now on.
+  bool m_titleDemanded = false;
+  /// The driver asked for a game this trip and got turned down; the GPS pitches it at this time.
+  bool m_gameRefused = false;
+  std::optional<double> m_gamePitchAt;
+  double m_lastTitleScoldT = -1e18;
+  struct Opener
+  {
+    double t;
+    std::string key;
+    Vars vars;
+  };
+  std::optional<Opener> m_opener;
   /// The driver said the car is driving itself this trip ("it's on autopilot").
   bool m_autopilotClaimed = false;
   bool m_lemonSaid = false;

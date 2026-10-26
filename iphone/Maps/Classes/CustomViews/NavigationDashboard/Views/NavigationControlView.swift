@@ -66,6 +66,8 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
   @objc var isVisible = false {
     didSet {
       guard isVisible != oldValue else { return }
+      // The map's own mic button steps aside while this one is on screen.
+      NotificationCenter.default.post(name: BackseatTalkButton.navigationVisibilityChanged, object: isVisible)
       if isVisible {
         addView()
       } else {
@@ -159,11 +161,7 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
       talkButton.centerXAnchor.constraint(equalTo: mapPositionButton.centerXAnchor),
       talkButton.bottomAnchor.constraint(equalTo: mapPositionButton.topAnchor, constant: -12),
     ])
-    BackseatListener.shared.onListeningChanged = { [weak self] listening in
-      guard let button = self?.talkButton else { return }
-      button.configuration?.baseBackgroundColor = listening ? .systemRed : .systemBackground
-      button.configuration?.baseForegroundColor = listening ? .white : .label
-    }
+    BackseatTalkButton.followListening(talkButton)
 
     trackRecordingButton.accessibilityLabel = L("record_track")
     TrackRecordingManager.shared.addObserver(self) { [weak self] state, _, _ in

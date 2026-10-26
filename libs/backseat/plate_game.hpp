@@ -45,6 +45,8 @@ struct PlateLog
   std::map<std::string, std::set<std::string>> byRoute;
   /// Declined games and made-up states. Read by the grudge ledger when it lands.
   int grudges = 0;
+  /// When the game was last played (ms since the epoch); 0 if never.
+  double lastPlayedMs = 0;
 
   std::string Serialize() const;
   static PlateLog Parse(std::string const & text);
@@ -96,6 +98,9 @@ public:
   /// The driver said something. Nothing when it isn't for the game (no game going on).
   /// `parked`: the car is parked or in a parking lot, where plates are too easy and don't count.
   std::optional<Reply> OnDriverSaid(std::string const & spoken, int tier, bool parked = false);
+  /// The GPS asked in its own words ("why don't we play that game you just suggested?").
+  void MarkOffered() { m_state = State::Offered; }
+  void MarkPlayed(double tMs) { m_log.lastPlayedMs = tMs; }
   /// The tally at arrival, if the game was played this trip.
   std::optional<Reply> WrapUp(int tier);
 

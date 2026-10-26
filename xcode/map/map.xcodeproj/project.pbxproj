@@ -16,6 +16,7 @@
 		C89D8B6EF2308693739EE381 /* report.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6CE5A2A08126DE31C7382DE0 /* report.cpp */; };
 		8F2760DEC663D74AAAF9C799 /* rewriter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8888C6442ED22E0789AFE1FB /* rewriter.cpp */; };
 		96F7CFA1B00024C4B463E939 /* plate_game.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 17DC53828FEBB4EB09BA0520 /* plate_game.cpp */; };
+		64476EA06BC0AB6C8023D759 /* voice_command.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F954DFEDF9E8B7DE621F3B0C /* voice_command.cpp */; };
 		0B15F328F38640D19B5B9AE4 /* rundown.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7EAB14BB4E72F7FF55D24A6B /* rundown.cpp */; };
 		6F25F49E7AC78E5D71CFF831 /* types.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 90A5740BA6726E771AAA944C /* types.cpp */; };
 		00AE49ABF03B388CF5C6B109 /* units.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FD2C377F4DEE4F0B06AC7E14 /* units.cpp */; };
@@ -171,6 +172,7 @@
 		6CE5A2A08126DE31C7382DE0 /* report.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = report.cpp; path = ../backseat/report.cpp; sourceTree = "<group>"; };
 		8888C6442ED22E0789AFE1FB /* rewriter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = rewriter.cpp; path = ../backseat/rewriter.cpp; sourceTree = "<group>"; };
 		17DC53828FEBB4EB09BA0520 /* plate_game.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = plate_game.cpp; path = ../backseat/plate_game.cpp; sourceTree = "<group>"; };
+		F954DFEDF9E8B7DE621F3B0C /* voice_command.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = voice_command.cpp; path = ../backseat/voice_command.cpp; sourceTree = "<group>"; };
 		7EAB14BB4E72F7FF55D24A6B /* rundown.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = rundown.cpp; path = ../backseat/rundown.cpp; sourceTree = "<group>"; };
 		90A5740BA6726E771AAA944C /* types.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = types.cpp; path = ../backseat/types.cpp; sourceTree = "<group>"; };
 		FD2C377F4DEE4F0B06AC7E14 /* units.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = units.cpp; path = ../backseat/units.cpp; sourceTree = "<group>"; };
@@ -469,6 +471,7 @@
 				6CE5A2A08126DE31C7382DE0 /* report.cpp */,
 				8888C6442ED22E0789AFE1FB /* rewriter.cpp */,
 				17DC53828FEBB4EB09BA0520 /* plate_game.cpp */,
+				F954DFEDF9E8B7DE621F3B0C /* voice_command.cpp */,
 				7EAB14BB4E72F7FF55D24A6B /* rundown.cpp */,
 				90A5740BA6726E771AAA944C /* types.cpp */,
 				FD2C377F4DEE4F0B06AC7E14 /* units.cpp */,
@@ -747,6 +750,7 @@
 				C89D8B6EF2308693739EE381 /* report.cpp in Sources */,
 				8F2760DEC663D74AAAF9C799 /* rewriter.cpp in Sources */,
 				96F7CFA1B00024C4B463E939 /* plate_game.cpp in Sources */,
+				64476EA06BC0AB6C8023D759 /* voice_command.cpp in Sources */,
 				0B15F328F38640D19B5B9AE4 /* rundown.cpp in Sources */,
 				6F25F49E7AC78E5D71CFF831 /* types.cpp in Sources */,
 				00AE49ABF03B388CF5C6B109 /* units.cpp in Sources */,

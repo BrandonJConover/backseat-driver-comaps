@@ -1,8 +1,13 @@
 #import "MWMBackseatRewriter.h"
+#import "MWMRoutePoint+CPP.h"
+#import "MWMRouter.h"
+#import "MapsAppDelegate.h"
 
 #include <CoreApi/Framework.h>
 
 #include "backseat/rewriter.hpp"
+
+#include "geometry/mercator.hpp"
 
 #include <atomic>
 #include <memory>
@@ -58,7 +63,24 @@ std::shared_ptr<BlockRewriter> & Installed()
 
 + (void)driverSaid:(NSString *)text
 {
-  GetFramework().GetRoutingManager().BackseatDriverSaid(text.UTF8String ?: "");
+  // "Take me to work": route there when the GPS knows where it is, otherwise search for it.
+  auto const heard = GetFramework().GetRoutingManager().BackseatDriverSaid(text.UTF8String ?: "");
+  using Kind = BackseatAdapter::HeardCommand::Kind;
+  if (heard.kind == Kind::RouteTo)
+  {
+    MWMRoutePoint * to = [[MWMRoutePoint alloc] initWithPoint:mercator::FromLatLon(heard.lat, heard.lon)
+                                                        title:@(heard.name.c_str())
+                                                     subtitle:@""
+                                                         type:MWMRoutePointTypeFinish
+                                            intermediateIndex:0];
+    if (![MWMRouter isRoutingActive])
+      [MWMRouter removePoints];
+    [MWMRouter buildToPoint:to bestRouter:NO];
+  }
+  else if (heard.kind == Kind::Search)
+  {
+    [[MapsAppDelegate theApp] searchText:@(heard.query.c_str())];
+  }
 }
 
 @end

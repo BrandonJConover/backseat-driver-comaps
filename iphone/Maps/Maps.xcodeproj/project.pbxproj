@@ -147,6 +147,7 @@
 		6BDF13DF3D46F27095EBC5E3 /* MWMBackseatTestDrive.mm in Sources */ = {isa = PBXBuildFile; fileRef = 52B06F3EF2E413E793E4938C /* MWMBackseatTestDrive.mm */; };
 		5CB2DD731D55FAF37F276ABC /* BackseatLLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3771351F90A1F053385C4151 /* BackseatLLM.swift */; };
 		3213DE744AEA509300F3828A /* BackseatListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = A134DCF11C5D2C0CF4DD010A /* BackseatListener.swift */; };
+		8A5DF1798F484411EEE1E998 /* BackseatTalkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */; };
 		34845DAF1E1649F6003D55B9 /* DownloaderNoResultsEmbedViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DAD1E1649F6003D55B9 /* DownloaderNoResultsEmbedViewController.swift */; };
 		34845DB31E165E24003D55B9 /* SearchNoResultsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DB11E165E24003D55B9 /* SearchNoResultsViewController.swift */; };
 		34845DB71E166084003D55B9 /* Common.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DB51E166084003D55B9 /* Common.swift */; };
@@ -977,6 +978,7 @@
 		52B06F3EF2E413E793E4938C /* MWMBackseatTestDrive.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatTestDrive.mm; sourceTree = "<group>"; };
 		3771351F90A1F053385C4151 /* BackseatLLM.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatLLM.swift; sourceTree = "<group>"; };
 		A134DCF11C5D2C0CF4DD010A /* BackseatListener.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatListener.swift; sourceTree = "<group>"; };
+		DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatTalkButton.swift; sourceTree = "<group>"; };
 		34763EE91F2F394D00F4D2D3 /* MWMTextToSpeech+CPP.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = "MWMTextToSpeech+CPP.h"; sourceTree = "<group>"; tabWidth = 2; };
 		34763EEA1F2F3AD700F4D2D3 /* MWMTextToSpeechObserver.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMTextToSpeechObserver.h; sourceTree = "<group>"; tabWidth = 2; };
 		34763F0B1F30CCAC00F4D2D3 /* MWMEditorCellType.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMEditorCellType.h; sourceTree = "<group>"; tabWidth = 2; };
@@ -2571,6 +2573,7 @@
 			children = (
 				3771351F90A1F053385C4151 /* BackseatLLM.swift */,
 				A134DCF11C5D2C0CF4DD010A /* BackseatListener.swift */,
+				DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */,
 				E26D17103928978C28885B55 /* MWMBackseatRewriter.h */,
 				0CBA5579CD04841A09E00696 /* MWMBackseatRewriter.mm */,
 				A81B8A62C7102ECAD1FED099 /* MWMBackseatTestDrive.h */,
@@ -4864,6 +4867,7 @@
 				6BDF13DF3D46F27095EBC5E3 /* MWMBackseatTestDrive.mm in Sources */,
 				5CB2DD731D55FAF37F276ABC /* BackseatLLM.swift in Sources */,
 				3213DE744AEA509300F3828A /* BackseatListener.swift in Sources */,
+				8A5DF1798F484411EEE1E998 /* BackseatTalkButton.swift in Sources */,
 				F6E2FE221E097BA00083EBEC /* MWMOpeningHoursEditorViewController.mm in Sources */,
 				ED79A5D72BDF8D6100952D1F /* SynchronizationStateResolver.swift in Sources */,
 				999FC12B23ABB4B800B0E6F9 /* FontStyleSheet.swift in Sources */,

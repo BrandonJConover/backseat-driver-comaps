@@ -223,6 +223,8 @@ std::string PlateLog::Serialize() const
     return s;
   };
   std::string out = "grudges " + std::to_string(grudges) + "\n";
+  if (lastPlayedMs > 0)
+    out += "played " + std::to_string(static_cast<long long>(lastPlayedMs)) + "\n";
   out += "lifetime" + join(lifetime) + "\n";
   for (auto const & [key, codes] : byRoute)
     out += "route " + key + join(codes) + "\n";
@@ -242,6 +244,8 @@ PlateLog PlateLog::Parse(std::string const & text)
     std::set<std::string> * target = nullptr;
     if (kind == "grudges")
       in >> log.grudges;
+    else if (kind == "played")
+      in >> log.lastPlayedMs;
     else if (kind == "lifetime")
       target = &log.lifetime;
     else if (kind == "route")

@@ -149,6 +149,12 @@ char const * ToString(Category c)
   case Category::Venue: return "venue";
   case Category::Autopilot: return "autopilot";
   case Category::LongDrive: return "longDrive";
+  case Category::Bossy: return "bossy";
+  case Category::Thanked: return "thanked";
+  case Category::Title: return "title";
+  case Category::Tour: return "tour";
+  case Category::Routine: return "routine";
+  case Category::Partner: return "partner";
   case Category::Count: break;
   }
   return "?";

@@ -92,6 +92,7 @@ import app.organicmaps.sdk.MapRenderingListener;
 import app.organicmaps.sdk.PlacePageActivationListener;
 import app.organicmaps.sdk.Router;
 import app.organicmaps.sdk.bookmarks.data.BookmarkManager;
+import app.organicmaps.sdk.bookmarks.data.FeatureId;
 import app.organicmaps.sdk.bookmarks.data.MapObject;
 import app.organicmaps.sdk.display.DisplayChangedListener;
 import app.organicmaps.sdk.display.DisplayManager;
@@ -177,7 +178,7 @@ public class MwmActivity extends BaseMwmFragmentActivity
           return;
         final java.util.ArrayList<String> heard = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
         if (heard != null && !heard.isEmpty())
-          Backseat.driverSaid(heard.get(0));
+          onDriverCommand(Backseat.driverSaid(heard.get(0)));
       });
 
   private static final String MAIN_MENU_ID = "MAIN_MENU_BOTTOM_SHEET";
@@ -935,6 +936,21 @@ public class MwmActivity extends BaseMwmFragmentActivity
     case trackRecordingStatus -> showTrackSaveDialog();
     case backseatTalk -> listenToDriver();
     }
+  }
+
+  /// "Take me to work": route there if the GPS knows where it is, otherwise search for it.
+  private void onDriverCommand(@Nullable Backseat.Command command)
+  {
+    if (command == null)
+      return;
+    if (command.latLon == null)
+    {
+      showSearch(command.name);
+      return;
+    }
+    final MapObject to = MapObject.createMapObject(FeatureId.EMPTY, MapObject.API_POINT, command.name, "",
+                                                   command.latLon[0], command.latLon[1]);
+    RoutingController.get().prepare(MwmApplication.from(this).getLocationHelper().getMyPosition(), to);
   }
 
   private void listenToDriver()

@@ -86,6 +86,8 @@ TripRecord RecordTrip(CritiqueEngine const & engine, TripPlan const & plan)
   r.missedTurns = st.missedTurns;
   r.hardBrakes = st.hardBrakes;
   r.grade = engine.Report().overall.letter;
+  if (plan.destination.lat || plan.destination.lon)
+    r.to = plan.destination;
   return r;
 }
 

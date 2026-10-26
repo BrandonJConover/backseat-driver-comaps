@@ -22,6 +22,8 @@ struct TripRecord
   int missedTurns = 0;
   int hardBrakes = 0;
   std::string grade;
+  /// Exactly where the trip was headed, when known (the route key is rounded to ~250 m).
+  std::optional<LatLon> to;
 };
 
 struct TripPlan

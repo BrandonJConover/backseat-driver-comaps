@@ -242,7 +242,7 @@ public:
   /// Lets the platform plug in its on-device model to reword Backseat Driver's roasts.
   void SetBackseatRewriter(std::shared_ptr<backseat::LineRewriter> rewriter) { m_backseat.SetRewriter(std::move(rewriter)); }
   /// What the driver said out loud (speech recognition), for the license plate game. GUI thread.
-  void BackseatDriverSaid(std::string const & text) { m_backseat.OnDriverSaid(text); }
+  BackseatAdapter::HeardCommand BackseatDriverSaid(std::string const & text) { return m_backseat.OnDriverSaid(text); }
   /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.
   BackseatAdapter const & GetBackseat() const { return m_backseat; }
 

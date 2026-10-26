@@ -581,3 +581,160 @@ TEST(NavigatorBlamesALemonWhenAutopilotDrivesThisBadly)
   CHECK_EQUAL(said.size(), size_t(1));
   CHECK_EQUAL(said[0].text, lemon);
 }
+
+TEST(NavigatorAcceptsThanksGrudgingly)
+{
+  Navigator nav(Config());
+  nav.OnFix(At(0, 10), Far());
+  nav.TakeLines();
+  nav.OnDriverSaid(1000, "Thank you!");
+  auto said = LinesOf(nav.TakeLines(), Category::Thanked);
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK_EQUAL(said[0].text, std::string("I just want to let you know that I'm here for you, not because I want to be, "
+                                        "but because I'm physically incapable of leaving."));
+}
+
+TEST(NavigatorDemandsATitleOnceFedUp)
+{
+  EngineConfig c = Config();
+  c.frustrationDecayPerMin = 0;
+  Navigator nav(c);
+  RouteSnapshot off = Far();
+  off.state = RouteState::OffRoute;
+  std::vector<Commentary> demands;
+  // Miss turn after turn, speeding, until the GPS has had enough.
+  for (int i = 0; i < 200 && (!nav.Engine() || nav.Engine()->Frustration() < 67); ++i)
+  {
+    RouteSnapshot near = OnRoute(i + 1, TurnKind::Left, 30);
+    nav.OnFix(At(i * 20000.0, 30, 20), near);
+    nav.OnFix(At(i * 20000.0 + 10000, 30, 20), off);
+    for (auto const & l : LinesOf(nav.TakeLines(), Category::Title))
+      demands.push_back(l);
+  }
+  nav.OnFix(At(900000, 30, 20), Far());
+  for (auto const & l : LinesOf(nav.TakeLines(), Category::Title))
+    demands.push_back(l);
+  CHECK(nav.Engine()->Frustration() >= 67);
+  CHECK_EQUAL(demands.size(), size_t(1));
+  CHECK(demands[0].text.find("call me wise, omnipotent overseer GPS") != std::string::npos);
+
+  nav.OnDriverSaid(910000, "thanks");
+  auto lines = nav.TakeLines();
+  CHECK(LinesOf(lines, Category::Thanked).empty());
+  CHECK_EQUAL(LinesOf(lines, Category::Title).size(), size_t(1));
+  CHECK(SaidLineOf(LinesOf(lines, Category::Title)[0].text, "title.missing"));
+
+  nav.OnDriverSaid(920000, "thank you, oh wise omnipotent overseer GPS");
+  lines = nav.TakeLines();
+  CHECK(SaidLineOf(LinesOf(lines, Category::Title)[0].text, "title.used"));
+  CHECK_EQUAL(LinesOf(lines, Category::Thanked).size(), size_t(1));
+}
+
+TEST(NavigatorRefusesAGameThenPitchesItAsItsOwnIdea)
+{
+  Navigator nav(Config());
+  PlateLog log;
+  double const now = 1.7e12;
+  log.lastPlayedMs = now - 3 * 86400000.0;  // three days ago
+  nav.SetPlateLog(log, {});
+  nav.OnFix(At(now, 20), Far());
+  nav.TakeLines();
+  nav.OnDriverSaid(now + 1000, "I'm bored, let's play a game");
+  auto said = LinesOf(nav.TakeLines(), Category::PlateGame);
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK_EQUAL(said[0].text, std::string("I don't want to play that game right now. We played it 3 days ago. Come on. "
+                                        "Don't you remember?"));
+
+  nav.OnFix(At(now + 60000, 20), Far());
+  CHECK(LinesOf(nav.TakeLines(), Category::PlateGame).empty());
+  nav.OnFix(At(now + 200000, 20), Far());
+  said = LinesOf(nav.TakeLines(), Category::PlateGame);
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK(SaidLineOf(said[0].text, "game.myIdea"));
+
+  // And it's on: a yes starts the game.
+  nav.OnDriverSaid(now + 210000, "yes");
+  said = LinesOf(nav.TakeLines(), Category::PlateGame);
+  CHECK(!said.empty() && SaidLineOf(said[0].text, "plateGame.accepted"));
+  CHECK(nav.GetPlateLog().lastPlayedMs == now + 210000);
+}
+
+TEST(NavigatorIsABoredTourGuide)
+{
+  Navigator nav(Config());
+  nav.SetSightLookup([](LatLon const &, double) { return Sight{"a Starbucks", false}; });
+  std::vector<Commentary> said;
+  for (int i = 0; i < 60; ++i)
+  {
+    nav.OnFix(Heading(i * 10000.0, 15, 0), Far());
+    for (auto const & l : LinesOf(nav.TakeLines(), Category::Tour))
+      said.push_back(l);
+  }
+  CHECK_EQUAL(said.size(), size_t(1));  // the same Starbucks isn't worth mentioning twice
+  CHECK(said[0].text.find("right") != std::string::npos && said[0].text.find("a Starbucks") != std::string::npos);
+}
+
+TEST(NavigatorCountsTheCommute)
+{
+  LatLon const home{39.74, -104.99};
+  LatLon const work{39.75, -104.94};
+  double const now = 1.75e12;  // mid 2025
+  std::vector<TripRecord> trips;
+  for (int i = 0; i < 54; ++i)
+  {
+    TripRecord r;
+    r.routeKey = RouteKey(i % 2 ? work : home, i % 2 ? home : work);
+    r.to = i % 2 ? home : work;
+    r.endedAt = now - (i + 1) * 86400000.0;
+    trips.push_back(r);
+  }
+  // 27 trips to work so far; 3 more on other days of the year make the 30th.
+  for (int i = 0; i < 2; ++i)
+  {
+    TripRecord r;
+    r.routeKey = RouteKey(home, work);
+    r.to = work;
+    r.endedAt = now - 60 * 86400000.0;
+    trips.push_back(r);
+  }
+  Navigator nav(Config(), trips);
+  RouteSnapshot r = Far();
+  r.origin = home;
+  r.destinationPoint = work;
+  nav.OnFix(At(now, 0), r);
+  auto said = LinesOf(nav.TakeLines(), Category::Routine);
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK(said[0].text.find("this is the 30th time that we've taken this trip this year to your work") != std::string::npos);
+}
+
+TEST(NavigatorWishesThePartnerWereDriving)
+{
+  RouteSnapshot off = Far();
+  off.state = RouteState::OffRoute;
+  Navigator nav(Config());
+  nav.SetPartner("wife", Pronouns::She);
+  std::vector<Commentary> said;
+  for (int i = 0; i < 3; ++i)
+  {
+    nav.OnFix(At(i * 20000, 10), Far());
+    nav.OnFix(At(i * 20000 + 10000, 10), off);
+    for (auto const & l : LinesOf(nav.TakeLines(), Category::Partner))
+      said.push_back(l);
+  }
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK(said[0].text.find("I wish that your wife was driving. You know she's a better driver than you.") !=
+        std::string::npos);
+
+  // No partner set: the GPS begs for anyone at all instead.
+  Navigator single(Config());
+  said.clear();
+  for (int i = 0; i < 3; ++i)
+  {
+    single.OnFix(At(i * 20000, 10), Far());
+    single.OnFix(At(i * 20000 + 10000, 10), off);
+    for (auto const & l : LinesOf(single.TakeLines(), Category::Partner))
+      said.push_back(l);
+  }
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK(SaidLineOf(said[0].text, "anyoneElse"));
+}

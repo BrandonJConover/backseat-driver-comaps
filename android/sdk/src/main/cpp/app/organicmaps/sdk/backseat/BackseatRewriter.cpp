@@ -8,9 +8,11 @@
 #include "backseat/rewriter.hpp"
 
 #include <atomic>
+#include <iomanip>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <sstream>
 
 namespace
 {
@@ -93,8 +95,20 @@ JNIEXPORT void JNICALL Java_app_organicmaps_sdk_backseat_BackseatRewriter_native
     rewriter->Answer(id, jni::ToNativeString(env, text));
 }
 
-JNIEXPORT void JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeDriverSaid(JNIEnv * env, jclass, jstring text)
+JNIEXPORT jstring JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeDriverSaid(JNIEnv * env, jclass, jstring text)
 {
-  frm()->GetRoutingManager().BackseatDriverSaid(jni::ToNativeString(env, text));
+  // "" when the navigator took it, "route\tlat\tlon\tname" or "search\tquery" for a destination.
+  auto const heard = frm()->GetRoutingManager().BackseatDriverSaid(jni::ToNativeString(env, text));
+  using Kind = BackseatAdapter::HeardCommand::Kind;
+  std::string out;
+  if (heard.kind == Kind::RouteTo)
+  {
+    std::ostringstream s;
+    s << std::setprecision(9) << "route\t" << heard.lat << '\t' << heard.lon << '\t' << heard.name;
+    out = s.str();
+  }
+  else if (heard.kind == Kind::Search)
+    out = "search\t" + heard.query;
+  return jni::ToJavaString(env, out);
 }
 }  // extern "C"

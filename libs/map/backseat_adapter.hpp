@@ -49,7 +49,25 @@ public:
   void SetCountryInfoGetter(std::function<storage::CountryInfoGetter const &()> getter);
   /// What the driver said out loud (speech recognition), e.g. "I see a Texas plate".
   /// Call on the same thread as OnLocationUpdate.
-  void OnDriverSaid(std::string const & text) { m_navigator.OnDriverSaid(0, text); }
+  /// A destination the driver asked for out loud ("take me to work").
+  struct HeardCommand
+  {
+    enum class Kind
+    {
+      /// Not a destination command; the navigator took it (plate game, police...).
+      None,
+      /// Route to `lat`/`lon` (home or work, worked out from past trips).
+      RouteTo,
+      /// Search for `query` and let the driver pick.
+      Search
+    };
+    Kind kind = Kind::None;
+    double lat = 0;
+    double lon = 0;
+    std::string name;
+    std::string query;
+  };
+  HeardCommand OnDriverSaid(std::string const & text);
   /// Traffic lights on the route just built (mercator points). A left turn off a side street
   /// with no light there is treated as a stop sign, since stop signs aren't in the map data.
   void SetTrafficLights(std::vector<m2::PointD> points);
@@ -74,6 +92,7 @@ private:
   std::optional<backseat::Place> PlaceAt(backseat::LatLon const & at) const;
   bool InParkingLot(backseat::LatLon const & at) const;
   std::optional<backseat::Venue> VenueAt(backseat::LatLon const & at) const;
+  std::optional<backseat::Sight> SightAt(backseat::LatLon const & at, double bearingDeg) const;
   backseat::Bridge BridgeAt(backseat::LatLon const & at, double bearingDeg) const;
   void CheckBattery(double tMs);
 

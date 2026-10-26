@@ -409,6 +409,7 @@ m2::PointD ToPixelPoint(UIView * view, CGPoint pt) {
     [self onGetFocus:self.deferredFocusValue];
 
   [MWMRouter restoreRouteIfNeeded];
+  [BackseatTalkButton installIn:self.controlsView];
 
   self.view.clipsToBounds = YES;
   [MWMKeyboard addObserver:self];

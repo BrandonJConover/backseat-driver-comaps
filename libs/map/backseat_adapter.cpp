@@ -1,5 +1,7 @@
 #include "map/backseat_adapter.hpp"
 
+#include "backseat/voice_command.hpp"
+
 #include "routing/following_info.hpp"
 #include "routing/route.hpp"
 #include "routing/routing_session.hpp"
@@ -24,7 +26,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
 
 namespace
@@ -155,6 +159,14 @@ std::vector<backseat::TripRecord> LoadTrips()
         r.speedingShare = std::stod(share);
         r.missedTurns = std::stoi(missed);
         r.hardBrakes = std::stoi(brakes);
+        // Newer lines end with where the trip was headed: "lat,lon".
+        std::string to;
+        if (std::getline(fields, to, '\t'))
+        {
+          auto const comma = to.find(',');
+          if (comma != std::string::npos)
+            r.to = backseat::LatLon{std::stod(to.substr(0, comma)), std::stod(to.substr(comma + 1))};
+        }
         trips.push_back(r);
       }
       catch (std::exception const &)
@@ -172,8 +184,10 @@ void AppendTrip(backseat::TripRecord const & r)
 {
   std::ofstream out(GetPlatform().SettingsPathForFile(kTripsFile), std::ios::app);
   out << r.routeKey << '\t' << r.destination << '\t' << r.endedAt << '\t' << r.expectedMinutes << '\t'
-      << r.actualMinutes << '\t' << r.speedingShare << '\t' << r.missedTurns << '\t' << r.hardBrakes << '\t' << r.grade
-      << '\n';
+      << r.actualMinutes << '\t' << r.speedingShare << '\t' << r.missedTurns << '\t' << r.hardBrakes << '\t' << r.grade;
+  if (r.to)
+    out << '\t' << std::setprecision(9) << r.to->lat << ',' << r.to->lon;
+  out << '\n';
 }
 backseat::PlateLog LoadPlates()
 {
@@ -242,6 +256,7 @@ void BackseatAdapter::SetDataSource(std::function<DataSource &()> getter)
   m_dataSource = std::move(getter);
   m_navigator.SetPlaceLookup([this](backseat::LatLon const & at) { return PlaceAt(at); });
   m_navigator.SetParkingLookup([this](backseat::LatLon const & at) { return InParkingLot(at); });
+  m_navigator.SetSightLookup([this](backseat::LatLon const & at, double bearing) { return SightAt(at, bearing); });
   m_navigator.SetVenueLookup([this](backseat::LatLon const & at) { return VenueAt(at); });
   m_navigator.SetBridgeLookup([this](backseat::LatLon const & at, double bearing) { return BridgeAt(at, bearing); });
   // A stop within a light's queue is a red light, not pulling over.
@@ -437,6 +452,102 @@ std::optional<backseat::Venue> BackseatAdapter::VenueAt(backseat::LatLon const &
       bestDistance = distance;
     }
   }, mercator::RectByCenterXYAndSizeInMeters(center, 2 * kNearM), scales::GetUpperScale());
+  return best;
+}
+
+BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & text)
+{
+  HeardCommand heard;
+  auto const command = backseat::ParseDestinationCommand(text);
+  if (!command)
+  {
+    m_navigator.OnDriverSaid(0, text);
+    return heard;
+  }
+  auto const known = backseat::KnownPlaceOf(command->target);
+  std::string const place = !known                                ? command->target
+                            : *known == backseat::KnownPlace::Home ? "your home"
+                                                                   : "your work";
+  if (!command->polite)
+  {
+    double const nowMs = std::chrono::duration<double, std::milli>(
+                             std::chrono::system_clock::now().time_since_epoch()).count();
+    m_navigator.QueueOpener(nowMs, "bossy", {{"place", place}});
+  }
+  if (known)
+  {
+    if (auto const at = backseat::GuessPlace(m_navigator.History(), *known))
+    {
+      heard.kind = HeardCommand::Kind::RouteTo;
+      heard.lat = at->lat;
+      heard.lon = at->lon;
+      heard.name = *known == backseat::KnownPlace::Home ? "Home" : "Work";
+      LOG(LINFO, ("Backseat: heard a command for", heard.name));
+      return heard;
+    }
+  }
+  // Somewhere new (or home/work before there's enough history): let the driver pick.
+  heard.kind = HeardCommand::Kind::Search;
+  heard.query = command->target;
+  LOG(LINFO, ("Backseat: searching for", heard.query));
+  return heard;
+}
+
+std::optional<backseat::Sight> BackseatAdapter::SightAt(backseat::LatLon const & at, double bearingDeg) const
+{
+  if (!m_dataSource)
+    return {};
+  auto const & c = classif();
+  // Things a tour guide would point at. Shops and restaurants count; it's that kind of tour.
+  static std::vector<uint32_t> const kSights = {
+      c.GetTypeByPath({"amenity", "cafe"}),       c.GetTypeByPath({"amenity", "restaurant"}),
+      c.GetTypeByPath({"amenity", "fast_food"}),  c.GetTypeByPath({"amenity", "cinema"}),
+      c.GetTypeByPath({"amenity", "theatre"}),    c.GetTypeByPath({"amenity", "library"}),
+      c.GetTypeByPath({"amenity", "place_of_worship"}), c.GetTypeByPath({"tourism", "attraction"}),
+      c.GetTypeByPath({"tourism", "museum"}),     c.GetTypeByPath({"tourism", "hotel"}),
+      c.GetTypeByPath({"leisure", "park"}),       c.GetTypeByPath({"leisure", "stadium"}),
+      c.GetTypeByPath({"shop"}),                  c.GetTypeByPath({"historic"})};
+
+  double constexpr kBesideM = 80;
+  m2::PointD const center = mercator::FromLatLon(at.lat, at.lon);
+  std::optional<backseat::Sight> best;
+  double bestDistance = 0;
+  m_dataSource().ForEachInRect([&](FeatureType & ft)
+  {
+    if (ft.GetGeomType() == feature::GeomType::Line)
+      return;
+    bool sight = false;
+    for (uint32_t type : feature::TypesHolder(ft))
+    {
+      uint32_t two = type;
+      ftype::TruncValue(two, 2);
+      uint32_t one = type;
+      ftype::TruncValue(one, 1);
+      if (std::find(kSights.begin(), kSights.end(), two) != kSights.end() ||
+          std::find(kSights.begin(), kSights.end(), one) != kSights.end())
+        sight = true;
+    }
+    if (!sight)
+      return;
+    std::string const name = ft.GetTranslatedName().m_primary;
+    if (name.empty())
+      return;
+    m2::PointD const where = feature::GetCenter(ft);
+    double const distance = mercator::DistanceOnEarth(center, where);
+    if (distance > kBesideM)
+      return;
+    // Beside the road, not ahead or behind: 30 to 150 degrees off the heading.
+    double const toIt = std::atan2(where.x - center.x, where.y - center.y) * 180 / M_PI;
+    double off = std::fmod(toIt - bearingDeg + 540.0, 360.0) - 180;  // -180..180, negative is left
+    if (std::fabs(off) < 30 || std::fabs(off) > 150)
+      return;
+    if (best && distance >= bestDistance)
+      return;
+    // Chains are "a Starbucks"; one-of-a-kind places are just their name.
+    bool const chain = !ft.GetMetadata(feature::Metadata::FMD_BRAND).empty();
+    best = backseat::Sight{chain ? "a " + name : name, off < 0};
+    bestDistance = distance;
+  }, mercator::RectByCenterXYAndSizeInMeters(center, 2 * kBesideM), scales::GetUpperScale());
   return best;
 }
 

@@ -241,6 +241,18 @@ enum class Category
   Autopilot,
   /// Posture, smells and other remarks on a long drive (navigator only).
   LongDrive,
+  /// The driver barked a destination without a please (navigator only).
+  Bossy,
+  /// The driver said something nice (navigator only).
+  Thanked,
+  /// "Call me wise, omnipotent overseer GPS" and what follows (navigator only).
+  Title,
+  /// Deadpan tour guide (navigator only).
+  Tour,
+  /// The same commute again (navigator only).
+  Routine,
+  /// "I wish your wife was driving" (navigator only).
+  Partner,
   Count
 };
 

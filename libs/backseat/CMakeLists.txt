@@ -29,6 +29,8 @@ set(
   types.hpp
   units.cpp
   units.hpp
+  voice_command.cpp
+  voice_command.hpp
 )
 
 if (COMMAND omim_add_library)
