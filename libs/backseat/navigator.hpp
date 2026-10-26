@@ -170,6 +170,7 @@ private:
   void TrackFear(Fix const & fix, RouteSnapshot const & route);
   void SayPolice(double tMs);
   void SayVenue(double tMs, RouteSnapshot const & route);
+  void TrackLongDrive(double tMs, RouteSnapshot const & route);
   int Tier() const;
   bool Parked() const;
 
@@ -204,6 +205,8 @@ private:
   VenueLookup m_venueLookup;
   /// Reroutes this trip; the third one gets the autopilot line.
   int m_reroutes = 0;
+  /// Long-drive remarks said so far this trip.
+  size_t m_longDriveSaid = 0;
 
   // Fear: bridges and sharp curves.
   BridgeLookup m_bridgeLookup;

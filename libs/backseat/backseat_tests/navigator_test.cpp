@@ -510,3 +510,30 @@ TEST(NavigatorSuggestsAutopilotOnTheThirdReroute)
       CHECK_EQUAL(said[0].text, std::string("You know there are cars out there that come with autopilot. You might want to look into it. Just saying."));
   }
 }
+
+TEST(NavigatorNagsOnALongDrive)
+{
+  Navigator nav(Config());
+  RouteSnapshot road = Far();
+  road.etaSeconds = 3 * 3600;
+  std::vector<Commentary> said;
+  for (int minute = 0; minute <= 100; ++minute)
+  {
+    nav.OnFix(At(minute * 60000.0, 25), road);
+    for (auto const & l : LinesOf(nav.TakeLines(), Category::LongDrive))
+      said.push_back(l);
+  }
+  CHECK_EQUAL(said.size(), size_t(3));
+  CHECK_EQUAL(said[0].text, std::string("Hey, no slouching. This may be a 3 hour drive but there are no excuses for bad posture."));
+  CHECK(SaidLineOf(said[1].text, "longDrive.smell"));
+  CHECK(SaidLineOf(said[2].text, "longDrive.metal"));
+  CHECK(said[1].t >= 50 * 60000 && said[2].t >= 90 * 60000);
+
+  // A half-hour errand doesn't qualify.
+  Navigator errand(Config());
+  RouteSnapshot shortTrip = Far();
+  shortTrip.etaSeconds = 1800;
+  for (int minute = 0; minute <= 100; ++minute)
+    errand.OnFix(At(minute * 60000.0, 25), shortTrip);
+  CHECK(LinesOf(errand.TakeLines(), Category::LongDrive).empty());
+}

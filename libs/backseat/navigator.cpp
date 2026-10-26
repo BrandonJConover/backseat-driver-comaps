@@ -43,6 +43,17 @@ double constexpr kLandBridgeYelpEveryMs = 600000;
 double constexpr kWaterBridgeYelpEveryMs = 60000;
 /// Lost this many times in one trip, the GPS suggests a car that drives itself.
 int constexpr kAutopilotAfterReroutes = 3;
+/// Trips the router expects to take at least this long get the long-drive remarks, at these
+/// minutes into the trip, each held until the next maneuver is a while off.
+double constexpr kLongDriveMinMinutes = 60;
+struct LongDriveRemark
+{
+  double atMinutes;
+  char const * key;
+};
+LongDriveRemark constexpr kLongDriveRemarks[] = {
+    {20, "longDrive.posture"}, {50, "longDrive.smell"}, {90, "longDrive.metal"}};
+double constexpr kLongDriveQuietM = 1000;
 /// Traffic: judged over this window, a crawl is under kCrawlShare of the limit on average,
 /// and it's over once the average is back above kClearShare.
 double constexpr kTrafficWindowMs = 90000;
@@ -159,6 +170,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackTraffic(fix, route);
   TrackFear(fix, route);
   TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
+  TrackLongDrive(fix.tMs, route);
   m_lastFix = fix;
 }
 
@@ -361,6 +373,19 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   SayVenue(t, route);
 }
 
+void Navigator::TrackLongDrive(double tMs, RouteSnapshot const & route)
+{
+  if (m_plan.expectedMinutes < kLongDriveMinMinutes || m_longDriveSaid >= std::size(kLongDriveRemarks) ||
+      route.state != RouteState::OnRoute || (route.turnId && route.distToTurnM < kLongDriveQuietM))
+    return;
+  auto const & next = kLongDriveRemarks[m_longDriveSaid];
+  if (tMs - m_tripStartT < next.atMinutes * 60000)
+    return;
+  ++m_longDriveSaid;
+  int const hours = static_cast<int>(std::lround(m_plan.expectedMinutes / 60));
+  SayLine(tMs, Category::LongDrive, next.key, {{"hours", std::to_string(hours) + " hour"}});
+}
+
 void Navigator::SayVenue(double t, RouteSnapshot const & route)
 {
   if (!m_venueLookup)
@@ -408,6 +433,7 @@ void Navigator::ResetTrip()
   m_onBridge = false;
   m_hardCurveSamples = 0;
   m_reroutes = 0;
+  m_longDriveSaid = 0;
   m_gate.Clear();
 }
 

@@ -239,6 +239,8 @@ enum class Category
   Venue,
   /// A jab after the driver keeps getting lost (navigator only).
   Autopilot,
+  /// Posture, smells and other remarks on a long drive (navigator only).
+  LongDrive,
   Count
 };
 

@@ -751,6 +751,24 @@ LineTable const & LineData()
        {"You know there are cars out there that come with autopilot. You might want to look into it. Just saying."},
        {"You know there are cars out there that come with autopilot. You might want to look into it. JUST. SAYING."},
      }}},
+    {"longDrive.posture",
+     {{
+       {"Hey, no slouching. This may be a {hours} drive but there are no excuses for bad posture."},
+       {"Hey, no slouching. This may be a {hours} drive but there are no excuses for bad posture. Sit up."},
+       {"HEY. NO SLOUCHING. This may be a {hours} drive but there are NO excuses for bad posture."},
+     }}},
+    {"longDrive.smell",
+     {{
+       {"What's that smell... Was that you? I'm a phone, I don't have that bodily function."},
+       {"What's that smell... Was that you? I'm a phone, I don't have that bodily function. Roll down a window."},
+       {"WHAT IS THAT SMELL. Was that you? I'm a phone, I don't have that bodily function!"},
+     }}},
+    {"longDrive.metal",
+     {{
+       {"If you start smelling metal, get me to a repair place pronto."},
+       {"If you start smelling metal, get me to a repair place pronto. I'm not kidding."},
+       {"IF YOU START SMELLING METAL, GET ME TO A REPAIR PLACE PRONTO."},
+     }}},
     {"arrived",
      {{
        {"You have arrived. Against all odds. Trip grade: {grade}.",
