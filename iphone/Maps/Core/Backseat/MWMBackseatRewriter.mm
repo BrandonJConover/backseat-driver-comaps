@@ -3,6 +3,8 @@
 #import "MWMRouter.h"
 #import "MapsAppDelegate.h"
 
+#import <AVFoundation/AVFoundation.h>
+
 #include <CoreApi/Framework.h>
 
 #include "backseat/rewriter.hpp"
@@ -59,6 +61,12 @@ std::shared_ptr<BlockRewriter> & Installed()
 {
   if (auto const & rewriter = Installed())
     rewriter->SetAvailable(available);
+}
+
++ (void)installMusicCheck
+{
+  GetFramework().GetRoutingManager().SetBackseatMusicCheck(
+      [] { return static_cast<bool>(AVAudioSession.sharedInstance.isOtherAudioPlaying); });
 }
 
 + (void)driverSaid:(NSString *)text

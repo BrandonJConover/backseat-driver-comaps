@@ -53,6 +53,11 @@ int constexpr kBegAfterReroutes = 4;
 double constexpr kSightCheckEveryMs = 8000;
 double constexpr kSightEveryMs = 240000;
 double constexpr kSightQuietM = 500;
+/// Asking for music: once a trip, at least this far in, on a quiet stretch, if nothing is playing.
+double constexpr kMusicAfterMs = 15 * 60000;
+double constexpr kMusicCheckEveryMs = 15000;
+/// "You call this music?" once it has been playing this long.
+double constexpr kMusicJudgeAfterMs = 45000;
 /// After turning down the driver's game, the GPS pitches it as its own idea this much later.
 double constexpr kGamePitchAfterMs = 180000;
 
@@ -215,6 +220,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
   TrackLongDrive(fix.tMs, route);
   TrackSights(fix, route);
+  TrackMusic(fix.tMs, route);
   // Fed up for the first time this trip: from now on it's "wise, omnipotent overseer GPS".
   if (!m_titleDemanded && Tier() == 2)
   {
@@ -503,6 +509,32 @@ void Navigator::SayRoutine(double t, RouteSnapshot const & route)
     SayLine(t, Category::Routine, "routine.same");
 }
 
+void Navigator::TrackMusic(double tMs, RouteSnapshot const & route)
+{
+  if (!m_musicLookup || route.state != RouteState::OnRoute || tMs - m_lastMusicCheckT < kMusicCheckEveryMs)
+    return;
+  m_lastMusicCheckT = tMs;
+  bool const playing = m_musicLookup();
+  if (playing && !m_musicPlaying)
+    m_musicStartedT = tMs;
+  m_musicPlaying = playing;
+  bool const quiet = !route.turnId || route.distToTurnM >= kLongDriveQuietM;
+  if (!quiet)
+    return;
+  // Music's on: give it a song's worth of a chance, then judge it. Once a trip.
+  if (playing && !m_musicJudged && tMs - m_musicStartedT >= kMusicJudgeAfterMs)
+  {
+    m_musicJudged = true;
+    SayLine(tMs, Category::Music, "music.judge");
+  }
+  // Silence (well, just the GPS) on a long trip: ask for music.
+  if (!playing && !m_musicAsked && tMs - m_tripStartT >= kMusicAfterMs)
+  {
+    m_musicAsked = true;
+    SayLine(tMs, Category::Music, "music");
+  }
+}
+
 void Navigator::SayVenue(double t, RouteSnapshot const & route)
 {
   if (!m_venueLookup)
@@ -556,6 +588,9 @@ void Navigator::ResetTrip()
   m_titleDemanded = false;
   m_gameRefused = false;
   m_sightsSaid.clear();
+  m_musicAsked = false;
+  m_musicJudged = false;
+  m_musicPlaying = false;
   m_lastSightT = -1e18;
   m_gamePitchAt.reset();
   m_lastTitleScoldT = -1e18;

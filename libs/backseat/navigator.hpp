@@ -96,6 +96,9 @@ struct Sight
 /// A named place just beside the road at a point, given which way the car is heading.
 using SightLookup = std::function<std::optional<Sight>(LatLon const &, double bearingDeg)>;
 
+/// Whether other audio (music, a podcast) is playing on the phone.
+using MusicLookup = std::function<bool()>;
+
 /// How the GPS refers to the driver when it throws them under the bus ("It was them, officer").
 enum class Pronouns
 {
@@ -158,6 +161,8 @@ public:
   void SetCarHasAutopilot(bool has) { m_carHasAutopilot = has; }
   /// Lets the GPS panic on bridges.
   void SetBridgeLookup(BridgeLookup lookup) { m_bridgeLookup = std::move(lookup); }
+  /// Lets the GPS ask for music on a quiet drive, and keep it to itself when music is on.
+  void SetMusicLookup(MusicLookup lookup) { m_musicLookup = std::move(lookup); }
   /// Lets the GPS play tour guide, without enthusiasm ("On your right, there's a Starbucks. That's it.").
   void SetSightLookup(SightLookup lookup) { m_sightLookup = std::move(lookup); }
   /// Lets the GPS comment on where we're going ("Oh, we are getting coffee?").
@@ -201,6 +206,7 @@ private:
   void SayRoutine(double tMs, RouteSnapshot const & route);
   void TrackLongDrive(double tMs, RouteSnapshot const & route);
   void TrackSights(Fix const & fix, RouteSnapshot const & route);
+  void TrackMusic(double tMs, RouteSnapshot const & route);
   int Tier() const;
   bool Parked() const;
 
@@ -234,6 +240,12 @@ private:
 
   VenueLookup m_venueLookup;
   SightLookup m_sightLookup;
+  MusicLookup m_musicLookup;
+  double m_lastMusicCheckT = -1e18;
+  bool m_musicAsked = false;
+  bool m_musicJudged = false;
+  bool m_musicPlaying = false;
+  double m_musicStartedT = 0;
   double m_lastSightCheckT = -1e18;
   double m_lastSightT = -1e18;
   std::vector<std::string> m_sightsSaid;

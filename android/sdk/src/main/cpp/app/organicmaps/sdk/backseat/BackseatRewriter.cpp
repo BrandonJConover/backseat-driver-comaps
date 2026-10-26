@@ -95,6 +95,21 @@ JNIEXPORT void JNICALL Java_app_organicmaps_sdk_backseat_BackseatRewriter_native
     rewriter->Answer(id, jni::ToNativeString(env, text));
 }
 
+JNIEXPORT void JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeEnableMusicCheck(JNIEnv *, jclass)
+{
+  frm()->GetRoutingManager().SetBackseatMusicCheck([]
+  {
+    JNIEnv * env = jni::GetEnv();
+    if (env == nullptr)
+      return true;  // can't tell: assume music, so the GPS doesn't nag
+    static jclass const clazz = jni::GetGlobalClassRef(env, "app/organicmaps/sdk/backseat/Backseat");
+    static jmethodID const isMusicActive = jni::GetStaticMethodID(env, clazz, "isMusicActive", "()Z");
+    bool const active = env->CallStaticBooleanMethod(clazz, isMusicActive);
+    jni::HandleJavaException(env);
+    return active;
+  });
+}
+
 JNIEXPORT jstring JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeDriverSaid(JNIEnv * env, jclass, jstring text)
 {
   // "" when the navigator took it, "route\tlat\tlon\tname" or "search\tquery" for a destination.

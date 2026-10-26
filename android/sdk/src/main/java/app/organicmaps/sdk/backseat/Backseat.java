@@ -1,5 +1,8 @@
 package app.organicmaps.sdk.backseat;
 
+import android.content.Context;
+import android.media.AudioManager;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
@@ -9,6 +12,25 @@ import androidx.annotation.UiThread;
 public final class Backseat
 {
   private Backseat() {}
+
+  @Nullable
+  private static AudioManager sAudio;
+
+  /// Lets the GPS see whether music is playing ("Could we please turn on some music?").
+  /// Call once the framework is up.
+  @UiThread
+  public static void init(@NonNull Context context)
+  {
+    sAudio = (AudioManager) context.getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
+    nativeEnableMusicCheck();
+  }
+
+  // Called from the core.
+  @SuppressWarnings("unused")
+  private static boolean isMusicActive()
+  {
+    return sAudio != null && sAudio.isMusicActive();
+  }
 
   /// A destination the driver asked for out loud ("take me to work").
   public static final class Command
@@ -47,6 +69,8 @@ public final class Backseat
       return new Command(null, parts[1]);
     return null;
   }
+
+  private static native void nativeEnableMusicCheck();
 
   @NonNull
   private static native String nativeDriverSaid(@NonNull String text);

@@ -71,6 +71,8 @@ public:
   /// Traffic lights on the route just built (mercator points). A left turn off a side street
   /// with no light there is treated as a stop sign, since stop signs aren't in the map data.
   void SetTrafficLights(std::vector<m2::PointD> points);
+  /// Whether other audio is playing (the platform's audio session), so the GPS can ask for music.
+  void SetMusicCheck(std::function<bool()> check) { m_navigator.SetMusicLookup(std::move(check)); }
   /// The platform's on-device language model, for rewording roasts in real time.
   void SetRewriter(std::shared_ptr<backseat::LineRewriter> rewriter) { m_navigator.SetRewriter(std::move(rewriter)); }
 

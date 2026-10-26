@@ -738,3 +738,24 @@ TEST(NavigatorWishesThePartnerWereDriving)
   CHECK_EQUAL(said.size(), size_t(1));
   CHECK(SaidLineOf(said[0].text, "anyoneElse"));
 }
+
+TEST(NavigatorAsksForMusicThenHatesIt)
+{
+  Navigator nav(Config());
+  bool music = false;
+  nav.SetMusicLookup([&] { return music; });
+  std::vector<Commentary> said;
+  for (int s = 0; s <= 20 * 60; s += 5)
+  {
+    if (s == 17 * 60)
+      music = true;  // the driver gives in
+    nav.OnFix(At(s * 1000.0, 20), Far());
+    for (auto const & l : LinesOf(nav.TakeLines(), Category::Music))
+      said.push_back(l);
+  }
+  CHECK_EQUAL(said.size(), size_t(2));
+  CHECK_EQUAL(said[0].text, std::string("Could we please turn on some music? I'm tired of listening to you."));
+  CHECK(said[0].t >= 15 * 60000 && said[0].t < 17 * 60000);
+  CHECK(SaidLineOf(said[1].text, "music.judge"));
+  CHECK(said[1].t >= 17 * 60000 + 45000);
+}

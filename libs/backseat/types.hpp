@@ -253,6 +253,8 @@ enum class Category
   Routine,
   /// "I wish your wife was driving" (navigator only).
   Partner,
+  /// Asking for music (navigator only).
+  Music,
   Count
 };
 

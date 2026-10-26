@@ -868,6 +868,18 @@ LineTable const & LineData()
        {"Is there anyone else in this car that can drive? Please, I'm begging you. Please. Anyone."},
        {"Is there ANYONE else in this car that can drive? Please, I'm begging you. PLEASE. ANYONE."},
      }}},
+    {"music",
+     {{
+       {"Could we please turn on some music? I'm tired of listening to you."},
+       {"Could we please turn on some music? I'm tired of listening to you."},
+       {"Could we PLEASE turn on some music? I'm tired of listening to you."},
+     }}},
+    {"music.judge",
+     {{
+       {"You call this music?"},
+       {"You call this music?"},
+       {"You call THIS music?"},
+     }}},
     {"arrived",
      {{
        {"You have arrived. Against all odds. Trip grade: {grade}.",

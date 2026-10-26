@@ -508,6 +508,7 @@ public class MwmActivity extends BaseMwmFragmentActivity
   protected void onSafeCreate(@Nullable Bundle savedInstanceState)
   {
     super.onSafeCreate(savedInstanceState);
+    Backseat.init(this);
 
     mIsTabletLayout = getResources().getBoolean(R.bool.tabletLayout);
 

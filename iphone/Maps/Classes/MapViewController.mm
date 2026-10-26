@@ -13,6 +13,7 @@
 #import "MWMPlacePageProtocol.h"
 #import "MapsAppDelegate.h"
 #import "SwiftBridge.h"
+#import "MWMBackseatRewriter.h"
 
 #import <CoreApi/Framework.h>
 #import <CoreApi/MWMFrameworkHelper.h>
@@ -410,6 +411,7 @@ m2::PointD ToPixelPoint(UIView * view, CGPoint pt) {
 
   [MWMRouter restoreRouteIfNeeded];
   [BackseatTalkButton installIn:self.controlsView];
+  [MWMBackseatRewriter installMusicCheck];
 
   self.view.clipsToBounds = YES;
   [MWMKeyboard addObserver:self];

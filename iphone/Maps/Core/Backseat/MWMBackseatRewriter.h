@@ -14,6 +14,8 @@ typedef void (^MWMBackseatRewriteHandler)(NSString * instructions, NSString * pr
 + (void)setAvailable:(BOOL)available;
 /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate". Main thread.
 + (void)driverSaid:(NSString *)text;
+/// Lets the GPS see whether other audio (music, podcasts) is playing.
++ (void)installMusicCheck;
 
 @end
 
