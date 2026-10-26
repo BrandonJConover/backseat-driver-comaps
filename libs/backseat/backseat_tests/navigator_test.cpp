@@ -796,3 +796,29 @@ TEST(NavigatorHatesChristmasLights)
   CHECK_EQUAL(said.size(), size_t(1));
   CHECK(SaidLineOf(said[0].text, "holiday.halloween"));
 }
+
+TEST(NavigatorPointsAtTheVolumeKnobAtRoundabouts)
+{
+  bool music = true;
+  Navigator nav(Config());
+  nav.SetMusicLookup([&] { return music; });
+  nav.OnFix(At(0, 10), OnRoute(1, TurnKind::Roundabout, 300));
+  auto said = LinesOf(nav.TakeLines(), Category::Music);
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK_EQUAL(said[0].text, std::string("Oh look, a roundabout! Do you know what else in this car is round?"));
+  // ...awkward pause...
+  nav.OnFix(At(4000, 10), OnRoute(1, TurnKind::Roundabout, 260));
+  CHECK(LinesOf(nav.TakeLines(), Category::Music).empty());
+  nav.OnFix(At(8000, 10), OnRoute(1, TurnKind::Roundabout, 220));
+  said = LinesOf(nav.TakeLines(), Category::Music);
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK_EQUAL(said[0].text, std::string("The volume knob."));
+  nav.OnFix(At(30000, 10), OnRoute(2, TurnKind::Roundabout, 300));
+  CHECK(LinesOf(nav.TakeLines(), Category::Music).empty());  // once a trip
+
+  music = false;
+  Navigator quiet(Config());
+  quiet.SetMusicLookup([&] { return music; });
+  quiet.OnFix(At(0, 10), OnRoute(1, TurnKind::Roundabout, 300));
+  CHECK(LinesOf(quiet.TakeLines(), Category::Music).empty());
+}

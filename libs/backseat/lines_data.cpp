@@ -931,6 +931,12 @@ LineTable const & LineData()
        {"THANKSGIVING. I'm thankful this trip will end eventually.",
         "Thanksgiving. Gobble gobble. Drive."},
      }}},
+    {"music.roundabout",
+     {{
+       {"Oh look, a roundabout! Do you know what else in this car is round? || The volume knob."},
+       {"Oh look, a roundabout! Do you know what else in this car is round? || The volume knob."},
+       {"Oh look, a roundabout! Do you know what else in this car is round? || THE VOLUME KNOB."},
+     }}},
     {"arrived",
      {{
        {"You have arrived. Against all odds. Trip grade: {grade}.",

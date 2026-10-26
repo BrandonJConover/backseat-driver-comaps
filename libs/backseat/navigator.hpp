@@ -250,6 +250,9 @@ private:
   MusicLookup m_musicLookup;
   std::function<std::tm(double)> m_localTime;
   bool m_christmasSaid = false;
+  bool m_roundaboutSaid = false;
+  /// Punchlines waiting out their awkward pause, by when to say them.
+  std::vector<Commentary> m_punchlines;
   double m_lastMusicCheckT = -1e18;
   bool m_musicAsked = false;
   bool m_musicJudged = false;

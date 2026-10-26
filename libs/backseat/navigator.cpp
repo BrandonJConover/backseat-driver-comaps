@@ -58,6 +58,15 @@ double constexpr kMusicAfterMs = 15 * 60000;
 double constexpr kMusicCheckEveryMs = 15000;
 /// "You call this music?" once it has been playing this long.
 double constexpr kMusicJudgeAfterMs = 45000;
+/// Silence between a setup and its punchline.
+double constexpr kAwkwardPauseMs = 2500;
+
+/// Roughly how long a line takes to say: ~2.7 words a second at normal speed.
+double SpeakingMs(std::string const & text, double speed)
+{
+  int const words = static_cast<int>(std::count(text.begin(), text.end(), ' ')) + 1;
+  return words / 2.7 * 1000 / std::max(0.5, speed);
+}
 /// After turning down the driver's game, the GPS pitches it as its own idea this much later.
 double constexpr kGamePitchAfterMs = 180000;
 
@@ -345,7 +354,16 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
   }
 }
 
-std::vector<Commentary> Navigator::TakeLines() { return m_gate.Take(); }
+std::vector<Commentary> Navigator::TakeLines()
+{
+  // Punchlines whose awkward pause is over.
+  while (!m_punchlines.empty() && m_punchlines.front().t <= m_lastT)
+  {
+    m_gate.Push(std::move(m_punchlines.front()), false);
+    m_punchlines.erase(m_punchlines.begin());
+  }
+  return m_gate.Take();
+}
 
 void Navigator::Update(double t, RouteSnapshot const & route)
 {
@@ -417,6 +435,12 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     m_turnId = route.turnId;
     std::string const text = InstructionText(route.turn, route.nextStreet, route.destination);
     Say(m_engine->OnNav(NavEvent::Instruction(t, text, route.distToTurnM, ManeuverOf(route.turn), route.control)));
+    // A roundabout with the music on: a hint about the other round thing in the car. Once a trip.
+    if (route.turn == TurnKind::Roundabout && !m_roundaboutSaid && m_musicLookup && m_musicLookup())
+    {
+      m_roundaboutSaid = true;
+      SayLine(t, Category::Music, "music.roundabout");
+    }
   }
   else
   {
@@ -638,12 +662,14 @@ void Navigator::ResetTrip()
   m_sightsSaid.clear();
   m_musicAsked = false;
   m_christmasSaid = false;
+  m_roundaboutSaid = false;
   m_musicJudged = false;
   m_musicPlaying = false;
   m_lastSightT = -1e18;
   m_gamePitchAt.reset();
   m_lastTitleScoldT = -1e18;
   m_gate.Clear();
+  m_punchlines.clear();
 }
 
 void Navigator::SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange)
@@ -800,6 +826,16 @@ void Navigator::SayLine(double tMs, Category category, std::string const & key, 
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = Priority::Roast;
   c.voiceSpeed = 1 + c.frustration / 250.0;
+  // "Setup || punchline": the punchline waits out the setup and then an awkward pause.
+  auto const pause = c.text.find(" || ");
+  if (pause != std::string::npos)
+  {
+    Commentary punchline = c;
+    punchline.text = c.text.substr(pause + 4);
+    c.text.resize(pause);
+    punchline.t = tMs + SpeakingMs(c.text, c.voiceSpeed) + kAwkwardPauseMs;
+    m_punchlines.push_back(std::move(punchline));
+  }
   // Brandon's lines; the rewording model leaves them alone.
   m_gate.Push(std::move(c), false);
 }
