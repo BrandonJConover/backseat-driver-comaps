@@ -47,8 +47,10 @@ jobs:
         run: |
           brew install qt optipng
           pip3 install "protobuf<3.21" --break-system-packages
-          xcodebuild -downloadComponent metalToolchain
-          xcodebuild -downloadPlatform iOS
+          # Apple's component downloads fail now and then; retry before giving up.
+          retry() { for i in 1 2 3; do "$@" && return 0; echo "Attempt $i failed: $*"; sleep 30; done; return 1; }
+          retry xcodebuild -downloadComponent metalToolchain
+          retry xcodebuild -downloadPlatform iOS
 
       - uses: actions/checkout@v6
         if: steps.secrets.outputs.ready == 'true'
