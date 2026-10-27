@@ -107,8 +107,29 @@ public:
   static char const * const kDriverNameKey;
   /// Rereads those settings; call after the platform changes them.
   void ReloadPersonality();
-  /// What the GPS says when first-run setup is done ("Brandon. Fine. I'll try to remember that.").
-  std::string SetupDoneReply() { return m_navigator.Reply("setup.done"); }
+  /// First-run setup, spoken, Brandon's script:
+  ///   SetupLine(Intro)       "Before we begin... My name is Echo. ...the sound your head makes when you tap it."
+  ///   SetupLine(Name)        "Your turn. What's your name?"  -> listen, SetupHeard(Name, answer) until true
+  ///   SetupLine(WrongName)   "Interesting. I thought it would have been Gary. Can I call you Gary?" -> listen (any answer)
+  ///   SetupLine(WhereTo)     "Okay Doug, where are we headed?" -> the answer goes to OnDriverSaid() as usual
+  /// Pronouns and Passenger are optional extra questions (SetupHeard saves those answers too).
+  enum class SetupStep
+  {
+    Intro,
+    Name,
+    WrongName,
+    WhereTo,
+    Pronouns,
+    Passenger
+  };
+  /// `voiceName` is the voice speaking ("Echo" gets Brandon's opener).
+  std::string SetupLine(SetupStep step, std::string const & voiceName = "Echo");
+  /// False when the answer wasn't understood; ask again. Saves what it understood to settings.
+  bool SetupHeard(SetupStep step, std::string const & spoken);
+
+  /// What the GPS has worked out about the driver, for the profile screen: label and value, e.g.
+  /// {"Works at", "Acme Corp"}, {"Commute", "Mon to Fri, around 8:05 AM"}.
+  std::vector<std::pair<std::string, std::string>> LearnedFacts() const;
 
   /// How to voice one line of the last TakeNotifications() batch.
   struct LineVoice
@@ -143,6 +164,13 @@ private:
   std::vector<LineVoice> m_lastVoices;
   /// For "repeat that" and "how long": the last direction said, and time left on the route.
   std::string m_lastDirection;
+  /// The wrong name the setup just called the driver, so the next one is different.
+  std::string m_wrongName;
+  /// For "Starbucks in Colorado or Starbucks in Alaska?": where the phone is, the first search
+  /// after setup asks, then every few searches.
+  std::optional<m2::PointD> m_here;
+  bool m_askStateNext = false;
+  int m_searches = 0;
   std::vector<backseat::VoiceOption> m_voices;
   mutable int m_secondsLeft = -1;
 };

@@ -88,6 +88,24 @@ struct AppCommand
 /// which already listens for them.
 std::vector<AppCommand> ParseAppCommands(std::string const & spoken);
 
+/// First-run setup answers, said out loud.
+/// "My name is Brandon", "call me B", "it's Brandon", "Brandon" -> "Brandon". Empty if unclear.
+std::string ParseNameAnswer(std::string const & spoken);
+/// "he", "she" or "they" ("I'm a guy" -> "he").
+std::optional<std::string> ParsePronounAnswer(std::string const & spoken);
+
+struct Passenger
+{
+  /// "wife", "husband", "girlfriend"... Empty: it's just the driver.
+  std::string word;
+  /// "he", "she" or "they".
+  std::string pronouns = "they";
+};
+/// "Usually my wife" -> wife/she. "No, just me" -> nobody.
+std::optional<Passenger> ParsePassengerAnswer(std::string const & spoken);
+/// A partner mentioned in passing ("my wife hates this song"), for learning about the driver.
+std::optional<Passenger> MentionedPartner(std::string const & spoken);
+
 /// A voice the platform can speak in.
 struct VoiceOption
 {

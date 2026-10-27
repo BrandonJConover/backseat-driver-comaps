@@ -174,5 +174,72 @@ TEST(RepliesKnowTheDriver)
   CHECK_EQUAL(nav.Reply("cmd.voice.fellForIt", {{"voice", "Echo"}}),
               std::string("Ha ha ha! I can't believe you fell for that. She's all yours, Echo."));
   nav.SetDriverName("Brandon");
-  CHECK(nav.Reply("setup.done").find("Brandon") != std::string::npos);
+  CHECK_EQUAL(nav.Reply("setup.whereTo", {{"wrong", "Doug"}}), std::string("Okay Doug, where are we headed?"));
+  CHECK(nav.Reply("name.wrong") != nav.Reply("name.wrong"));
+}
+
+TEST(SetupAnswersAreUnderstood)
+{
+  CHECK_EQUAL(ParseNameAnswer("My name is Brandon"), std::string("Brandon"));
+  CHECK_EQUAL(ParseNameAnswer("um, call me B please"), std::string("B"));
+  CHECK_EQUAL(ParseNameAnswer("Brandon Conover"), std::string("Brandon Conover"));
+  CHECK_EQUAL(ParseNameAnswer("uh"), std::string());
+  CHECK(ParsePronounAnswer("he him") == std::string("he"));
+  CHECK(ParsePronounAnswer("I'm a girl") == std::string("she"));
+  CHECK(ParsePronounAnswer("they please") == std::string("they"));
+  CHECK(!ParsePronounAnswer("pass"));
+  CHECK_EQUAL(ParsePassengerAnswer("usually my wife")->word, std::string("wife"));
+  CHECK_EQUAL(ParsePassengerAnswer("usually my wife")->pronouns, std::string("she"));
+  CHECK_EQUAL(ParsePassengerAnswer("nope, just me")->word, std::string());
+  CHECK(!ParsePassengerAnswer("hmm"));
+  CHECK_EQUAL(MentionedPartner("my husband hates this song")->word, std::string("husband"));
+  CHECK(!MentionedPartner("no wife jokes please"));
+}
+
+namespace
+{
+std::tm Utc(double ms)
+{
+  std::time_t const s = static_cast<std::time_t>(ms / 1000);
+  std::tm tm{};
+  gmtime_r(&s, &tm);
+  return tm;
+}
+}  // namespace
+
+TEST(RoutinesAreLearnedAndBroken)
+{
+  LatLon const home{39.70, -104.90};
+  LatLon const work{39.75, -104.99};
+  LatLon const gym{39.72, -104.95};
+  // Two weeks of commutes: Monday 2026-10-12 to Friday, leaving at 8:00 (UTC here), 25 minutes.
+  double const monday = 1791763200000.0;  // 2026-10-12 00:00 UTC, a Monday
+  double constexpr kDay = 86400000.0;
+  std::vector<TripRecord> history;
+  for (int week = 0; week < 2; ++week)
+    for (int d = 0; d < 5; ++d)
+    {
+      TripRecord r;
+      r.routeKey = RouteKey(home, work);
+      r.destination = "Acme Corp";
+      r.to = work;
+      r.actualMinutes = 25;
+      r.endedAt = monday + (week * 7 + d) * kDay + (8 * 60 + 25) * 60000.0;
+      history.push_back(r);
+    }
+  auto const routines = LearnRoutines(history, Utc);
+  CHECK_EQUAL(routines.size(), size_t(1));
+  CHECK_EQUAL(routines[0].startMinute, 8 * 60);
+  CHECK(routines[0].usualOn[1] && routines[0].usualOn[5] && !routines[0].usualOn[6]);
+  CHECK_EQUAL(routines[0].destination, std::string("Acme Corp"));
+
+  auto at = [&](int dayOffset, int hour, int minute) { return Utc(monday + dayOffset * kDay + (hour * 60 + minute) * 60000.0); };
+  CHECK(!CheckRoutine(routines, RouteKey(home, work), at(15, 8, 5)));  // a Tuesday, on time
+  auto const saturday = CheckRoutine(routines, RouteKey(home, work), at(19, 8, 10));
+  CHECK(saturday && saturday->kind == RoutineBreak::Kind::OffDay);
+  auto const late = CheckRoutine(routines, RouteKey(home, work), at(15, 9, 30));
+  CHECK(late && late->kind == RoutineBreak::Kind::Late && late->minutesLate == 90);
+  auto const elsewhere = CheckRoutine(routines, RouteKey(home, gym), at(15, 8, 5));
+  CHECK(elsewhere && elsewhere->kind == RoutineBreak::Kind::Elsewhere);
+  CHECK(!CheckRoutine(routines, RouteKey(home, gym), at(15, 19, 0)));
 }

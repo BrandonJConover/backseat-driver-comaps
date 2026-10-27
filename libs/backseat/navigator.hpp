@@ -199,6 +199,10 @@ public:
   void QueueOpener(double tMs, std::string key, Vars vars = {});
   static double constexpr kOpenerValidMs = 600000;
   std::vector<TripRecord> const & History() const { return m_history; }
+  /// Routines learned from past trips (the commute), in local time.
+  std::vector<Routine> Routines() const;
+  /// "work" or "home" when `at` is there, otherwise `name` (or "the usual place").
+  std::string PlaceName(std::optional<LatLon> const & at, std::string const & name) const;
 
   bool InTrip() const { return m_engine != nullptr; }
   CritiqueEngine const * Engine() const { return m_engine.get(); }
@@ -221,6 +225,7 @@ private:
   void SayRoutine(double tMs, RouteSnapshot const & route);
   void SayHoliday(double tMs);
   std::tm LocalTime(double ms) const;
+  bool SayRoutineBreak(double t, RouteSnapshot const & route);
   bool KnowsTheDate(double ms) const;
   void TrackLongDrive(double tMs, RouteSnapshot const & route);
   void TrackSights(Fix const & fix, RouteSnapshot const & route);

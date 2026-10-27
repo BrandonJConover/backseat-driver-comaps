@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <map>
 
 namespace backseat
 {
@@ -138,5 +140,96 @@ TripPrediction PredictTrip(std::vector<TripRecord> const & history, TripPlan con
   p.predictedMinutes = predicted;
   p.timesOnRoute = static_cast<int>(sameRoute.size());
   return p;
+}
+
+std::vector<Routine> LearnRoutines(std::vector<TripRecord> const & history,
+                                   std::function<std::tm(double)> const & localTime)
+{
+  struct Start
+  {
+    int minute;
+    int day;
+    TripRecord const * trip;
+  };
+  std::map<std::string, std::vector<Start>> byRoute;
+  for (auto const & trip : history)
+  {
+    if (trip.routeKey.empty() || trip.endedAt <= 0)
+      continue;
+    std::tm const tm = localTime(trip.endedAt - trip.actualMinutes * 60000);
+    byRoute[trip.routeKey].push_back({tm.tm_hour * 60 + tm.tm_min, tm.tm_wday, &trip});
+  }
+  int constexpr kSameTimeMinutes = 75;
+  int constexpr kMinTrips = 4;
+  std::vector<Routine> out;
+  for (auto & [key, starts] : byRoute)
+  {
+    std::stable_sort(starts.begin(), starts.end(), [](Start const & a, Start const & b) { return a.minute < b.minute; });
+    // Runs of starts close together in the day: 7:50, 8:05, 8:20 is one routine, 17:30 another.
+    for (size_t i = 0; i < starts.size();)
+    {
+      size_t j = i + 1;
+      while (j < starts.size() && starts[j].minute - starts[j - 1].minute <= kSameTimeMinutes / 2)
+        ++j;
+      if (static_cast<int>(j - i) >= kMinTrips)
+      {
+        Routine r;
+        r.routeKey = key;
+        int sum = 0;
+        double lastEnded = -1;
+        for (size_t k = i; k < j; ++k)
+        {
+          sum += starts[k].minute;
+          r.tripsByDay[starts[k].day]++;
+          if (starts[k].trip->endedAt > lastEnded)
+          {
+            lastEnded = starts[k].trip->endedAt;
+            r.destination = starts[k].trip->destination;
+            if (starts[k].trip->to)
+              r.to = starts[k].trip->to;
+          }
+        }
+        r.trips = static_cast<int>(j - i);
+        r.startMinute = sum / r.trips;
+        bool any = false;
+        for (int d = 0; d < 7; ++d)
+          any |= r.usualOn[d] = r.tripsByDay[d] >= 2;
+        if (any)
+          out.push_back(std::move(r));
+      }
+      i = j;
+    }
+  }
+  return out;
+}
+
+std::optional<RoutineBreak> CheckRoutine(std::vector<Routine> const & routines, std::string const & routeKey,
+                                         std::tm const & now)
+{
+  int const minute = now.tm_hour * 60 + now.tm_min;
+  int const day = now.tm_wday;
+  auto const from = [](std::string const & key) { return key.substr(0, key.find('>')); };
+  auto const usualDays = [](Routine const & r) { return std::count(r.usualOn.begin(), r.usualOn.end(), true); };
+  // This exact trip is usual right now: nothing to say.
+  for (auto const & r : routines)
+    if (r.routeKey == routeKey && r.usualOn[day] && std::abs(minute - r.startMinute) <= 45)
+      return {};
+  // Same place, same time, usual day, different destination: "normally we'd be going to work".
+  for (auto const & r : routines)
+    if (r.routeKey != routeKey && from(r.routeKey) == from(routeKey) && r.usualOn[day] &&
+        std::abs(minute - r.startMinute) <= 30)
+      return RoutineBreak{RoutineBreak::Kind::Elsewhere, r, 0};
+  for (auto const & r : routines)
+  {
+    if (r.routeKey != routeKey)
+      continue;
+    // The commute on a day off. Only for routines with a few usual days, so weekend brunch on a
+    // Sunday doesn't count as a break when it's on Saturday.
+    if (!r.usualOn[day] && usualDays(r) >= 3 && std::abs(minute - r.startMinute) <= 120)
+      return RoutineBreak{RoutineBreak::Kind::OffDay, r, 0};
+    if (r.usualOn[day] && minute - r.startMinute >= 45 && minute - r.startMinute <= 240)
+      return RoutineBreak{RoutineBreak::Kind::Late, r, minute - r.startMinute};
+  }
+  return {};
 }
 }  // namespace backseat

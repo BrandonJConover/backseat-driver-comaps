@@ -559,8 +559,56 @@ void Navigator::TrackWrongWay(Fix const & fix, RouteSnapshot const & route)
   m_lastWrongWayT = fix.tMs;
 }
 
+std::vector<Routine> Navigator::Routines() const
+{
+  return LearnRoutines(m_history, [this](double ms) { return LocalTime(ms); });
+}
+
+std::string Navigator::PlaceName(std::optional<LatLon> const & at, std::string const & name) const
+{
+  if (at)
+  {
+    for (auto const place : {KnownPlace::Work, KnownPlace::Home})
+      if (auto const known = GuessPlace(m_history, place); known && DistanceM(*known, *at) < kNearDestinationM)
+        return place == KnownPlace::Work ? "work" : "home";
+  }
+  return name.empty() ? "the usual place" : name;
+}
+
+bool Navigator::SayRoutineBreak(double t, RouteSnapshot const & route)
+{
+  if (!KnowsTheDate(t))
+    return false;
+  std::tm const now = LocalTime(t);
+  auto const broken = CheckRoutine(Routines(), RouteKey(route.origin, route.destinationPoint), now);
+  if (!broken)
+    return false;
+  static char const * const kDays[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+  int const h = now.tm_hour;
+  Vars vars = {{"usual", PlaceName(broken->routine.to, broken->routine.destination)},
+               {"place", PlaceName(route.destinationPoint, route.destination)},
+               {"day", kDays[now.tm_wday]},
+               {"daypart", h < 12 ? "morning" : h < 17 ? "afternoon" : h < 21 ? "evening" : "night"}};
+  switch (broken->kind)
+  {
+  case RoutineBreak::Kind::Elsewhere: SayLine(t, Category::Routine, "routine.elsewhere", vars); break;
+  case RoutineBreak::Kind::OffDay: SayLine(t, Category::Routine, "routine.offDay", vars); break;
+  case RoutineBreak::Kind::Late:
+  {
+    int const m = broken->minutesLate;
+    vars["late"] = m < 55 ? std::to_string((m + 2) / 5 * 5) + " minutes" : m < 90 ? "an hour" : std::to_string((m + 30) / 60) + " hours";
+    SayLine(t, Category::Routine, "routine.late", vars);
+    break;
+  }
+  }
+  return true;
+}
+
 void Navigator::SayRoutine(double t, RouteSnapshot const & route)
 {
+  // Breaking the routine beats congratulating it.
+  if (SayRoutineBreak(t, route))
+    return;
   // Work trips this year: every fifth one from the tenth on gets the count.
   auto const yearOf = [](double ms)
   {

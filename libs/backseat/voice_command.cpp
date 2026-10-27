@@ -261,6 +261,97 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   return out;
 }
 
+std::string ParseNameAnswer(std::string const & spoken)
+{
+  std::string words = CommandWords(spoken);
+  std::string rest;
+  for (char const * cue : {" my name is ", " my name's ", " call me ", " name is ", " i am ", " i'm ", " im ", " it's ",
+                           " its ", " this is "})
+  {
+    auto const at = words.find(cue);
+    if (at != std::string::npos)
+    {
+      rest = words.substr(at + std::string(cue).size());
+      break;
+    }
+  }
+  if (rest.empty())
+    rest = words.substr(1);
+  // Up to two words of name, minus filler.
+  std::string name;
+  int taken = 0;
+  size_t pos = 0;
+  while (taken < 2 && pos < rest.size())
+  {
+    auto const end = rest.find(' ', pos);
+    std::string word = rest.substr(pos, end - pos);
+    pos = end == std::string::npos ? rest.size() : end + 1;
+    if (word.empty())
+      continue;
+    static char const * const kFiller[] = {"um", "uh", "well", "hi", "hey", "hello", "oh", "so", "and", "please", "thanks",
+                                          "just", "it", "yeah", "ok", "okay"};
+    if (taken == 0 && std::find(std::begin(kFiller), std::end(kFiller), word) != std::end(kFiller))
+      continue;
+    if (taken == 1 && std::find(std::begin(kFiller), std::end(kFiller), word) != std::end(kFiller))
+      break;
+    word[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[0])));
+    name += (name.empty() ? "" : " ") + word;
+    ++taken;
+  }
+  return name;
+}
+
+std::optional<std::string> ParsePronounAnswer(std::string const & spoken)
+{
+  std::string const words = CommandWords(spoken);
+  auto const has = [&words](std::initializer_list<char const *> cues)
+  { return std::any_of(cues.begin(), cues.end(), [&](char const * c) { return words.find(c) != std::string::npos; }); };
+  if (has({" they ", " them ", " they them ", " neither ", " nonbinary ", " non binary ", " enby "}))
+    return "they";
+  if (has({" she ", " her ", " female ", " woman ", " girl ", " lady ", " gal "}))
+    return "she";
+  if (has({" he ", " him ", " male ", " man ", " guy ", " dude ", " boy "}))
+    return "he";
+  return {};
+}
+
+namespace
+{
+struct PartnerWord
+{
+  char const * word;
+  char const * pronouns;
+};
+PartnerWord const kPartners[] = {
+    {"wife", "she"},       {"husband", "he"},  {"girlfriend", "she"}, {"boyfriend", "he"}, {"fiancee", "she"},
+    {"fiance", "they"},    {"partner", "they"}, {"spouse", "they"},   {"hubby", "he"},     {"wifey", "she"},
+    {"significant other", "they"}};
+}  // namespace
+
+std::optional<Passenger> MentionedPartner(std::string const & spoken)
+{
+  std::string const words = CommandWords(spoken);
+  for (auto const & p : kPartners)
+    if (words.find(std::string(" my ") + p.word + " ") != std::string::npos)
+      return Passenger{p.word, p.pronouns};
+  return {};
+}
+
+std::optional<Passenger> ParsePassengerAnswer(std::string const & spoken)
+{
+  if (auto const partner = MentionedPartner(spoken))
+    return partner;
+  std::string const words = CommandWords(spoken);
+  for (auto const & p : kPartners)
+    if (words.find(std::string(" ") + p.word + " ") != std::string::npos)
+      return Passenger{p.word, p.pronouns};
+  for (char const * alone : {" no ", " nope ", " nobody ", " no one ", " noone ", " just me ", " alone ", " only me ",
+                             " myself ", " single "})
+    if (words.find(alone) != std::string::npos)
+      return Passenger{};
+  return {};
+}
+
 std::vector<std::string> VoicePhrases(std::vector<VoiceOption> const & voices)
 {
   static char const * const kPool[] = {

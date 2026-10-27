@@ -252,7 +252,15 @@ public:
     return m_backseat.RunTool(name, argument, spoken);
   }
   void SetBackseatVoices(std::vector<backseat::VoiceOption> voices) { m_backseat.SetVoices(std::move(voices)); }
-  std::string BackseatSetupDoneReply() { return m_backseat.SetupDoneReply(); }
+  std::string BackseatSetupLine(BackseatAdapter::SetupStep step, std::string const & voiceName)
+  {
+    return m_backseat.SetupLine(step, voiceName);
+  }
+  bool BackseatSetupHeard(BackseatAdapter::SetupStep step, std::string const & spoken)
+  {
+    return m_backseat.SetupHeard(step, spoken);
+  }
+  std::vector<std::pair<std::string, std::string>> BackseatLearnedFacts() const { return m_backseat.LearnedFacts(); }
   /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.
   BackseatAdapter const & GetBackseat() const { return m_backseat; }
 

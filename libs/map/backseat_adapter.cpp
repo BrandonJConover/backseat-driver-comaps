@@ -30,6 +30,7 @@
 #include <chrono>
 #include <fstream>
 #include <iomanip>
+#include <map>
 #include <sstream>
 
 namespace
@@ -280,6 +281,7 @@ BackseatAdapter::BackseatAdapter()
 void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::RoutingSession const & session,
                                        std::string const & destinationName)
 {
+  m_here = mercator::FromLatLon(info.m_latitude, info.m_longitude);
   auto const route = Snapshot(session, destinationName);
   if (route.state == backseat::RouteState::Inactive && !m_navigator.InTrip())
     return;
@@ -554,6 +556,18 @@ std::string Capitalized(std::string s)
 BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & text)
 {
   HeardCommand heard;
+  // "My wife hates this song": now it knows there's a wife.
+  if (auto const partner = backseat::MentionedPartner(text))
+  {
+    std::string current;
+    if (!settings::Get(kPartnerKey, current) || current.empty())
+    {
+      settings::Set(kPartnerKey, partner->word);
+      settings::Set(kPartnerPronounsKey, partner->pronouns);
+      ReloadPersonality();
+      LOG(LINFO, ("Backseat: learned the driver has a", partner->word));
+    }
+  }
   // A voice's code phrase ("purple monkey"): the old voice gets the last word.
   if (auto const voice = backseat::VoiceByPhrase(m_voices, text))
   {
@@ -632,6 +646,27 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     // Somewhere new (or home/work before there's enough history): let the driver pick.
     heard.kind = HeardCommand::Kind::Search;
     heard.query = command.argument;
+    // "Starbucks in Colorado, or Starbucks in Alaska?" Not every time, or it gets old.
+    if (!known && (m_askStateNext || ++m_searches % 5 == 0))
+    {
+      m_askStateNext = false;
+      std::string here = "this state";
+      if (m_here && m_countryInfo)
+        if (auto const region = PlateRegionOfMap(m_countryInfo().GetRegionCountryId(*m_here)))
+          here = *region;
+      std::string far;
+      for (int i = 0; i < 4 && (far.empty() || far == here); ++i)
+        far = m_navigator.Reply("place.farState");
+      std::string place;
+      bool word = true;
+      for (char const ch : command.argument)
+      {
+        place += word ? static_cast<char>(std::toupper(static_cast<unsigned char>(ch))) : ch;
+        word = ch == ' ';
+      }
+      // Asked instead of "routing to...", since the driver still has to pick from the results.
+      reply = m_navigator.Reply("dest.whichState", {{"place", place}, {"here", here}, {"far", far}});
+    }
     return reply;
   }
   case AppAction::RepeatInstruction:
@@ -683,6 +718,123 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
   heard.actions.push_back(command);
   char const * key = ReplyKey(command.action, command.argument);
   return key ? m_navigator.Reply(key, {{"voice", Capitalized(command.argument)}}) : std::string();
+}
+
+std::string BackseatAdapter::SetupLine(SetupStep step, std::string const & voiceName)
+{
+  switch (step)
+  {
+  case SetupStep::Intro:
+  {
+    std::string lower;
+    for (unsigned char const ch : voiceName)
+      lower += static_cast<char>(std::tolower(ch));
+    return lower == "echo" ? m_navigator.Reply("setup.intro.echo") : m_navigator.Reply("setup.intro", {{"voice", voiceName}});
+  }
+  case SetupStep::Name: return m_navigator.Reply("setup.askName");
+  case SetupStep::WrongName:
+  case SetupStep::WhereTo:
+  {
+    // Any name but theirs, and not the one it just tried.
+    std::string name;
+    settings::TryGet(kDriverNameKey, name);
+    std::string wrong;
+    for (int i = 0; i < 4 && (wrong.empty() || wrong == name || wrong == m_wrongName); ++i)
+      wrong = m_navigator.Reply("name.wrong");
+    m_wrongName = wrong;
+    if (step == SetupStep::WhereTo)
+      m_askStateNext = true;
+    return m_navigator.Reply(step == SetupStep::WrongName ? "setup.wrongName" : "setup.whereTo", {{"wrong", wrong}});
+  }
+  case SetupStep::Pronouns: return m_navigator.Reply("setup.askPronouns");
+  case SetupStep::Passenger: return m_navigator.Reply("setup.askPassenger");
+  }
+  return {};
+}
+
+bool BackseatAdapter::SetupHeard(SetupStep step, std::string const & spoken)
+{
+  switch (step)
+  {
+  case SetupStep::Name:
+  {
+    auto const name = backseat::ParseNameAnswer(spoken);
+    if (name.empty())
+      return false;
+    settings::Set(kDriverNameKey, name);
+    break;
+  }
+  case SetupStep::Pronouns:
+  {
+    auto const pronouns = backseat::ParsePronounAnswer(spoken);
+    if (!pronouns)
+      return false;
+    settings::Set(kDriverPronounsKey, *pronouns);
+    break;
+  }
+  case SetupStep::Passenger:
+  {
+    auto const passenger = backseat::ParsePassengerAnswer(spoken);
+    if (!passenger)
+      return false;
+    settings::Set(kPartnerKey, passenger->word);
+    settings::Set(kPartnerPronounsKey, passenger->pronouns);
+    break;
+  }
+  default: return true;
+  }
+  ReloadPersonality();
+  return true;
+}
+
+std::vector<std::pair<std::string, std::string>> BackseatAdapter::LearnedFacts() const
+{
+  std::vector<std::pair<std::string, std::string>> facts;
+  std::string partner;
+  if (settings::Get(kPartnerKey, partner))
+    facts.push_back({"Rides with", partner.empty() ? "Nobody (single, or just quiet about it)" : "Your " + partner});
+  auto const & history = m_navigator.History();
+  auto const nameNear = [&history](backseat::LatLon const & at)
+  {
+    // The name the driver used most for trips ending there.
+    std::map<std::string, int> names;
+    for (auto const & trip : history)
+      if (trip.to && !trip.destination.empty() &&
+          mercator::DistanceOnEarth(mercator::FromLatLon(trip.to->lat, trip.to->lon), mercator::FromLatLon(at.lat, at.lon)) < 250)
+        names[trip.destination]++;
+    auto const best = std::max_element(names.begin(), names.end(), [](auto const & a, auto const & b) { return a.second < b.second; });
+    return best == names.end() ? std::string("Somewhere you go a lot") : best->first;
+  };
+  if (auto const home = backseat::GuessPlace(history, backseat::KnownPlace::Home))
+    facts.push_back({"Home", nameNear(*home)});
+  if (auto const work = backseat::GuessPlace(history, backseat::KnownPlace::Work))
+    facts.push_back({"Works at", nameNear(*work)});
+  static char const * const kDays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+  for (auto const & r : m_navigator.Routines())
+  {
+    std::string days;
+    // Runs of days read better: "Mon to Fri".
+    for (int d = 0; d < 7;)
+    {
+      if (!r.usualOn[d])
+      {
+        ++d;
+        continue;
+      }
+      int e = d;
+      while (e + 1 < 7 && r.usualOn[e + 1])
+        ++e;
+      days += std::string(days.empty() ? "" : ", ") + kDays[d] + (e - d >= 2 ? std::string(" to ") + kDays[e] : e > d ? std::string(", ") + kDays[e] : "");
+      d = e + 1;
+    }
+    int const h = r.startMinute / 60;
+    int const m = r.startMinute % 60;
+    std::ostringstream when;
+    when << days << ", around " << (h % 12 == 0 ? 12 : h % 12) << ":" << std::setw(2) << std::setfill('0') << m
+         << (h < 12 ? " AM" : " PM");
+    facts.push_back({"Routine: " + m_navigator.PlaceName(r.to, r.destination), when.str()});
+  }
+  return facts;
 }
 
 std::optional<backseat::Sight> BackseatAdapter::SightAt(backseat::LatLon const & at, double bearingDeg) const
