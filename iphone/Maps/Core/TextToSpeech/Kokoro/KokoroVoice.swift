@@ -32,11 +32,15 @@ final class KokoroVoice: NSObject {
   /// The Kokoro voice picked in Settings. The system voice is never picked: it only fills in while
   /// Kokoro loads, after a Core ML crash, or for an instruction language Kokoro can't speak.
   static let voiceKey = "backseat.kokoro.voice"
-  static let defaultVoice = KokoroAneConstants.defaultVoice
+  /// Echo, unless the driver picks another.
+  static let defaultVoice = "am_echo"
 
   struct VoiceOption: Identifiable, Hashable {
     let id: String
+    /// For the Settings list: "Echo (American male)".
     let name: String
+    /// Out loud: "Echo".
+    let spokenName: String
   }
 
   /// The American and British English voices FluidAudio publishes, named for the Settings list.
@@ -45,9 +49,23 @@ final class KokoroVoice: NSObject {
     return KokoroAneConstants.englishVoices.compactMap { id in
       let parts = id.split(separator: "_", maxSplits: 1)
       guard parts.count == 2, let accent = accents[String(parts[0])] else { return nil }
-      return VoiceOption(id: id, name: "\(parts[1].capitalized) (\(accent))")
+      let spoken = parts[1].capitalized
+      return VoiceOption(id: id, name: "\(spoken) (\(accent))", spokenName: spoken)
     }
   }()
+
+  /// Voice ids and their spoken names, in the same order, for the navigator.
+  @objc static var voiceIDs: [String] { voiceOptions.map(\.id) }
+  @objc static var voiceSpokenNames: [String] { voiceOptions.map(\.spokenName) }
+
+  /// The voice the driver named: an id ("am_echo") or a name ("echo", "Echo (American male)").
+  @objc static func voiceID(matching spoken: String) -> String? {
+    let wanted = spoken.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard !wanted.isEmpty else { return nil }
+    return voiceOptions.first {
+      $0.id == wanted || $0.spokenName.lowercased() == wanted || $0.name.lowercased() == wanted
+    }?.id
+  }
 
   /// The picked voice. Anything else stored (such as the old "system" choice) means the default.
   static var selectedVoiceID: String {
@@ -77,16 +95,20 @@ final class KokoroVoice: NSObject {
     let nav: Bool
     let speed: Float
     let voice: String
+    /// A reply to the driver: it never goes stale.
+    let keep: Bool
     let fallback: () -> Void
     let generation: Int
     let queuedAt = Date()
     var state = State.waiting  // guarded by KokoroVoice.lock
 
-    init(text: String, nav: Bool, speed: Float, voice: String, fallback: @escaping () -> Void, generation: Int) {
+    init(text: String, nav: Bool, speed: Float, voice: String, keep: Bool, fallback: @escaping () -> Void,
+         generation: Int) {
       self.text = text
       self.nav = nav
       self.speed = speed
       self.voice = voice
+      self.keep = keep
       self.fallback = fallback
       self.generation = generation
     }
@@ -213,20 +235,40 @@ final class KokoroVoice: NSObject {
 
   /// Says `text` with Kokoro, or calls `fallback` (on the main queue) to say it with the system voice.
   @objc func speak(_ text: String, nav: Bool, speed: Float, fallback: @escaping () -> Void) {
+    enqueue(text, nav: nav, speed: speed, voice: nil, keep: false, fallback: fallback)
+  }
+
+  /// Answers the driver, in `voiceID` (the picked voice when nil or unknown). Replies play in the
+  /// order given and never go stale, so a whole line-up of voices can take turns.
+  @objc func sayReply(_ text: String, voiceID: String?, fallback: @escaping () -> Void) {
+    enqueue(text, nav: false, speed: 1, voice: voiceID, keep: true, fallback: fallback)
+  }
+
+  /// Picks a voice without cutting off what's queued: the old voice finishes its goodbye.
+  @objc func switchVoice(to id: String) {
+    guard Self.voiceOptions.contains(where: { $0.id == id }) else { return }
+    UserDefaults.standard.set(id, forKey: Self.voiceKey)
+  }
+
+  private func enqueue(_ text: String, nav: Bool, speed: Float, voice requested: String?, keep: Bool,
+                       fallback: @escaping () -> Void) {
     lock.lock()
-    guard primary != nil, let voice = Self.voice else {
+    let known = requested.flatMap { id in Self.voiceOptions.contains { $0.id == id } ? id : nil }
+    guard primary != nil, let picked = Self.voice else {
       lock.unlock()
       DispatchQueue.main.async { self.player.sayWithSystemVoice(fallback) }
       return
     }
+    let voice = known ?? picked
     let key = Self.key(text, speed, voice)
     if let wav = cache[key] {
       touch(key)
       lock.unlock()
-      DispatchQueue.main.async { self.player.play(wav, nav: nav) }
+      DispatchQueue.main.async { self.player.play(wav, nav: nav, keep: keep) }
       return
     }
-    let job = Job(text: text, nav: nav, speed: speed, voice: voice, fallback: fallback, generation: generation)
+    let job = Job(text: text, nav: nav, speed: speed, voice: voice, keep: keep, fallback: fallback,
+                  generation: generation)
     if nav { navJobs.append(job) } else { roastJobs.append(job) }
     lock.unlock()
     wake?.yield()
@@ -279,7 +321,7 @@ final class KokoroVoice: NSObject {
     }
     while !roastJobs.isEmpty {
       let job = roastJobs.removeFirst()
-      if Date().timeIntervalSince(job.queuedAt) <= Self.roastMaxAge { return job }
+      if job.keep || Date().timeIntervalSince(job.queuedAt) <= Self.roastMaxAge { return job }
     }
     return nil
   }
@@ -336,7 +378,7 @@ final class KokoroVoice: NSObject {
     let play = job.state == .waiting && job.generation == generation
     if play { job.state = .playing }
     lock.unlock()
-    if play { DispatchQueue.main.async { self.player.play(wav, nav: job.nav) } }
+    if play { DispatchQueue.main.async { self.player.play(wav, nav: job.nav, keep: job.keep) } }
   }
 
   /// Call with `lock` held.
@@ -358,6 +400,7 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   private struct Item {
     let wav: Data
     let nav: Bool
+    var keep = false
     let queuedAt = Date()
   }
 
@@ -373,12 +416,12 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   /// How long a clip waits for the system voice before giving up on politeness.
   private static let systemWaitLimit: TimeInterval = 30
 
-  func play(_ wav: Data, nav: Bool) {
+  func play(_ wav: Data, nav: Bool, keep: Bool) {
     if nav {
       navQueue.append(Item(wav: wav, nav: true))
       if current != nil && !currentIsNav { finishCurrent() }
     } else {
-      roastQueue.append(Item(wav: wav, nav: false))
+      roastQueue.append(Item(wav: wav, nav: false, keep: keep))
     }
     playNext()
   }
@@ -434,7 +477,7 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
       return
     }
     waitingSince = nil
-    roastQueue.removeAll { Date().timeIntervalSince($0.queuedAt) > KokoroVoice.roastMaxAge }
+    roastQueue.removeAll { !$0.keep && Date().timeIntervalSince($0.queuedAt) > KokoroVoice.roastMaxAge }
     let item: Item
     if !navQueue.isEmpty { item = navQueue.removeFirst() }
     else if !roastQueue.isEmpty { item = roastQueue.removeFirst() }

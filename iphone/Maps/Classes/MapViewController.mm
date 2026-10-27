@@ -459,6 +459,8 @@ m2::PointD ToPixelPoint(UIView * view, CGPoint pt) {
   // Otherwise PP container view is nil, or there is no animation/selection of the point.
   if (DeepLinkHandler.shared.hasPendingDeepLink)
     (void)[DeepLinkHandler.shared handleDeepLinkAndReset];
+  // Backseat Driver introduces itself and asks who's driving, once, before the first trip.
+  [BackseatSetup startIfNeeded];
 }
 
 - (void)viewDidLayoutSubviews {

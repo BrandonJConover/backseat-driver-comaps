@@ -41,6 +41,10 @@ import Speech
   private var navigating = false
   /// The driver tapped the mic to mute hands-free listening for this route.
   private var mutedForRoute = false
+  /// The mic is paused while the GPS talks, so its voice plays at full volume and isn't heard back.
+  private var pausedForSpeech = false
+  /// Takes the next thing heard instead of the navigator, e.g. an answer to a setup question.
+  private var answerHandler: ((String) -> Void)?
 
   @objc private(set) var isListening = false {
     didSet { NotificationCenter.default.post(name: Self.listeningChanged, object: self) }
@@ -89,6 +93,21 @@ import Speech
     withPermission { self.start(continuous: false) }
   }
 
+  /// Sends the next thing the driver says (empty when they say nothing) to `handler` instead of the
+  /// navigator, listening for it if the mic is off.
+  func listenForAnswer(_ handler: @escaping (String) -> Void) {
+    answerHandler = handler
+    if !isListening {
+      withPermission { self.start(continuous: false) }
+    }
+  }
+
+  /// "Stop listening": hands-free stays off for the rest of this route, as if the mic was tapped.
+  @objc func pauseForRoute() {
+    mutedForRoute = true
+    if isListening { cleanUp() }
+  }
+
   /// Listens while a route is followed and hands-free is on, and stops otherwise.
   private func followNavigation() {
     let want = navigating && Self.handsFree && !mutedForRoute
@@ -125,9 +144,10 @@ import Speech
     let session = AVAudioSession.sharedInstance()
     do {
       if continuous {
-        // Voice chat cancels the GPS's own voice from the mic. Music keeps playing undimmed: a
-        // route-long session would otherwise duck it the whole way.
-        try session.setCategory(.playAndRecord, mode: .voiceChat,
+        // Not voice chat: its voice processing turned the GPS's own voice down to nothing. The mic
+        // pauses while the GPS talks instead. Music keeps playing undimmed: a route-long session
+        // would otherwise duck it the whole way.
+        try session.setCategory(.playAndRecord, mode: .default,
                                 options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
       } else {
         try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
@@ -157,14 +177,46 @@ import Speech
     startSegment()
     if continuous {
       speakingCheck = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
-        if KokoroVoice.shared.anyVoiceSpeaking { self?.heardTheGPS = true }
+        self?.followSpeech()
       }
     }
   }
 
+  /// Pauses the mic while Kokoro or the system voice talks, and listens again once it's done.
+  private func followSpeech() {
+    let speaking = KokoroVoice.shared.anyVoiceSpeaking
+    if speaking && !pausedForSpeech {
+      pausedForSpeech = true
+      endSegment()
+      audioEngine.pause()
+    } else if !speaking && pausedForSpeech {
+      pausedForSpeech = false
+      do {
+        try audioEngine.start()
+      } catch {
+        LOG(.error, "Backseat: audio engine didn't restart: \(error)")
+        cleanUp()
+        return
+      }
+      startSegment()
+    }
+  }
+
+  /// Drops the recognition task in progress without sending what it heard.
+  private func endSegment() {
+    timeout?.invalidate()
+    timeout = nil
+    segmentTimer?.invalidate()
+    segmentTimer = nil
+    request?.endAudio()
+    task?.cancel()
+    request = nil
+    task = nil
+  }
+
   /// One recognition task: a phrase, or up to `segmentLimit` of listening.
   private func startSegment() {
-    guard let recognizer, isListening, request == nil else { return }
+    guard let recognizer, isListening, request == nil, !pausedForSpeech else { return }
     let request = SFSpeechAudioBufferRecognitionRequest()
     request.shouldReportPartialResults = true
     if recognizer.supportsOnDeviceRecognition {
@@ -214,18 +266,19 @@ import Speech
     let text = heard.trimmingCharacters(in: .whitespacesAndNewlines)
     let echo = heardTheGPS || KokoroVoice.shared.anyVoiceSpeaking
     if continuous {
-      timeout?.invalidate()
-      timeout = nil
-      segmentTimer?.invalidate()
-      segmentTimer = nil
-      request?.endAudio()
-      task?.cancel()
-      request = nil
-      task = nil
+      endSegment()
       // The next one starts after this turn, so a failing recognizer can't spin.
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.startSegment() }
     } else {
       cleanUp()
+    }
+    if let answer = answerHandler, !(continuous && echo) {
+      // An empty answer only counts when the mic was opened just for it.
+      if !text.isEmpty || !continuous {
+        answerHandler = nil
+        answer(text)
+      }
+      return
     }
     guard !text.isEmpty else { return }
     if continuous && echo {
@@ -250,6 +303,7 @@ import Speech
     request = nil
     task = nil
     continuous = false
+    pausedForSpeech = false
     Self.restorePlayback()
     if isListening {
       isListening = false
@@ -263,5 +317,68 @@ import Speech
     if !KokoroVoice.shared.anyVoiceSpeaking {
       try? session.setActive(false, options: .notifyOthersOnDeactivation)
     }
+  }
+}
+
+/// The spoken first-run setup: the GPS introduces itself, gets the driver's name (and gets it
+/// wrong on purpose), then asks where they're headed. Runs once, before the first trip.
+@objc final class BackseatSetup: NSObject {
+  private static let doneKey = "backseat.setupDone"
+  private static var running = false
+
+  @objc static func startIfNeeded() {
+    guard !running, !UserDefaults.standard.bool(forKey: doneKey), MWMBackseatRewriter.driverName.isEmpty else { return }
+    running = true
+    // Give Kokoro up to half a minute to load, so the introduction is in its voice.
+    waitForKokoro(tries: 60) {
+      let voiceName = KokoroVoice.voiceOptions.first { $0.id == KokoroVoice.selectedVoiceID }?.spokenName ?? "Echo"
+      say(.intro, voiceName: voiceName)
+      askName(voiceName: voiceName, tries: 3)
+    }
+  }
+
+  private static func askName(voiceName: String, tries: Int) {
+    say(.name, voiceName: voiceName)
+    listen { answer in
+      if MWMBackseatRewriter.setupHeard(.name, answer: answer) || tries <= 1 {
+        say(.wrongName, voiceName: voiceName)
+        listen { answer in
+          _ = MWMBackseatRewriter.setupHeard(.wrongName, answer: answer)
+          say(.whereTo, voiceName: voiceName)
+          UserDefaults.standard.set(true, forKey: doneKey)
+          running = false
+          listen { answer in
+            if !answer.isEmpty { MWMBackseatRewriter.driverSaid(answer) }
+          }
+        }
+      } else {
+        askName(voiceName: voiceName, tries: tries - 1)
+      }
+    }
+  }
+
+  private static func say(_ step: MWMBackseatSetupStep, voiceName: String) {
+    let line = MWMBackseatRewriter.setupLine(step, voiceName: voiceName)
+    guard !line.isEmpty else { return }
+    KokoroVoice.shared.sayReply(line, voiceID: nil) { MWMTextToSpeech.tts().play(line) }
+  }
+
+  /// Listens once the GPS has finished talking, so it doesn't hear itself.
+  private static func listen(_ handler: @escaping (String) -> Void) {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+      if KokoroVoice.shared.anyVoiceSpeaking {
+        listen(handler)
+      } else {
+        BackseatListener.shared.listenForAnswer(handler)
+      }
+    }
+  }
+
+  private static func waitForKokoro(tries: Int, then: @escaping () -> Void) {
+    if KokoroVoice.shared.isReady || tries <= 0 {
+      then()
+      return
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { waitForKokoro(tries: tries - 1, then: then) }
   }
 }

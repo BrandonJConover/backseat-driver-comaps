@@ -16,6 +16,10 @@ struct SettingsBackseatView: View {
     @State var isHandsFree: Bool = true
 
 
+    /// What to call the driver
+    @State var driverName: String = ""
+
+
     /// Who rides along, e.g. "my wife" or "Sam"; empty when it's just the driver
     @State var partner: String = ""
 
@@ -38,6 +42,10 @@ struct SettingsBackseatView: View {
 
     /// The picked voice's name
     @State var voiceName: String = KokoroVoice.selectedVoiceName
+
+
+    /// What the GPS has worked out about the driver, as label / value pairs
+    @State var learnedFacts: [[String]] = []
 
 
     /// The actual view
@@ -112,6 +120,14 @@ struct SettingsBackseatView: View {
             }
 
             Section {
+                TextField(text: $driverName) {
+                    Text(verbatim: "Your name")
+                }
+                .textContentType(.givenName)
+                .submitLabel(.done)
+
+                pronounPicker(title: "Your pronouns", selection: $driverPronouns)
+
                 TextField(text: $partner) {
                     Text(verbatim: "Passenger, e.g. \"my wife\" or \"Sam\"")
                 }
@@ -121,8 +137,6 @@ struct SettingsBackseatView: View {
                 if !partner.trimmingCharacters(in: .whitespaces).isEmpty {
                     pronounPicker(title: "Their pronouns", selection: $partnerPronouns)
                 }
-
-                pronounPicker(title: "Your pronouns", selection: $driverPronouns)
 
                 Toggle(isOn: $carHasAutopilot) {
                     Text(verbatim: "My car has autopilot")
@@ -137,6 +151,34 @@ struct SettingsBackseatView: View {
                 }
             } footer: {
                 Text(verbatim: "The Backseat Driver works these into the jokes. Leave the passenger empty if it's usually just you. With autopilot on, it may suggest letting the car drive after you miss a few turns.")
+            }
+
+            Section {
+                if learnedFacts.isEmpty {
+                    Text(verbatim: "Nothing yet. Drive somewhere.")
+                        .foregroundStyle(.secondary)
+                }
+
+                ForEach(learnedFacts, id: \.self) { fact in
+                    HStack {
+                        Text(verbatim: fact.first ?? "")
+
+                        Spacer()
+
+                        Text(verbatim: fact.last ?? "")
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
+                    }
+                }
+            } header: {
+                HStack(spacing: 4) {
+                    Image(systemName: "brain")
+                        .imageScale(.small)
+
+                    Text(verbatim: "What I've learned about you")
+                }
+            } footer: {
+                Text(verbatim: "Picked up from your trips and what you say, and used to call you out when you break your routine.")
             }
         }
         .accentColor(.accent)
@@ -154,6 +196,9 @@ struct SettingsBackseatView: View {
             if changedIsHandsFree != BackseatListener.handsFree {
                 BackseatListener.handsFree = changedIsHandsFree
             }
+        }
+        .onChange(of: driverName) { changedDriverName in
+            MWMBackseatRewriter.driverName = changedDriverName
         }
         .onChange(of: partner) { changedPartner in
             MWMBackseatRewriter.partner = changedPartner
@@ -187,12 +232,14 @@ struct SettingsBackseatView: View {
     private func reload() {
         shouldProvideVoiceRouting = Settings.shouldProvideVoiceRouting
         isHandsFree = BackseatListener.handsFree
+        driverName = MWMBackseatRewriter.driverName
         partner = MWMBackseatRewriter.partner
         partnerPronouns = MWMBackseatRewriter.partnerPronouns
         driverPronouns = MWMBackseatRewriter.driverPronouns
         carHasAutopilot = MWMBackseatRewriter.carHasAutopilot
         voiceName = KokoroVoice.selectedVoiceName
         voiceStatus = KokoroVoice.shared.status
+        learnedFacts = MWMBackseatRewriter.learnedFacts
     }
 }
 
@@ -266,3 +313,4 @@ struct SettingsBackseatVoiceView: View {
         }
     }
 }
+
