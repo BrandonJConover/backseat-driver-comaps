@@ -159,6 +159,7 @@ char const * ToString(Category c)
   case Category::Holiday: return "holiday";
   case Category::WrongWay: return "wrongWay";
   case Category::UTurn: return "uTurn";
+  case Category::Achievement: return "achievement";
   case Category::Count: break;
   }
   return "?";

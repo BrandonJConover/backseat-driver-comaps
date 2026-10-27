@@ -255,6 +255,18 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
       m_pendingTurn.reset();
     else
       m_pendingTurn = PendingTurn{dir == Maneuver::Left ? TurnDirection::Left : TurnDirection::Right, e.t, stage, {}};
+    m_turnDoneSaid = false;
+    if (dir == Maneuver::Left)
+      ++m_leftStreak;
+    else if (dir == Maneuver::Right)
+    {
+      m_leftStreak = 0;
+      m_nascarSaid = false;
+    }
+    if (e.distanceM >= m_config.straightNagMinM)
+      m_straight = StraightNag{e.t, e.distanceM, 0, e.distanceM >= m_config.straightLongM};
+    else
+      m_straight.reset();
     if (e.at && !m_position)
       m_position = e.at;
     int const tier = Tier();
@@ -262,6 +274,14 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     std::string const suffix = Pick("instruction.suffix", tier);
     std::string const text = prefix + "In " + FormatDistance(e.distanceM, units) + ", " + LowerFirst(e.text) + "." + suffix;
     out.push_back(Make(e.t, Category::Instruction, text, Priority::Nav));
+    if (m_straight && m_straight->longHaul)
+    {
+      // Brandon's line, with the distance in whole miles or kilometers ("the next 200 miles").
+      double const unitM = units == Units::Mph ? 1609.344 : 1000;
+      std::string const distance = FormatDistance(JsRound(e.distanceM / unitM) * unitM, units);
+      out.push_back(Make(e.t, Category::Instruction, Fill(Pick("straight.long", tier), {{"distance", distance}}),
+                         Priority::Nav));
+    }
     if (dir == Maneuver::Left && e.control == Control::StopSign)
     {
       // The GPS gloats about the unprotected left it just sent you into.
@@ -272,7 +292,16 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     break;
   }
   case NavEvent::Type::TurnCompleted:
+  {
+    // Nagged all the way through the turn ("You should still be turning right")? Then the turn ends
+    // with "Please stop turning right." instead of the usual verdict.
+    bool const nagged = m_pendingTurn && m_pendingTurn->stage >= 4;
+    if (nagged && e.onTime)
+      SayTurnDone(out, e.t, m_pendingTurn->dir);
+    bool const doneSaid = m_turnDoneSaid;
+    m_turnDoneSaid = false;
     m_pendingTurn.reset();
+    m_straight.reset();
     m_stats.turnsCompleted++;
     if (!e.onTime)
     {
@@ -280,9 +309,14 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
       Log(MakeIncident(e.t, IncidentKind::LateTurn, m_lastInstructionText), e.at);
     }
     Bump(Category::TurnCompleted);
-    Roast(out, e.t, Category::TurnCompleted, e.onTime ? "turnCompleted.onTime" : "turnCompleted.late", {}, true);
+    if (!(doneSaid && e.onTime))
+      Roast(out, e.t, Category::TurnCompleted, e.onTime ? "turnCompleted.onTime" : "turnCompleted.late", {}, true);
     break;
-  case NavEvent::Type::Progress: Countdown(out, e.t, e.distanceM); break;
+  }
+  case NavEvent::Type::Progress:
+    NagStraight(out, e.t, e.distanceM);
+    Countdown(out, e.t, e.distanceM);
+    break;
   case NavEvent::Type::UnplannedStop:
   {
     PlaceKind const kind = e.place ? e.place->kind : PlaceKind::Other;
@@ -463,6 +497,8 @@ void CritiqueEngine::CheckTurnDirection(TelemetrySample const & s, std::vector<C
   m_headings.clear();
   if (turned == m_pendingTurn->dir)
   {
+    if (m_pendingTurn->stage >= 4)
+      SayTurnDone(out, s.t, m_pendingTurn->dir);
     m_pendingTurn.reset();
     return;
   }
@@ -486,8 +522,10 @@ void CritiqueEngine::CheckNoDestination(TelemetrySample const & s, std::vector<C
     m_lastNoDestinationAt = s.t;
 }
 
-/// "Just in case you forgot, you are turning left in 500 feet." ... "50 feet." ...
-/// "You are turning left." ... "You are still turning left." Each stage is said once.
+/// "In 500 feet you are going to turn right." ... "By the way, did I mention you should turn right."
+/// ... "Hey, you should be turning right." ... "You should still be turning right." ... and once
+/// the turn is done, "Please stop turning right." (SayTurnDone). Each stage is said once. The 50 ft
+/// nag only plays when the 250 ft one didn't.
 void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double distanceM)
 {
   if (!m_pendingTurn)
@@ -495,13 +533,28 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   auto & p = *m_pendingTurn;
   double const far = m_config.countdownFarM;
   double const near = m_config.countdownNearM;
+  double const mention = m_config.countdownMentionM;
   char const * key = nullptr;
+  double sayM = near;
   if (p.stage == 0 && distanceM <= far && distanceM > near)
   {
     key = "countdown.far";
+    // The third left in a row and beyond: going around in circles, NASCAR style.
+    if (p.dir == TurnDirection::Left && m_leftStreak >= 3 && !m_nascarSaid)
+    {
+      key = "countdown.nascar";
+      m_nascarSaid = true;
+    }
+    sayM = far;
     p.stage = 1;
   }
-  else if (p.stage <= 1 && distanceM <= near && distanceM > 5)
+  else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > near)
+  {
+    key = "countdown.mention";
+    sayM = mention;
+    p.mentioned = true;
+  }
+  else if (p.stage <= 1 && !p.mentioned && distanceM <= near && distanceM > 5)
   {
     key = "countdown.near";
     p.stage = 2;
@@ -512,16 +565,45 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
     p.stage = 3;
     p.atTurnSince = t;
   }
-  else if (p.stage == 3 && p.atTurnSince && t - *p.atTurnSince >= 4000)
+  else if (p.stage == 3 && p.atTurnSince && t - *p.atTurnSince >= 3000)
   {
     key = "countdown.still";
     p.stage = 4;
   }
   if (!key)
     return;
-  std::string const distance = FormatDistance(std::string(key) == "countdown.far" ? far : near, m_config.units);
+  std::string const distance = FormatDistance(sayM, m_config.units);
   std::string const text = Fill(Pick(key, Tier()), {{"dir", DirName(p.dir)}, {"distance", distance}});
   out.push_back(Make(t, Category::Instruction, Capitalize(text), Priority::Nav));
+}
+
+/// The turn is done after the full countdown: "Please stop turning right." Once per maneuver.
+void CritiqueEngine::SayTurnDone(std::vector<Commentary> & out, double t, TurnDirection dir)
+{
+  if (m_turnDoneSaid)
+    return;
+  m_turnDoneSaid = true;
+  std::string const text = Fill(Pick("countdown.done", Tier()), {{"dir", DirName(dir)}});
+  out.push_back(Make(t, Category::Instruction, Capitalize(text), Priority::Nav));
+}
+
+/// A long way to the next maneuver: "Please continue straight." ... "You should still be going
+/// straight." ... "I'm serious." Only while the car is actually covering ground, and never inside
+/// the turn countdown's range.
+void CritiqueEngine::NagStraight(std::vector<Commentary> & out, double t, double distanceM)
+{
+  if (!m_straight || (!m_straight->longHaul && m_straight->stage >= 3) || distanceM <= 2 * m_config.countdownFarM)
+    return;
+  auto & s = *m_straight;
+  double const every = s.longHaul ? m_config.straightLongNagEveryMs : m_config.straightNagEveryMs;
+  if (t - s.since < every * (s.stage + 1) || s.lastM - distanceM < 100)
+    return;
+  // After the first three, a long haul alternates the last two.
+  static char const * const kKeys[] = {"straight.please", "straight.still", "straight.serious"};
+  char const * const key = kKeys[s.stage < 3 ? s.stage : 1 + (s.stage - 3) % 2];
+  s.stage++;
+  s.lastM = distanceM;
+  out.push_back(Make(t, Category::Instruction, Capitalize(Pick(key, Tier())), Priority::Nav));
 }
 
 /// The driver's most recent offense, phrased for "consider this payback for ___".

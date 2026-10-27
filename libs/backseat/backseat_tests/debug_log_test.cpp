@@ -3,8 +3,8 @@
 #include "backseat/debug_log.hpp"
 
 #include <cstdio>
+#include <unistd.h>
 #include <cstdlib>
-#include <unistd.h>  // mkdtemp on macOS
 #include <fstream>
 #include <sstream>
 #include <string>

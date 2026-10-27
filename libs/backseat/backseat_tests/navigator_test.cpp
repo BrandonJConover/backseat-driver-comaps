@@ -1122,3 +1122,86 @@ TEST(SpeedingUpInACurve)
   nav.OnFix(fix(2000, 19, 20), route);
   CHECK(SaidKey(nav.TakeLines(), "curve.accelerate"));
 }
+
+namespace
+{
+/// Drives three lefts then a right, and returns every line said along the way.
+std::vector<Commentary> DriveThreeLefts(Navigator & nav)
+{
+  std::vector<Commentary> all;
+  auto const take = [&] { for (auto & l : nav.TakeLines()) all.push_back(std::move(l)); };
+  TurnKind const turns[] = {TurnKind::Left, TurnKind::SharpLeft, TurnKind::Left, TurnKind::Right};
+  double t = 0;
+  for (uint32_t i = 0; i < 4; ++i)
+  {
+    nav.OnFix(At(t, 10), OnRoute(i + 1, turns[i], 400));
+    take();
+    t += 60000;
+  }
+  for (int i = 0; i < 10; ++i, t += 5000)
+  {
+    nav.OnFix(At(t, 10), OnRoute(4, TurnKind::Right, 300));
+    take();
+  }
+  return all;
+}
+
+size_t CountCategory(std::vector<Commentary> const & lines, Category c)
+{
+  return static_cast<size_t>(std::count_if(lines.begin(), lines.end(), [c](auto const & l) { return l.category == c; }));
+}
+}  // namespace
+
+TEST(AchievementsSurviveARoundTrip)
+{
+  Achievements a;
+  CHECK(a.Unlock("nascar", 1700000000123.0));
+  CHECK(!a.Unlock("nascar", 1700000000999.0));
+  CHECK(!a.Unlock("no-such-badge", 1));
+  CHECK(a.Dirty());
+  auto const back = Achievements::Parse(a.Serialize());
+  CHECK(back.Has("nascar"));
+  CHECK_EQUAL(back.Unlocked().at("nascar"), 1700000000123.0);
+  CHECK(!back.Dirty());
+  auto const messy = Achievements::Parse("junk\nnascar\tnope\nghost\t5\n");
+  CHECK(!messy.Has("nascar"));
+  CHECK(messy.Has("ghost"));  // a badge from a newer build is kept, not lost on the next save
+  CHECK(FindBadge("nascar") != nullptr);
+  CHECK_EQUAL(std::string(FindBadge("nascar")->name), std::string("NASCAR Driver"));
+}
+
+TEST(ThreeLeftsInARowUnlockNascarDriverOnce)
+{
+  std::vector<std::string> saved;
+  Navigator nav(Config());
+  nav.SetAchievements({}, [&](Achievements const & a) { saved.push_back(a.Serialize()); });
+  auto const lines = DriveThreeLefts(nav);
+  CHECK_EQUAL(CountCategory(lines, Category::Achievement), size_t{1});
+  auto const badge = std::find_if(lines.begin(), lines.end(), [](auto const & l) { return l.category == Category::Achievement; });
+  CHECK(badge != lines.end() && badge->text.find("NASCAR Driver") != std::string::npos);
+  CHECK(badge != lines.end() && badge->priority == Priority::Nav);
+  CHECK_EQUAL(saved.size(), size_t{1});
+  CHECK(nav.GetAchievements().Has("nascar"));
+
+  // Already earned on an earlier trip: no second unlock.
+  Navigator again(Config());
+  again.SetAchievements(Achievements::Parse(saved.back()), [&](Achievements const & a) { saved.push_back(a.Serialize()); });
+  CHECK_EQUAL(CountCategory(DriveThreeLefts(again), Category::Achievement), size_t{0});
+  CHECK_EQUAL(saved.size(), size_t{1});
+}
+
+TEST(ARightTurnBreaksTheNascarStreak)
+{
+  Navigator nav(Config());
+  nav.SetAchievements({}, nullptr);
+  TurnKind const turns[] = {TurnKind::Left, TurnKind::Left, TurnKind::Right, TurnKind::Left, TurnKind::Destination};
+  std::vector<Commentary> all;
+  double t = 0;
+  for (uint32_t i = 0; i < 5; ++i, t += 60000)
+  {
+    nav.OnFix(At(t, 10), OnRoute(i + 1, turns[i], 400));
+    for (auto & l : nav.TakeLines()) all.push_back(std::move(l));
+  }
+  CHECK_EQUAL(CountCategory(all, Category::Achievement), size_t{0});
+  CHECK(!nav.GetAchievements().Has("nascar"));
+}

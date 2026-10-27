@@ -5,6 +5,7 @@
 // map/backseat_adapter builds the snapshot from the routing session.
 #pragma once
 
+#include "backseat/achievements.hpp"
 #include "backseat/engine.hpp"
 #include "backseat/history.hpp"
 #include "backseat/plate_game.hpp"
@@ -208,6 +209,9 @@ public:
   void SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange);
   /// What was said on earlier trips, and where to save it when it changes (from TakeLines()).
   void SetSaidLog(SaidLog log, std::function<void(SaidLog const &)> onChange);
+  /// Badges unlocked on earlier trips, and where to save them when one is unlocked.
+  void SetAchievements(Achievements achievements, std::function<void(Achievements const &)> onChange);
+  Achievements const & GetAchievements() const { return m_achievements; }
   PlateLog const & GetPlateLog() const { return m_plates.Log(); }
   /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate".
   /// Same thread as OnFix.
@@ -243,9 +247,12 @@ private:
   void TrackStop(Fix const & fix, RouteSnapshot const & route);
   void TrackTraffic(Fix const & fix, RouteSnapshot const & route);
   void ResetTrip();
+  /// A maneuver was done: counts lefts in a row and unlocks NASCAR Driver on the third.
+  void CountLefts(double t);
   void TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot const & route);
   void SayPlate(double tMs, PlateGame::Reply const & reply);
-  void SayLine(double tMs, Category category, std::string const & key, Vars vars = {});
+  void SayLine(double tMs, Category category, std::string const & key, Vars vars = {},
+               Priority priority = Priority::Roast);
   void TrackFear(Fix const & fix, RouteSnapshot const & route);
   void SayPolice(double tMs);
   void SayLemon(double tMs);
@@ -386,6 +393,11 @@ private:
   std::function<void(PlateLog const &)> m_onPlateLog;
   SaidLog m_said;
   std::function<void(SaidLog const &)> m_onSaid;
+  Achievements m_achievements;
+  std::function<void(Achievements const &)> m_onAchievements;
+  /// The maneuver we were heading for, and how many lefts in a row were done (NASCAR Driver).
+  TurnKind m_turnKind = TurnKind::None;
+  int m_leftsInARow = 0;
   int m_tripsOnRoute = 0;
   double m_tripStartT = 0;
   double m_lastRegionCheckT = -1e18;

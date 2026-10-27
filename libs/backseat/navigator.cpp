@@ -554,9 +554,15 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   {
     // Moving on to a new maneuver means the last one was done, unless a reroute got us here.
     if (m_turnId && !m_rerouting)
+    {
       Say(m_engine->OnNav(NavEvent::TurnCompleted(t, true)));
+      CountLefts(t);
+    }
+    else if (m_rerouting)
+      m_leftsInARow = 0;
     m_rerouting = false;
     m_turnId = route.turnId;
+    m_turnKind = route.turn;
     std::string const text = InstructionText(route.turn, route.nextStreet, route.destination);
     Trace("nav.turn", {{"id", std::to_string(*route.turnId)},
                        {"text", text},
@@ -932,6 +938,8 @@ void Navigator::SayVenue(double t, RouteSnapshot const & route)
 void Navigator::ResetTrip()
 {
   m_turnId.reset();
+  m_turnKind = TurnKind::None;
+  m_leftsInARow = 0;
   m_rerouting = false;
   m_arrived = false;
   m_lastState = RouteState::Inactive;
@@ -979,6 +987,32 @@ void Navigator::SetSaidLog(SaidLog log, std::function<void(SaidLog const &)> onC
 {
   m_said = std::move(log);
   m_onSaid = std::move(onChange);
+}
+
+void Navigator::SetAchievements(Achievements achievements,
+                                std::function<void(Achievements const &)> onChange)
+{
+  m_achievements = std::move(achievements);
+  m_onAchievements = std::move(onChange);
+}
+
+void Navigator::CountLefts(double t)
+{
+  // Counted the same way as the engine's NASCAR line: rights break the streak, the rest don't count.
+  switch (ManeuverOf(m_turnKind))
+  {
+  case Maneuver::Left: ++m_leftsInARow; break;
+  case Maneuver::Right: m_leftsInARow = 0; return;
+  case Maneuver::Other: return;
+  }
+  // Three lefts in a row: round and round, like a stock car. Unlocked once, ever.
+  if (m_leftsInARow >= 3 && m_achievements.Unlock("nascar", t))
+  {
+    SayLine(t, Category::Achievement, "badge.nascar", {}, Priority::Nav);
+    if (m_onAchievements)
+      m_onAchievements(m_achievements);
+    m_achievements.ClearDirty();
+  }
 }
 
 void Navigator::SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange)
@@ -1125,7 +1159,7 @@ bool Navigator::Parked() const
   return m_parkingLookup({m_lastFix->lat, m_lastFix->lon});
 }
 
-void Navigator::SayLine(double tMs, Category category, std::string const & key, Vars vars)
+void Navigator::SayLine(double tMs, Category category, std::string const & key, Vars vars, Priority priority)
 {
   auto const & options = LinesFor(key, Tier());
   double const r = m_config.rng ? m_config.rng() : 0;
@@ -1134,7 +1168,7 @@ void Navigator::SayLine(double tMs, Category category, std::string const & key, 
   c.category = category;
   c.text = Fill(m_said.Pick(key, options, r), vars);
   c.frustration = m_engine ? m_engine->Frustration() : 0;
-  c.priority = Priority::Roast;
+  c.priority = priority;
   c.voiceSpeed = 1 + c.frustration / 250.0;
   // "Setup || punchline": the punchline waits out the setup and then an awkward pause.
   auto const pause = c.text.find(" || ");

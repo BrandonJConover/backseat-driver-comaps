@@ -42,6 +42,7 @@ namespace
 std::string const kTripsFile = "backseat_trips.tsv";
 std::string const kPlatesFile = "backseat_plates.txt";
 std::string const kSaidFile = "backseat_said.tsv";
+std::string const kAchievementsFile = "backseat_achievements.tsv";
 std::string const kMemoryFile = "backseat_memory.tsv";
 /// Every drive the mileage log saw, never capped: it's the driver's tax record.
 std::string const kDrivesFile = "backseat_drives.tsv";
@@ -220,6 +221,19 @@ backseat::SaidLog LoadSaid()
 void SaveSaid(backseat::SaidLog const & log)
 {
   std::ofstream(GetPlatform().SettingsPathForFile(kSaidFile)) << log.Serialize();
+}
+
+backseat::Achievements LoadAchievements()
+{
+  std::ifstream in(GetPlatform().SettingsPathForFile(kAchievementsFile));
+  std::stringstream text;
+  text << in.rdbuf();
+  return backseat::Achievements::Parse(text.str());
+}
+
+void SaveAchievements(backseat::Achievements const & achievements)
+{
+  std::ofstream(GetPlatform().SettingsPathForFile(kAchievementsFile)) << achievements.Serialize();
 }
 
 backseat::DriverMemory LoadMemory()
@@ -420,6 +434,7 @@ BackseatAdapter::BackseatAdapter()
 {
   m_navigator.SetPlateLog(LoadPlates(), &SavePlates);
   m_navigator.SetSaidLog(LoadSaid(), &SaveSaid);
+  m_navigator.SetAchievements(LoadAchievements(), &SaveAchievements);
   m_memory = LoadMemory();
   m_driveLog = LoadDrives();
   m_taggedPlaces = LoadMileagePlaces();

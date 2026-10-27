@@ -52,6 +52,16 @@ struct EngineConfig
   /// Distances for the "you are turning left in 500 feet / 50 feet" nags.
   double countdownFarM = 152;  // 500 ft
   double countdownNearM = 15;  // 50 ft
+  /// "By the way, did I mention you should turn right." Said in place of the 50 ft nag.
+  double countdownMentionM = 76;  // 250 ft
+  /// A stretch at least this long to the next maneuver gets "Please continue straight." nags,
+  /// one every straightNagEveryMs of driving, three at most.
+  double straightNagMinM = 1000;
+  double straightNagEveryMs = 30000;
+  /// A stretch this long (about 10 miles) opens with "I don't think I'm needed for this, but ok."
+  /// and then chimes in now and then for as long as it lasts.
+  double straightLongM = 16000;
+  double straightLongNagEveryMs = 600000;
   /// While speeding, log a heat-map incident this often so long stretches show up as streaks.
   double speedingLogEveryMs = 5000;
   /// Frustration points lost per minute of good behavior.
@@ -95,6 +105,16 @@ private:
     double since;
     int stage;  // 0..4, see Countdown()
     std::optional<double> atTurnSince;
+    bool mentioned = false;
+  };
+
+  /// "Please continue straight." ... "You should still be going straight." ... "I'm serious."
+  struct StraightNag
+  {
+    double since;
+    double lastM;
+    int stage;  // lines said so far; a long haul keeps going after 3
+    bool longHaul;
   };
 
   struct Heading
@@ -109,6 +129,8 @@ private:
   void CheckTurnDirection(TelemetrySample const & s, std::vector<Commentary> & out);
   void CheckNoDestination(TelemetrySample const & s, std::vector<Commentary> & out);
   void Countdown(std::vector<Commentary> & out, double t, double distanceM);
+  void NagStraight(std::vector<Commentary> & out, double t, double distanceM);
+  void SayTurnDone(std::vector<Commentary> & out, double t, TurnDirection dir);
   void WrongTurn(std::vector<Commentary> & out, double t, TurnDirection expected, TurnDirection turned,
                  std::optional<LatLon> at = {});
   std::optional<std::string> Grievance() const;
@@ -145,6 +167,12 @@ private:
   std::optional<std::string> m_trafficAlternate;  // set while stuck in heavy traffic
   /// The left/right turn we're waiting for, so a turn the other way can be caught.
   std::optional<PendingTurn> m_pendingTurn;
+  std::optional<StraightNag> m_straight;
+  /// "Please stop turning right." already said for this maneuver, in place of the turn praise.
+  bool m_turnDoneSaid = false;
+  /// Lefts in a row (a right resets it), for "Just like a NASCAR driver", once per run of lefts.
+  int m_leftStreak = 0;
+  bool m_nascarSaid = false;
   std::vector<Heading> m_headings;
   double m_lastWrongTurnAt;
   bool m_hasDestination = false;

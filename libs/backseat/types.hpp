@@ -261,6 +261,8 @@ enum class Category
   WrongWay,
   /// Turned around: "I feel like I've been here before" (navigator only).
   UTurn,
+  /// A badge unlocked ("Achievement unlocked: NASCAR Driver").
+  Achievement,
   Count
 };
 
