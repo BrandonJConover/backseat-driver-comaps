@@ -326,10 +326,55 @@ final class KokoroVoice: NSObject {
     return nil
   }
 
+  /// Silence after a sentence, and at a comma. Kokoro's own pauses run sentences together.
+  private static let sentencePause: TimeInterval = 0.35
+  private static let commaPause: TimeInterval = 0.18
+  /// Roasts any faster than this get hard to follow. Faster still (the first trip's speed run)
+  /// is on purpose and keeps its speed.
+  private static let roastSpeedCap: Float = 1.15
+  private static let deliberatelyFast: Float = 1.3
+
   private func render(_ text: String, speed: Float, voice: String, with engine: KokoroAneManager) async throws -> Data {
     CoreMLCrashGuard.begin()
     defer { CoreMLCrashGuard.end() }
-    return try await engine.synthesize(text: text, voice: voice, speed: speed)
+    let fast = speed >= Self.deliberatelyFast
+    let pace = fast ? speed : min(speed, Self.roastSpeedCap)
+    var samples: [Float] = []
+    var sampleRate = KokoroAneConstants.sampleRate
+    // A speed run keeps its commas tight: "right, left, right" with pauses isn't fast.
+    for (piece, pause) in Self.pieces(of: text, commas: !fast) {
+      let result = try await engine.synthesizeDetailed(text: piece, voice: voice, speed: pace)
+      sampleRate = result.sampleRate
+      samples += result.samples
+      samples += [Float](repeating: 0, count: Int(Double(sampleRate) * pause))
+    }
+    return try AudioWAV.data(from: samples, sampleRate: Double(sampleRate), normalize: false)
+  }
+
+  /// `text` split into sentences (and clauses at commas), each with the silence that follows it.
+  private static func pieces(of text: String, commas: Bool) -> [(String, TimeInterval)] {
+    var pieces: [(String, TimeInterval)] = []
+    var current = ""
+    func flush(_ pause: TimeInterval) {
+      let piece = current.trimmingCharacters(in: .whitespaces)
+      if !piece.isEmpty { pieces.append((piece, pause)) }
+      current = ""
+    }
+    let chars = Array(text.replacingOccurrences(of: " || ", with: ". "))
+    for (i, ch) in chars.enumerated() {
+      current.append(ch)
+      // Only at a word break, so "3.5 miles" and "St. Louis"-style dots mid-token stay put.
+      let atBreak = i + 1 == chars.count || chars[i + 1] == " "
+      guard atBreak else { continue }
+      if ".?!".contains(ch) {
+        flush(sentencePause)
+      } else if commas && (ch == "," || ch == ";") {
+        flush(commaPause)
+      }
+    }
+    flush(0)
+    if let last = pieces.indices.last { pieces[last].1 = 0 }
+    return pieces.isEmpty ? [(text, 0)] : pieces
   }
 
   /// The CPU-only route, for a line the Neural Engine route failed on.

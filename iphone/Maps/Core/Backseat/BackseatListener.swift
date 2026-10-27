@@ -1,4 +1,5 @@
 import AVFoundation
+import UIKit
 import Speech
 
 /// The driver talks back, and the text goes to the navigator. Hands-free (the default), the mic
@@ -45,6 +46,8 @@ import Speech
   private var pausedForSpeech = false
   /// Takes the next thing heard instead of the navigator, e.g. an answer to a setup question.
   private var answerHandler: ((String) -> Void)?
+  /// How long the mic waits for the first word when opened for one phrase.
+  private var firstWordWait: TimeInterval = 6
 
   @objc private(set) var isListening = false {
     didSet { NotificationCenter.default.post(name: Self.listeningChanged, object: self) }
@@ -95,8 +98,9 @@ import Speech
 
   /// Sends the next thing the driver says (empty when they say nothing) to `handler` instead of the
   /// navigator, listening for it if the mic is off.
-  func listenForAnswer(_ handler: @escaping (String) -> Void) {
+  func listenForAnswer(waiting: TimeInterval = 6, _ handler: @escaping (String) -> Void) {
     answerHandler = handler
+    firstWordWait = waiting
     if !isListening {
       withPermission { self.start(continuous: false) }
     }
@@ -249,7 +253,7 @@ import Speech
         self?.finish()
       }
     } else {
-      restartTimeout(after: 6)
+      restartTimeout(after: firstWordWait)
     }
   }
 
@@ -270,6 +274,7 @@ import Speech
       // The next one starts after this turn, so a failing recognizer can't spin.
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.startSegment() }
     } else {
+      firstWordWait = 6
       cleanUp()
     }
     if let answer = answerHandler, !(continuous && echo) {
@@ -364,21 +369,62 @@ import Speech
   }
 
   /// Listens once the GPS has finished talking, so it doesn't hear itself.
-  private static func listen(_ handler: @escaping (String) -> Void) {
+  static func listen(waiting: TimeInterval = 6, _ handler: @escaping (String) -> Void) {
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
       if KokoroVoice.shared.anyVoiceSpeaking {
-        listen(handler)
+        listen(waiting: waiting, handler)
       } else {
-        BackseatListener.shared.listenForAnswer(handler)
+        BackseatListener.shared.listenForAnswer(waiting: waiting, handler)
       }
     }
   }
 
-  private static func waitForKokoro(tries: Int, then: @escaping () -> Void) {
+  static var isDone: Bool {
+    !running && (UserDefaults.standard.bool(forKey: doneKey) || !MWMBackseatRewriter.driverName.isEmpty)
+  }
+
+  static func waitForKokoro(tries: Int, then: @escaping () -> Void) {
     if KokoroVoice.shared.isReady || tries <= 0 {
       then()
       return
     }
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { waitForKokoro(tries: tries - 1, then: then) }
+  }
+}
+
+/// When the app opens with no route, the GPS asks where to, so the driver can say it instead of
+/// typing. At most every ten minutes, and not during first-run setup, which asks on its own.
+@objc final class BackseatWhereTo: NSObject {
+  private static let interval: TimeInterval = 10 * 60
+  /// Long enough to find a place to stop and think.
+  private static let answerWait: TimeInterval = 45
+  private static var lastAsked: Date?
+  private static var observer: NSObjectProtocol?
+
+  @objc static func install() {
+    observer = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
+                                                      object: nil, queue: .main) { _ in askIfNeeded() }
+  }
+
+  private static func askIfNeeded() {
+    guard BackseatSetup.isDone, !MWMRouter.isRoutingActive(), MWMTextToSpeech.isTTSEnabled() else { return }
+    if let lastAsked, Date().timeIntervalSince(lastAsked) < interval { return }
+    lastAsked = Date()
+    BackseatSetup.waitForKokoro(tries: 60) {
+      guard !MWMRouter.isRoutingActive() else { return }
+      let question = MWMBackseatRewriter.askWhereTo
+      guard !question.isEmpty else { return }
+      KokoroVoice.shared.sayReply(question, voiceID: nil) { MWMTextToSpeech.tts().play(question) }
+      BackseatSetup.listen(waiting: answerWait) { answer in
+        if answer.isEmpty {
+          let shrug = MWMBackseatRewriter.noAnswerToWhereTo
+          if !shrug.isEmpty {
+            KokoroVoice.shared.sayReply(shrug, voiceID: nil) { MWMTextToSpeech.tts().play(shrug) }
+          }
+        } else {
+          MWMBackseatRewriter.driverSaid(answer)
+        }
+      }
+    }
   }
 }

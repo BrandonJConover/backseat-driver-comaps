@@ -52,6 +52,10 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 + (NSString *)setupLine:(MWMBackseatSetupStep)step voiceName:(NSString *)voiceName;
 /// The driver's answer at `step`. NO means ask again (the name wasn't understood).
 + (BOOL)setupHeard:(MWMBackseatSetupStep)step answer:(NSString *)answer;
+/// "Where are we going?" (or a guess: "It's Tuesday morning. Work, I assume?") when the app opens.
+@property(class, nonatomic, readonly) NSString * askWhereTo;
+/// What to say when nobody answered `askWhereTo`; empty for nothing.
+@property(class, nonatomic, readonly) NSString * noAnswerToWhereTo;
 /// What the GPS has worked out about the driver, as label / value pairs ("Works at", "Acme Corp").
 @property(class, nonatomic, readonly) NSArray<NSArray<NSString *> *> * learnedFacts;
 
