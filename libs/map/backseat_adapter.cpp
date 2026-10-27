@@ -252,6 +252,34 @@ char const * const BackseatAdapter::kPartnerPronounsKey = "BackseatPartnerPronou
 char const * const BackseatAdapter::kDriverPronounsKey = "BackseatDriverPronouns";
 char const * const BackseatAdapter::kAutopilotKey = "BackseatCarHasAutopilot";
 char const * const BackseatAdapter::kDriverNameKey = "BackseatDriverName";
+char const * const BackseatAdapter::kDriverAgeKey = "BackseatDriverAge";
+
+namespace
+{
+backseat::DriverProfile SavedProfile()
+{
+  backseat::DriverProfile p;
+  settings::TryGet(BackseatAdapter::kDriverNameKey, p.name);
+  settings::TryGet(BackseatAdapter::kDriverPronounsKey, p.pronouns);
+  settings::TryGet(BackseatAdapter::kDriverAgeKey, p.age);
+  return p;
+}
+}  // namespace
+
+void BackseatAdapter::BeginProfileEdit()
+{
+  m_profileBefore = SavedProfile();
+}
+
+std::string BackseatAdapter::EndProfileEdit()
+{
+  if (!m_profileBefore)
+    return {};
+  auto const change = backseat::ProfileChanged(*m_profileBefore, SavedProfile());
+  m_profileBefore.reset();
+  ReloadPersonality();
+  return change ? m_navigator.Reply(change->key, change->vars) : std::string();
+}
 
 void BackseatAdapter::ReloadPersonality()
 {

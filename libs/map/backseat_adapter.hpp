@@ -106,8 +106,15 @@ public:
   static char const * const kAutopilotKey;
   /// What to call the driver, from first-run setup.
   static char const * const kDriverNameKey;
+  /// The driver's age as typed in Settings ("34"), empty if never given.
+  static char const * const kDriverAgeKey;
   /// Rereads those settings; call after the platform changes them.
   void ReloadPersonality();
+  /// Call when the driver opens their profile in Settings, and EndProfileEdit() when they leave it.
+  /// If they changed their name, pronouns or age by hand, EndProfileEdit() returns what to say:
+  /// "Changing it up, I see. Okay, Brandon... I mean, Brenda." Empty otherwise.
+  void BeginProfileEdit();
+  std::string EndProfileEdit();
   /// First-run setup, spoken, Brandon's script:
   ///   SetupLine(Intro)       "Before we begin... My name is Echo. ...the sound your head makes when you tap it."
   ///   SetupLine(Name)        "Your turn. What's your name?"  -> listen, SetupHeard(Name, answer) until true
@@ -213,6 +220,8 @@ private:
   std::optional<Guess> m_guess;
   /// Where the phone was when AskWhereTo() asked.
   std::optional<m2::PointD> m_askedAt;
+  /// The profile as it was when Settings opened it, until EndProfileEdit().
+  std::optional<backseat::DriverProfile> m_profileBefore;
   /// Results last read out, waiting for "the first one".
   std::vector<SearchResult> m_results;
   std::vector<backseat::VoiceOption> m_voices;

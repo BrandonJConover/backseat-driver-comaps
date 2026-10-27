@@ -246,6 +246,8 @@ public:
   BackseatAdapter::HeardCommand BackseatDriverSaid(std::string const & text) { return m_backseat.OnDriverSaid(text); }
   /// Call after the Settings screen writes one of BackseatAdapter's personality keys.
   void ReloadBackseatPersonality() { m_backseat.ReloadPersonality(); }
+  void BackseatBeginProfileEdit() { m_backseat.BeginProfileEdit(); }
+  std::string BackseatEndProfileEdit() { return m_backseat.EndProfileEdit(); }
   BackseatAdapter::HeardCommand BackseatRunTool(std::string const & name, std::string const & argument,
                                                 std::string const & spoken)
   {

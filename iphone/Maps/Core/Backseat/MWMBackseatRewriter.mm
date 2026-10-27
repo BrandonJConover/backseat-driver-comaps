@@ -333,6 +333,27 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
                       forKey:BackseatAdapter::kDriverNameKey];
 }
 
++ (NSString *)driverAge
+{
+  return [self personalityString:BackseatAdapter::kDriverAgeKey fallback:@""];
+}
+
++ (void)setDriverAge:(NSString *)driverAge
+{
+  [self setPersonalityString:[driverAge stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet]
+                      forKey:BackseatAdapter::kDriverAgeKey];
+}
+
++ (void)beginProfileEdit
+{
+  GetFramework().GetRoutingManager().BackseatBeginProfileEdit();
+}
+
++ (NSString *)endProfileEdit
+{
+  return @(GetFramework().GetRoutingManager().BackseatEndProfileEdit().c_str());
+}
+
 + (NSString *)setupLine:(MWMBackseatSetupStep)step voiceName:(NSString *)voiceName
 {
   auto const line = GetFramework().GetRoutingManager().BackseatSetupLine(

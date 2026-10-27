@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <iterator>
 #include <map>
@@ -687,5 +688,36 @@ std::optional<LatLon> GuessPlace(std::vector<TripRecord> const & history, KnownP
   if (s.exact > 0)
     return LatLon{s.sum.lat / s.exact, s.sum.lon / s.exact};
   return s.cell;
+}
+namespace
+{
+/// What the GPS calls someone with these pronouns when it's being polite through its teeth.
+std::string Title(std::string const & pronouns)
+{
+  if (pronouns == "he")
+    return "sir";
+  if (pronouns == "she")
+    return "ma'am";
+  return "my friend";
+}
+}  // namespace
+
+std::optional<ProfileChange> ProfileChanged(DriverProfile const & before, DriverProfile const & after)
+{
+  auto const changed = [](std::string const & was, std::string const & now)
+  { return !was.empty() && !now.empty() && CommandWords(was) != CommandWords(now); };
+  if (changed(before.name, after.name))
+    return ProfileChange{"profile.name", {{"old", before.name}, {"new", after.name}}};
+  // Pronouns default to "they" when never set, so only a set-to-set change counts.
+  if (changed(before.pronouns, after.pronouns) && Title(before.pronouns) != Title(after.pronouns))
+    return ProfileChange{"profile.title", {{"old", Title(before.pronouns)}, {"new", Title(after.pronouns)}}};
+  if (changed(before.age, after.age))
+  {
+    int was = 0, now = 0;
+    bool const numbers = std::sscanf(before.age.c_str(), "%d", &was) == 1 && std::sscanf(after.age.c_str(), "%d", &now) == 1;
+    return ProfileChange{numbers && now < was ? "profile.younger" : "profile.age",
+                         {{"old", before.age}, {"new", after.age}}};
+  }
+  return {};
 }
 }  // namespace backseat

@@ -303,3 +303,20 @@ TEST(SearchChoicesAreHeard)
   CHECK(!ParseChoice("hmm", names));
   CHECK(!ParseChoice("first", {}));
 }
+
+TEST(HandEditedProfileIsCalledOut)
+{
+  DriverProfile const before{"Brandon", "he", "34"};
+  auto name = ProfileChanged(before, {"Brenda", "she", "34"});
+  CHECK(name && name->key == "profile.name");
+  CHECK(name->vars.at("old") == "Brandon" && name->vars.at("new") == "Brenda");
+  auto title = ProfileChanged(before, {"Brandon", "she", "34"});
+  CHECK(title && title->key == "profile.title" && title->vars.at("old") == "sir" && title->vars.at("new") == "ma'am");
+  CHECK(ProfileChanged(before, {"Brandon", "he", "40"})->key == "profile.age");
+  CHECK(ProfileChanged(before, {"Brandon", "he", "29"})->key == "profile.younger");
+  CHECK(!ProfileChanged(before, before));
+  CHECK(!ProfileChanged(before, {"brandon", "he", "34"}));
+  // Filling in something new is setup, not changing it up.
+  CHECK(!ProfileChanged({"Brandon", "he", ""}, {"Brandon", "he", "34"}));
+  CHECK(!ProfileChanged({"", "", ""}, {"Brandon", "he", ""}));
+}

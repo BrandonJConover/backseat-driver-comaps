@@ -41,6 +41,13 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 @property(class, nonatomic) BOOL carHasAutopilot;
 /// What to call the driver; empty until first-run setup.
 @property(class, nonatomic, copy) NSString * driverName;
+/// The driver's age as typed ("34"); empty if never given.
+@property(class, nonatomic, copy) NSString * driverAge;
+/// Call when the profile section of Settings appears, and endProfileEdit when it goes away. A hand
+/// edit of name, pronouns or age comes back as a line to speak ("Changing it up, I see. Okay,
+/// Brandon... I mean, Brenda."); empty for none.
++ (void)beginProfileEdit;
++ (NSString *)endProfileEdit;
 
 /// The spoken first-run setup, in order: intro, name (asked until it sticks), wrong name, where to.
 typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {

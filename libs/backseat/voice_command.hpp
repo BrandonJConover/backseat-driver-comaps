@@ -5,6 +5,7 @@
 #include "backseat/history.hpp"
 #include "backseat/types.hpp"
 
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -138,6 +139,27 @@ std::vector<std::string> VoicePhrases(std::vector<VoiceOption> const & voices);
 std::optional<size_t> VoiceByPhrase(std::vector<VoiceOption> const & voices, std::string const & spoken);
 /// The voice called `said` (by name or id, any case), as an index into `voices`.
 std::optional<size_t> VoiceNamed(std::vector<VoiceOption> const & voices, std::string const & said);
+
+/// Who the driver says they are, as the Settings screen saved it. Pronouns are "he", "she" or
+/// "they"; age is whatever was typed ("34"), empty if never given.
+struct DriverProfile
+{
+  std::string name;
+  std::string pronouns;
+  std::string age;
+};
+
+/// What to say when the driver edits their own profile by hand (Brandon: "Changing it up, I see",
+/// then it calls them the old thing and corrects itself). `key` is the line ("profile.name",
+/// "profile.title", "profile.age" or "profile.younger") and `vars` fill {old} and {new}. A name
+/// change wins over a pronoun change, which wins over age. Nothing for no change, or for filling in
+/// something that was empty (that's setup, not changing it up).
+struct ProfileChange
+{
+  std::string key;
+  std::map<std::string, std::string> vars;
+};
+std::optional<ProfileChange> ProfileChanged(DriverProfile const & before, DriverProfile const & after);
 
 /// Where home or work probably is, from past trips. Home is where trips start and end most;
 /// work is the most common other destination. Needs at least two trips there to be sure.
