@@ -135,6 +135,27 @@ public:
   /// today, huh?" if the car hasn't moved since; empty otherwise.
   std::string NoAnswerToWhereTo();
 
+  /// Spoken search results, after a HeardCommand Search. The platform runs the search, passes the
+  /// top results closest first, speaks the returned line, and then:
+  ///  - `pick` set: route to that result right away (one result, or none to pick from: `none`).
+  ///  - otherwise listen and pass the answer to PickSearchResult().
+  struct SearchResult
+  {
+    std::string name;
+    /// From the car, meters.
+    double distanceM = 0;
+  };
+  struct SearchSpeech
+  {
+    std::string line;
+    std::optional<size_t> pick;
+    bool none = false;
+  };
+  SearchSpeech SpeakSearchResults(std::string const & query, std::vector<SearchResult> results);
+  /// "The second one": which result, and the line to say ("Starbucks. Good choice."). No index
+  /// means it didn't understand; say the line ("First, second, or third?") and listen again.
+  std::pair<std::optional<size_t>, std::string> PickSearchResult(std::string const & spoken);
+
   /// What the GPS has worked out about the driver, for the profile screen: label and value, e.g.
   /// {"Works at", "Acme Corp"}, {"Commute", "Mon to Fri, around 8:05 AM"}.
   std::vector<std::pair<std::string, std::string>> LearnedFacts() const;
@@ -189,6 +210,8 @@ private:
   std::optional<Guess> m_guess;
   /// Where the phone was when AskWhereTo() asked.
   std::optional<m2::PointD> m_askedAt;
+  /// Results last read out, waiting for "the first one".
+  std::vector<SearchResult> m_results;
   std::vector<backseat::VoiceOption> m_voices;
   mutable int m_secondsLeft = -1;
 };

@@ -1,5 +1,6 @@
 #include "map/backseat_adapter.hpp"
 
+#include "backseat/units.hpp"
 #include "backseat/voice_command.hpp"
 
 #include "routing/following_info.hpp"
@@ -754,6 +755,49 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
   heard.actions.push_back(command);
   char const * key = ReplyKey(command.action, command.argument);
   return key ? m_navigator.Reply(key, {{"voice", Capitalized(command.argument)}}) : std::string();
+}
+
+BackseatAdapter::SearchSpeech BackseatAdapter::SpeakSearchResults(std::string const & query,
+                                                                  std::vector<SearchResult> results)
+{
+  size_t constexpr kReadOut = 3;
+  SearchSpeech speech;
+  m_results.clear();
+  if (results.empty())
+  {
+    speech.none = true;
+    speech.line = m_navigator.Reply("search.none", {{"place", query}});
+    return speech;
+  }
+  if (results.size() == 1)
+  {
+    speech.pick = 0;
+    speech.line = m_navigator.Reply("search.one", {{"place", results[0].name}});
+    return speech;
+  }
+  if (results.size() > kReadOut)
+    results.resize(kReadOut);
+  static char const * const kOrdinal[] = {"First", "Second", "Third"};
+  std::string list;
+  for (size_t i = 0; i < results.size(); ++i)
+    list += std::string(i ? ". " : "") + kOrdinal[i] + ", " + results[i].name + ", " +
+            backseat::FormatDistance(results[i].distanceM, backseat::Units::Mph) + " away";
+  speech.line = m_navigator.Reply("search.results", {{"count", std::to_string(results.size())}, {"list", list}});
+  m_results = std::move(results);
+  return speech;
+}
+
+std::pair<std::optional<size_t>, std::string> BackseatAdapter::PickSearchResult(std::string const & spoken)
+{
+  std::vector<std::string> names;
+  for (auto const & r : m_results)
+    names.push_back(r.name);
+  auto const choice = backseat::ParseChoice(spoken, names);
+  if (!choice)
+    return {std::nullopt, m_navigator.Reply("search.huh")};
+  std::string const place = m_results[*choice].name;
+  m_results.clear();
+  return {choice, m_navigator.Reply("search.picked", {{"place", place}})};
 }
 
 std::string BackseatAdapter::NoAnswerToWhereTo()

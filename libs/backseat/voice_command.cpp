@@ -504,6 +504,56 @@ std::optional<Passenger> ParsePassengerAnswer(std::string const & spoken)
   return {};
 }
 
+std::optional<size_t> ParseChoice(std::string const & spoken, std::vector<std::string> const & names)
+{
+  if (names.empty())
+    return {};
+  std::string const words = CommandWords(spoken);
+  auto const has = [&words](char const * w) { return words.find(w) != std::string::npos; };
+  static std::vector<std::vector<char const *>> const kOrdinals = {
+      {" first ", " number one ", " one ", " 1 ", " 1st ", " top "},
+      {" second ", " number two ", " two ", " 2 ", " 2nd "},
+      {" third ", " number three ", " three ", " 3 ", " 3rd "},
+      {" fourth ", " number four ", " four ", " 4 ", " 4th "},
+      {" fifth ", " number five ", " five ", " 5 ", " 5th "}};
+  if (has(" closest ") || has(" nearest ") || has(" close one "))
+    return 0;
+  if (has(" last ") || has(" farthest ") || has(" furthest "))
+    return names.size() - 1;
+  // A word in just one result's name: "the one on Colfax".
+  static char const * const kCommon[] = {"the", "on", "at", "and", "of", "a", "in", "st", "street", "ave", "avenue", "rd", "road"};
+  std::optional<size_t> byName;
+  int matches = 0;
+  for (size_t i = 0; i < names.size(); ++i)
+  {
+    std::string const name = CommandWords(names[i]);
+    for (size_t pos = 1; pos < name.size();)
+    {
+      auto const end = name.find(' ', pos);
+      std::string const w = name.substr(pos, end - pos);
+      pos = end + 1;
+      if (w.size() < 3 || std::find(std::begin(kCommon), std::end(kCommon), w) != std::end(kCommon))
+        continue;
+      bool const shared = std::any_of(names.begin(), names.end(), [&](std::string const & other)
+      { return &other != &names[i] && CommandWords(other).find(" " + w + " ") != std::string::npos; });
+      if (!shared && words.find(" " + w + " ") != std::string::npos)
+      {
+        if (byName != i)
+          ++matches;
+        byName = i;
+        break;
+      }
+    }
+  }
+  if (byName && matches == 1)
+    return byName;
+  for (size_t i = 0; i < kOrdinals.size() && i < names.size(); ++i)
+    for (char const * o : kOrdinals[i])
+      if (has(o))
+        return i;
+  return {};
+}
+
 std::vector<std::string> VoicePhrases(std::vector<VoiceOption> const & voices)
 {
   static char const * const kPool[] = {

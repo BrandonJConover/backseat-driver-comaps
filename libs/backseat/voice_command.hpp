@@ -118,6 +118,10 @@ std::optional<Passenger> ParsePassengerAnswer(std::string const & spoken);
 /// A partner mentioned in passing ("my wife hates this song"), for learning about the driver.
 std::optional<Passenger> MentionedPartner(std::string const & spoken);
 
+/// Which search result the driver meant: "the first one", "number two", "the closest", "the one on
+/// Main" (a word only that result's name has). `names` are the results read out, closest first.
+std::optional<size_t> ParseChoice(std::string const & spoken, std::vector<std::string> const & names);
+
 /// A voice the platform can speak in.
 struct VoiceOption
 {

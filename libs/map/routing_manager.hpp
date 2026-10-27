@@ -261,6 +261,15 @@ public:
     return m_backseat.SetupHeard(step, spoken);
   }
   std::string BackseatAskWhereTo() { return m_backseat.AskWhereTo(); }
+  BackseatAdapter::SearchSpeech BackseatSpeakSearchResults(std::string const & query,
+                                                           std::vector<BackseatAdapter::SearchResult> results)
+  {
+    return m_backseat.SpeakSearchResults(query, std::move(results));
+  }
+  std::pair<std::optional<size_t>, std::string> BackseatPickSearchResult(std::string const & spoken)
+  {
+    return m_backseat.PickSearchResult(spoken);
+  }
   std::string BackseatNoAnswerToWhereTo() { return m_backseat.NoAnswerToWhereTo(); }
   std::vector<std::pair<std::string, std::string>> BackseatLearnedFacts() const { return m_backseat.LearnedFacts(); }
   /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.

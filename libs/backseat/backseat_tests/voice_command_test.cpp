@@ -290,3 +290,16 @@ TEST(PronounsAreGuessedAndCorrected)
   CHECK(!PronounCorrection("I'm a terrible driver"));
   CHECK(!PronounCorrection("I'm hungry"));
 }
+
+TEST(SearchChoicesAreHeard)
+{
+  std::vector<std::string> const names = {"Starbucks", "Starbucks Colfax Avenue", "Starbucks Union Station"};
+  CHECK(ParseChoice("the first one", names) == size_t(0));
+  CHECK(ParseChoice("number two please", names) == size_t(1));
+  CHECK(ParseChoice("the closest", names) == size_t(0));
+  CHECK(ParseChoice("last one", names) == size_t(2));
+  CHECK(ParseChoice("the one on Colfax", names) == size_t(1));
+  CHECK(ParseChoice("union station", names) == size_t(2));
+  CHECK(!ParseChoice("hmm", names));
+  CHECK(!ParseChoice("first", {}));
+}
