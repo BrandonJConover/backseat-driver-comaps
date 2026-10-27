@@ -171,7 +171,7 @@ struct SettingsView: View {
                     }
                     
                     Picker(selection: $selectedCustomButtonKind) {
-                        ForEach(MapCustomButton.Kind.allCases) { customButtonKind in
+                        ForEach(MapCustomButton.Kind.offered) { customButtonKind in
                             Text(customButtonKind.description)
                         }
                     } label: {

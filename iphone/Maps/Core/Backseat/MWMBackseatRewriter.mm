@@ -115,6 +115,7 @@ void Perform(backseat::AppCommand const & command)
   case AppAction::RouteOverview: ShowRouteOverview(); break;
   case AppAction::OpenSettings: [[MapViewController sharedController] openSettings]; break;
   case AppAction::StopListening: [BackseatListener.shared pauseForRoute]; break;
+  case AppAction::ListCommands: [BackseatCommandsSheet present]; break;
   // The navigator handles these itself.
   case AppAction::NavigateTo:
   case AppAction::RepeatInstruction:
@@ -221,6 +222,14 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
     [guide appendString:@"\n"];
   }
   return guide;
+}
+
++ (NSArray<NSString *> *)commandDescriptions
+{
+  NSMutableArray<NSString *> * descriptions = [NSMutableArray array];
+  for (auto const & tool : backseat::AppTools())
+    [descriptions addObject:@(tool.description)];
+  return descriptions;
 }
 
 + (void)runTool:(NSString *)name argument:(NSString *)argument spoken:(NSString *)spoken

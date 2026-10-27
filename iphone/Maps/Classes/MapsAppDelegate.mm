@@ -107,6 +107,10 @@ void InitLocalizedStrings() {
   NSTimeInterval const minimumBackgroundFetchIntervalInSeconds = 6 * 60 * 60;
   [UIApplication.sharedApplication setMinimumBackgroundFetchInterval:minimumBackgroundFetchIntervalInSeconds];
   [self updateApplicationIconBadgeNumber];
+  [TrackRecordingManager.shared stopLeftoverRecording];
+  // The record-track button isn't offered any more; don't leave it as the map's custom button.
+  if ([[NSUserDefaults.standardUserDefaults stringForKey:@"LeftButtonType"] isEqualToString:@"RecordTrack"])
+    [NSUserDefaults.standardUserDefaults setObject:@"Favourites" forKey:@"LeftButtonType"];
   [TrackRecordingManager.shared setup];
   [self startObservingLifecycle];
 }

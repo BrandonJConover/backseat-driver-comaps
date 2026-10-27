@@ -25,6 +25,8 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 /// The app actions the model can pick from, snake_case ("cancel_route"), and what each does.
 @property(class, nonatomic, readonly) NSArray<NSString *> * toolNames;
 @property(class, nonatomic, readonly) NSString * toolGuide;
+/// Each app action as "what it does", for the "what can you do?" sheet.
+@property(class, nonatomic, readonly) NSArray<NSString *> * commandDescriptions;
 /// Carries out the action the model picked. Main thread.
 + (void)runTool:(NSString *)name argument:(NSString *)argument spoken:(NSString *)spoken;
 /// Tells the navigator which voices there are, for "what voice options do you have?".

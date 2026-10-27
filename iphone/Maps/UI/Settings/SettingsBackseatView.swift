@@ -314,3 +314,54 @@ struct SettingsBackseatVoiceView: View {
     }
 }
 
+
+
+/// "What can you do?": the things the driver can say, while the GPS reads its tour of them
+struct BackseatCommandsView: View {
+    // MARK: Properties
+
+    /// Closes the sheet
+    let dismiss: () -> Void
+
+
+    /// The actual view
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    ForEach(MWMBackseatRewriter.commandDescriptions, id: \.self) { description in
+                        Text(verbatim: description)
+                    }
+                } footer: {
+                    Text(verbatim: "Just say it while you drive, or tap the mic first if hands-free listening is off.")
+                }
+            }
+            .navigationTitle(Text(verbatim: "Things you can say"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text(verbatim: "Done")
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+/// Shows the commands sheet over whatever is on screen
+@objc final class BackseatCommandsSheet: NSObject {
+    @objc static func present() {
+        guard let root = UIApplication.shared.connectedScenes
+            .compactMap({ ($0 as? UIWindowScene)?.keyWindow?.rootViewController }).first else { return }
+        var top = root
+        while let presented = top.presentedViewController { top = presented }
+        weak var host: UIViewController?
+        let sheet = UIHostingController(rootView: BackseatCommandsView { host?.dismiss(animated: true) })
+        host = sheet
+        top.present(sheet, animated: true)
+    }
+}
