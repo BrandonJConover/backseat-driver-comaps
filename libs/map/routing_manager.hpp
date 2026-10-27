@@ -244,6 +244,8 @@ public:
   /// What the driver said out loud (speech recognition), for the license plate game. GUI thread.
   void SetBackseatMusicCheck(std::function<bool()> check) { m_backseat.SetMusicCheck(std::move(check)); }
   BackseatAdapter::HeardCommand BackseatDriverSaid(std::string const & text) { return m_backseat.OnDriverSaid(text); }
+  /// Call after the Settings screen writes one of BackseatAdapter's personality keys.
+  void ReloadBackseatPersonality() { m_backseat.ReloadPersonality(); }
   /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.
   BackseatAdapter const & GetBackseat() const { return m_backseat; }
 

@@ -16,6 +16,7 @@
 #include "indexer/scales.hpp"
 
 #include "platform/platform.hpp"
+#include "platform/settings.hpp"
 
 #include "storage/country_info_getter.hpp"
 
@@ -216,6 +217,15 @@ void SavePlates(backseat::PlateLog const & log)
   std::ofstream(GetPlatform().SettingsPathForFile(kPlatesFile)) << log.Serialize();
 }
 
+backseat::Pronouns PronounsFrom(std::string const & s)
+{
+  if (s == "he")
+    return backseat::Pronouns::He;
+  if (s == "she")
+    return backseat::Pronouns::She;
+  return backseat::Pronouns::They;
+}
+
 /// "Colorado" for the map region "US_Colorado_Denver", "British Columbia" for
 /// "Canada_British Columbia_Vancouver", "Mexico" for any part of Mexico.
 std::optional<std::string> PlateRegionOfMap(std::string const & countryId)
@@ -233,6 +243,24 @@ std::optional<std::string> PlateRegionOfMap(std::string const & countryId)
 }
 }  // namespace
 
+char const * const BackseatAdapter::kPartnerKey = "BackseatPartner";
+char const * const BackseatAdapter::kPartnerPronounsKey = "BackseatPartnerPronouns";
+char const * const BackseatAdapter::kDriverPronounsKey = "BackseatDriverPronouns";
+char const * const BackseatAdapter::kAutopilotKey = "BackseatCarHasAutopilot";
+
+void BackseatAdapter::ReloadPersonality()
+{
+  std::string partner, partnerPronouns, driverPronouns;
+  bool autopilot = false;
+  settings::TryGet(kPartnerKey, partner);
+  settings::TryGet(kPartnerPronounsKey, partnerPronouns);
+  settings::TryGet(kDriverPronounsKey, driverPronouns);
+  settings::TryGet(kAutopilotKey, autopilot);
+  m_navigator.SetPartner(partner, PronounsFrom(partnerPronouns));
+  m_navigator.SetDriverPronouns(PronounsFrom(driverPronouns));
+  m_navigator.SetCarHasAutopilot(autopilot);
+}
+
 BackseatAdapter::BackseatAdapter()
   : m_navigator({}, LoadTrips(), [](backseat::TripRecord const & r, backseat::TripReport const & report)
 {
@@ -242,6 +270,7 @@ BackseatAdapter::BackseatAdapter()
 {
   m_navigator.SetPlateLog(LoadPlates(), &SavePlates);
   m_navigator.SetSaidLog(LoadSaid(), &SaveSaid);
+  ReloadPersonality();
 }
 
 void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::RoutingSession const & session,

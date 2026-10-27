@@ -76,6 +76,15 @@ public:
   /// The platform's on-device language model, for rewording roasts in real time.
   void SetRewriter(std::shared_ptr<backseat::LineRewriter> rewriter) { m_navigator.SetRewriter(std::move(rewriter)); }
 
+  /// Settings keys for who's in the car, written by the platform's Settings screen. Pronouns are
+  /// "they", "he" or "she"; the partner is a word like "wife" or a name, empty for nobody.
+  static char const * const kPartnerKey;
+  static char const * const kPartnerPronounsKey;
+  static char const * const kDriverPronounsKey;
+  static char const * const kAutopilotKey;
+  /// Rereads those settings; call after the platform changes them.
+  void ReloadPersonality();
+
   /// How to voice one line of the last TakeNotifications() batch.
   struct LineVoice
   {
