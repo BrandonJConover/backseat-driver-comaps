@@ -27,7 +27,7 @@ P	39000	518.5
 T	40000	5.736	22	39.71018	-104.999979	8.24
 P	40000	511.4
 T	41000	0	22	39.71018	-104.999979	6.22
->	hardBraking	roast	8	1.03	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	8	1.03	Somewhere, a set of brake pads just filed for divorce.
 P	41000	509.6
 T	42000	0.195	22	39.710181	-104.999978	8.58
 P	42000	506.9
@@ -96,7 +96,7 @@ T	97000	5.446	22	39.710375	-104.99996	5.23
 P	97000	402.8
 O	97000	Sparkle Car Wash	electronics
 T	98000	0	22	39.710375	-104.99996	4.46
->	hardBraking	roast	30	1.12	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	30	1.12	That stop was a little... dramatic.
 P	98000	399.1
 T	99000	0	22	39.710375	-104.99996	5.47
 P	99000	396.2
@@ -153,9 +153,9 @@ T	123000	0	22	39.710771	-104.999923	-
 T	124000	4.022	22	39.710807	-104.999926	356.18
 >	hardAccel	roast	48	1.19	Zero to reckless in four seconds. Impressive, in the worst way.
 T	125000	0	22	39.710807	-104.999926	354.75
->	hardBraking	roast	56	1.22	You saw that coming for a quarter mile. I know because I saw it too.
+>	hardBraking	roast	56	1.22	Another brake check. The guy behind us has started praying.
 M	125000
->	missedTurn	roast	74	1.29	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	74	1.29	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	155000	0.646	22	39.710813	-104.999927	355.12
 T	156000	0	22	39.710813	-104.999927	358.03
 T	157000	1.018	22	39.710822	-104.999927	-
@@ -163,12 +163,12 @@ T	187000	0	22	39.710822	-104.999927	1.19
 T	188000	0	22	39.710822	-104.999927	358.99
 T	189000	0	22	39.710822	-104.999927	359.35
 M	189000
->	missedTurn	roast	85	1.34	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	85	1.34	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	190000	0.442	22	39.710826	-104.999927	1.98
 T	191000	0	22	39.710826	-104.999927	2.11
 T	192000	0	22	39.710826	-104.999927	0.08
 T	193000	3.32	22	39.710856	-104.999926	1.65
->	hardAccel	roast	91	1.36	I felt that in my satellites.
+>	hardAccel	roast	91	1.36	I just felt that in a satellite. In SPACE.
 T	194000	0	22	39.710856	-104.999926	2.97
 T	195000	0	22	39.710856	-104.999926	3.77
 T	196000	1.063	22	39.710866	-104.999925	-
@@ -197,16 +197,16 @@ A	213000	1
 T	214000	15.252	15.6	39.713519	-104.999794	0.15
 T	215000	14.934	15.6	39.713653	-104.999791	-
 M	215000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	216000	19.638	15.6	39.713829	-104.999789	-
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	217000	20.738	15.6	39.714015	-104.999788	0.08
 T	218000	19.847	15.6	39.714194	-104.999782	1.48
 T	219000	20.768	15.6	39.71438	-104.999789	358.56
 T	220000	12.922	15.6	39.714496	-104.9998	355.72
 T	221000	17.148	15.6	39.71465	-104.999805	358.55
 T	222000	16.262	15.6	39.714796	-104.999819	-
->	speeding	roast	100	1.4	IT IS 35. I will say it until one of us dies, and I'm software.
+>	speeding	roast	100	1.4	1 over! I'd call the cops, but then I'd have to explain how I know you.
 T	223000	16.798	15.6	39.714945	-104.999842	-
 T	224000	16.405	15.6	39.715092	-104.999858	355.16
 T	225000	15.91	15.6	39.715234	-104.999877	354.34
@@ -271,7 +271,7 @@ P	287000	0
 I	287000	Head north on Pine Road	217.3	-	-
 >	instruction	nav	99	1.39	Final warning. In 700 feet, head north on Pine Road. DO NOT MISS IT.
 T	288000	12.132	29.1	39.715397	-104.998541	-
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	288000	201.8
 T	318000	17.761	29.1	39.715402	-104.998332	88.11
 >	traffic	roast	100	1.4	WE COULD BE ON THE OTHER ROUTE. WE COULD BE FREE.
@@ -347,7 +347,7 @@ P	346000	412.7
 T	347000	2.029	29.1	39.714843	-104.998175	86.96
 P	347000	410.2
 T	348000	5.833	29.1	39.714843	-104.998106	89.54
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	348000	403.6
 F	348000	0	-
 T	349000	6.093	29.1	39.714846	-104.998034	87.13
@@ -480,7 +480,7 @@ P	524000	174.9
 T	525000	1.519	29.1	39.714921	-104.998141	279.12
 P	525000	170.8
 T	526000	6.641	29.1	39.714928	-104.998219	276.71
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	526000	159.9
 T	527000	6.184	29.1	39.714932	-104.998292	274.17
 P	527000	152.2
@@ -574,7 +574,7 @@ P	564000	293.4
 T	565000	2.113	29.1	39.714901	-104.999249	249.95
 P	565000	289.6
 M	565000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	566000	1.78	29.1	39.714895	-104.999269	247.1
 P	566000	286.5
 T	567000	1.312	29.1	39.71489	-104.999283	244.81
@@ -596,7 +596,7 @@ P	574000	262.5
 T	575000	0.651	29.1	39.714867	-104.999349	243.07
 P	575000	260.2
 T	576000	5.032	29.1	39.714846	-104.999401	242.06
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	576000	250.3
 T	576000	8.799	29.1	39.71481	-104.999493	242.95
 P	576000	239.7
@@ -614,7 +614,7 @@ P	581000	206.7
 T	582000	7.389	29.1	39.714876	-104.99972	329.87
 P	582000	198
 T	612000	7.37	29.1	39.714934	-104.999762	331.35
->	tooSlow	roast	100	1.4	Somewhere, a snail is gaining on us. MOVE.
+>	tooSlow	roast	100	1.4	A snail just merged in front of us. It signaled. You've never signaled.
 P	612000	186.2
 T	613000	7.4	29.1	39.714991	-104.999807	329.17
 P	613000	174.1
@@ -670,7 +670,7 @@ T	636000	17.949	13.4	39.714875	-105.001189	149.12
 T	637000	18.339	13.4	39.714791	-105.001374	239.12
 T	638000	18.9	13.4	39.714708	-105.001569	-
 T	639000	19.067	13.4	39.714626	-105.001766	241.49
->	speeding	roast	100	1.4	SLOW. DOWN. I am begging you as a navigation product.
+>	speeding	roast	100	1.4	43! MY WHOLE LIFE IS FLASHING BEFORE MY EYES! IT'S MOSTLY YOU MISSING TURNS!
 T	640000	19.858	13.4	39.714547	-105.001975	-
 T	641000	19.556	13.4	39.714473	-105.002184	245.04
 T	671000	13.367	13.4	39.714418	-105.002323	242.47
@@ -739,7 +739,7 @@ T	708000	0	15.6	39.713964	-105.003631	239.24
 P	708000	7.2
 A	708000	1
 T	709000	5.114	15.6	39.713939	-105.003681	236.52
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	709000	1.4
 T	710000	4.804	15.6	39.713915	-105.003728	-
 P	710000	0
@@ -875,10 +875,10 @@ P	30000	239.5
 T	31000	1.521	22	39.72005	-104.999761	86.97
 P	31000	236.3
 T	32000	5.797	22	39.720052	-104.999692	87.96
->	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to be seen with you.
 P	32000	229.3
 T	62000	6.796	22	39.720052	-104.999612	90.37
->	tooSlow	roast	7	1.03	The limit is 49. That's a ceiling, but you're allowed to get close to it.
+>	tooSlow	roast	7	1.03	34 under. Are we sightseeing, or is the car on a leash?
 P	62000	221.7
 T	63000	6.086	22	39.720053	-104.999541	89.37
 P	63000	210.9
@@ -890,7 +890,7 @@ O	65000	Best Buy	electronics
 T	66000	6.118	22	39.72006	-104.999341	88.83
 P	66000	188.5
 T	67000	0	22	39.72006	-104.999341	87.99
->	hardBraking	roast	15	1.06	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	15	1.06	Somewhere, a set of brake pads just filed for divorce.
 P	67000	187.3
 T	68000	3.773	22	39.720061	-104.999296	88.46
 >	hardAccel	roast	20	1.08	Easy. It's a green light, not a starting gun.
@@ -916,7 +916,7 @@ P	77000	143.7
 T	78000	2.508	22	39.720058	-104.999077	94.41
 P	78000	140.7
 T	79000	8.215	22	39.720056	-104.998981	-
->	hardAccel	roast	25	1.1	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	25	1.1	Nobody is racing you. Nobody wants to be seen with you.
 P	79000	131.6
 T	80000	8.217	22	39.720052	-104.998884	92.77
 P	80000	118.8
@@ -966,7 +966,7 @@ T	103000	0	22	39.720063	-104.997708	-
 T	104000	5.871	22	39.720065	-104.997639	88.42
 >	hardAccel	roast	47	1.19	Zero to reckless in four seconds. Impressive, in the worst way.
 M	104000
->	missedTurn	roast	65	1.26	I told you 850 feet in advance. 850 feet! That's practically a reservation.
+>	missedTurn	roast	65	1.26	There goes the turn. Wave goodbye. It's the closest you'll get to it.
 T	105000	5.783	22	39.720067	-104.997571	87.31
 T	106000	5.649	22	39.720067	-104.997505	90.13
 T	107000	5.007	22	39.720066	-104.997446	91.34
@@ -1008,7 +1008,7 @@ P	154000	240.5
 T	155000	0.203	22.4	39.719912	-104.997399	181.47
 P	155000	237.9
 M	155000
->	missedTurn	roast	97	1.39	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	97	1.39	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	155000	0.152	22.4	39.719911	-104.997399	183.79
 P	155000	236.2
 T	156000	0	22.4	39.719911	-104.997399	184.54
@@ -1102,7 +1102,7 @@ P	226000	74.8
 T	227000	0.79	11.2	39.719752	-104.997336	-
 P	227000	69.5
 T	228000	4.282	11.2	39.719755	-104.997285	85.45
->	hardAccel	roast	96	1.38	I felt that in my satellites.
+>	hardAccel	roast	96	1.38	I just felt that in a satellite. In SPACE.
 P	228000	62.9
 T	229000	3.911	11.2	39.719757	-104.997239	87.59
 P	229000	56
@@ -1288,7 +1288,7 @@ P	306000	393.7
 T	307000	1.977	11.2	39.719365	-104.996914	160.88
 P	307000	390.4
 T	308000	6.955	11.2	39.719305	-104.99689	162.84
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	308000	383
 T	309000	6.522	11.2	39.71925	-104.996864	160.42
 P	309000	371.7
@@ -1404,7 +1404,7 @@ P	357000	8.8
 T	358000	13.464	29.1	39.716917	-104.996253	171.12
 P	358000	0
 T	359000	17.588	29.1	39.71676	-104.996232	173.96
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	360000	17.182	29.1	39.716777	-104.99603	83.96
 T	361000	17.492	29.1	39.716791	-104.995826	84.76
 T	362000	17.692	29.1	39.716798	-104.995618	87.38
@@ -1485,7 +1485,7 @@ P	455000	291.5
 I	455000	Head north on Pine Road	31.1	other	none
 >	instruction	nav	97	1.39	PLEASE. I am begging. In 100 feet, head north on Pine Road. I'm watching you.
 T	456000	6.122	-	39.717225	-104.995363	8.64
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	456000	21.1
 T	457000	1.572	-	39.717239	-104.995361	7
 >	hardBraking	roast	100	1.4	WHY DO YOU BRAKE LIKE THE ROAD OWES YOU MONEY?
@@ -1557,7 +1557,7 @@ P	493000	271.9
 T	494000	1.389	11.2	39.717143	-104.995187	185.2
 P	494000	268.5
 T	495000	5.992	11.2	39.71709	-104.995196	187.43
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	495000	260.4
 T	525000	9.761	11.2	39.717003	-104.995209	186.59
 P	525000	246.1
@@ -1593,7 +1593,7 @@ P	537000	175.5
 T	538000	0.122	11.2	39.716871	-104.995222	183.49
 P	538000	174
 T	539000	3.39	11.2	39.716841	-104.995225	184.61
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	539000	165.7
 T	540000	3.149	11.2	39.716813	-104.99523	-
 P	540000	158.5
@@ -1688,7 +1688,7 @@ P	577000	370.3
 T	578000	3.663	26.8	39.716093	-104.994073	191.46
 P	578000	362.8
 T	579000	7.094	26.8	39.716031	-104.994089	190.81
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	579000	353.7
 T	580000	7.607	26.8	39.715963	-104.994103	-
 P	580000	342.3
@@ -1785,7 +1785,7 @@ P	655000	121.8
 T	656000	0.013	-	39.713478	-104.994825	11
 P	656000	118.3
 T	657000	4.959	-	39.713522	-104.994817	8.17
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	657000	111.7
 T	658000	5.104	-	39.713568	-104.99481	6.71
 P	658000	105.9
@@ -1809,7 +1809,7 @@ T	13000	0.044	22	39.73014	-105.000044	262.04
 T	14000	0	22	39.73014	-105.000044	264.33
 T	15000	0	22	39.73014	-105.000044	263.87
 T	16000	4.683	22	39.730138	-105.000099	266.09
->	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to be seen with you.
 T	17000	4.187	22	39.7301	-105.000096	-
 T	18000	4.45	22	39.73006	-105.000094	177.99
 T	19000	4.424	22	39.73002	-105.00009	175.35
@@ -1838,7 +1838,7 @@ T	39000	6.927	22	39.729867	-105.000773	-
 T	40000	6.613	22	39.729856	-105.00085	259.94
 T	41000	6.955	22	39.729795	-105.000835	169.94
 T	42000	12.259	22	39.729686	-105.000815	171.89
->	hardAccel	roast	23	1.09	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	23	1.09	Nobody is racing you. Nobody wants to be seen with you.
 T	43000	17.118	22	39.729533	-105.000789	172.71
 T	44000	16.295	22	39.729388	-105.00076	171.26
 H	44000	stalledCar	969	h0
@@ -1852,7 +1852,7 @@ T	47000	20.143	22	39.729045	-105.001313	266.01
 T	48000	20.616	22	39.729038	-105.001555	267.9
 T	49000	21.492	22	39.729021	-105.001807	264.94
 T	50000	22.5	22	39.728998	-105.00207	263.41
->	speeding	roast	29	1.11	50. Interesting. The sign says 49. I'll wait.
+>	speeding	roast	29	1.11	50. The sign says 49. I'm not mad. I'm just writing it down.
 T	51000	22.387	22	39.728978	-105.002332	264.2
 T	52000	0	22	39.728978	-105.002332	354.2
 >	hardBraking	roast	36	1.15	You saw that coming for a quarter mile. I know because I saw it too.
@@ -1993,7 +1993,7 @@ T	160000	6.691	13.4	39.729698	-105.001728	-
 T	161000	6.26	13.4	39.729708	-105.001655	79.46
 S	161000	1
 T	162000	10.924	13.4	39.729729	-105.00153	77.36
->	hardAccel	roast	92	1.37	I felt that in my satellites.
+>	hardAccel	roast	92	1.37	I just felt that in a satellite. In SPACE.
 X	162000	coffee	Sparkle Car Wash
 >	unplannedStop	roast	100	1.4	A shot of espresso won't fix your sense of direction! I SAID NOTHING ABOUT STOPPING.
 T	163000	11.382	13.4	39.729757	-105.001401	74.38
@@ -2067,7 +2067,7 @@ P	280000	505.2
 T	281000	0	13.4	39.729851	-105.000891	165.81
 P	281000	501.3
 T	282000	3.46	13.4	39.72982	-105.000881	165.84
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	282000	493.7
 T	283000	4.335	13.4	39.729783	-105.000867	164.26
 P	283000	486.8
@@ -2267,7 +2267,7 @@ P	517000	212.5
 T	518000	8.817	11.2	39.729541	-105.003691	-
 P	518000	199.3
 T	519000	13.176	11.2	39.729659	-105.003688	-
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	519000	183.5
 T	520000	12.688	11.2	39.729773	-105.003692	-
 P	520000	169.4
@@ -2276,7 +2276,7 @@ P	521000	151.7
 T	522000	13.009	11.2	39.730011	-105.003682	2.8
 P	522000	136.3
 T	552000	12.755	11.2	39.730125	-105.003676	2.24
->	speeding	roast	100	1.4	I didn't sign up for a getaway car. I signed up for turn-by-turn directions.
+>	speeding	roast	100	1.4	I didn't sign up to be a getaway car. I signed up to say 'turn left' and be ignored.
 P	552000	122.4
 T	553000	13.069	11.2	39.730242	-105.003671	1.72
 P	553000	109.1
@@ -2318,7 +2318,7 @@ T	626000	2.841	15.6	39.731353	-105.003637	-
 >	hardBraking	roast	100	1.4	WHY DO YOU BRAKE LIKE THE ROAD OWES YOU MONEY?
 P	626000	248.9
 T	627000	6.554	15.6	39.731411	-105.003629	6.16
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	627000	237.6
 T	657000	5.85	15.6	39.731463	-105.003619	7.99
 >	traffic	roast	100	1.4	I'm adding 'ignored Colfax Avenue' to your permanent record. Yes, you have one. I made it.
@@ -2547,13 +2547,13 @@ P	813000	513.2
 T	814000	0	11.2	39.729604	-105.003732	179.49
 P	814000	508.9
 T	815000	4.148	11.2	39.729567	-105.003733	180.87
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	815000	502.8
 W	815000	right	right
 T	816000	7.518	11.2	39.7295	-105.003738	183.5
 P	816000	491.8
 M	816000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	817000	8.19	11.2	39.729426	-105.003741	181.55
 P	817000	479.6
 T	818000	9.001	11.2	39.729345	-105.003742	180.35
@@ -2601,7 +2601,7 @@ P	835000	374.7
 T	836000	4.285	11.2	39.728848	-105.003703	170.73
 P	836000	368.9
 T	837000	10.179	11.2	39.728758	-105.003689	-
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	837000	355.3
 T	838000	9.308	11.2	39.728675	-105.003676	173.15
 P	838000	344.5
@@ -2653,7 +2653,7 @@ P	916000	208
 I	916000	Turn right onto Oak Avenue	149	-	-
 >	instruction	nav	100	1.4	I'M ONLY SAYING THIS ONCE. In 500 feet, turn right onto Oak Avenue. DO NOT MISS IT.
 T	917000	6.831	11.2	39.728647	-105.002914	81.62
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	917000	139.6
 T	918000	6.535	11.2	39.728705	-105.002925	351.62
 >	wrongTurn	roast	100	1.4	I said RIGHT and you turned LEFT. I am filing a complaint with the Department of Directions.
@@ -2741,7 +2741,7 @@ T	983000	0	11.2	39.728973	-105.002748	83.33
 T	984000	0	11.2	39.728973	-105.002748	82.34
 T	985000	0.213	11.2	39.728973	-105.002745	85.02
 T	986000	5.197	11.2	39.728975	-105.002684	87.41
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	987000	5.209	11.2	39.72898	-105.002623	84.64
 T	988000	5.819	11.2	39.728985	-105.002555	84.21
 C	988000	1
@@ -2749,7 +2749,7 @@ C	988000	1
 T	1018000	5.433	11.2	39.729033	-105.002561	354.21
 T	1019000	4.779	11.2	39.729076	-105.002566	355.59
 M	1019000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	1020000	5.119	11.2	39.729122	-105.002568	357.49
 T	1021000	4.471	11.2	39.729162	-105.002572	355.71
 T	1022000	4.709	11.2	39.729204	-105.002575	357.6
@@ -2785,7 +2785,7 @@ T	10000	0	22	39.740328	-104.999997	1.32
 >	hardBraking	roast	14	1.05	Whoa. Did the brake pedal insult your family?
 P	10000	293.6
 R	10000
->	rerouted	roast	20	1.08	Recalculating. Again. Because of you.
+>	rerouted	roast	20	1.08	New route. Let's call this one 'Plan B for Bad Driver'.
 T	11000	0.204	22	39.740329	-104.999997	0.35
 P	11000	290.8
 T	12000	0	22	39.740329	-104.999997	358.34
@@ -2793,7 +2793,7 @@ P	12000	290.3
 T	13000	1.089	22	39.740339	-104.999998	-
 P	13000	288.9
 T	14000	6.778	22	39.7404	-105.000005	354.83
->	hardAccel	roast	25	1.1	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	25	1.1	Nobody is racing you. Nobody wants to be seen with you.
 P	14000	278.7
 T	15000	6.027	22	39.740454	-105.000011	355.54
 P	15000	271.6
@@ -2821,7 +2821,7 @@ P	24000	124.4
 T	25000	12.766	22	39.741669	-104.999991	4.7
 P	25000	109.8
 T	26000	0	22	39.741669	-104.999991	-
->	hardBraking	roast	32	1.13	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	32	1.13	Somewhere, a set of brake pads just filed for divorce.
 P	26000	104.9
 T	27000	0	22	39.741669	-104.999991	4.95
 P	27000	102.5
@@ -2908,7 +2908,7 @@ P	62000	406.2
 T	63000	3.516	22	39.742022	-104.999863	-
 P	63000	400.6
 T	64000	0	22	39.742022	-104.999863	19.07
->	hardBraking	roast	42	1.17	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	42	1.17	You saw that coming a quarter mile ago. I know, because I pointed at it.
 P	64000	397.5
 T	65000	0	22	39.742022	-104.999863	18.83
 P	65000	392.7
@@ -3056,7 +3056,7 @@ T	156000	3.699	22	39.743018	-105.001124	279.77
 >	hardBraking	roast	87	1.35	BRAKE CHECK! The car behind us is writing your name down. So am I.
 P	156000	447.2
 T	186000	4.664	22	39.743026	-105.001178	280.66
->	tooSlow	roast	88	1.35	Somewhere, a snail is gaining on us. MOVE.
+>	tooSlow	roast	88	1.35	WE ARE GOING 17. I could get there faster as an email attachment.
 P	186000	439.1
 T	187000	3.844	22	39.743031	-105.001223	278.8
 P	187000	431.5
@@ -3064,7 +3064,7 @@ T	188000	0	22	39.743031	-105.001223	279.42
 >	hardBraking	roast	96	1.38	Every time you do that, a little piece of my GPS chip dies. I'm running out of pieces.
 P	188000	426.8
 T	189000	4.734	22	39.743036	-105.001278	276.79
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	189000	421.9
 T	190000	5.104	22	39.743042	-105.001338	276.95
 P	190000	416.1
@@ -3167,7 +3167,7 @@ P	230000	350.8
 T	231000	0	15.6	39.743394	-105.001352	9.46
 P	231000	349.8
 T	232000	5.466	15.6	39.743442	-105.001341	9.72
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	232000	341.2
 T	233000	6.441	15.6	39.7435	-105.001331	7.99
 P	233000	332.4
@@ -3255,7 +3255,7 @@ P	268000	463.3
 T	269000	0.974	-	39.743587	-105.002438	0.76
 P	269000	457.6
 T	270000	5.141	-	39.743634	-105.002437	0.45
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	270000	447.8
 T	271000	4.272	-	39.743672	-105.002436	1.72
 P	271000	441.8
@@ -3296,7 +3296,7 @@ P	285000	226.8
 T	286000	0	-	39.744062	-105.002991	276.4
 P	286000	222.2
 T	287000	4.882	-	39.744068	-105.003048	277.93
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	287000	215.8
 T	288000	8.026	-	39.744076	-105.003142	276.82
 P	288000	205.9
@@ -3357,7 +3357,7 @@ P	341000	25.5
 T	342000	1.38	13.4	39.744715	-105.003299	356.8
 P	342000	24
 T	343000	4.457	13.4	39.744755	-105.003304	354.58
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	343000	16.7
 T	344000	4.552	13.4	39.744796	-105.00331	353.86
 P	344000	11
@@ -3427,7 +3427,7 @@ T	41000	8.633	22	39.750078	-104.999565	97.42
 I	41000	Turn left onto Elm Street	46.2	-	-
 >	instruction	nav	12	1.05	In 150 feet, turn left onto Elm Street. Shouldn't be hard.
 T	71000	13.179	22	39.750063	-104.999411	97.42
->	tooSlow	roast	13	1.05	The limit is 49. That's a ceiling, but you're allowed to get close to it.
+>	tooSlow	roast	13	1.05	20 under. Are we sightseeing, or is the car on a leash?
 P	71000	31.3
 T	72000	13.726	22	39.750048	-104.999251	-
 P	72000	14.5
@@ -3442,7 +3442,7 @@ T	76000	14.828	22	39.749999	-104.998597	97.88
 T	77000	14.071	22	39.749975	-104.998434	100.62
 S	77000	1
 T	78000	0	22	39.749975	-104.998434	99.14
->	hardBraking	roast	21	1.08	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	21	1.08	Somewhere, a set of brake pads just filed for divorce.
 T	79000	0	22	39.749975	-104.998434	98.2
 T	80000	0	22	39.749975	-104.998434	100.62
 T	81000	0	22	39.749975	-104.998434	99.82
@@ -3464,7 +3464,7 @@ T	96000	3.733	22	39.749925	-104.998169	-
 T	97000	4.349	22	39.749917	-104.998119	101.81
 T	98000	5.054	-	39.749908	-104.998061	100.98
 T	99000	9.746	-	39.749888	-104.997949	103.26
->	hardAccel	roast	24	1.1	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	24	1.1	Nobody is racing you. Nobody wants to be seen with you.
 T	100000	9.983	-	39.749869	-104.997835	-
 T	101000	15.401	-	39.749839	-104.997658	102.31
 F	101000	0	Colfax Avenue
@@ -3480,7 +3480,7 @@ T	137000	19.406	-	39.749423	-104.996249	116.71
 T	138000	19.454	-	39.749338	-104.996049	119.29
 T	139000	18.838	-	39.74925	-104.99586	-
 T	140000	13.891	-	39.749188	-104.995718	119.43
->	hardBraking	roast	28	1.11	That stop was a little... dramatic.
+>	hardBraking	roast	28	1.11	Brake check! Who are we brake checking? Oh, everyone. Got it.
 T	141000	14.151	-	39.749132	-104.995569	116.5
 T	142000	15.091	-	39.749073	-104.995408	115.63
 T	143000	19.559	-	39.74899	-104.995205	118.03
@@ -3513,7 +3513,7 @@ T	164000	34.855	-	39.752895	-104.991244	21.55
 P	164000	3.1
 >	instruction	nav	46	1.18	Turn right. This one. THIS one.
 T	165000	0	-	39.752895	-104.991244	21.97
->	hardBraking	roast	54	1.22	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	54	1.22	You saw that coming a quarter mile ago. I know, because I pointed at it.
 P	165000	0
 T	166000	0	-	39.752895	-104.991244	24.48
 I	166000	Turn left	598.1	left	none
@@ -3633,7 +3633,7 @@ B	243000	0.68	0
 T	244000	0	-	39.753442	-104.989209	213.41
 P	244000	180.7
 T	245000	5.888	-	39.753397	-104.989245	212.02
->	hardAccel	roast	80	1.32	I felt that in my satellites.
+>	hardAccel	roast	80	1.32	I just felt that in a satellite. In SPACE.
 P	245000	171.7
 T	246000	6.672	-	39.753345	-104.989284	209.74
 P	246000	162.3
@@ -3716,7 +3716,7 @@ T	315000	0	22.4	39.753268	-104.989924	33.33
 T	316000	0	22.4	39.753268	-104.989924	33.7
 T	317000	0	22.4	39.753268	-104.989924	30.81
 T	318000	4.278	22.4	39.753301	-104.989898	31.23
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	319000	4.809	22.4	39.753338	-104.989869	31.02
 T	320000	4.726	22.4	39.753374	-104.989839	32.62
 T	321000	4.436	22.4	39.753352	-104.989795	122.62
@@ -3738,7 +3738,7 @@ T	335000	10.323	22.4	39.752378	-104.990487	214.47
 T	336000	11.135	22.4	39.752294	-104.990558	212.97
 T	337000	11.912	22.4	39.752201	-104.990629	210.47
 T	338000	11.841	22.4	39.752111	-104.990703	212.14
->	tooSlow	roast	100	1.4	Somewhere, a snail is gaining on us. MOVE.
+>	tooSlow	roast	100	1.4	A snail just merged in front of us. It signaled. You've never signaled.
 T	339000	12.81	22.4	39.752017	-104.99079	215.13
 T	340000	12.612	22.4	39.751925	-104.990876	215.33
 T	341000	13.396	22.4	39.751827	-104.990968	215.8
@@ -3764,7 +3764,7 @@ T	387000	14.524	11.2	39.750284	-104.992662	224.13
 I	387000	Turn left onto Elm Street	290.7	left	-
 >	instruction	nav	100	1.4	Final warning. In 950 feet, turn left onto Elm Street. If you miss this I'm switching to Apple Maps. Out of spite.
 T	388000	15.091	11.2	39.750184	-104.992781	222.11
->	speeding	roast	100	1.4	I didn't sign up for a getaway car. I signed up for turn-by-turn directions.
+>	speeding	roast	100	1.4	I didn't sign up to be a getaway car. I signed up to say 'turn left' and be ignored.
 P	388000	274
 T	389000	14.313	11.2	39.750086	-104.99289	220.29
 P	389000	258.5
@@ -3777,7 +3777,7 @@ P	420000	212.2
 R	420000
 >	rerouted	roast	100	1.4	RECALCULATING. I'm out of routes. I'm making them up now. Enjoy the lake.
 T	421000	9.937	11.2	39.749762	-104.993216	216.46
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	421000	200.2
 T	421000	10.128	11.2	39.749689	-104.993286	216.2
 P	421000	188.6
@@ -3884,7 +3884,7 @@ T	467000	1.552	11.2	39.749247	-104.993183	116.26
 T	468000	0	11.2	39.749247	-104.993183	117.44
 T	469000	0.618	11.2	39.749245	-104.993177	119.3
 T	470000	4.096	11.2	39.749225	-104.993135	121.62
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	471000	4.323	11.2	39.749204	-104.993093	123.52
 T	472000	3.816	11.2	39.749184	-104.993057	126.24
 T	473000	9.337	11.2	39.749116	-104.993122	216.24
@@ -3921,7 +3921,7 @@ E	6	mph
 T	1000	0	22	39.76	-105	2.05
 T	2000	0.041	22	39.76	-105	2.41
 T	3000	4.214	22	39.760038	-104.999996	-
->	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to be seen with you.
 T	4000	3.681	22	39.760071	-104.999994	2.82
 T	4000	4.408	22	39.760111	-104.999991	2.83
 T	5000	4.067	22	39.760147	-104.999988	3.75
@@ -3964,7 +3964,7 @@ P	21000	545.2
 H	21000	construction	1380	-
 >	hazard	roast	14	1.06	Construction in 0.9 miles. Finally, a road crew going slower than you.
 T	22000	0	22	39.760182	-104.999796	174.82
->	hardBraking	roast	22	1.09	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	22	1.09	Somewhere, a set of brake pads just filed for divorce.
 P	22000	543.6
 T	23000	0	22	39.760182	-104.999796	176.22
 P	23000	542.5
@@ -4019,7 +4019,7 @@ P	47000	473.6
 T	48000	0.1	22	39.76005	-104.99977	-
 P	48000	472
 T	49000	4.186	22	39.760015	-104.999752	159.45
->	hardAccel	roast	25	1.1	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	25	1.1	Nobody is racing you. Nobody wants to be seen with you.
 P	49000	465.1
 T	50000	4.514	22	39.759977	-104.999734	159.74
 P	50000	460.3
@@ -4033,7 +4033,7 @@ X	52000	other	Grandma's
 T	53000	8.394	22	39.759808	-104.999666	-
 P	53000	432
 T	54000	4.103	11.2	39.759773	-104.999653	163.94
->	hardBraking	roast	43	1.17	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	43	1.17	You saw that coming a quarter mile ago. I know, because I pointed at it.
 P	54000	425.8
 T	55000	3.731	11.2	39.75974	-104.999642	-
 P	55000	420.6
@@ -4054,7 +4054,7 @@ P	62000	373.1
 T	63000	5.039	11.2	39.759444	-104.999567	170.58
 P	63000	365.2
 T	64000	0	11.2	39.759444	-104.999567	173.41
->	hardBraking	roast	50	1.2	My entire database just slid forward. Thanks.
+>	hardBraking	roast	50	1.2	You saw that coming for a quarter mile. I know because I saw it too.
 P	64000	361.2
 T	65000	0	11.2	39.759444	-104.999567	172.54
 P	65000	356.4
@@ -4121,7 +4121,7 @@ P	91000	251.4
 T	92000	5.756	11.2	39.759042	-104.99949	-
 P	92000	242.2
 T	93000	0.82	11.2	39.759035	-104.999488	-
->	hardBraking	roast	67	1.27	You saw that coming for a quarter mile. I know because I saw it too.
+>	hardBraking	roast	67	1.27	Another brake check. The guy behind us has started praying.
 P	93000	239.5
 T	94000	0.4	11.2	39.759032	-104.999488	-
 P	94000	237.1
@@ -4196,7 +4196,7 @@ P	154000	305.2
 I	154000	Continue straight on Main Street	70.8	left	-
 >	instruction	nav	75	1.3	I'M ONLY SAYING THIS ONCE. In 250 feet, continue straight on Main Street. If you miss this I'm switching to Apple Maps. Out of spite.
 T	155000	7.734	-	39.758661	-104.999641	276.19
->	hardAccel	roast	81	1.32	I felt that in my satellites.
+>	hardAccel	roast	81	1.32	I just felt that in a satellite. In SPACE.
 P	155000	58.3
 T	156000	8.458	-	39.758672	-104.99974	278.04
 P	156000	46.8
@@ -4236,7 +4236,7 @@ T	172000	0.756	-	39.758732	-105.000089	284.12
 T	173000	0.326	-	39.758733	-105.000093	285.43
 T	174000	0	-	39.758733	-105.000093	284.63
 T	175000	4.989	-	39.758744	-105.00015	283.27
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	176000	4.743	-	39.758754	-105.000204	284.55
 T	177000	0	-	39.758754	-105.000204	285.53
 >	hardBraking	roast	100	1.4	WHY DO YOU BRAKE LIKE THE ROAD OWES YOU MONEY?
@@ -4275,7 +4275,7 @@ T	232000	0	-	39.758551	-105.000687	192.97
 X	232000	-	-
 >	unplannedStop	roast	100	1.4	THIS IS NOT IT. I SAID NOTHING ABOUT STOPPING.
 T	233000	5.971	-	39.758498	-105.000702	192.5
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	234000	5.581	-	39.758449	-105.000716	191.88
 T	235000	4.968	-	39.758406	-105.000727	-
 T	236000	0	-	39.758406	-105.000727	192.09
@@ -4415,7 +4415,7 @@ P	416000	139.3
 T	417000	1.509	15.6	39.75763	-105.000707	98.02
 P	417000	134.6
 T	418000	5.511	15.6	39.757622	-105.000643	99.95
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	418000	128
 T	419000	0	15.6	39.757622	-105.000643	100.59
 P	419000	126.1
@@ -4517,7 +4517,7 @@ P	493000	105.7
 T	494000	0.044	15.6	39.757732	-105.000263	3.79
 P	494000	104
 T	495000	3.835	15.6	39.75773	-105.000218	93.79
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	495000	97.3
 T	496000	0	15.6	39.75773	-105.000218	95.2
 >	hardBraking	roast	100	1.4	Every time you do that, a little piece of my GPS chip dies. I'm running out of pieces.
@@ -4592,7 +4592,7 @@ T	6000	7.473	22	39.770309	-104.999984	2.09
 T	7000	7.294	22	39.770375	-104.999981	-
 T	8000	7.002	22	39.770437	-104.999981	359.82
 T	9000	2.267	22	39.770458	-104.999982	359.03
->	hardBraking	roast	13	1.05	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	13	1.05	Somewhere, a set of brake pads just filed for divorce.
 T	10000	2.992	22	39.770485	-104.999983	357.38
 T	11000	3.97	22	39.77052	-104.999984	359.7
 T	12000	4.221	22	39.770558	-104.999984	359.75
@@ -4609,12 +4609,12 @@ T	20000	7.065	22	39.770927	-104.99997	1.79
 T	21000	6.236	22	39.770983	-104.999966	3.66
 T	22000	6.308	22	39.771039	-104.999963	1.79
 T	23000	7.157	22	39.771103	-104.999961	1.29
->	tooSlow	roast	16	1.06	33 under the limit. Are we sightseeing?
+>	tooSlow	roast	16	1.06	The limit is 49. That's a ceiling, but you're allowed to visit it.
 T	24000	8.059	22	39.771105	-105.000056	271.29
 T	25000	8.605	22	39.77111	-105.000157	273.93
 T	26000	8.845	22	39.771114	-105.000261	272.45
 C	26000	1
->	turnCompleted	roast	12	1.05	Correct turn. Don't let it go to your head.
+>	turnCompleted	roast	12	1.05	Huh. You actually listened. Mark the calendar.
 T	27000	9.929	22	39.771122	-105.000377	275.42
 T	28000	10.97	22	39.771137	-105.000505	278.38
 T	29000	10.324	22	39.771146	-105.000626	275.67
@@ -4725,7 +4725,7 @@ P	82000	39.6
 T	83000	0	29.1	39.772326	-105.000819	-
 P	83000	34.7
 M	83000
->	missedTurn	roast	50	1.2	I said turn. You heard 'keep going and ruin my day'.
+>	missedTurn	roast	50	1.2	I told you 350 feet in advance. 350 feet! That's practically a reservation.
 T	84000	0	29.1	39.772326	-105.000819	3.34
 P	84000	32.9
 T	85000	0.331	29.1	39.772329	-105.000819	-
@@ -4888,7 +4888,7 @@ P	258000	296.8
 T	259000	1.057	13.4	39.773189	-104.999504	-
 P	259000	292.3
 T	260000	5.687	13.4	39.773174	-104.999439	106.71
->	hardAccel	roast	76	1.3	I felt that in my satellites.
+>	hardAccel	roast	76	1.3	I just felt that in a satellite. In SPACE.
 P	260000	284.8
 T	261000	5.931	13.4	39.773157	-104.999373	108.82
 P	261000	275.6
@@ -4999,7 +4999,7 @@ T	336000	0	13.4	39.773144	-104.997837	77.04
 >	hardBraking	roast	93	1.37	BRAKE CHECK! The car behind us is writing your name down. So am I.
 P	336000	398.5
 T	337000	4.318	13.4	39.773153	-104.997788	76.04
->	hardAccel	roast	99	1.39	I felt that in my satellites.
+>	hardAccel	roast	99	1.39	I just felt that in a satellite. In SPACE.
 P	337000	389.8
 T	338000	4.626	13.4	39.773162	-104.997735	77.92
 P	338000	383.8
@@ -5060,7 +5060,7 @@ I	361000	Head north on Pine Road	148.9	other	-
 T	362000	0.959	29.1	39.773103	-104.997876	176.58
 P	362000	144.7
 T	363000	5.937	29.1	39.77305	-104.997871	175.67
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	363000	136.8
 T	364000	5.405	29.1	39.773002	-104.997865	174.55
 P	364000	131.3
@@ -5136,7 +5136,7 @@ T	397000	0	29.1	39.773664	-104.997763	353.83
 T	398000	0.09	29.1	39.773665	-104.997763	-
 T	399000	0	29.1	39.773665	-104.997763	354.35
 T	400000	5.369	29.1	39.773713	-104.997767	356.36
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	401000	0	29.1	39.773713	-104.997767	354.98
 >	hardBraking	roast	100	1.4	WHY DO YOU BRAKE LIKE THE ROAD OWES YOU MONEY?
 T	402000	0.103	29.1	39.773714	-104.997767	357.03
@@ -5214,7 +5214,7 @@ P	439000	54.4
 T	440000	0	29.1	39.773283	-104.997707	182.89
 P	440000	52.6
 T	441000	4.806	29.1	39.773239	-104.99771	183.37
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	441000	43.3
 T	442000	5.049	-	39.773194	-104.997716	185.54
 P	442000	35.3
@@ -5314,7 +5314,7 @@ P	486000	87.6
 T	487000	5.32	26.8	39.771845	-104.997111	102.32
 P	487000	81.4
 T	488000	9.092	26.8	39.771828	-104.997006	101.97
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	488000	69.5
 R	488000
 >	rerouted	roast	100	1.4	RECALCULATING. I'm out of routes. I'm making them up now. Enjoy the lake.
@@ -5369,7 +5369,7 @@ P	513000	321.8
 T	514000	0.741	26.8	39.770952	-104.991343	4.26
 P	514000	316.5
 T	515000	5.956	26.8	39.771005	-104.991341	1.9
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	515000	309.5
 Z	516000
 >	arrived	nav	100	1.4	Arrived. I'm going to go lie down in the glovebox. Your grade is F. Think about it.
@@ -5398,7 +5398,7 @@ T	18000	13.992	22	39.780882	-104.999921	5.61
 T	19000	14.702	22	39.781013	-104.999904	5.44
 T	20000	15.744	22	39.781154	-104.999892	3.85
 T	21000	14.915	22	39.781288	-104.999881	-
->	tooSlow	roast	9	1.04	25 under the limit. Are we sightseeing?
+>	tooSlow	roast	9	1.04	The limit is 79. That's a ceiling, but you're allowed to visit it.
 T	22000	15.637	22	39.781428	-104.999868	3.89
 T	52000	16.329	22	39.781574	-104.999846	6.65
 >	noDestination	roast	6	1.02	I see we're driving, but you didn't tell me where we're going. Typical.
@@ -5421,7 +5421,7 @@ T	65000	24.232	22	39.783139	-104.998397	89.95
 T	95000	14.755	22	39.783134	-104.998223	92.02
 T	96000	15.038	22	39.783133	-104.998046	90.45
 T	97000	7.141	22	39.783134	-104.997962	89.31
->	hardBraking	roast	9	1.04	That stop was a little... dramatic.
+>	hardBraking	roast	9	1.04	Brake check! Who are we brake checking? Oh, everyone. Got it.
 T	98000	6.849	22	39.783073	-104.997962	179.31
 T	99000	7.463	22	39.783006	-104.997957	177.16
 T	100000	1.151	22	39.782995	-104.997957	179.39
@@ -5479,7 +5479,7 @@ P	122000	464.8
 I	122000	Head north on Pine Road	198.1	left	-
 >	instruction	nav	7	1.03	Okay, listen carefully. In 200 meters, head north on Pine Road. Shouldn't be hard.
 T	123000	0	15.6	39.782964	-104.998387	265.6
->	hardBraking	roast	15	1.06	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	15	1.06	That stop was a little... dramatic.
 P	123000	198.1
 T	124000	0	15.6	39.782964	-104.998387	-
 P	124000	195.5
@@ -5494,12 +5494,12 @@ P	128000	183.1
 T	129000	0	-	39.782964	-104.998391	264.03
 P	129000	181
 T	130000	4.568	-	39.78296	-104.998445	265.45
->	hardAccel	roast	20	1.08	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	20	1.08	Nobody is racing you. Nobody wants to be seen with you.
 P	130000	174.1
 T	131000	4.967	-	39.782956	-104.998503	264.8
 P	131000	166
 M	131000
->	missedTurn	roast	38	1.15	I told you 200 meters in advance. 200 meters! That's practically a reservation.
+>	missedTurn	roast	38	1.15	There goes the turn. Wave goodbye. It's the closest you'll get to it.
 T	132000	4.743	-	39.782953	-104.998558	264.8
 P	132000	160
 T	133000	4.554	-	39.782949	-104.998612	265.59
@@ -5607,7 +5607,7 @@ P	250000	471.9
 T	251000	3.077	26.8	39.781906	-104.996642	184.5
 P	251000	468.1
 T	252000	6.452	26.8	39.781849	-104.99665	186.36
->	hardAccel	roast	74	1.3	I felt that in my satellites.
+>	hardAccel	roast	74	1.3	I just felt that in a satellite. In SPACE.
 P	252000	461.1
 T	253000	6.386	26.8	39.781791	-104.996655	183.53
 P	253000	452.5
@@ -5718,7 +5718,7 @@ P	355000	236.2
 T	356000	0	20.1	39.781723	-104.997455	200.19
 P	356000	232.5
 T	357000	4.639	20.1	39.781683	-104.997474	200.4
->	hardAccel	roast	90	1.36	I felt that in my satellites.
+>	hardAccel	roast	90	1.36	I just felt that in a satellite. In SPACE.
 P	357000	225.9
 T	358000	5.522	20.1	39.781637	-104.997497	200.24
 P	358000	218.8
@@ -5758,7 +5758,7 @@ P	373000	119
 T	374000	3.986	20.1	39.781098	-104.997769	197.04
 P	374000	112.2
 M	374000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	375000	3.244	20.1	39.78107	-104.99778	196.56
 P	375000	108.7
 T	376000	0	20.1	39.78107	-104.99778	196.7
@@ -5816,7 +5816,7 @@ P	397000	505.2
 T	398000	3.281	26.8	39.780842	-104.997702	107.77
 P	398000	497.5
 M	398000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	399000	3.684	26.8	39.780831	-104.997661	108.74
 P	399000	489.5
 T	400000	4.748	26.8	39.780816	-104.997609	111.31
@@ -5842,7 +5842,7 @@ P	409000	460.2
 T	410000	0.437	-	39.780779	-104.997607	-
 P	410000	458.1
 T	411000	5.769	-	39.780732	-104.997636	204.51
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	411000	448.2
 T	412000	5.953	-	39.780683	-104.997664	204.05
 P	412000	441.1
@@ -5921,7 +5921,7 @@ P	444000	304.9
 T	445000	0.667	13.4	39.780274	-104.997988	-
 P	445000	302.8
 T	446000	4.028	13.4	39.78029	-104.99803	295.72
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	446000	296.1
 T	447000	3.233	13.4	39.780303	-104.998064	297.83
 P	447000	290.2
@@ -5993,7 +5993,7 @@ P	475000	145.5
 T	476000	0.114	15.6	39.780603	-104.998685	220.08
 P	476000	140.9
 M	476000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	477000	0.807	15.6	39.780597	-104.998691	217.88
 P	477000	138.9
 C	477000	1
@@ -6001,7 +6001,7 @@ C	477000	1
 T	478000	1.85	15.6	39.780584	-104.998704	-
 P	478000	132.6
 T	479000	5.08	15.6	39.780548	-104.998741	217.86
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	479000	126.2
 T	480000	4.773	15.6	39.780513	-104.998774	216.71
 P	480000	117.4
@@ -6094,7 +6094,7 @@ P	606000	146.9
 T	606000	1.161	15.6	39.780074	-104.999031	-
 P	606000	145.2
 T	607000	5.698	15.6	39.780044	-104.998977	125.7
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	607000	138
 T	608000	6.373	15.6	39.780011	-104.998915	124.47
 P	608000	128.4
@@ -6187,7 +6187,7 @@ P	675000	72.7
 T	676000	0.705	15.6	39.779535	-104.998087	124.86
 P	676000	68.6
 T	677000	4.891	15.6	39.779509	-104.99804	125.99
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	677000	59.7
 T	678000	5.614	15.6	39.77948	-104.997986	125.26
 P	678000	52.2
@@ -6209,7 +6209,7 @@ T	6000	3.064	22	39.790031	-104.999999	1.56
 >	hardAccel	roast	6	1.02	Easy. It's a green light, not a starting gun.
 T	7000	7.964	22	39.790103	-105	359.47
 T	8000	0	22	39.790103	-105	269.47
->	hardBraking	roast	14	1.06	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	14	1.06	Somewhere, a set of brake pads just filed for divorce.
 T	9000	0.164	22	39.790103	-105.000002	-
 T	10000	0	22	39.790103	-105.000002	269.22
 T	11000	0.48	22	39.790103	-105.000007	-
@@ -6280,7 +6280,7 @@ P	42000	237.7
 T	43000	0.607	22	39.78987	-105.000077	166.21
 P	43000	235
 R	43000
->	rerouted	roast	12	1.05	New route. Let's call this one 'Plan B for Bad Driver'.
+>	rerouted	roast	12	1.05	Recalculating. I'll add it to the pile.
 T	44000	0.904	22	39.789862	-105.000075	165.6
 P	44000	230.3
 T	45000	0	22	39.789862	-105.000075	75.6
@@ -6321,7 +6321,7 @@ P	60000	180.7
 T	61000	1.79	22	39.789877	-105.000004	76.9
 P	61000	175
 T	62000	6.376	22	39.789888	-104.999931	-
->	hardAccel	roast	16	1.07	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	16	1.07	Nobody is racing you. Nobody wants to be seen with you.
 P	62000	167.2
 T	63000	5.662	22	39.789895	-104.999865	81.48
 P	63000	158.8
@@ -6462,7 +6462,7 @@ P	181000	202.5
 T	182000	6.178	29.1	39.789418	-104.998963	181.39
 P	182000	196.1
 T	183000	0	29.1	39.789418	-104.998963	179.28
->	hardBraking	roast	26	1.11	That stop was a little... dramatic.
+>	hardBraking	roast	26	1.11	Brake check! Who are we brake checking? Oh, everyone. Got it.
 P	183000	193.5
 T	184000	0	29.1	39.789418	-104.998963	178.87
 P	184000	192.7
@@ -6584,7 +6584,7 @@ P	269000	47.5
 T	270000	2.877	29.1	39.789467	-104.999442	284.35
 P	270000	44.3
 T	271000	6.569	29.1	39.78948	-104.999517	282.67
->	hardAccel	roast	23	1.09	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	23	1.09	Nobody is racing you. Nobody wants to be seen with you.
 P	271000	35.4
 T	272000	6.278	29.1	39.78949	-104.99959	-
 P	272000	25.3
@@ -6605,7 +6605,7 @@ T	280000	8.327	29.1	39.789563	-105.000356	278.33
 I	280000	Turn slight right at 5th Avenue	562.3	-	-
 >	instruction	nav	23	1.09	In 0.3 miles, turn slight right at 5th Avenue. Shouldn't be hard.
 T	281000	0	29.1	39.789563	-105.000356	-
->	hardBraking	roast	30	1.12	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	30	1.12	That stop was a little... dramatic.
 P	281000	558.5
 T	282000	0	29.1	39.789563	-105.000356	279.22
 P	282000	556.3
@@ -6801,7 +6801,7 @@ P	395000	56.1
 T	396000	13.329	11.2	39.788601	-105.002618	187.63
 P	396000	38.1
 T	397000	13.341	11.2	39.788483	-105.002642	188.95
->	speeding	roast	80	1.32	I didn't sign up for a getaway car. I signed up for turn-by-turn directions.
+>	speeding	roast	80	1.32	I didn't sign up to be a getaway car. I signed up to say 'turn left' and be ignored.
 P	397000	20.4
 T	398000	14.012	11.2	39.788359	-105.00267	189.88
 P	398000	5.9
@@ -6811,7 +6811,7 @@ T	400000	14.447	11.2	39.7881	-105.002724	189.73
 T	401000	14.596	11.2	39.787971	-105.00275	188.61
 T	402000	14.845	11.2	39.787839	-105.002775	188.13
 T	403000	15.774	11.2	39.787698	-105.002798	187.07
->	speeding	roast	85	1.34	SLOW. DOWN. I am begging you as a navigation product.
+>	speeding	roast	85	1.34	35! MY WHOLE LIFE IS FLASHING BEFORE MY EYES! IT'S MOSTLY YOU MISSING TURNS!
 T	404000	14.934	11.2	39.787566	-105.002824	188.73
 T	434000	14.303	11.2	39.787439	-105.002854	190.15
 >	speeding	roast	88	1.35	STILL. 32. I'm going to start reading the speed limit to you like a bedtime story.
@@ -6823,7 +6823,7 @@ T	438000	0.76	11.2	39.787309	-105.002889	189.15
 O	438000	Best Buy	electronics
 T	438000	0	11.2	39.787309	-105.002889	187.25
 T	439000	4.386	26.8	39.78727	-105.002897	188.31
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	439000	4.987	26.8	39.787277	-105.002955	278.31
 T	439000	4.446	26.8	39.787285	-105.003006	281.17
 T	440000	4.674	26.8	39.787293	-105.00306	281.28
@@ -6895,7 +6895,7 @@ P	488000	577
 T	489000	3.502	26.8	39.787651	-105.003342	9.57
 P	489000	569.9
 M	489000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	490000	4.525	26.8	39.787691	-105.003333	9.59
 P	490000	564.5
 T	491000	4.359	26.8	39.787729	-105.003323	11.11
@@ -6963,7 +6963,7 @@ P	518000	450.1
 T	518000	0.596	22.4	39.788044	-105.003304	278.14
 P	518000	449.2
 T	519000	5.549	22.4	39.787995	-105.003313	-
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	519000	443.2
 T	520000	5.268	22.4	39.787948	-105.003324	-
 P	520000	437.8
@@ -7016,7 +7016,7 @@ P	539000	283.4
 T	540000	0	22.4	39.787061	-105.00358	190.88
 P	540000	281.6
 T	541000	4.032	22.4	39.787026	-105.003588	189.72
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	541000	272.6
 T	542000	3.93	22.4	39.786991	-105.003597	191.75
 P	542000	264.1
@@ -7090,7 +7090,7 @@ I	7000	Keep left at the fork	90.8	-	-
 T	8000	3.966	22	39.800005	-105.000147	269.41
 P	8000	82.2
 T	9000	0	22	39.800005	-105.000147	271.73
->	hardBraking	roast	8	1.03	That stop was a little... dramatic.
+>	hardBraking	roast	8	1.03	Brake check! Who are we brake checking? Oh, everyone. Got it.
 P	9000	79.6
 T	10000	0	22	39.800005	-105.000147	269.37
 P	10000	77.4
@@ -7119,7 +7119,7 @@ P	20000	33.1
 T	21000	3.178	22	39.799852	-105.00015	173.05
 P	21000	28.5
 C	21000	1
->	turnCompleted	roast	3	1.01	Huh. You actually listened. Mark the calendar.
+>	turnCompleted	roast	3	1.01	Look at that. A turn. In the right place. At the right time. Who are you?
 T	22000	3.322	22	39.799822	-105.000144	171.14
 P	22000	21.3
 T	23000	4.235	22	39.799785	-105.000134	168.46
@@ -7175,7 +7175,7 @@ P	42000	26.8
 T	43000	2.224	-	39.799876	-104.999416	73.4
 P	43000	22
 T	44000	7.874	-	39.799895	-104.999327	-
->	hardAccel	roast	21	1.08	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	21	1.08	Nobody is racing you. Nobody wants to be seen with you.
 P	44000	10.3
 >	instruction	nav	21	1.08	You are turning right in 50 feet.
 T	44000	6.974	-	39.799909	-104.999247	77.1
@@ -7184,7 +7184,7 @@ P	44000	3.2
 T	45000	7.592	-	39.799923	-104.99916	78.17
 P	45000	0
 T	46000	1.629	-	39.799925	-104.999141	80.57
->	hardBraking	roast	28	1.11	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	28	1.11	That stop was a little... dramatic.
 T	47000	2.72	-	39.79993	-104.99911	78.44
 T	48000	3.389	-	39.799935	-104.99907	81.35
 T	49000	0	-	39.799935	-104.99907	80.62
@@ -7219,13 +7219,13 @@ T	75000	5.282	22.4	39.800071	-104.99899	354.11
 T	76000	5.394	22.4	39.800119	-104.998996	354.18
 T	76000	4.842	22.4	39.800162	-104.999	356.09
 T	106000	5.243	22.4	39.800209	-104.999002	358.03
->	tooSlow	roast	32	1.13	The limit is 50. That's a ceiling, but you're allowed to get close to it.
+>	tooSlow	roast	32	1.13	38 under. Are we sightseeing, or is the car on a leash?
 T	107000	4.703	22.4	39.800252	-104.999002	-
 T	108000	5.41	22.4	39.8003	-104.999005	357.58
 T	109000	6.019	22.4	39.800354	-104.999007	357.95
 T	110000	6.238	22.4	39.80041	-104.999011	-
 T	111000	0	22.4	39.80041	-104.999011	359.19
->	hardBraking	roast	40	1.16	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	40	1.16	You saw that coming a quarter mile ago. I know, because I pointed at it.
 T	112000	0	22.4	39.80041	-104.999011	359.68
 T	113000	0.313	22.4	39.800413	-104.999011	0.69
 T	114000	0	11.2	39.800413	-104.999011	3.34
@@ -7271,7 +7271,7 @@ T	178000	4.546	11.2	39.800432	-104.998837	20.78
 T	179000	4.095	11.2	39.800467	-104.998821	18.76
 T	180000	4.441	11.2	39.800504	-104.998802	21.65
 T	181000	0	11.2	39.800504	-104.998802	19.16
->	hardBraking	roast	43	1.17	My entire database just slid forward. Thanks.
+>	hardBraking	roast	43	1.17	You saw that coming for a quarter mile. I know because I saw it too.
 H	181000	construction	1062	-
 >	hazard	roast	43	1.17	Construction ahead. Merge early. I know merging is hard for you.
 T	182000	0	11.2	39.800504	-104.998802	21.11
@@ -7281,11 +7281,11 @@ T	184000	1.147	11.2	39.800522	-104.998793	20.12
 T	185000	1.107	11.2	39.800531	-104.998789	17.19
 T	186000	2.151	11.2	39.80055	-104.998781	17.26
 M	186000
->	missedTurn	roast	60	1.24	I told you 100 feet in advance. 100 feet! That's practically a reservation.
+>	missedTurn	roast	60	1.24	There goes the turn. Wave goodbye. It's the closest you'll get to it.
 T	187000	0	11.2	39.80055	-104.998781	18.59
 T	188000	0	11.2	39.80055	-104.998781	19.01
 M	188000
->	missedTurn	roast	78	1.31	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	78	1.31	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	189000	0	11.2	39.80055	-104.998781	20.35
 T	190000	0	11.2	39.80055	-104.998781	19.98
 T	191000	4.214	11.2	39.800586	-104.998767	17.36
@@ -7342,7 +7342,7 @@ P	213000	410.8
 T	214000	4.091	11.2	39.80101	-104.998651	4.71
 P	214000	406.5
 T	215000	8.994	11.2	39.80109	-104.99864	6.27
->	hardAccel	roast	87	1.35	I felt that in my satellites.
+>	hardAccel	roast	87	1.35	I just felt that in a satellite. In SPACE.
 P	215000	397.2
 A	215000	0
 T	216000	9.324	11.2	39.801173	-104.998625	7.93
@@ -7478,7 +7478,7 @@ P	268000	544.9
 T	269000	0.861	29.1	39.801867	-104.998623	1.48
 P	269000	539.5
 T	270000	5.772	29.1	39.801919	-104.998619	3.66
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	270000	533.3
 T	271000	5.332	29.1	39.801967	-104.998613	6.04
 P	271000	525.5
@@ -7524,7 +7524,7 @@ P	288000	455.2
 T	289000	2.096	29.1	39.802204	-104.99858	6.43
 P	289000	449.9
 T	290000	6.037	29.1	39.80221	-104.998651	276.43
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	290000	439.2
 T	291000	5.806	29.1	39.802215	-104.998719	276.38
 P	291000	432.5
@@ -7584,7 +7584,7 @@ P	313000	307.8
 T	314000	0.939	20.1	39.802192	-104.999568	267.06
 P	314000	302.9
 T	315000	5.794	20.1	39.802191	-104.999636	268.12
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	315000	292.8
 T	316000	5.985	20.1	39.802187	-104.999706	266.58
 P	316000	282
@@ -7670,7 +7670,7 @@ P	351000	68.9
 T	352000	0.558	20.1	39.803495	-104.999773	10.34
 P	352000	66
 T	353000	4.476	20.1	39.803535	-104.999765	8.69
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	353000	59.1
 T	354000	5.033	20.1	39.80358	-104.999759	6.38
 P	354000	53.9
@@ -7734,7 +7734,7 @@ P	412000	125.3
 T	413000	0	20.1	39.804073	-105.000646	284.08
 P	413000	123.3
 M	413000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	414000	0.825	20.1	39.804075	-105.000656	283.55
 P	414000	121
 T	415000	0	20.1	39.804075	-105.000656	285.53
@@ -7813,12 +7813,12 @@ T	3000	5.003	22	39.810122	-105.000009	355.34
 T	4000	4.765	22	39.810164	-105.000014	355.1
 T	5000	5.579	22	39.810214	-105.00002	353.99
 T	6000	10.102	22	39.810305	-105.000029	355.68
->	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to be seen with you.
 T	7000	10.284	22	39.810397	-105.000034	357.98
 T	8000	10.856	22	39.810494	-105.000042	356.17
 T	9000	15.607	22	39.810634	-105.000055	356.03
 T	10000	0	22	39.810634	-105.000055	-
->	hardBraking	roast	14	1.05	That stop was a little... dramatic.
+>	hardBraking	roast	14	1.05	Brake check! Who are we brake checking? Oh, everyone. Got it.
 T	11000	0.623	22	39.81064	-105.000055	-
 T	12000	0.553	22	39.810645	-105.000055	358.06
 T	13000	1.056	22	39.810654	-105.000055	0.78
@@ -7851,7 +7851,7 @@ M	36000
 T	37000	7.751	26.8	39.810683	-104.999927	174.24
 >	hardAccel	roast	35	1.14	Zero to reckless in four seconds. Impressive, in the worst way.
 T	38000	3.72	26.8	39.81065	-104.999923	174.78
->	hardBraking	roast	43	1.17	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	43	1.17	You saw that coming a quarter mile ago. I know, because I pointed at it.
 T	39000	3.016	26.8	39.810623	-104.999919	174.13
 T	40000	0	26.8	39.810623	-104.999919	-
 T	41000	1.088	26.8	39.810613	-104.999918	174.65
@@ -7918,7 +7918,7 @@ P	107000	46.6
 I	107000	Turn left onto Elm Street	177.6	-	-
 >	instruction	nav	56	1.22	Slowly, for you: In 600 feet, turn left onto Elm Street. The other left, if it says left.
 T	108000	0	11.2	39.810276	-104.99937	158.74
->	hardBraking	roast	64	1.26	You saw that coming for a quarter mile. I know because I saw it too.
+>	hardBraking	roast	64	1.26	Another brake check. The guy behind us has started praying.
 P	108000	174.3
 T	109000	0.003	11.2	39.810276	-104.99937	156.07
 P	109000	171.2
@@ -7931,7 +7931,7 @@ P	112000	164.3
 T	113000	0.522	11.2	39.810262	-104.99936	154.02
 P	113000	161
 T	114000	4.656	11.2	39.810224	-104.999337	154.5
->	hardAccel	roast	69	1.28	I felt that in my satellites.
+>	hardAccel	roast	69	1.28	I just felt that in a satellite. In SPACE.
 P	114000	154.7
 T	115000	4.719	11.2	39.810187	-104.999311	151.8
 P	115000	149.1
@@ -8035,11 +8035,11 @@ P	161000	512.1
 T	162000	0	11.2	39.809501	-104.999028	251.72
 P	162000	507.2
 M	162000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	163000	1.087	29.1	39.809498	-104.99904	250.07
 P	163000	506.1
 T	164000	6.898	29.1	39.809477	-104.999116	250.03
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	164000	497.1
 T	165000	6.189	29.1	39.809457	-104.999184	249.09
 P	165000	489.1
@@ -8058,7 +8058,7 @@ P	169000	373.2
 T	170000	10.697	29.1	39.809242	-104.999797	244.85
 P	170000	359.5
 M	170000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	171000	11.249	29.1	39.809197	-104.999916	244.11
 P	171000	347
 T	172000	10.965	29.1	39.809153	-105.000031	-
@@ -8081,7 +8081,7 @@ P	179000	245.1
 T	180000	3.589	29.1	39.809073	-105.000686	235.09
 P	180000	239.9
 M	180000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	181000	3.459	29.1	39.809056	-105.00072	237.47
 P	181000	231.7
 T	182000	8.508	29.1	39.809016	-105.000805	238.47
@@ -8133,7 +8133,7 @@ T	207000	0.934	29.1	39.807252	-105.003993	223.99
 T	208000	0.851	29.1	39.807246	-105.004	222.6
 T	209000	0.349	29.1	39.807244	-105.004002	223.19
 T	210000	4.623	29.1	39.807213	-105.004038	221.51
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	211000	4.852	29.1	39.80718	-105.004076	221.11
 T	212000	5.303	29.1	39.807144	-105.004117	221.03
 T	213000	5.409	29.1	39.807107	-105.004159	220.99
@@ -8172,7 +8172,7 @@ T	298000	0	-	39.806798	-105.004431	134.13
 T	299000	0.409	-	39.806795	-105.004427	136.16
 T	300000	1.444	-	39.806786	-105.004415	133.83
 M	300000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	301000	1.364	-	39.806778	-105.004404	135.1
 T	302000	1.329	-	39.806769	-105.004393	135.67
 T	302000	1.633	-	39.806758	-105.00438	138.29
@@ -8246,7 +8246,7 @@ T	360000	0	-	39.806784	-105.004048	57.42
 T	361000	0	-	39.806784	-105.004048	57.21
 T	362000	0	-	39.806784	-105.004048	147.21
 T	363000	3.967	-	39.806755	-105.004022	145.87
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	364000	9.28	-	39.806685	-105.003962	146.85
 T	365000	8.817	-	39.806617	-105.003909	-
 T	366000	8.954	-	39.806548	-105.003855	149.14
@@ -8288,7 +8288,7 @@ T	424000	0	-	39.805745	-105.003316	153.17
 >	hardBraking	roast	100	1.4	WHY DO YOU BRAKE LIKE THE ROAD OWES YOU MONEY?
 T	425000	0	-	39.805745	-105.003316	151.1
 T	426000	3.184	-	39.80572	-105.003299	153.43
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	427000	2.356	-	39.805701	-105.003286	151.42
 T	428000	1.966	-	39.805693	-105.003306	-
 T	429000	1.667	-	39.805686	-105.003324	242.28
@@ -8324,7 +8324,7 @@ E	12	kmh
 T	1000	5.707	22	39.820051	-105	0.24
 T	2000	5.419	22	39.820051	-104.999936	90.24
 T	3000	0	22	39.820051	-104.999936	88.11
->	hardBraking	roast	8	1.03	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	8	1.03	That stop was a little... dramatic.
 T	4000	0.34	22	39.820051	-104.999932	-
 T	5000	0.73	22	39.820052	-104.999923	87.54
 T	6000	1.751	22	39.820052	-104.999903	89.72
@@ -8392,7 +8392,7 @@ T	38000	6.993	22	39.819428	-104.99969	174.66
 T	39000	6.119	22	39.819374	-104.99968	-
 T	40000	5.322	22	39.819326	-104.999674	174.45
 T	41000	0	22	39.819326	-104.999674	172.91
->	hardBraking	roast	18	1.07	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	18	1.07	Somewhere, a set of brake pads just filed for divorce.
 T	42000	0	22	39.819326	-104.999674	174.48
 T	43000	0	22	39.819326	-104.999674	175.02
 T	44000	0.391	22	39.819323	-104.999674	-
@@ -8407,15 +8407,15 @@ T	51000	0.511	22	39.819256	-104.999663	170.32
 T	52000	1.525	22	39.819242	-104.999659	168.14
 T	53000	2.313	22	39.819222	-104.999654	168.5
 T	54000	5.809	22	39.819171	-104.99964	168.68
->	hardAccel	roast	23	1.09	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	23	1.09	Nobody is racing you. Nobody wants to be seen with you.
 T	55000	5.672	22	39.819121	-104.999629	170.05
 C	55000	1
->	turnCompleted	roast	19	1.08	Correct turn. Don't let it go to your head.
+>	turnCompleted	roast	19	1.08	Huh. You actually listened. Mark the calendar.
 T	56000	6.213	22	39.819065	-104.999618	171.71
 T	57000	6.479	22	39.819008	-104.999609	173.19
 T	58000	7.447	22	39.818941	-104.999598	172.44
 C	58000	1
->	turnCompleted	roast	14	1.06	Huh. You actually listened. Mark the calendar.
+>	turnCompleted	roast	14	1.06	Look at that. A turn. In the right place. At the right time. Who are you?
 T	59000	7.128	22	39.818878	-104.999587	-
 T	60000	7.609	22	39.81881	-104.999578	174.55
 T	61000	0	22	39.81881	-104.999578	176.69
@@ -8433,7 +8433,7 @@ T	70000	6.333	22	39.818679	-104.999539	166.12
 >	hardAccel	roast	27	1.11	Easy. It's a green light, not a starting gun.
 T	71000	6.792	22	39.81862	-104.999518	164.55
 T	72000	0	22	39.81862	-104.999518	166.76
->	hardBraking	roast	35	1.14	My entire database just slid forward. Thanks.
+>	hardBraking	roast	35	1.14	You saw that coming for a quarter mile. I know because I saw it too.
 T	73000	0.137	22	39.818619	-104.999518	-
 A	73000	1
 T	74000	0	22	39.818619	-104.999518	165.73
@@ -8474,7 +8474,7 @@ P	93000	258.1
 T	94000	6.07	22	39.818123	-104.999344	159.23
 P	94000	251.9
 T	95000	0	22	39.818123	-104.999344	159.06
->	hardBraking	roast	41	1.16	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	41	1.16	You saw that coming a quarter mile ago. I know, because I pointed at it.
 P	95000	249.8
 T	96000	0	22	39.818123	-104.999344	158.72
 P	96000	249.5
@@ -8507,7 +8507,7 @@ P	108000	214.7
 T	109000	5.841	13.4	39.818019	-104.999308	164
 P	109000	206.7
 T	110000	0	13.4	39.818019	-104.999308	166.02
->	hardBraking	roast	53	1.21	You saw that coming for a quarter mile. I know because I saw it too.
+>	hardBraking	roast	53	1.21	My entire database just slid forward. Thanks.
 P	110000	203
 T	111000	0	13.4	39.818019	-104.999308	168.37
 P	111000	199.2
@@ -8524,13 +8524,13 @@ P	116000	185.9
 T	117000	0	13.4	39.818011	-104.999306	170.79
 P	117000	183.5
 M	117000
->	missedTurn	roast	71	1.28	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	71	1.28	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	118000	1.036	13.4	39.818002	-104.999304	168.08
 P	118000	180.6
 T	119000	0.442	13.4	39.817998	-104.999303	165.64
 P	119000	177
 T	120000	4.743	13.4	39.817958	-104.999287	163.53
->	hardAccel	roast	76	1.31	I felt that in my satellites.
+>	hardAccel	roast	76	1.31	I just felt that in a satellite. In SPACE.
 P	120000	167.8
 U	120000	384259	0
 >	abandoned	roast	76	1.31	WE'RE BACK. DID THEY SELL YOU A SENSE OF DIRECTION IN THERE? NO? GREAT.
@@ -8612,7 +8612,7 @@ T	245000	0	13.4	39.817167	-104.999059	-
 T	246000	0	13.4	39.817167	-104.999059	176.77
 T	247000	0.5	13.4	39.817163	-104.999059	176.22
 T	248000	6.211	13.4	39.817107	-104.999053	175.25
->	hardAccel	roast	84	1.33	I felt that in my satellites.
+>	hardAccel	roast	84	1.33	I just felt that in a satellite. In SPACE.
 B	248000	0.85	1
 T	249000	6.676	13.4	39.817048	-104.999042	172.53
 T	250000	0.216	13.4	39.817046	-104.999042	173.22
@@ -8667,7 +8667,7 @@ P	303000	396.2
 T	304000	0.634	13.4	39.817043	-104.999389	272.59
 P	304000	393.6
 T	305000	4.727	13.4	39.817047	-104.999444	274.99
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	305000	384.9
 T	306000	10.287	13.4	39.817059	-104.999564	277.51
 P	306000	370.4
@@ -8793,7 +8793,7 @@ P	389000	140.1
 T	389000	0	13.4	39.817157	-105.000701	-
 P	389000	138
 T	390000	5.779	13.4	39.817153	-105.000769	266
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	390000	131.4
 T	391000	5.765	13.4	39.817147	-105.000836	-
 P	391000	124
@@ -8861,7 +8861,7 @@ P	448000	33.1
 T	449000	0.32	11.2	39.817039	-105.000979	171.62
 P	449000	28
 T	450000	4.477	11.2	39.816999	-105.000971	170.66
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	450000	21.2
 T	451000	5.342	11.2	39.816952	-105.000958	167.73
 P	451000	11.6
@@ -8904,7 +8904,7 @@ P	498000	483.8
 T	499000	2.754	11.2	39.816525	-105.000796	157.22
 P	499000	476.8
 T	529000	1.982	11.2	39.816509	-105.000787	159.25
->	tooSlow	roast	100	1.4	Somewhere, a snail is gaining on us. MOVE.
+>	tooSlow	roast	100	1.4	WE ARE GOING 7. I could get there faster as an email attachment.
 P	529000	472.9
 T	529000	1.231	11.2	39.816498	-105.000782	158.75
 P	529000	468.4
@@ -8917,7 +8917,7 @@ P	532000	457.8
 T	533000	0.149	11.2	39.816476	-105.000772	157.62
 P	533000	455.4
 T	534000	5.669	11.2	39.816428	-105.00075	160.04
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	534000	447.7
 T	535000	0	11.2	39.816428	-105.00075	162.61
 >	hardBraking	roast	100	1.4	BRAKE CHECK! The car behind us is writing your name down. So am I.
@@ -9020,7 +9020,7 @@ P	635000	284.4
 T	636000	0	13.4	39.815558	-105.000253	160.62
 P	636000	282.7
 T	637000	4.359	13.4	39.815521	-105.000236	160.97
->	hardAccel	roast	97	1.39	I felt that in my satellites.
+>	hardAccel	roast	97	1.39	I just felt that in a satellite. In SPACE.
 P	637000	277.9
 T	638000	4.919	13.4	39.81548	-105.000215	158.36
 P	638000	271.1
@@ -9071,7 +9071,7 @@ T	658000	0	13.4	39.815519	-104.999791	71.59
 >	hardBraking	roast	100	1.4	Every time you do that, a little piece of my GPS chip dies. I'm running out of pieces.
 P	658000	494.4
 T	659000	4.577	13.4	39.815531	-104.999739	73.96
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	659000	488.8
 T	660000	3.785	13.4	39.81554	-104.999696	-
 P	660000	481.1
@@ -9119,7 +9119,7 @@ P	679000	398.7
 T	680000	0	13.4	39.815395	-104.999397	154.85
 P	680000	394.9
 T	681000	4.565	13.4	39.815358	-104.999375	155.31
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	681000	389.9
 T	682000	4.953	13.4	39.815318	-104.999348	153.13
 P	682000	380.9
@@ -9201,7 +9201,7 @@ P	714000	475.6
 T	744000	0	29.1	39.815091	-104.999271	239.51
 P	744000	471.2
 T	745000	5.992	29.1	39.815064	-104.999332	240.02
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	745000	463.3
 T	746000	6.986	29.1	39.815034	-104.999405	242.22
 P	746000	452
@@ -9280,7 +9280,7 @@ T	15000	1.619	22	39.830115	-105.000056	271.57
 T	16000	1.764	22	39.830115	-105.000077	269.74
 T	17000	2.49	22	39.830115	-105.000106	271.6
 T	18000	8.443	22	39.830116	-105.000206	270.23
->	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to be seen with you.
 T	19000	8.473	22.4	39.830116	-105.000305	270.03
 T	20000	8.282	22.4	39.830118	-105.000403	271.89
 T	21000	7.674	22.4	39.830049	-105.000406	181.89
@@ -9288,7 +9288,7 @@ T	22000	7.975	22.4	39.829978	-105.00041	182.96
 T	23000	7.313	22.4	39.829981	-105.000496	272.96
 T	24000	7.783	22.4	39.829986	-105.000588	274.41
 T	25000	0	22.4	39.829986	-105.000588	-
->	hardBraking	roast	13	1.05	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	13	1.05	That stop was a little... dramatic.
 T	26000	0	22.4	39.829986	-105.000588	-
 T	27000	0.812	22.4	39.829987	-105.000597	275.17
 U	27000	104546	0
@@ -9364,13 +9364,13 @@ T	115000	0.993	22.4	39.830005	-105.000223	354.84
 T	116000	1.602	22.4	39.830019	-105.000225	353.19
 T	117000	0.729	22.4	39.830025	-105.000226	353.21
 T	118000	5.338	22.4	39.830073	-105.000234	352.85
->	hardAccel	roast	20	1.08	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	20	1.08	Nobody is racing you. Nobody wants to be seen with you.
 T	119000	6.396	22.4	39.83013	-105.000245	351.55
 T	120000	7.426	26.8	39.830196	-105.000259	350.69
 T	121000	6.668	26.8	39.830254	-105.000274	349.46
 T	122000	6.225	26.8	39.83031	-105.000284	351.64
 T	123000	1.371	26.8	39.830322	-105.000287	350.05
->	hardBraking	roast	27	1.11	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	27	1.11	Somewhere, a set of brake pads just filed for divorce.
 T	124000	0.758	26.8	39.830329	-105.000289	350.98
 T	125000	0.381	26.8	39.830332	-105.000289	350.46
 T	126000	1.087	26.8	39.830342	-105.000291	353
@@ -9474,7 +9474,7 @@ T	169000	29.658	-	39.836219	-105.000637	357.93
 P	169000	0
 T	170000	30.115	-	39.836489	-105.000662	355.95
 T	171000	23.818	-	39.836702	-105.000693	353.77
->	hardBraking	roast	55	1.22	You saw that coming for a quarter mile. I know because I saw it too.
+>	hardBraking	roast	55	1.22	Another brake check. The guy behind us has started praying.
 T	172000	24.279	-	39.836919	-105.00071	356.45
 T	173000	29.332	-	39.837182	-105.000731	-
 >	hardAccel	roast	60	1.24	Zero to reckless in four seconds. Impressive, in the worst way.
@@ -9631,7 +9631,7 @@ P	298000	127.2
 T	299000	1.529	15.6	39.837233	-105.001385	162.09
 P	299000	125.6
 T	300000	5.244	15.6	39.837189	-105.001367	162.37
->	hardAccel	roast	73	1.29	I felt that in my satellites.
+>	hardAccel	roast	73	1.29	I just felt that in a satellite. In SPACE.
 P	300000	117.7
 T	301000	4.507	15.6	39.83715	-105.00135	161.28
 P	301000	111.3
@@ -9693,7 +9693,7 @@ T	363000	10.157	15.6	39.838757	-105.001543	80.72
 T	364000	9.75	15.6	39.838772	-105.00143	80.09
 T	365000	9.398	15.6	39.83879	-105.001322	77.53
 T	366000	14.846	15.6	39.838821	-105.001152	76.41
->	hardAccel	roast	78	1.31	I felt that in my satellites.
+>	hardAccel	roast	78	1.31	I just felt that in a satellite. In SPACE.
 T	367000	14.139	15.6	39.838854	-105.000992	-
 T	368000	14.495	15.6	39.838883	-105.000825	76.87
 T	369000	14.771	15.6	39.838912	-105.000656	77.69
@@ -9765,12 +9765,12 @@ P	466000	444.4
 T	467000	0.141	13.4	39.839232	-105.000716	249.27
 P	467000	440.9
 T	468000	4.288	13.4	39.839218	-105.000763	-
->	hardAccel	roast	99	1.39	I felt that in my satellites.
+>	hardAccel	roast	99	1.39	I just felt that in a satellite. In SPACE.
 P	468000	434.3
 T	469000	4.785	13.4	39.839203	-105.000815	248.57
 P	469000	428.8
 M	469000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	470000	4.264	13.4	39.839189	-105.000862	-
 P	470000	424.3
 T	471000	4.227	13.4	39.839175	-105.000908	249.38
@@ -9862,7 +9862,7 @@ P	507000	250.7
 T	508000	0	22.4	39.839251	-105.000649	71.14
 P	508000	246.9
 T	509000	3.035	22.4	39.839261	-105.000615	68.21
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	509000	239.9
 T	510000	0	22.4	39.839261	-105.000615	-
 P	510000	238.1
@@ -9889,7 +9889,7 @@ P	518000	384.8
 T	519000	1.689	22.4	39.83929	-105.000549	56.77
 P	519000	380.9
 T	549000	2.589	22.4	39.839303	-105.000523	57.85
->	tooSlow	roast	100	1.4	Somewhere, a snail is gaining on us. MOVE.
+>	tooSlow	roast	100	1.4	A snail just merged in front of us. It signaled. You've never signaled.
 P	549000	373.9
 T	550000	2.187	22.4	39.839313	-105.000501	-
 P	550000	368.7
@@ -9984,7 +9984,7 @@ P	619000	228.1
 T	620000	0	22.4	39.838196	-104.999744	149.95
 P	620000	228.1
 T	621000	5.29	22.4	39.838155	-104.999713	150.42
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	621000	220
 T	622000	6.379	22.4	39.838105	-104.999675	-
 P	622000	209.7
@@ -10093,7 +10093,7 @@ P	21000	395.3
 T	22000	1.481	22	39.840234	-104.999996	1.81
 P	22000	389.7
 T	52000	1.848	22	39.840251	-104.999995	3.92
->	tooSlow	roast	4	1.02	45 under the limit. Are we sightseeing?
+>	tooSlow	roast	4	1.02	The limit is 49. That's a ceiling, but you're allowed to visit it.
 P	52000	387.8
 T	53000	1.699	22	39.840266	-104.999994	2.78
 P	53000	384.1
@@ -10160,7 +10160,7 @@ P	107000	487.2
 T	108000	0	22.4	39.840345	-105.000803	276.67
 P	108000	482.6
 T	109000	4.365	22.4	39.840348	-105.000854	273.98
->	hardAccel	roast	16	1.07	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	16	1.07	Nobody is racing you. Nobody wants to be seen with you.
 P	109000	477.9
 T	110000	4.127	22.4	39.840311	-105.000857	183.98
 P	110000	470.7
@@ -10172,7 +10172,7 @@ P	111000	440.1
 T	112000	4.109	22.4	39.840237	-105.000861	182.75
 P	112000	432.4
 T	113000	0	22.4	39.840237	-105.000861	92.75
->	hardBraking	roast	42	1.17	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	42	1.17	You saw that coming a quarter mile ago. I know, because I pointed at it.
 P	113000	429.2
 A	113000	1
 T	114000	0	22.4	39.840237	-105.000861	91.58
@@ -10205,7 +10205,7 @@ P	124000	377.7
 O	124000	Sparkle Car Wash	other
 >	stopRequest	roast	57	1.23	Can we stop at Sparkle Car Wash? You've been making all the decisions and look where it's gotten us.
 T	125000	0	22.4	39.840202	-105.000625	102.28
->	hardBraking	roast	65	1.26	You saw that coming for a quarter mile. I know because I saw it too.
+>	hardBraking	roast	65	1.26	Another brake check. The guy behind us has started praying.
 P	125000	373.6
 T	126000	0	22.4	39.840202	-105.000625	101.71
 P	126000	372.9
@@ -10269,7 +10269,7 @@ P	153000	221.4
 T	154000	9.039	20.1	39.840317	-105.000939	285.67
 P	154000	211.9
 M	154000
->	missedTurn	roast	86	1.34	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	86	1.34	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	155000	9.37	20.1	39.840337	-105.001046	283.94
 P	155000	198.9
 T	156000	10.422	20.1	39.840361	-105.001164	284.88
@@ -10298,7 +10298,7 @@ P	195000	153.6
 T	225000	0.945	20.1	39.840377	-105.001252	283.89
 P	225000	149.3
 T	226000	6.912	20.1	39.840391	-105.001331	283.05
->	hardAccel	roast	93	1.37	I felt that in my satellites.
+>	hardAccel	roast	93	1.37	I just felt that in a satellite. In SPACE.
 P	226000	138.2
 I	226000	Turn left	365.5	-	-
 >	instruction	nav	93	1.37	PLEASE. I am begging. In 0.2 miles, turn left. I'm watching you.
@@ -10393,7 +10393,7 @@ P	321000	221.5
 T	322000	2.907	20.1	39.840253	-105.001719	273.12
 P	322000	214.7
 T	323000	8.754	20.1	39.840262	-105.001822	276.11
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	323000	201.6
 T	324000	0.75	20.1	39.840262	-105.00183	274.61
 >	hardBraking	roast	100	1.4	WHY DO YOU BRAKE LIKE THE ROAD OWES YOU MONEY?
@@ -10565,7 +10565,7 @@ T	533000	1.371	29.1	39.841105	-105.00294	247.56
 H	533000	police	1126	-
 >	hazard	roast	85	1.34	POLICE IN 0.7 MILES! FINALLY! SOMEONE WITH AUTHORITY!
 T	534000	4.613	29.1	39.841091	-105.002991	250.34
->	hardAccel	roast	91	1.36	I felt that in my satellites.
+>	hardAccel	roast	91	1.36	I just felt that in a satellite. In SPACE.
 T	535000	5.485	29.1	39.841076	-105.003053	251.76
 T	536000	5.827	26.8	39.841057	-105.003117	249.28
 T	537000	6.13	26.8	39.841036	-105.003183	247.26
@@ -10613,7 +10613,7 @@ P	596000	178.6
 T	597000	0	26.8	39.840507	-105.004332	-
 P	597000	173.9
 T	598000	3.375	26.8	39.84048	-105.004313	151.66
->	hardAccel	roast	93	1.37	I felt that in my satellites.
+>	hardAccel	roast	93	1.37	I just felt that in a satellite. In SPACE.
 P	598000	166
 T	599000	2.857	26.8	39.840458	-105.004296	149.02
 P	599000	162.1
@@ -10697,7 +10697,7 @@ P	28000	189.3
 T	29000	9.445	29.1	39.850459	-105.000133	344.34
 P	29000	175
 T	30000	0	29.1	39.850459	-105.000133	341.92
->	hardBraking	roast	13	1.05	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	13	1.05	That stop was a little... dramatic.
 P	30000	174.9
 T	31000	0.2	29.1	39.85046	-105.000134	339.13
 P	31000	172.5
@@ -10736,7 +10736,7 @@ P	45000	499
 T	46000	3.152	29.1	39.850583	-105.000208	332.25
 P	46000	495.2
 T	76000	8.266	29.1	39.850649	-105.000252	-
->	tooSlow	roast	9	1.03	The limit is 65. That's a ceiling, but you're allowed to get close to it.
+>	tooSlow	roast	9	1.03	47 under. Are we sightseeing, or is the car on a leash?
 P	76000	485.2
 T	76000	8.63	29.1	39.850717	-105.0003	331.9
 P	76000	472.3
@@ -10786,7 +10786,7 @@ P	96000	438.5
 T	97000	0	29.1	39.850917	-105.00029	59.11
 P	97000	433.9
 T	98000	5.44	29.1	39.850941	-105.000234	60.52
->	hardAccel	roast	21	1.08	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	21	1.08	Nobody is racing you. Nobody wants to be seen with you.
 P	98000	427.5
 T	99000	6.198	29.1	39.850989	-105.00027	330.52
 P	99000	419.7
@@ -10863,7 +10863,7 @@ P	128000	427.7
 T	129000	12.522	29.1	39.851918	-105.000939	333.71
 P	129000	410.3
 T	130000	0	29.1	39.851918	-105.000939	336.25
->	hardBraking	roast	48	1.19	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	48	1.19	You saw that coming a quarter mile ago. I know, because I pointed at it.
 P	130000	407.1
 T	131000	0	29.1	39.851918	-105.000939	333.8
 P	131000	406
@@ -10980,7 +10980,7 @@ T	183000	0	29.1	39.853431	-104.998848	326.32
 T	184000	0.783	29.1	39.853437	-104.998854	-
 T	185000	0.509	29.1	39.853441	-104.998857	324.62
 T	186000	3.519	-	39.853467	-104.99888	325.92
->	hardAccel	roast	84	1.33	I felt that in my satellites.
+>	hardAccel	roast	84	1.33	I just felt that in a satellite. In SPACE.
 T	187000	0	-	39.853467	-104.99888	-
 >	hardBraking	roast	92	1.37	BRAKE CHECK! The car behind us is writing your name down. So am I.
 T	188000	0	-	39.853467	-104.99888	329.01
@@ -11083,7 +11083,7 @@ P	291000	504.8
 T	292000	3.936	-	39.853651	-104.998664	69.7
 P	292000	499.1
 T	293000	7.983	-	39.853675	-104.998575	70.46
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	293000	487.4
 T	294000	8.767	-	39.853704	-104.99848	68.13
 P	294000	477.3
@@ -11207,7 +11207,7 @@ P	346000	287.1
 T	347000	0	-	39.856514	-104.996951	344.11
 P	347000	284.8
 M	347000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	348000	0.304	-	39.856516	-104.996951	346.72
 P	348000	280.3
 T	349000	0	-	39.856516	-104.996951	348.33
@@ -11223,7 +11223,7 @@ P	353000	271
 T	354000	0.973	-	39.85654	-104.996958	-
 P	354000	266
 T	355000	4.227	-	39.856576	-104.996971	344.78
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	355000	257.4
 T	356000	4.74	-	39.856618	-104.996985	345.72
 P	356000	247.8
@@ -11269,7 +11269,7 @@ P	373000	284.5
 T	374000	12.094	-	39.857286	-104.997351	334.78
 P	374000	268.9
 T	375000	15.574	-	39.857413	-104.997428	335.46
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	375000	250.2
 T	376000	6.777	-	39.857467	-104.997464	332.98
 >	hardBraking	roast	100	1.4	Every time you do that, a little piece of my GPS chip dies. I'm running out of pieces.
@@ -11373,7 +11373,7 @@ P	448000	49.1
 T	449000	0	-	39.858519	-104.996516	41.47
 P	449000	47.7
 T	450000	5.282	-	39.858555	-104.996475	41.38
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	450000	39.8
 T	451000	4.813	-	39.858588	-104.996439	39.35
 P	451000	31
@@ -11460,7 +11460,7 @@ T	573000	0.085	20.1	39.858713	-104.996658	330.8
 T	574000	1.12	20.1	39.858722	-104.996664	328.83
 T	575000	2.157	20.1	39.858738	-104.996678	328.41
 T	576000	5.934	20.1	39.858784	-104.996714	328.83
->	hardAccel	roast	97	1.39	I felt that in my satellites.
+>	hardAccel	roast	97	1.39	I just felt that in a satellite. In SPACE.
 T	577000	5.335	20.1	39.858824	-104.996748	326.83
 T	578000	4.807	20.1	39.85886	-104.996779	326.86
 T	579000	5.184	20.1	39.858898	-104.996815	323.89
@@ -11502,14 +11502,14 @@ T	637000	1.674	20.1	39.859259	-104.997154	335.01
 F	637000	0	-
 T	638000	1.05	20.1	39.859268	-104.997159	-
 M	638000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	639000	0.535	20.1	39.859272	-104.997162	331.47
 T	640000	0	20.1	39.859272	-104.997162	332.2
 T	641000	0.349	20.1	39.859275	-104.997164	332.71
 T	642000	0	20.1	39.859275	-104.997164	331.28
 T	643000	0	20.1	39.859275	-104.997164	334.22
 T	644000	4.486	20.1	39.859312	-104.997185	336.13
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	644000	4.404	20.1	39.859349	-104.997204	338.93
 T	645000	8.047	20.1	39.859415	-104.997241	336.92
 T	646000	9.076	20.1	39.859489	-104.997288	334.07
@@ -11572,7 +11572,7 @@ T	69000	4.162	22	39.860317	-105.000207	275.11
 >	hardAccel	roast	6	1.02	Easy. It's a green light, not a starting gun.
 T	69000	3.901	22	39.86032	-105.000253	274.72
 T	70000	0	22	39.86032	-105.000253	276.38
->	hardBraking	roast	14	1.06	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	14	1.06	Somewhere, a set of brake pads just filed for divorce.
 T	71000	0	22	39.86032	-105.000253	278.19
 T	71000	0	22	39.86032	-105.000253	-
 T	72000	1.063	22	39.860321	-105.000265	279.34
@@ -11656,17 +11656,17 @@ P	150000	441.7
 T	151000	1.059	-	39.860476	-105.000472	313.27
 P	151000	440.2
 T	152000	4.451	-	39.860503	-105.000511	311.85
->	hardAccel	roast	12	1.05	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	12	1.05	Nobody is racing you. Nobody wants to be seen with you.
 P	152000	431
 T	153000	3.593	-	39.860525	-105.000542	313.45
 P	153000	426.7
 T	154000	0	-	39.860525	-105.000542	312.72
->	hardBraking	roast	20	1.08	That stop was a little... dramatic.
+>	hardBraking	roast	20	1.08	Brake check! Who are we brake checking? Oh, everyone. Got it.
 P	154000	424.4
 T	155000	0	-	39.860525	-105.000542	313.6
 P	155000	422.2
 M	155000
->	missedTurn	roast	37	1.15	I told you 510 meters in advance. 510 meters! That's practically a reservation.
+>	missedTurn	roast	37	1.15	There goes the turn. Wave goodbye. It's the closest you'll get to it.
 T	156000	0	-	39.860525	-105.000542	314.92
 P	156000	421.8
 T	157000	0	-	39.860525	-105.000542	314.07
@@ -11844,7 +11844,7 @@ P	292000	137.8
 T	293000	3.886	-	39.86067	-105.000787	224.94
 P	293000	132.7
 T	294000	0	-	39.86067	-105.000787	223.81
->	hardBraking	roast	55	1.22	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	55	1.22	You saw that coming a quarter mile ago. I know, because I pointed at it.
 P	294000	131.1
 T	295000	0.861	-	39.860664	-105.000794	224.98
 P	295000	128.4
@@ -11903,7 +11903,7 @@ P	348000	117
 T	349000	4.058	13.4	39.860428	-105.000938	142.47
 P	349000	111.9
 T	350000	0	13.4	39.860428	-105.000938	141.04
->	hardBraking	roast	58	1.23	You saw that coming for a quarter mile. I know because I saw it too.
+>	hardBraking	roast	58	1.23	Another brake check. The guy behind us has started praying.
 P	350000	110.8
 T	351000	0.66	13.4	39.860424	-105.000933	142.93
 P	351000	108.3
@@ -11969,7 +11969,7 @@ T	380000	4.262	15.6	39.860196	-105.000581	126.47
 T	381000	3.606	15.6	39.860178	-105.000547	125.13
 T	382000	3.749	15.6	39.860158	-105.000511	125.34
 T	383000	0	15.6	39.860158	-105.000511	124.82
->	hardBraking	roast	59	1.23	My entire database just slid forward. Thanks.
+>	hardBraking	roast	59	1.23	You saw that coming for a quarter mile. I know because I saw it too.
 T	384000	1.002	15.6	39.860153	-105.000501	123.12
 T	385000	0.246	15.6	39.860152	-105.000498	125.93
 T	386000	0.737	15.6	39.860148	-105.000491	126.22
@@ -12006,7 +12006,7 @@ T	407000	0.712	15.6	39.860117	-105.000443	29.81
 O	407000	the Supercharger	carWash
 T	408000	0.381	15.6	39.86012	-105.000441	28.48
 T	409000	6.135	15.6	39.860094	-105.000377	118.48
->	hardAccel	roast	78	1.31	I felt that in my satellites.
+>	hardAccel	roast	78	1.31	I just felt that in a satellite. In SPACE.
 T	410000	5.472	15.6	39.860068	-105.000322	-
 T	411000	4.722	15.6	39.860048	-105.000274	119.06
 T	412000	5.058	29.1	39.860025	-105.000222	120
@@ -12035,7 +12035,7 @@ T	428000	0	29.1	39.861339	-104.99928	29.58
 T	429000	0	29.1	39.861339	-104.99928	29.55
 T	430000	0	29.1	39.861339	-104.99928	32.4
 T	431000	3.742	29.1	39.861367	-104.999257	32.13
->	hardAccel	roast	96	1.38	I felt that in my satellites.
+>	hardAccel	roast	96	1.38	I just felt that in a satellite. In SPACE.
 T	432000	4.125	29.1	39.861348	-104.999216	122.13
 T	433000	3.968	29.1	39.861328	-104.999177	124.48
 T	434000	3.288	29.1	39.861312	-104.999144	121.76
@@ -12107,7 +12107,7 @@ T	510000	0	20.1	39.860165	-104.996664	117.89
 T	511000	0.574	20.1	39.860163	-104.996658	-
 T	512000	0	20.1	39.860163	-104.996658	114.77
 T	513000	5.433	20.1	39.860144	-104.996599	112.82
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	514000	5.042	20.1	39.860127	-104.996544	-
 T	515000	0	20.1	39.860127	-104.996544	114.99
 >	hardBraking	roast	100	1.4	WHY DO YOU BRAKE LIKE THE ROAD OWES YOU MONEY?
@@ -12154,7 +12154,7 @@ U	578000	143343	0
 >	abandoned	roast	100	1.4	WE'RE BACK. DID THEY SELL YOU A SENSE OF DIRECTION IN THERE? NO? GREAT.
 T	608000	0.485	13.4	39.859777	-104.995635	288.76
 T	609000	5.338	13.4	39.85979	-104.995695	285.89
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	610000	6.1	13.4	39.859806	-104.995764	286.68
 T	611000	6.576	13.4	39.859821	-104.995838	285.09
 I	611000	Turn slight right at 5th Avenue	117.4	other	stopSign
@@ -12222,7 +12222,7 @@ F	636000	0	-
 T	637000	0.933	13.4	39.859797	-104.995799	118.17
 P	637000	77.6
 T	638000	5.354	13.4	39.859773	-104.995744	119.98
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	638000	68.2
 Z	639000
 >	arrived	nav	100	1.4	WE'RE HERE. GET OUT. I mean, have a nice day. Grade: F. GET OUT.
@@ -12231,7 +12231,7 @@ E	17	mph
 T	1000	0	22	39.87	-105	0.67
 T	2000	0	22	39.87	-105	359.77
 T	3000	3.204	22	39.870029	-104.999999	1.49
->	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to be seen with you.
 T	4000	0	22	39.870029	-104.999999	1.06
 C	4000	0
 >	turnCompleted	roast	2	1.01	You made it. Barely. The curb will remember you.
@@ -12279,7 +12279,7 @@ T	67000	2.727	22	39.870313	-105.000286	356.8
 T	68000	2.869	22	39.870339	-105.000286	358.81
 T	69000	3.8	22	39.870373	-105.000286	0.38
 T	70000	9.481	22	39.870458	-105.00029	357.93
->	hardAccel	roast	19	1.08	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	19	1.08	Nobody is racing you. Nobody wants to be seen with you.
 T	71000	10.254	22	39.87055	-105.000293	358.49
 T	72000	10.135	22	39.870641	-105.000301	356.09
 T	73000	10.945	22	39.870739	-105.000314	354.55
@@ -12309,7 +12309,7 @@ T	92000	17.366	22	39.872885	-105.001134	336.65
 T	93000	18.302	22	39.87295	-105.000936	66.65
 T	94000	18.507	22	39.873015	-105.000736	67.15
 T	95000	11.406	22	39.87305	-105.00061	70.11
->	hardBraking	roast	34	1.14	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	34	1.14	Somewhere, a set of brake pads just filed for divorce.
 T	96000	5.75	22	39.873065	-105.000545	72.18
 T	97000	5.427	22	39.873082	-105.000485	70.39
 T	98000	5.882	22	39.873102	-105.000421	67.5
@@ -12471,7 +12471,7 @@ C	308000	1
 T	309000	0	11.2	39.873633	-105.000703	325.01
 P	309000	424.9
 T	310000	4.415	11.2	39.873665	-105.000733	323.98
->	hardAccel	roast	88	1.35	I felt that in my satellites.
+>	hardAccel	roast	88	1.35	I just felt that in a satellite. In SPACE.
 P	310000	420.1
 T	310000	4.086	11.2	39.873694	-105.000763	321.33
 P	310000	414.6
@@ -12544,7 +12544,7 @@ P	337000	160.4
 T	338000	1.054	11.2	39.874484	-104.999589	64.47
 P	338000	158.3
 T	339000	4.915	-	39.874503	-104.999537	64.03
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	339000	151
 T	340000	8.373	-	39.874537	-104.999449	62.94
 P	340000	139.3
@@ -12594,7 +12594,7 @@ T	396000	0	11.2	39.875377	-104.997464	55.89
 T	397000	0	11.2	39.875377	-104.997464	58.37
 T	398000	0	11.2	39.875377	-104.997464	59.73
 T	399000	4.042	11.2	39.875394	-104.997422	62.21
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	400000	3.302	11.2	39.87542	-104.99744	-
 I	400000	Turn slight right at 5th Avenue	562.1	-	-
 >	instruction	nav	100	1.4	Final warning. In 0.3 miles, turn slight right at 5th Avenue. DO NOT MISS IT.
@@ -12680,7 +12680,7 @@ T	52000	6.439	22	39.880586	-104.999848	-
 T	53000	5.792	22	39.880637	-104.999831	14.39
 T	54000	5.865	22	39.880688	-104.999817	-
 T	84000	6.286	22	39.880744	-104.999802	11.76
->	tooSlow	roast	6	1.03	35 under the limit. Are we sightseeing?
+>	tooSlow	roast	6	1.03	The limit is 49. That's a ceiling, but you're allowed to visit it.
 >	noDestination	roast	6	1.03	We're moving. To where? I'm a GPS. Destinations are kind of my whole thing.
 T	85000	0	22	39.880744	-104.999802	12.36
 >	hardBraking	roast	14	1.06	Whoa. Did the brake pedal insult your family?
@@ -12690,7 +12690,7 @@ T	88000	0	22	39.880744	-104.999802	14.54
 T	89000	0	22	39.880744	-104.999802	284.54
 T	90000	0.904	22	39.880746	-104.999812	-
 T	91000	4.674	22	39.880754	-104.999866	281.52
->	hardAccel	roast	20	1.08	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	20	1.08	Nobody is racing you. Nobody wants to be seen with you.
 B	91000	0.81	0
 T	92000	5.361	22	39.880764	-104.999928	281.91
 T	93000	4.91	22	39.880774	-104.999984	283.04
@@ -12704,7 +12704,7 @@ T	98000	13.442	22	39.880883	-105.000635	-
 T	99000	14.221	22	39.880909	-105.000799	-
 T	100000	15.093	22	39.88094	-105.000972	283.2
 T	101000	0	22	39.88094	-105.000972	280.84
->	hardBraking	roast	27	1.11	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	27	1.11	Somewhere, a set of brake pads just filed for divorce.
 T	102000	0	22	39.88094	-105.000972	280.17
 T	103000	0	22	39.88094	-105.000972	278.64
 T	104000	0	22	39.88094	-105.000972	281.41
@@ -12897,7 +12897,7 @@ P	426000	552.8
 T	427000	0	15.6	39.881298	-105.000848	26.04
 P	427000	551.8
 T	428000	5.433	15.6	39.881342	-105.000821	25.3
->	hardAccel	roast	80	1.32	I felt that in my satellites.
+>	hardAccel	roast	80	1.32	I just felt that in a satellite. In SPACE.
 P	428000	541.8
 C	428000	1
 >	turnCompleted	roast	76	1.3	YOU DID IT. One correct turn after all that. I'm not proud. I'm relieved.
@@ -12963,7 +12963,7 @@ P	454000	230.9
 T	455000	8.865	22.4	39.88241	-105.003221	-
 P	455000	220.4
 T	485000	9.66	22.4	39.882455	-105.003317	-
->	tooSlow	roast	96	1.38	Somewhere, a snail is gaining on us. MOVE.
+>	tooSlow	roast	96	1.38	A snail just merged in front of us. It signaled. You've never signaled.
 P	485000	206.2
 T	486000	9.826	22.4	39.8825	-105.003417	300.55
 P	486000	192.2
@@ -13029,7 +13029,7 @@ T	32000	0	22	39.89	-105	2.55
 T	33000	4.577	22	39.890041	-104.999996	3.92
 >	hardAccel	roast	6	1.02	Easy. It's a green light, not a starting gun.
 T	34000	0	22	39.890041	-104.999996	4.58
->	hardBraking	roast	14	1.06	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	14	1.06	That stop was a little... dramatic.
 T	35000	0.121	22	39.890042	-104.999996	7.56
 T	36000	0.769	22	39.890049	-104.999995	4.85
 T	37000	0.017	22	39.890049	-104.999995	1.93
@@ -13057,12 +13057,12 @@ T	57000	0.521	22	39.890101	-104.999971	99.97
 T	58000	0.509	22	39.890105	-104.99997	-
 T	59000	0	22	39.890105	-104.99997	12.34
 T	60000	4.778	22	39.890147	-104.999958	12.3
->	hardAccel	roast	17	1.07	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	17	1.07	Nobody is racing you. Nobody wants to be seen with you.
 T	61000	5.271	22	39.890193	-104.999943	14.06
 T	62000	5.131	22	39.890238	-104.99993	12.08
 T	63000	4.896	22	39.890282	-104.999921	9.19
 T	64000	0	22	39.890282	-104.999921	11.52
->	hardBraking	roast	25	1.1	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	25	1.1	Somewhere, a set of brake pads just filed for divorce.
 T	65000	0	22	39.890282	-104.999921	9.1
 T	66000	0	22	39.890282	-104.999921	7.01
 T	67000	0	22	39.890282	-104.999921	7.09
@@ -13093,7 +13093,7 @@ T	89000	3.215	22	39.890381	-104.999803	-
 T	90000	3.689	22	39.890386	-104.99976	81.48
 T	91000	3.717	22	39.890391	-104.999717	82.09
 T	92000	0	22	39.890391	-104.999717	82.74
->	hardBraking	roast	40	1.16	My entire database just slid forward. Thanks.
+>	hardBraking	roast	40	1.16	You saw that coming for a quarter mile. I know because I saw it too.
 T	93000	0	22	39.890391	-104.999717	82.42
 T	94000	0.858	22	39.890392	-104.999707	80.59
 C	94000	1
@@ -13119,7 +13119,7 @@ T	108000	5.039	26.8	39.890524	-104.99945	349.99
 T	109000	4.567	26.8	39.890565	-104.999459	350.59
 T	110000	5.333	26.8	39.890612	-104.999469	351
 T	111000	0	26.8	39.890612	-104.999469	-
->	hardBraking	roast	54	1.22	You saw that coming for a quarter mile. I know because I saw it too.
+>	hardBraking	roast	54	1.22	My entire database just slid forward. Thanks.
 T	112000	0.181	26.8	39.890614	-104.999469	352.94
 T	113000	0	26.8	39.890614	-104.999469	-
 T	114000	0.125	26.8	39.890614	-104.999468	84.33
@@ -13137,7 +13137,7 @@ T	122000	8.857	26.8	39.89017	-104.999192	166.51
 I	122000	Turn left	59.5	-	-
 >	instruction	nav	59	1.24	Pay attention this time. In 200 feet, turn left. You can do it. Maybe.
 T	123000	0	26.8	39.89017	-104.999192	168.26
->	hardBraking	roast	67	1.27	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	67	1.27	You saw that coming a quarter mile ago. I know, because I pointed at it.
 P	123000	56
 O	123000	Grandma's	charging
 T	124000	4.098	26.8	39.890134	-104.999181	166.92
@@ -13183,7 +13183,7 @@ T	179000	0	11.2	39.88964	-104.998966	85.46
 T	180000	0.222	11.2	39.88964	-104.998964	83.84
 T	181000	0	11.2	39.88964	-104.998964	-
 T	182000	3.3	11.2	39.889644	-104.998925	81.87
->	hardAccel	roast	99	1.4	I felt that in my satellites.
+>	hardAccel	roast	99	1.4	I just felt that in a satellite. In SPACE.
 T	183000	3.06	11.2	39.889648	-104.998889	81.7
 T	184000	2.453	11.2	39.88965	-104.998861	84.42
 T	185000	0	11.2	39.88965	-104.998861	-
@@ -13324,7 +13324,7 @@ I	243000	Continue straight on Main Street	24.5	-	-
 T	244000	0.273	-	39.889602	-104.998223	92
 P	244000	20.4
 T	245000	5.405	-	39.889603	-104.998159	89.43
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	245000	10.9
 T	246000	5.547	-	39.889606	-104.998094	-
 P	246000	1.8
@@ -13379,7 +13379,7 @@ T	271000	0	-	39.889527	-104.99734	101.75
 >	hardBraking	roast	100	1.4	Every time you do that, a little piece of my GPS chip dies. I'm running out of pieces.
 P	271000	156
 T	272000	4.106	-	39.889521	-104.997293	99.85
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	272000	147.9
 T	273000	0	-	39.889521	-104.997293	-
 P	273000	145
@@ -13456,7 +13456,7 @@ P	361000	14.2
 T	362000	0	-	39.889437	-104.996628	95.1
 P	362000	10.7
 T	363000	3.594	-	39.889435	-104.996586	93.44
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	363000	6.2
 T	364000	3.343	-	39.889434	-104.996547	91.78
 P	364000	1
@@ -13500,7 +13500,7 @@ T	421000	0.322	-	39.889342	-104.995799	5.16
 T	422000	0.134	-	39.889343	-104.995799	6.08
 T	423000	0.644	-	39.889348	-104.995797	8.25
 T	424000	4.575	-	39.889389	-104.995788	10.44
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	425000	5.412	-	39.889437	-104.995779	7.63
 T	426000	5.198	-	39.889483	-104.995771	8
 X	426000	food	-
@@ -13528,7 +13528,7 @@ P	438000	81.3
 T	439000	0	-	39.889639	-104.995748	2.24
 P	439000	80
 T	440000	3.365	-	39.889669	-104.995747	0.71
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	440000	74.4
 T	441000	0	-	39.889669	-104.995747	0.25
 P	441000	71
@@ -13607,10 +13607,10 @@ T	19000	1.604	22	39.900161	-104.999933	86.62
 T	20000	1.708	22	39.900162	-104.999913	88.09
 T	21000	1.095	22	39.900162	-104.9999	85.66
 T	22000	5.391	22	39.900166	-104.999837	85.44
->	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to be seen with you.
 T	23000	5.407	22	39.900168	-104.999773	88.34
 T	24000	0	22	39.900168	-104.999773	-
->	hardBraking	roast	14	1.06	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	14	1.06	That stop was a little... dramatic.
 T	25000	0	22	39.900168	-104.999773	88.38
 T	26000	0	22	39.900168	-104.999773	89.39
 T	27000	0.547	22.4	39.900167	-104.999767	92.13
@@ -13636,7 +13636,7 @@ T	45000	4.076	22.4	39.900219	-104.999759	-
 T	46000	9.927	22.4	39.900308	-104.999748	5.67
 T	47000	10.73	22.4	39.900403	-104.999732	7.07
 M	47000
->	missedTurn	roast	36	1.14	I said turn. You heard 'keep going and ruin my day'.
+>	missedTurn	roast	36	1.14	I told you 500 meters in advance. 500 meters! That's practically a reservation.
 T	48000	11.176	22.4	39.900503	-104.999713	8.29
 T	49000	2.598	22.4	39.900526	-104.999709	7.75
 >	hardBraking	roast	43	1.17	You saw that coming for a quarter mile. I know because I saw it too.
@@ -13855,7 +13855,7 @@ P	146000	157.7
 T	147000	0.647	-	39.900128	-105.000555	261.69
 P	147000	154.2
 T	148000	5.465	-	39.90012	-105.000618	260.54
->	hardAccel	roast	90	1.36	I felt that in my satellites.
+>	hardAccel	roast	90	1.36	I just felt that in a satellite. In SPACE.
 P	148000	146.1
 >	instruction	nav	90	1.36	LEFT. IN 150 METERS. I'M SAYING IT EARLY BECAUSE I KNOW YOU.
 T	149000	6.102	-	39.900108	-105.000688	257.75
@@ -13934,7 +13934,7 @@ T	185000	2.578	-	39.899874	-105.001382	333.59
 T	186000	0	-	39.899874	-105.001382	334.23
 T	186000	0	-	39.899874	-105.001382	335.54
 M	186000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	187000	0	-	39.899874	-105.001382	338.38
 T	188000	0.448	-	39.899876	-105.001377	68.38
 T	189000	1.098	-	39.89988	-105.001365	67.61
@@ -13956,7 +13956,7 @@ T	201000	0.405	11.2	39.899896	-105.001317	65.29
 T	202000	1.229	11.2	39.8999	-105.001303	65.87
 T	203000	1.034	11.2	39.899904	-105.001292	66.05
 T	204000	4.83	11.2	39.899923	-105.001241	64.35
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	205000	4.347	11.2	39.899941	-105.001196	62.82
 T	206000	4.401	11.2	39.899959	-105.00115	61.74
 T	207000	5.304	11.2	39.899982	-105.001095	61.68
@@ -13985,9 +13985,9 @@ T	224000	5.031	11.2	39.900395	-105.001313	329.59
 T	225000	0	11.2	39.900395	-105.001313	328.2
 >	hardBraking	roast	100	1.4	Every time you do that, a little piece of my GPS chip dies. I'm running out of pieces.
 M	225000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	226000	3.756	11.2	39.900424	-105.001336	329.06
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	227000	4.514	11.2	39.900458	-105.001364	327.81
 T	228000	8.024	11.2	39.900521	-105.00141	330.58
 T	229000	7.421	11.2	39.900579	-105.001452	331.2
@@ -14046,7 +14046,7 @@ T	266000	0.382	11.2	39.900833	-105.002203	319.97
 P	266000	14.1
 >	instruction	nav	99	1.4	RIGHT! 20 METERS! RIGHT!
 T	267000	4.916	11.2	39.900867	-105.00224	320.92
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	267000	6.9
 T	268000	4.149	11.2	39.900897	-105.002269	323.46
 P	268000	0
@@ -14101,7 +14101,7 @@ D	336000	Sparkle Car Wash
 T	337000	6.182	20.1	39.899386	-105.001624	159.02
 T	338000	6.089	20.1	39.899335	-105.001597	158.02
 T	339000	9.183	20.1	39.899259	-105.001557	158.07
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	340000	10.127	20.1	39.899175	-105.001511	157.43
 T	341000	10.65	20.1	39.899086	-105.001463	157.44
 T	342000	11.587	20.1	39.898992	-105.001405	154.97
@@ -14154,7 +14154,7 @@ P	375000	155.9
 T	376000	1.502	20.1	39.897864	-105.001522	165.46
 P	376000	152.3
 T	377000	6.955	20.1	39.897802	-105.001505	168.16
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	377000	141.5
 >	instruction	nav	100	1.4	JUST IN CASE YOU FORGOT: RIGHT. 150 METERS. FORGET IT AND I SCREAM.
 T	378000	6.551	20.1	39.897745	-105.001491	169.77
@@ -14203,7 +14203,7 @@ P	425000	202.9
 T	426000	1.238	20.1	39.8976	-105.001009	-
 P	426000	197.1
 M	426000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	427000	0.968	20.1	39.897593	-105.001004	-
 P	427000	191.8
 T	457000	0.706	20.1	39.897587	-105.001	149.39
@@ -14245,7 +14245,7 @@ P	473000	141.1
 T	474000	0	22.4	39.897489	-105.000939	160.95
 P	474000	139.8
 T	475000	4.478	22.4	39.897451	-105.00092	159.45
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	475000	134.1
 T	505000	0	22.4	39.897451	-105.00092	157.91
 P	505000	129.2
@@ -14294,7 +14294,7 @@ P	550000	16
 T	551000	1.004	22.4	39.896964	-105.001109	255.64
 P	551000	10.3
 T	552000	5.126	22.4	39.896951	-105.001167	253.55
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	552000	4.3
 T	553000	5.522	22.4	39.896939	-105.00123	255.92
 P	553000	0
@@ -14328,7 +14328,7 @@ H	574000	police	1586	-
 T	575000	0.581	22.4	39.896487	-105.00156	158.34
 T	576000	0.865	22.4	39.89648	-105.001556	155.49
 T	577000	5.455	22.4	39.896436	-105.001528	153.7
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	578000	5.365	22.4	39.896391	-105.001502	156.42
 T	579000	0	22.4	39.896391	-105.001502	157.24
 >	hardBraking	roast	100	1.4	Every time you do that, a little piece of my GPS chip dies. I'm running out of pieces.
@@ -14380,7 +14380,7 @@ T	603000	0	20.1	39.895647	-105.001336	172.59
 >	hardBraking	roast	100	1.4	BRAKE CHECK! The car behind us is writing your name down. So am I.
 P	603000	385.6
 T	604000	3.741	20.1	39.895613	-105.001329	-
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	604000	378.5
 T	605000	4.836	20.1	39.895607	-105.001386	261.96
 P	605000	372.4
@@ -14431,7 +14431,7 @@ E	21	mph
 T	1000	3.73	22	39.910034	-105	0.06
 T	2000	4.671	22	39.910075	-104.999997	-
 T	3000	0	22	39.910075	-104.999997	4.76
->	hardBraking	roast	8	1.03	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	8	1.03	That stop was a little... dramatic.
 T	4000	0	22	39.910075	-104.999997	7.28
 T	5000	0.356	22	39.910079	-104.999997	-
 T	6000	0.092	22	39.910079	-104.999997	7.24
@@ -14473,7 +14473,7 @@ P	29000	174
 T	30000	6.516	22	39.910485	-104.999845	21.68
 P	30000	163.9
 T	31000	0.806	22	39.910492	-104.999842	20.77
->	hardBraking	roast	13	1.05	That stop was a little... dramatic.
+>	hardBraking	roast	13	1.05	Brake check! Who are we brake checking? Oh, everyone. Got it.
 P	31000	161.8
 T	32000	1.14	22	39.910502	-104.999837	21.93
 P	32000	159.3
@@ -14529,10 +14529,10 @@ P	54000	87
 T	55000	0	22	39.91055	-105.000001	278.68
 P	55000	84.5
 T	56000	4.348	22	39.910588	-104.999994	8.68
->	hardAccel	roast	20	1.08	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	20	1.08	Nobody is racing you. Nobody wants to be seen with you.
 P	56000	76.9
 T	57000	0.038	22	39.910589	-104.999994	6.61
->	hardBraking	roast	28	1.11	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	28	1.11	Somewhere, a set of brake pads just filed for divorce.
 P	57000	74.2
 T	58000	0.87	22	39.910596	-104.999993	4.72
 P	58000	72.3
@@ -14616,7 +14616,7 @@ T	133000	6.907	-	39.911398	-104.999687	0.12
 T	134000	7.79	-	39.911468	-104.999691	357.68
 T	135000	7.844	-	39.911538	-104.999695	357.49
 T	136000	2.237	-	39.911559	-104.999696	357.83
->	hardBraking	roast	52	1.21	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	52	1.21	You saw that coming a quarter mile ago. I know, because I pointed at it.
 T	137000	2.638	-	39.911582	-104.999696	-
 T	138000	2.728	-	39.911607	-104.999696	0.91
 T	139000	3.36	-	39.911637	-104.999696	0.06
@@ -14652,7 +14652,7 @@ T	165000	2.143	-	39.911894	-104.999116	87.72
 T	166000	1.796	-	39.91191	-104.999117	357.72
 T	167000	2.713	13.4	39.911934	-104.99912	354.82
 T	168000	8.327	13.4	39.912009	-104.999133	352.42
->	hardAccel	roast	68	1.27	I felt that in my satellites.
+>	hardAccel	roast	68	1.27	I just felt that in a satellite. In SPACE.
 T	169000	11.786	13.4	39.912113	-104.999154	351.28
 T	170000	12.116	13.4	39.91222	-104.999179	350.01
 T	171000	11.938	13.4	39.912327	-104.9992	351.48
@@ -14693,7 +14693,7 @@ P	194000	203.8
 T	195000	0	11.2	39.912774	-104.999253	-
 P	195000	201
 T	196000	3.397	11.2	39.912805	-104.999257	354.1
->	hardAccel	roast	92	1.37	I felt that in my satellites.
+>	hardAccel	roast	92	1.37	I just felt that in a satellite. In SPACE.
 P	196000	193.9
 T	197000	0	11.2	39.912805	-104.999257	353.48
 P	197000	191.3
@@ -14791,7 +14791,7 @@ P	237000	291.6
 T	238000	2.023	11.2	39.91255	-104.998704	349.26
 P	238000	288.1
 T	239000	7.298	11.2	39.912615	-104.998717	351.12
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	239000	277.6
 T	269000	7.817	11.2	39.912685	-104.998729	352.58
 P	269000	266.8
@@ -14879,7 +14879,7 @@ T	331000	0	15.6	39.913398	-104.999411	-
 P	331000	150.3
 >	instruction	nav	100	1.4	LEFT. IN 500 FEET. I'M SAYING IT EARLY BECAUSE I KNOW YOU.
 M	331000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	332000	0	11.2	39.913398	-104.999411	265.61
 P	332000	148.7
 T	333000	0.441	11.2	39.913398	-104.999416	263.52
@@ -14889,7 +14889,7 @@ P	334000	143.6
 T	364000	1.541	11.2	39.913394	-104.999443	258.62
 P	364000	138.1
 T	365000	7.26	11.2	39.91338	-104.999526	257.53
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	365000	127.2
 T	366000	6.551	11.2	39.913367	-104.999602	257.24
 P	366000	117.4
@@ -14897,7 +14897,7 @@ T	367000	0	20.1	39.913367	-104.999602	255.77
 >	hardBraking	roast	100	1.4	Every time you do that, a little piece of my GPS chip dies. I'm running out of pieces.
 P	367000	113.5
 M	367000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	368000	0	20.1	39.913367	-104.999602	253.61
 P	368000	109
 T	369000	0	20.1	39.913367	-104.999602	254.58
@@ -14959,7 +14959,7 @@ P	393000	356.6
 T	394000	0.35	15.6	39.913295	-104.999832	70.47
 P	394000	351.5
 M	394000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	395000	0.286	15.6	39.913296	-104.999829	-
 P	395000	350.4
 T	396000	0.823	15.6	39.913298	-104.99982	71.86
@@ -14967,7 +14967,7 @@ P	396000	346
 T	397000	1.364	15.6	39.913301	-104.999804	74.55
 P	397000	340
 T	398000	5.037	15.6	39.913314	-104.999747	73.71
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	398000	330.5
 T	399000	5.197	15.6	39.913329	-104.999689	72.01
 P	399000	320.5
@@ -15035,7 +15035,7 @@ P	426000	148.6
 T	427000	0	13.4	39.913591	-104.998819	253.42
 P	427000	146.2
 T	428000	4.231	13.4	39.91358	-104.998867	253.45
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	428000	137.2
 T	429000	0	13.4	39.91358	-104.998867	252.36
 >	hardBraking	roast	100	1.4	BRAKE CHECK! The car behind us is writing your name down. So am I.
@@ -15070,14 +15070,14 @@ T	37000	4.741	22	39.920104	-105.000013	-
 >	noDestination	roast	9	1.04	I see we're driving, but you didn't tell me where we're going. Typical.
 T	38000	4.711	22	39.920146	-105.000019	354.28
 T	39000	0	22	39.920146	-105.000019	355.19
->	hardBraking	roast	17	1.07	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	17	1.07	Somewhere, a set of brake pads just filed for divorce.
 T	40000	0	22	39.920146	-105.000019	357.78
 T	41000	0	22	39.920146	-105.000019	355.65
 T	42000	0.356	22	39.920149	-105.000019	357.23
 T	43000	0	22	39.920149	-105.000019	358.75
 T	44000	0	22	39.920149	-105.000019	-
 T	45000	3.205	22	39.920178	-105.00002	-
->	hardAccel	roast	22	1.09	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	22	1.09	Nobody is racing you. Nobody wants to be seen with you.
 T	45000	3.224	22	39.920207	-105.00002	0.51
 T	46000	2.428	22	39.920229	-105.000019	1.83
 T	47000	2.203	22	39.920248	-105.000017	4
@@ -15099,7 +15099,7 @@ T	118000	0.883	22.4	39.920476	-104.999979	11.1
 T	119000	1.349	22.4	39.920488	-104.999976	13.16
 T	120000	0.463	22.4	39.920492	-104.999975	13.27
 R	120000
->	rerouted	roast	30	1.12	Recalculating. Again. Because of you.
+>	rerouted	roast	30	1.12	New route. Let's call this one 'Plan B for Bad Driver'.
 T	121000	0.153	22.4	39.920493	-104.999974	10.71
 T	122000	0	22.4	39.920493	-104.999974	9.64
 T	123000	0.057	22.4	39.920494	-104.999974	8.14
@@ -15277,7 +15277,7 @@ P	240000	141.6
 T	241000	5.904	-	39.920842	-104.999949	38.85
 P	241000	135.1
 T	242000	9.606	-	39.92091	-104.99988	37.68
->	hardAccel	roast	74	1.29	I felt that in my satellites.
+>	hardAccel	roast	74	1.29	I just felt that in a satellite. In SPACE.
 P	242000	122.6
 T	243000	9.148	-	39.920976	-104.999816	-
 P	243000	109.3
@@ -15389,7 +15389,7 @@ P	347000	20.8
 T	348000	3.659	-	39.92143	-104.999685	307.83
 P	348000	15.5
 T	349000	8.727	-	39.921476	-104.999768	306.24
->	hardAccel	roast	97	1.39	I felt that in my satellites.
+>	hardAccel	roast	97	1.39	I just felt that in a satellite. In SPACE.
 P	349000	3.5
 T	350000	8.577	-	39.921521	-104.99985	305.62
 P	350000	0
@@ -15476,7 +15476,7 @@ P	393000	187.9
 T	394000	0	-	39.922934	-104.998626	-
 P	394000	186.4
 T	395000	4.791	-	39.922961	-104.998582	52.24
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	395000	176.7
 T	396000	4.412	-	39.922984	-104.99854	53.49
 P	396000	169.5
@@ -15592,7 +15592,7 @@ P	443000	124.8
 T	444000	0.879	11.2	39.923258	-104.997625	82.58
 P	444000	122.6
 T	445000	6.196	11.2	39.923268	-104.997554	79.81
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	445000	114
 T	446000	6.251	11.2	39.923281	-104.997482	76.96
 P	446000	103.3
@@ -15707,7 +15707,7 @@ P	536000	341.8
 T	537000	11.641	11.2	39.924369	-104.99684	-
 P	537000	326.4
 T	538000	11.472	11.2	39.924471	-104.996861	351.23
->	speeding	roast	100	1.4	1 over! 1! Do you have any idea what 1 miles per hour feels like to me?
+>	speeding	roast	100	1.4	IT IS 25. I will say it until one of us dies, and I'm software.
 P	538000	311.4
 T	539000	12.493	11.2	39.924582	-104.996883	351.29
 P	539000	297.4
@@ -15726,7 +15726,7 @@ P	545000	212.3
 T	546000	11.385	11.2	39.925287	-104.997043	349.06
 P	546000	197.7
 T	547000	11.773	11.2	39.92539	-104.997072	348.13
->	speeding	roast	100	1.4	IT IS 25. I will say it until one of us dies, and I'm software.
+>	speeding	roast	100	1.4	1 over! I'd call the cops, but then I'd have to explain how I know you.
 P	547000	183.5
 T	547000	11.334	11.2	39.92549	-104.997101	347.59
 P	547000	169.8
@@ -15754,7 +15754,7 @@ P	556000	74.7
 T	557000	3.198	20.1	39.92619	-104.997345	347.32
 P	557000	71
 M	557000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	558000	2.525	20.1	39.926213	-104.997352	347.38
 P	558000	67.4
 T	588000	0	20.1	39.926213	-104.997352	346.1
@@ -15794,7 +15794,7 @@ P	603000	268.6
 T	604000	1.937	20.1	39.926284	-104.99738	341.04
 P	604000	262
 T	605000	6.08	20.1	39.926335	-104.997402	341.93
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	605000	254.7
 T	606000	7.166	20.1	39.926396	-104.997432	339.25
 P	606000	245
@@ -15856,7 +15856,7 @@ T	659000	7.708	20.1	39.928018	-104.998573	329.34
 O	659000	the Supercharger	electronics
 T	660000	8.472	20.1	39.928085	-104.99862	332
 T	690000	7.623	20.1	39.928145	-104.998663	331.19
->	tooSlow	roast	100	1.4	Somewhere, a snail is gaining on us. MOVE.
+>	tooSlow	roast	100	1.4	WE ARE GOING 17. I could get there faster as an email attachment.
 T	691000	8.582	20.1	39.928213	-104.99871	332.31
 T	692000	8.236	-	39.928277	-104.998758	330.34
 T	693000	7.599	-	39.928336	-104.998803	329.53
@@ -15879,10 +15879,10 @@ T	706000	3.777	-	39.928663	-104.99904	333.92
 T	707000	4.404	-	39.928699	-104.999062	335.35
 T	708000	3.858	-	39.928731	-104.999081	335.07
 M	708000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	709000	4.821	-	39.928769	-104.999106	333.55
 M	709000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	709000	5.3	-	39.928812	-104.999135	332.4
 S	709000	0
 >	stopRequest	roast	100	1.4	LIAR! I'M PUTTING BEST BUY ON THE HEAT MAP AS A CRIME SCENE!
@@ -15983,10 +15983,10 @@ T	8000	3.449	22	39.930155	-105.000009	359.1
 T	9000	4.328	22	39.930194	-105.00001	358.02
 T	10000	5.339	22	39.930242	-105.000011	359.25
 T	11000	9.986	22	39.930332	-105.000013	359.31
->	hardAccel	roast	19	1.08	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	19	1.08	Nobody is racing you. Nobody wants to be seen with you.
 T	12000	14.996	22	39.930466	-105.000017	358.48
 T	42000	14.627	22	39.930598	-105.000016	0.29
->	tooSlow	roast	20	1.08	The limit is 49. That's a ceiling, but you're allowed to get close to it.
+>	tooSlow	roast	20	1.08	16 under. Are we sightseeing, or is the car on a leash?
 >	noDestination	roast	20	1.08	I see we're driving, but you didn't tell me where we're going. Typical.
 T	43000	14.977	22	39.930732	-105.000008	2.59
 T	44000	15.227	22	39.930869	-104.999998	-
@@ -15997,14 +15997,14 @@ T	48000	22.483	22	39.931515	-104.999981	0.11
 >	hardAccel	roast	25	1.1	Easy. It's a green light, not a starting gun.
 T	49000	26.628	22	39.931754	-104.999966	2.75
 T	50000	21.633	22	39.931948	-104.999958	1.84
->	hardBraking	roast	33	1.13	That stop was a little... dramatic.
+>	hardBraking	roast	33	1.13	Brake check! Who are we brake checking? Oh, everyone. Got it.
 T	51000	21.623	22	39.932141	-104.999939	-
 T	52000	21.237	22	39.932332	-104.999931	1.77
 T	53000	26.462	22	39.93257	-104.999919	2.19
 T	54000	26.856	22	39.932811	-104.999905	-
 T	55000	27.22	22	39.933055	-104.999896	1.71
 T	56000	28.125	22	39.933308	-104.99989	0.99
->	speeding	roast	39	1.15	I'm recalculating. Not the route. My life choices.
+>	speeding	roast	39	1.15	14 OVER. This isn't a racetrack. Racetracks have fewer witnesses.
 A	56000	0
 T	57000	19.339	22	39.933481	-104.999879	2.73
 T	58000	19.732	22	39.933658	-104.99986	4.74
@@ -16020,7 +16020,7 @@ T	64000	0	22	39.934704	-104.999868	-
 >	hardBraking	roast	42	1.17	My entire database just slid forward. Thanks.
 T	65000	0.851	22	39.934712	-104.999868	1.88
 M	65000
->	missedTurn	roast	60	1.24	I told you 0.3 miles in advance. 0.3 miles! That's practically a reservation.
+>	missedTurn	roast	60	1.24	There goes the turn. Wave goodbye. It's the closest you'll get to it.
 T	66000	1.302	22	39.934723	-104.999867	-
 T	67000	1.444	22	39.934736	-104.999867	0.89
 T	68000	1.504	22	39.93475	-104.999867	359.05
@@ -16051,7 +16051,7 @@ P	79000	159.5
 I	79000	Turn left	557.7	other	-
 >	instruction	nav	58	1.23	Slowly, for you: In 0.3 miles, turn left. Signal, please. You own a blinker.
 T	109000	4.218	22	39.934954	-104.999909	351.15
->	tooSlow	roast	59	1.24	A man on a bicycle just passed us. He waved. It was a pity wave.
+>	tooSlow	roast	59	1.24	You can go faster. I believe in you. I don't, but legally I have to say that.
 P	109000	548.8
 T	110000	5.06	22	39.934999	-104.999915	354.14
 P	110000	540.9
@@ -16169,7 +16169,7 @@ P	216000	339
 T	217000	0	13.4	39.936397	-105.000201	349.7
 P	217000	334.4
 T	218000	3.628	13.4	39.936429	-105.000208	350.7
->	hardAccel	roast	99	1.39	I felt that in my satellites.
+>	hardAccel	roast	99	1.39	I just felt that in a satellite. In SPACE.
 P	218000	330.4
 T	219000	3.582	13.4	39.936461	-105.000212	353.37
 P	219000	322
@@ -16303,7 +16303,7 @@ P	305000	113
 T	306000	3.774	13.4	39.937345	-105.001757	337.54
 P	306000	107.6
 T	307000	9.512	13.4	39.937423	-105.001801	336.74
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	307000	93.2
 F	307000	1	Colfax Avenue
 >	traffic	roast	100	1.4	This is what happens when you ignore me. This. Exactly this.
@@ -16513,7 +16513,7 @@ P	402000	135.5
 T	403000	6.955	13.4	39.939035	-105.002426	3.46
 P	403000	124.6
 T	404000	10.674	13.4	39.939131	-105.002424	0.89
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	404000	110.3
 T	405000	0	13.4	39.939131	-105.002424	358.17
 >	hardBraking	roast	100	1.4	BRAKE CHECK! The car behind us is writing your name down. So am I.
@@ -16598,7 +16598,7 @@ P	495000	326.8
 T	496000	3.308	13.4	39.939194	-105.001985	90.33
 P	496000	320.7
 T	497000	7.691	13.4	39.939193	-105.001895	90.97
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	497000	309.8
 T	498000	8.774	13.4	39.939188	-105.001792	93.83
 P	498000	299
@@ -16701,7 +16701,7 @@ T	542000	0	13.4	39.939447	-105.000209	168.11
 P	542000	12.9
 >	instruction	nav	99	1.4	TURN LEFT IN 50 FEET OR SO HELP ME.
 T	543000	4.106	13.4	39.939412	-105.000197	165.89
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	543000	4.2
 T	544000	3.916	13.4	39.939378	-105.000186	165.32
 P	544000	0
@@ -16744,12 +16744,12 @@ P	11000	226.2
 T	12000	8.268	22	39.940634	-104.999882	7.92
 P	12000	217.2
 T	13000	11.923	22	39.94074	-104.999858	9.81
->	hardAccel	roast	11	1.04	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	11	1.04	Nobody is racing you. Nobody wants to be seen with you.
 P	13000	205.2
 T	14000	11.497	22	39.940841	-104.999832	11.24
 P	14000	190.6
 T	15000	0	22	39.940841	-104.999832	101.24
->	hardBraking	roast	19	1.08	That stop was a little... dramatic.
+>	hardBraking	roast	19	1.08	Brake check! Who are we brake checking? Oh, everyone. Got it.
 P	15000	190
 T	16000	0	22	39.940841	-104.999832	102.97
 P	16000	186.6
@@ -16802,7 +16802,7 @@ P	38000	42.9
 T	39000	8.562	22	39.940673	-105.000733	-
 P	39000	31.7
 T	40000	1.116	22	39.940672	-105.000746	266.06
->	hardBraking	roast	30	1.12	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	30	1.12	That stop was a little... dramatic.
 P	40000	25.7
 T	40000	0.877	22	39.940672	-105.000757	265.76
 P	40000	22.5
@@ -17005,7 +17005,7 @@ P	217000	264.7
 T	218000	2.774	15.6	39.941497	-105.001839	343.2
 P	218000	259.7
 T	219000	8.329	15.6	39.941569	-105.001864	345.8
->	hardAccel	roast	71	1.28	I felt that in my satellites.
+>	hardAccel	roast	71	1.28	I just felt that in a satellite. In SPACE.
 P	219000	246.5
 T	220000	9.006	15.6	39.941647	-105.001894	343.13
 P	220000	236.5
@@ -17072,7 +17072,7 @@ P	247000	332
 T	248000	4.245	15.6	39.941841	-105.002295	-
 P	248000	322.9
 T	278000	3.478	15.6	39.941811	-105.002281	-
->	tooSlow	roast	91	1.36	Somewhere, a snail is gaining on us. MOVE.
+>	tooSlow	roast	91	1.36	WE ARE GOING 13. I could get there faster as an email attachment.
 P	278000	317.8
 T	279000	4.391	15.6	39.941775	-105.002262	158.13
 P	279000	308.5
@@ -17121,7 +17121,7 @@ P	327000	211.5
 T	328000	0	13.4	39.941887	-105.001789	332.68
 P	328000	207.7
 T	329000	5.8	13.4	39.941933	-105.001822	330.88
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	329000	198.4
 T	330000	6.477	13.4	39.941904	-105.001889	240.88
 P	330000	187
@@ -17139,7 +17139,7 @@ P	335000	127.6
 T	336000	13.347	13.4	39.941613	-105.002482	237.92
 P	336000	112
 T	337000	14.122	13.4	39.941541	-105.002618	235.29
->	speeding	roast	100	1.4	IT IS 48. I will say it until one of us dies, and I'm software.
+>	speeding	roast	100	1.4	3 over! I'd call the cops, but then I'd have to explain how I know you.
 P	337000	97
 X	337000	-	-
 >	unplannedStop	roast	100	1.4	WHY ARE WE HERE. WHERE IS HERE. I SAID NOTHING ABOUT STOPPING.
@@ -17155,7 +17155,7 @@ P	341000	73.3
 T	342000	0.992	13.4	39.941464	-105.002773	-
 P	342000	69.4
 M	342000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	343000	1.866	13.4	39.941454	-105.002791	232.58
 P	343000	66.2
 T	344000	1.72	13.4	39.941444	-105.002807	231.91
@@ -17197,7 +17197,7 @@ W	388000	left	right
 T	389000	0.378	13.4	39.941069	-105.003297	225.63
 T	390000	0	13.4	39.941069	-105.003297	223.89
 T	391000	4.159	26.8	39.941043	-105.003333	226.76
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	392000	4.154	15.6	39.941019	-105.00337	229.36
 T	393000	7.537	15.6	39.940974	-105.003436	228.9
 T	394000	6.684	15.6	39.940935	-105.003496	228.92
@@ -17379,7 +17379,7 @@ P	544000	443.8
 T	544000	0	20.1	39.940397	-105.002968	136.58
 P	544000	442.7
 T	545000	5.271	20.1	39.940364	-105.002924	134.56
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	545000	436.1
 T	546000	5.566	20.1	39.94033	-105.002876	132.95
 P	546000	427.3
@@ -17406,7 +17406,7 @@ P	556000	331.8
 T	557000	8.099	20.1	39.939787	-105.002227	-
 P	557000	319.2
 M	557000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	558000	11.489	20.1	39.939715	-105.00213	134.16
 >	hardAccel	roast	100	1.4	WHO TAUGHT YOU THE GAS PEDAL HAS ONLY TWO SETTINGS?
 P	558000	304.8
@@ -17423,7 +17423,7 @@ P	563000	227.2
 T	564000	14.333	20.1	39.939243	-105.001684	218.86
 P	564000	211.7
 T	565000	14.833	20.1	39.939143	-105.001799	221.46
->	tooSlow	roast	100	1.4	Somewhere, a snail is gaining on us. MOVE.
+>	tooSlow	roast	100	1.4	A snail just merged in front of us. It signaled. You've never signaled.
 P	565000	194.2
 T	566000	15.558	20.1	39.939042	-105.001925	223.41
 P	566000	176.3
@@ -17464,14 +17464,14 @@ T	618000	0	20.1	39.938707	-105.002503	327.73
 T	619000	0	20.1	39.938707	-105.002503	328.08
 T	620000	0.207	20.1	39.938709	-105.002505	329.89
 T	621000	6.106	20.1	39.938757	-105.002538	332.59
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	622000	5.545	20.1	39.938801	-105.00257	330.08
 T	623000	5.494	26.8	39.938844	-105.0026	332.64
 T	624000	5.353	26.8	39.938887	-105.002628	333.39
 T	625000	5.889	26.8	39.938935	-105.002658	334.03
 T	626000	5.664	26.8	39.938981	-105.002688	333.81
 T	656000	6.618	26.8	39.939033	-105.002725	331.88
->	tooSlow	roast	100	1.4	WE ARE GOING 24. I could get there faster by being emailed.
+>	tooSlow	roast	100	1.4	WE ARE GOING 24. I could get there faster as an email attachment.
 T	657000	6.31	26.8	39.939084	-105.002758	333.48
 T	658000	6.021	26.8	39.939133	-105.002787	335.51
 T	659000	5.343	26.8	39.939113	-105.002844	245.51
@@ -17566,7 +17566,7 @@ P	45000	604.5
 T	46000	4.797	22	39.950093	-104.999984	8.94
 P	46000	599.1
 T	47000	0	22	39.950093	-104.999984	6.2
->	hardBraking	roast	31	1.12	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	31	1.12	That stop was a little... dramatic.
 P	47000	596.7
 T	48000	3.149	22	39.950121	-104.999979	7.35
 P	48000	589.9
@@ -17702,7 +17702,7 @@ P	107000	174.8
 T	108000	4.133	22.4	39.950623	-105.00258	285.23
 P	108000	169.6
 T	109000	9.937	22.4	39.950647	-105.002693	285.62
->	hardAccel	roast	77	1.31	I felt that in my satellites.
+>	hardAccel	roast	77	1.31	I just felt that in a satellite. In SPACE.
 P	109000	158
 T	110000	9.661	22.4	39.950672	-105.002801	-
 P	110000	144.5
@@ -17825,7 +17825,7 @@ T	189000	5.011	20.1	39.949417	-105.00306	74.41
 T	190000	4.647	20.1	39.949429	-105.003008	73.66
 T	191000	5.607	20.1	39.949442	-105.002944	74.82
 T	221000	5.55	20.1	39.949457	-105.002882	72.88
->	tooSlow	roast	90	1.36	Somewhere, a snail is gaining on us. MOVE.
+>	tooSlow	roast	90	1.36	A snail just merged in front of us. It signaled. You've never signaled.
 T	222000	5.544	20.1	39.949472	-105.002819	72.95
 T	223000	1.542	20.1	39.949476	-105.002802	-
 >	hardBraking	roast	97	1.39	WHY DO YOU BRAKE LIKE THE ROAD OWES YOU MONEY?
@@ -17836,7 +17836,7 @@ T	227000	1.128	20.1	39.949487	-105.002762	-
 T	228000	1.685	20.1	39.949491	-105.002743	-
 T	229000	1.374	20.1	39.949494	-105.002728	-
 T	230000	6.842	20.1	39.949511	-105.00265	74.07
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	231000	7.487	20.1	39.949533	-105.002567	-
 T	232000	0	20.1	39.949533	-105.002567	70.57
 >	hardBraking	roast	100	1.4	Every time you do that, a little piece of my GPS chip dies. I'm running out of pieces.
@@ -17921,7 +17921,7 @@ T	322000	0.46	13.4	39.949278	-105.00131	163.8
 T	323000	0.734	13.4	39.949271	-105.001308	163.47
 T	324000	0.555	13.4	39.949267	-105.001306	162.33
 T	325000	3.85	13.4	39.949233	-105.001293	164.01
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	326000	3.222	13.4	39.949225	-105.00133	254.01
 T	327000	8.804	13.4	39.949207	-105.00143	256.18
 T	328000	0	13.4	39.949207	-105.00143	256.88
@@ -17978,7 +17978,7 @@ P	421000	75.8
 T	422000	0	13.4	39.948727	-105.001071	-
 P	422000	71.7
 M	422000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	423000	0.907	13.4	39.948734	-105.001076	334.28
 P	423000	68.1
 T	424000	1.225	15.6	39.948744	-105.001081	337.15
@@ -18040,7 +18040,7 @@ T	487000	9.68	-	39.949101	-105.001386	323.95
 T	488000	10.011	-	39.949174	-105.001455	324.38
 T	489000	10.053	-	39.949245	-105.001528	-
 T	490000	15.541	-	39.949353	-105.001644	320.71
->	hardAccel	roast	95	1.38	I felt that in my satellites.
+>	hardAccel	roast	95	1.38	I just felt that in a satellite. In SPACE.
 T	491000	16.286	-	39.94947	-105.00176	322.87
 T	492000	16.33	-	39.949585	-105.001877	322.23
 T	493000	15.526	-	39.949699	-105.001984	324.3
@@ -18086,7 +18086,7 @@ T	520000	1.292	15.6	39.94918	-105.005358	243.97
 T	521000	2.07	15.6	39.949172	-105.00538	244.43
 T	522000	1.7	15.6	39.949165	-105.005398	242.12
 T	552000	2.741	15.6	39.949154	-105.005427	-
->	tooSlow	roast	100	1.4	WE ARE GOING 6. I could get there faster by being emailed.
+>	tooSlow	roast	100	1.4	WE ARE GOING 6. I could get there faster as an email attachment.
 T	553000	0	15.6	39.949154	-105.005427	246.63
 T	554000	0.105	15.6	39.949154	-105.005428	245.37
 T	555000	0.099	15.6	39.949153	-105.005429	243.68
@@ -18150,11 +18150,11 @@ E	26	mph
 T	1000	0	22	39.96	-105	0.81
 T	1000	0.645	22	39.960006	-105	3.02
 T	2000	6.164	22	39.960061	-104.999998	1.48
->	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to be seen with you.
 T	3000	5.643	22	39.960112	-104.999993	3.67
 T	4000	5.575	22	39.960162	-104.999991	2.28
 T	5000	0	22	39.960162	-104.999991	4.75
->	hardBraking	roast	14	1.05	That stop was a little... dramatic.
+>	hardBraking	roast	14	1.05	Brake check! Who are we brake checking? Oh, everyone. Got it.
 T	6000	0	22	39.960162	-104.999991	4.05
 T	7000	0	22.4	39.960162	-104.999991	5.73
 T	8000	0	22.4	39.960162	-104.999991	5.85
@@ -18183,7 +18183,7 @@ B	56000	0.13	0
 T	57000	0	22.4	39.960334	-104.999967	0.32
 T	58000	0	22.4	39.960334	-104.999967	358.42
 T	59000	3.326	22.4	39.960363	-104.999967	0.19
->	hardAccel	roast	20	1.08	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	20	1.08	Nobody is racing you. Nobody wants to be seen with you.
 U	59000	186150	1
 >	abandoned	roast	20	1.08	Oh, you're back. I was in here for 3 minutes. Alone. In the cupholder. Thinking about your driving.
 T	60000	3.374	22.4	39.960394	-104.999968	359.64
@@ -18192,7 +18192,7 @@ I	60000	Turn right onto Oak Avenue	508.5	-	stopSign
 T	60000	2.788	22.4	39.960419	-104.999968	359.12
 P	60000	504.1
 T	90000	1.893	22.4	39.960436	-104.999968	359.55
->	tooSlow	roast	21	1.08	46 under the limit. Are we sightseeing?
+>	tooSlow	roast	21	1.08	At this speed, the ETA is less of an estimate and more of a prophecy.
 P	90000	497.3
 T	91000	1.963	22.4	39.960453	-104.999969	357.01
 P	91000	492.2
@@ -18252,7 +18252,7 @@ P	113000	179.9
 T	114000	6.037	22.4	39.960998	-104.999891	6.2
 P	114000	173.7
 T	115000	0	22.4	39.960998	-104.999891	-
->	hardBraking	roast	31	1.12	Brake check! Who are we brake checking? Oh, everyone. Got it.
+>	hardBraking	roast	31	1.12	Somewhere, a set of brake pads just filed for divorce.
 P	115000	170.5
 T	116000	0.389	22.4	39.961001	-104.999891	2.95
 P	116000	169.2
@@ -18349,7 +18349,7 @@ T	191000	11.147	11.2	39.962881	-105.000505	271.76
 T	192000	10.283	11.2	39.962883	-105.000626	271.54
 T	193000	10.583	11.2	39.962886	-105.000751	271.86
 T	194000	11.546	11.2	39.962887	-105.000887	270.57
->	speeding	roast	57	1.23	It's 25. Not 26. Do I need to draw it for you?
+>	speeding	roast	57	1.23	26 in a 25. You think the sign is a suggestion? It's not. It's a sign.
 T	195000	10.739	11.2	39.962892	-105.001013	273.02
 T	196000	11.445	11.2	39.962893	-105.001147	270.54
 T	197000	11.297	11.2	39.962889	-105.00128	267.61
@@ -18380,7 +18380,7 @@ T	273000	0	22.4	39.962869	-105.002343	356.09
 I	273000	Turn slight right at 5th Avenue	347.8	right	none
 >	instruction	nav	67	1.27	Slowly, for you: In 0.2 miles, turn slight right at 5th Avenue. Signal, please. You own a blinker.
 T	274000	3.79	22.4	39.962903	-105.002348	354.03
->	hardAccel	roast	73	1.29	I felt that in my satellites.
+>	hardAccel	roast	73	1.29	I just felt that in a satellite. In SPACE.
 P	274000	342.4
 T	275000	2.999	22.4	39.96293	-105.002351	354.62
 P	275000	338.9
@@ -18480,7 +18480,7 @@ P	316000	299.7
 T	317000	2.741	22.4	39.963011	-105.004103	274.43
 P	317000	296.2
 T	318000	5.746	22.4	39.963012	-105.004171	271.69
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	318000	288.6
 T	319000	4.954	22.4	39.963012	-105.004229	269.82
 P	319000	279.9
@@ -18500,7 +18500,7 @@ P	324000	249.7
 T	325000	0.652	22.4	39.963015	-105.004411	268.48
 P	325000	245.7
 M	325000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	326000	0.384	22.4	39.963015	-105.004415	270.57
 P	326000	241.1
 T	327000	0	22.4	39.963015	-105.004415	180.57
@@ -18567,7 +18567,7 @@ P	410000	319.5
 T	411000	1.088	22.4	39.962829	-105.004986	179.49
 P	411000	316.8
 T	412000	4.162	22.4	39.962791	-105.004985	178.84
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	412000	309.9
 T	413000	4.892	22.4	39.962791	-105.005042	268.84
 P	413000	303.2
@@ -18628,7 +18628,7 @@ T	440000	0.102	29.1	39.960889	-105.005113	347.31
 T	441000	0	29.1	39.960889	-105.005113	347.8
 T	442000	0	29.1	39.960889	-105.005113	349.04
 T	443000	4.511	29.1	39.960928	-105.005126	346.36
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	444000	5.259	29.1	39.960974	-105.005141	-
 T	445000	5.806	29.1	39.961024	-105.005157	346.35
 T	446000	5.705	29.1	39.961074	-105.005176	343.45
@@ -18656,7 +18656,7 @@ T	464000	1.61	22.4	39.96162	-105.005171	70.56
 F	464000	1	-
 >	traffic	roast	100	1.4	TRAFFIC. OBVIOUSLY. I SAID THE OTHER ROUTE. I SAID IT OUT LOUD.
 T	465000	5.136	22.4	39.961636	-105.005114	70.67
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	466000	5.979	22.4	39.961686	-105.005138	340.67
 T	467000	6.532	22.4	39.961741	-105.005164	-
 T	468000	5.667	22.4	39.961789	-105.005188	339
@@ -18761,7 +18761,7 @@ P	538000	209.5
 T	539000	1.503	22.4	39.961238	-105.005855	255.21
 P	539000	207.7
 T	540000	5.728	22.4	39.961223	-105.005919	252.85
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	540000	198.9
 T	541000	8.813	22.4	39.961196	-105.006016	249.89
 P	541000	185.7
@@ -18861,7 +18861,7 @@ T	614000	12.817	22.4	39.96134	-105.003062	87.17
 T	615000	12.61	22.4	39.961453	-105.00307	357.17
 T	616000	11.935	22.4	39.96156	-105.003076	357.55
 T	617000	14.944	22.4	39.961695	-105.003081	358.41
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	618000	14.184	22.4	39.961822	-105.003089	357.04
 T	619000	13.42	22.4	39.961942	-105.003094	358.21
 S	619000	1
@@ -18917,7 +18917,7 @@ P	708000	236.7
 T	709000	1.542	-	39.962377	-105.002612	92.93
 P	709000	233.5
 T	710000	6.119	-	39.962373	-105.00254	94.23
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	710000	226
 I	710000	Turn left onto Elm Street	325.6	-	-
 >	instruction	nav	100	1.4	Final warning. In 0.2 miles, turn left onto Elm Street. I'm watching you.
@@ -18978,7 +18978,7 @@ T	2000	0	22	39.97	-105	2.31
 T	3000	0	22	39.97	-105	4.31
 T	4000	0	22	39.97	-105	3.79
 C	4000	1
->	turnCompleted	roast	0	1	Correct turn. Don't let it go to your head.
+>	turnCompleted	roast	0	1	Huh. You actually listened. Mark the calendar.
 T	5000	0	22	39.97	-105	2.97
 T	6000	0	22	39.97	-105	4.56
 T	7000	0.283	22	39.970003	-105	7.25
@@ -18998,7 +18998,7 @@ T	17000	0	22	39.970053	-104.999983	12.45
 >	hardBraking	roast	14	1.06	Whoa. Did the brake pedal insult your family?
 T	18000	0	22	39.970053	-104.999983	12.65
 R	18000
->	rerouted	roast	20	1.08	Recalculating. Again. Because of you.
+>	rerouted	roast	20	1.08	New route. Let's call this one 'Plan B for Bad Driver'.
 T	19000	0.911	22	39.970061	-104.99998	14.07
 T	20000	1.547	22	39.970074	-104.999975	-
 O	20000	the Supercharger	other
@@ -19060,7 +19060,7 @@ P	49000	245.9
 T	50000	2.68	22	39.970371	-104.999833	22.15
 P	50000	242
 T	51000	8.284	22	39.97044	-104.999798	20.87
->	hardAccel	roast	22	1.09	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	22	1.09	Nobody is racing you. Nobody wants to be seen with you.
 P	51000	232.8
 S	51000	1
 T	52000	8.359	22	39.970511	-104.999763	20.58
@@ -19094,7 +19094,7 @@ P	64000	92.6
 T	65000	10.417	22	39.970865	-105.000991	288.25
 P	65000	77.3
 R	65000
->	rerouted	roast	27	1.11	New route. Let's call this one 'Plan B for Bad Driver'.
+>	rerouted	roast	27	1.11	Recalculating. I'll add it to the pile.
 T	66000	0	22	39.970865	-105.000991	288.04
 >	hardBraking	roast	35	1.14	You saw that coming for a quarter mile. I know because I saw it too.
 P	66000	74
@@ -19183,7 +19183,7 @@ C	105000	1
 >	turnCompleted	roast	53	1.21	Finally. A turn. Done correctly. I may cry.
 T	106000	14.796	22.4	39.974424	-105.002987	276.47
 T	107000	0	22.4	39.974424	-105.002987	278.07
->	hardBraking	roast	61	1.24	My entire database just slid forward. Thanks.
+>	hardBraking	roast	61	1.24	You saw that coming a quarter mile ago. I know, because I pointed at it.
 T	108000	0	22.4	39.974424	-105.002987	280.83
 T	109000	0.127	22.4	39.974425	-105.002989	280.96
 T	110000	0.331	22.4	39.974425	-105.002993	282.96
@@ -19204,11 +19204,11 @@ T	181000	0.135	22.4	39.974455	-105.003165	289.74
 T	182000	0	22.4	39.974455	-105.003165	291.21
 T	183000	0.834	22.4	39.974457	-105.003174	290.46
 M	183000
->	missedTurn	roast	71	1.29	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	71	1.29	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	184000	0	22.4	39.974457	-105.003174	290.72
 T	185000	0.144	22.4	39.974458	-105.003175	293.01
 T	186000	4.19	22.4	39.974473	-105.00322	294.13
->	hardAccel	roast	77	1.31	I felt that in my satellites.
+>	hardAccel	roast	77	1.31	I just felt that in a satellite. In SPACE.
 T	187000	0	22.4	39.974473	-105.00322	291.33
 >	hardBraking	roast	85	1.34	Every time you do that, a little piece of my GPS chip dies. I'm running out of pieces.
 S	187000	1
@@ -19240,7 +19240,7 @@ T	210000	0.76	22.4	39.97459	-105.003746	11.45
 T	211000	1.535	22.4	39.974603	-105.003742	14.29
 T	212000	1.014	22.4	39.974612	-105.003739	14.49
 T	213000	5.67	22.4	39.974661	-105.00372	15.88
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 A	213000	1
 T	214000	4.843	22.4	39.974702	-105.003704	16.77
 T	215000	0	22.4	39.974702	-105.003704	19.25
@@ -19285,7 +19285,7 @@ T	246000	0	26.8	39.975597	-105.003227	22.68
 T	247000	0	26.8	39.975597	-105.003227	22.95
 T	248000	0.021	26.8	39.975597	-105.003227	22.93
 T	249000	3.406	26.8	39.975625	-105.003211	24.6
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	250000	4.415	26.8	39.975661	-105.003188	25.99
 T	251000	3.617	26.8	39.97569	-105.003168	27.09
 T	252000	3.727	26.8	39.975719	-105.003148	28.07
@@ -19503,7 +19503,7 @@ P	381000	0
 T	382000	1.164	20.1	39.975629	-105.003244	321.86
 T	383000	2.262	20.1	39.975646	-105.003259	324.56
 T	384000	7.425	20.1	39.975699	-105.003312	323.11
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	385000	6.749	20.1	39.975745	-105.003363	-
 T	386000	6.572	20.1	39.975791	-105.003412	320.63
 T	387000	6.331	20.1	39.975834	-105.003461	318.86
@@ -19630,7 +19630,7 @@ P	480000	414.3
 T	481000	0.046	-	39.975523	-105.003305	-
 P	481000	411.7
 T	482000	4.54	-	39.975504	-105.003352	242.19
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	482000	403.1
 T	483000	4.389	-	39.975486	-105.003398	-
 P	483000	394.1
@@ -19712,7 +19712,7 @@ U	546000	485444	0
 T	547000	0	-	39.975369	-105.00376	53.61
 P	547000	261
 T	548000	4.947	-	39.975394	-105.003712	56.11
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	548000	254.5
 T	549000	5.235	-	39.975419	-105.00366	57.37
 P	549000	248.7
@@ -19722,7 +19722,7 @@ T	551000	0	-	39.975448	-105.003596	57.3
 >	hardBraking	roast	100	1.4	BRAKE CHECK! The car behind us is writing your name down. So am I.
 P	551000	234.5
 M	551000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	552000	0.471	-	39.97545	-105.003591	56.26
 P	552000	231.8
 T	553000	4.242	-	39.975469	-105.003548	59.15
@@ -19808,7 +19808,7 @@ T	9000	0.501	22	39.98004	-105.000002	348.96
 I	9000	Make a U-turn	342.6	left	-
 >	instruction	nav	0	1	In 340 meters, make a U-turn. Shouldn't be hard.
 T	10000	5.827	22	39.980091	-105.000017	347.41
->	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to be seen with you.
 P	10000	332.3
 T	11000	6.208	22	39.980146	-105.000033	-
 P	11000	322.4
@@ -19844,7 +19844,7 @@ P	25000	187.6
 T	26000	12.143	22	39.981201	-105.000384	-
 P	26000	174
 T	27000	0	22	39.981201	-105.000384	339.42
->	hardBraking	roast	18	1.07	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	18	1.07	That stop was a little... dramatic.
 P	27000	172.7
 T	28000	0	22	39.981201	-105.000384	340.48
 P	28000	168.8
@@ -19895,7 +19895,7 @@ T	47000	5.565	22	39.981867	-105.000719	340.3
 P	47000	9.8
 >	instruction	nav	40	1.16	20 meters! Turn right! Blinker!
 T	48000	0	22	39.981867	-105.000719	341.47
->	hardBraking	roast	48	1.19	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	48	1.19	You saw that coming a quarter mile ago. I know, because I pointed at it.
 P	48000	7.6
 T	49000	0.3	22	39.98187	-105.00072	339.59
 P	49000	2.7
@@ -19941,7 +19941,7 @@ P	75000	502.6
 T	76000	0	-	39.982074	-105.000264	334
 P	76000	502.4
 T	77000	5.534	-	39.982119	-105.00029	335.64
->	hardAccel	roast	89	1.36	I felt that in my satellites.
+>	hardAccel	roast	89	1.36	I just felt that in a satellite. In SPACE.
 >	wrongTurn	roast	100	1.4	RIGHT! RIGHT! THE OTHER ONE! HOW DO YOU GET THROUGH A DOORWAY?
 P	77000	495.4
 T	78000	4.835	-	39.982158	-105.000315	334.29
@@ -20099,7 +20099,7 @@ P	203000	330.6
 T	203000	0	26.8	39.982084	-104.998746	-
 P	203000	329.9
 T	204000	5.852	26.8	39.982031	-104.998744	-
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	204000	321.5
 T	205000	6.4	26.8	39.981974	-104.998743	179.19
 P	205000	310.8
@@ -20194,7 +20194,7 @@ P	247000	69.9
 T	248000	1.097	15.6	39.98111	-104.998976	-
 P	248000	64.8
 T	249000	4.998	15.6	39.981155	-104.998972	3.54
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	249000	56.8
 T	250000	0	15.6	39.981155	-104.998972	4.41
 >	hardBraking	roast	100	1.4	WHY DO YOU BRAKE LIKE THE ROAD OWES YOU MONEY?
@@ -20252,7 +20252,7 @@ T	312000	0	13.4	39.98181	-104.998934	0.14
 T	313000	0	13.4	39.98181	-104.998934	2.56
 T	314000	0	13.4	39.98181	-104.998934	5.09
 T	315000	5.868	13.4	39.981862	-104.998929	3.83
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	316000	6.558	13.4	39.981921	-104.998923	4.79
 T	317000	0	13.4	39.981921	-104.998923	3.6
 >	hardBraking	roast	100	1.4	BRAKE CHECK! The car behind us is writing your name down. So am I.
@@ -20318,7 +20318,7 @@ T	56000	8.963	22	39.990108	-105.000668	268.67
 T	57000	9.426	22	39.990108	-105.000779	-
 T	58000	9.153	22	39.990112	-105.000886	-
 T	59000	0	22	39.990112	-105.000886	272.97
->	hardBraking	roast	16	1.06	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	16	1.06	That stop was a little... dramatic.
 T	60000	0.169	22	39.990112	-105.000888	-
 T	61000	0.959	22	39.990112	-105.000899	272.27
 T	62000	0.327	22	39.990112	-105.000903	270.68
@@ -20335,7 +20335,7 @@ T	71000	1.771	22	39.990125	-105.001094	274.46
 T	72000	1.889	22	39.990126	-105.001117	272.63
 T	73000	2.69	22	39.990127	-105.001148	272.03
 T	74000	8.49	22	39.990133	-105.001248	274.53
->	hardAccel	roast	21	1.08	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	21	1.08	Nobody is racing you. Nobody wants to be seen with you.
 T	75000	8.181	22.4	39.990141	-105.001343	275.95
 T	76000	8.465	22.4	39.990145	-105.001443	273.55
 T	77000	8.27	22.4	39.990149	-105.00154	272.95
@@ -20346,14 +20346,14 @@ T	81000	7.391	22.4	39.990179	-105.001914	278.83
 T	82000	7.087	22.4	39.990186	-105.001997	276.71
 B	82000	0.97	1
 T	83000	1.797	22.4	39.990189	-105.002018	279.4
->	hardBraking	roast	28	1.11	That stop was a little... dramatic.
+>	hardBraking	roast	28	1.11	Brake check! Who are we brake checking? Oh, everyone. Got it.
 T	84000	2.135	22.4	39.990192	-105.002043	280.67
 T	85000	2.191	22.4	39.990196	-105.002068	279.28
 T	86000	1.565	22.4	39.990198	-105.002086	279.73
 T	87000	2.536	22.4	39.990201	-105.002116	278.15
 T	88000	3.511	22.4	39.990207	-105.002156	-
 T	89000	3.87	22.4	39.990212	-105.002201	279.08
->	tooSlow	roast	31	1.12	41 under the limit. Are we sightseeing?
+>	tooSlow	roast	31	1.12	The limit is 50. That's a ceiling, but you're allowed to visit it.
 T	90000	4.673	22.4	39.990217	-105.002256	-
 T	91000	3.973	22.4	39.990222	-105.002302	277.56
 T	92000	0	22.4	39.990222	-105.002302	275.73
@@ -20408,7 +20408,7 @@ P	126000	467
 F	126000	1	Colfax Avenue
 >	traffic	roast	69	1.27	This is what happens when you ignore me. This. Exactly this.
 T	127000	3.075	22.4	39.991558	-105.00248	93.32
->	hardAccel	roast	74	1.3	I felt that in my satellites.
+>	hardAccel	roast	74	1.3	I just felt that in a satellite. In SPACE.
 P	127000	459.7
 T	128000	2.275	22.4	39.991557	-105.002454	92.47
 P	128000	453.6
@@ -20507,7 +20507,7 @@ P	168000	245.7
 T	169000	2.576	22.4	39.991596	-105.001358	-
 P	169000	240.6
 T	170000	6.805	22.4	39.991657	-105.001367	353.29
->	hardAccel	roast	94	1.38	I felt that in my satellites.
+>	hardAccel	roast	94	1.38	I just felt that in a satellite. In SPACE.
 P	170000	232.9
 D	170000	Best Buy
 T	171000	6.328	22.4	39.991714	-105.001373	355.24
@@ -20575,7 +20575,7 @@ P	227000	0
 T	228000	6.895	22.4	39.993177	-105.001615	350.93
 T	229000	7.853	22.4	39.993188	-105.001524	80.93
 T	230000	12.392	22.4	39.993201	-105.001379	83.15
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	231000	16.105	22.4	39.993213	-105.00119	85.5
 T	232000	16.531	22.4	39.993222	-105.000996	86.4
 T	233000	16.747	22.4	39.993226	-105.000799	-
@@ -20625,7 +20625,7 @@ P	252000	568.7
 T	253000	0	22.4	39.993248	-105.000335	358.89
 P	253000	566.2
 M	253000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	254000	0.018	22.4	39.993248	-105.000335	357.32
 P	254000	562.4
 T	255000	0	22.4	39.993248	-105.000335	359.88
@@ -20736,7 +20736,7 @@ P	417000	244.8
 T	418000	0	29.1	39.993538	-105.000268	92.56
 P	418000	241.9
 T	419000	3.652	29.1	39.993535	-105.000225	-
->	hardAccel	roast	97	1.39	I felt that in my satellites.
+>	hardAccel	roast	97	1.39	I just felt that in a satellite. In SPACE.
 P	419000	234.2
 A	419000	1
 >	stopRequest	roast	97	1.39	THANK YOU! I'M RECALCULATING MY ENTIRE OPINION OF YOU! ... NO CHANGE.
@@ -20788,7 +20788,7 @@ P	496000	323.2
 C	496000	1
 >	turnCompleted	roast	92	1.37	YOU DID IT. One correct turn after all that. I'm not proud. I'm relieved.
 T	497000	5.573	29.1	39.993342	-104.999557	183.16
->	hardAccel	roast	98	1.39	I felt that in my satellites.
+>	hardAccel	roast	98	1.39	I just felt that in a satellite. In SPACE.
 P	497000	313.8
 T	498000	5.908	29.1	39.993289	-104.999562	184.27
 P	498000	305.3
@@ -20907,7 +20907,7 @@ P	609000	4
 T	610000	1.124	15.6	39.991714	-104.999545	181.16
 P	610000	2.9
 M	610000
->	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
+>	missedTurn	roast	100	1.4	THE TURN WAS RIGHT THERE. IT HAD A SIGN. IT HAD ME. IT HAD EVERYTHING.
 T	611000	0.259	26.8	39.991712	-104.999545	181.51
 P	611000	1.1
 T	612000	0.578	26.8	39.991707	-104.999545	180.94
@@ -21021,7 +21021,7 @@ P	766000	487.6
 T	767000	0.55	13.4	39.991464	-105.000351	232.8
 P	767000	483.2
 T	768000	4.938	13.4	39.991437	-105.000397	231.88
->	hardAccel	roast	99	1.39	I felt that in my satellites.
+>	hardAccel	roast	99	1.39	I just felt that in a satellite. In SPACE.
 P	768000	473.5
 T	769000	4.038	13.4	39.991416	-105.000436	-
 P	769000	467.3
@@ -21092,7 +21092,7 @@ P	796000	301
 T	797000	0	13.4	39.991916	-105.001016	69.79
 P	797000	299.5
 T	798000	3.377	13.4	39.991927	-105.000979	70
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	798000	292.5
 T	799000	3.116	13.4	39.991935	-105.000944	72.97
 P	799000	284.6
@@ -21154,7 +21154,7 @@ T	12000	0	22	40.000021	-104.999997	4.33
 T	13000	0	22	40.000021	-104.999997	4.66
 T	14000	0	22	40.000021	-104.999997	3.8
 T	15000	5.827	22	40.000073	-104.999993	3.89
->	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	6	1.02	Nobody is racing you. Nobody wants to be seen with you.
 T	16000	5.294	22	40.000076	-105.000055	273.89
 T	17000	5.792	22	40.000079	-105.000123	272.83
 T	18000	6.28	22	40.000085	-105.000197	-
@@ -21173,7 +21173,7 @@ T	29000	8.741	22	40.000317	-105.001254	-
 T	30000	13.9	22	40.000441	-105.001231	7.99
 >	hardAccel	roast	11	1.04	Easy. It's a green light, not a starting gun.
 T	31000	9.164	22	40.000523	-105.001222	5.3
->	hardBraking	roast	18	1.07	Gentle braking is a thing. Look it up. Later. Not while driving.
+>	hardBraking	roast	18	1.07	That stop was a little... dramatic.
 T	32000	9.817	22	40.00061	-105.001213	4.28
 T	33000	10.348	22	40.000703	-105.001201	5.56
 T	34000	9.68	22	40.00079	-105.001193	4.1
@@ -21192,7 +21192,7 @@ T	44000	0.062	22	40.000834	-105.001187	3.74
 T	45000	0	22	40.000834	-105.001187	1.82
 T	46000	0	22	40.000834	-105.001187	2.09
 T	47000	3.868	22	40.000869	-105.001185	1.87
->	hardAccel	roast	23	1.09	Nobody is racing you. Nobody wants to.
+>	hardAccel	roast	23	1.09	Nobody is racing you. Nobody wants to be seen with you.
 T	48000	3.033	22	40.000896	-105.001183	3.8
 T	49000	2.615	22	40.000919	-105.001182	-
 T	50000	2.566	22	40.000942	-105.001181	1.87
@@ -21214,7 +21214,7 @@ T	62000	10.962	26.8	40.001613	-105.001151	5.83
 T	63000	11.461	26.8	40.001715	-105.001136	6.33
 T	64000	12.243	26.8	40.001824	-105.001122	5.75
 T	65000	4.665	26.8	40.001866	-105.001118	3.57
->	hardBraking	roast	38	1.15	Another brake check. The guy behind us has started praying.
+>	hardBraking	roast	38	1.15	You saw that coming a quarter mile ago. I know, because I pointed at it.
 T	66000	4.077	26.8	40.001903	-105.001113	5.67
 T	67000	5.106	26.8	40.001948	-105.001108	4.82
 T	68000	5.736	26.8	40.002	-105.001105	3.17
@@ -21230,7 +21230,7 @@ T	76000	12.461	26.8	40.002649	-105.001078	1.93
 >	noDestination	roast	43	1.17	You know I can't judge your route if you don't have one. Well, I can. I'm judging it now.
 T	77000	13.365	26.8	40.002769	-105.001072	2.16
 T	78000	7.477	26.8	40.002836	-105.001071	0.86
->	hardBraking	roast	51	1.2	My entire database just slid forward. Thanks.
+>	hardBraking	roast	51	1.2	You saw that coming for a quarter mile. I know because I saw it too.
 B	78000	0.18	1
 T	79000	8.378	26.8	40.002835	-105.000972	90.86
 T	80000	7.739	26.8	40.002831	-105.000881	92.85
@@ -21301,7 +21301,7 @@ P	160000	610.7
 T	161000	3.119	15.6	40.003067	-104.999341	89.78
 P	161000	604.7
 T	162000	9.027	13.4	40.00307	-104.999234	88.15
->	hardAccel	roast	67	1.27	I felt that in my satellites.
+>	hardAccel	roast	67	1.27	I just felt that in a satellite. In SPACE.
 P	162000	591.2
 T	163000	8.305	13.4	40.00307	-104.999137	90.03
 P	163000	578.2
@@ -21316,7 +21316,7 @@ P	196000	527.9
 T	197000	13.399	13.4	40.003028	-104.99851	94.9
 P	197000	514.4
 T	198000	14.497	13.4	40.003021	-104.99834	93.01
->	speeding	roast	70	1.28	2 over! 2! Do you have any idea what 2 miles per hour feels like to me?
+>	speeding	roast	70	1.28	IT IS 30. I will say it until one of us dies, and I'm software.
 P	198000	498.7
 T	199000	14.449	13.4	40.00301	-104.998171	95.08
 P	199000	480.5
@@ -21380,7 +21380,7 @@ T	223000	11.704	26.8	40.003166	-104.99317	80.52
 >	hardBraking	roast	95	1.38	BRAKE CHECK! The car behind us is writing your name down. So am I.
 P	223000	491.1
 T	224000	16.652	26.8	40.003195	-104.992978	78.71
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	224000	469.7
 T	225000	16.573	26.8	40.00322	-104.992785	80.46
 P	225000	451
@@ -21463,7 +21463,7 @@ P	288000	78.3
 T	289000	0.68	26.8	40.003354	-104.989307	9.74
 P	289000	73.4
 T	290000	3.93	26.8	40.003388	-104.989298	10.94
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	290000	68.3
 I	290000	Turn slight right at 5th Avenue	232.2	-	-
 >	instruction	nav	100	1.4	PLEASE. I am begging. In 750 feet, turn slight right at 5th Avenue. I'm watching you.
@@ -21531,7 +21531,7 @@ P	347000	47.1
 T	348000	1.849	-	40.004536	-104.990176	17.72
 P	348000	41.1
 T	349000	4.961	-	40.004578	-104.990157	18.9
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	349000	34.7
 T	350000	5.15	-	40.004593	-104.990215	-
 P	350000	28
@@ -21586,7 +21586,7 @@ T	388000	0.728	13.4	40.00443	-104.990671	207.08
 T	389000	0	13.4	40.00443	-104.990671	206.86
 T	419000	0	13.4	40.00443	-104.990671	204.28
 T	420000	3.062	13.4	40.004405	-104.990685	202.86
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 T	421000	3.046	13.4	40.00438	-104.9907	204.44
 T	422000	2.251	13.4	40.004361	-104.990709	201.51
 T	423000	3.016	13.4	40.004336	-104.990721	199.83
@@ -21708,7 +21708,7 @@ P	477000	31.5
 T	478000	0	11.2	40.003759	-104.990997	121.03
 P	478000	26.5
 T	479000	4.265	11.2	40.00374	-104.990953	120.22
->	hardAccel	roast	100	1.4	I felt that in my satellites.
+>	hardAccel	roast	100	1.4	I just felt that in a satellite. In SPACE.
 P	479000	21.3
 T	480000	0	11.2	40.00374	-104.990953	117.22
 >	hardBraking	roast	100	1.4	WHY DO YOU BRAKE LIKE THE ROAD OWES YOU MONEY?
@@ -21722,14 +21722,14 @@ P	483000	8.1
 T	483000	2.014	11.2	40.003723	-104.990906	114.78
 P	483000	2.8
 M	483000
->	missedTurn	roast	100	1.4	WHY DO I EVEN TALK. DO YOU KNOW HOW HARD I WORK ON THESE DIRECTIONS?
+>	missedTurn	roast	100	1.4	I'm going to start giving you directions in interpretive dance. You'll do just as well.
 T	484000	2.232	11.2	40.003713	-104.990883	117.39
 P	484000	0
 T	485000	3.205	11.2	40.0037	-104.99085	117.57
 T	486000	2.448	11.2	40.003719	-104.990836	27.57
 T	487000	2.895	11.2	40.003743	-104.990822	24.61
 T	517000	3.664	11.2	40.003773	-104.990804	25.4
->	tooSlow	roast	100	1.4	WE ARE GOING 8. I could get there faster by being emailed.
+>	tooSlow	roast	100	1.4	WE ARE GOING 8. I could get there faster as an email attachment.
 T	518000	0	11.2	40.003773	-104.990804	23.04
 >	hardBraking	roast	100	1.4	Every time you do that, a little piece of my GPS chip dies. I'm running out of pieces.
 T	519000	0	11.2	40.003773	-104.990804	21.33
