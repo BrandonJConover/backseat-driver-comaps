@@ -1,6 +1,7 @@
 #include "backseat/navigator.hpp"
 
 #include "backseat/lines.hpp"
+#include "backseat/route_sketch.hpp"
 #include "backseat/rundown.hpp"
 #include "backseat/units.hpp"
 #include "backseat/voice_command.hpp"
@@ -17,6 +18,9 @@ namespace
 {
 /// Off the route this close to the maneuver means the driver missed it, not wandered off.
 double constexpr kMissedTurnWithinM = 80;
+// Lane advice window before the maneuver.
+double constexpr kLaneSayMinM = 150;
+double constexpr kLaneSayMaxM = 1500;
 /// Slower than this counts as stopped.
 double constexpr kStoppedMps = 0.5;
 /// Faster than this means driving again, not walking around with the phone.
@@ -63,6 +67,14 @@ double constexpr kWrongWayMinMps = 3;
 double constexpr kWrongWayHoldMs = 3000;
 double constexpr kWrongWayEveryMs = 90000;
 int constexpr kWrongWayMaxPerTrip = 3;
+// A U-turn: heading now at least this far from the heading a few seconds ago...
+double constexpr kUTurnDeg = 160;
+double constexpr kUTurnMinAgoMs = 4000;
+double constexpr kUTurnMaxAgoMs = 30000;
+// ...counting headings only while actually moving.
+double constexpr kUTurnMinMps = 1.5;
+double constexpr kUTurnEveryMs = 120000;
+int constexpr kUTurnMaxPerTrip = 2;
 /// Asking for music: once a trip, at least this far in, on a quiet stretch, if nothing is playing.
 double constexpr kMusicAfterMs = 15 * 60000;
 double constexpr kMusicCheckEveryMs = 15000;
@@ -240,6 +252,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackLongDrive(fix.tMs, route);
   TrackSights(fix, route);
   TrackWrongWay(fix, route);
+  TrackUTurn(fix, route);
   TrackMusic(fix.tMs, route);
   // Fed up for the first time this trip: from now on it's "wise, omnipotent overseer GPS".
   if (!m_titleDemanded && Tier() == 2)
@@ -403,6 +416,9 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   if (route.state == RouteState::Finished)
   {
     m_arrived = true;
+    // "Scenic route complete. 12 minutes of my life I'll never get back." Before the grade.
+    if (m_sketched && m_sketchMinutesLost >= 1)
+      SayLine(t, Category::Arrived, "sketch.arrived", {{"minutes", std::to_string(m_sketchMinutesLost)}});
     Say(m_engine->OnNav(NavEvent::Arrived(t)), false /* mayRewrite */);
     m_heldPlateLines.clear();
     if (auto const wrap = m_plates.WrapUp(Tier()))
@@ -423,8 +439,11 @@ void Navigator::Update(double t, RouteSnapshot const & route)
       Say(m_engine->OnNav(NavEvent::Rerouted(t)));
       m_rerouting = true;
       ++m_reroutes;
+      // Missing a route they drew themselves gets its own line, in place of the "lost again" ones.
+      if (m_sketched)
+        SayLine(t, Category::Rerouted, "sketch.offRoute");
       // Lost while the car was supposedly driving itself.
-      if (m_autopilotClaimed)
+      else if (m_autopilotClaimed)
         SayLemon(t);
       else if (m_reroutes == kPartnerAfterReroutes && !m_partner.empty())
         SayLine(t, Category::Partner, "partner",
@@ -463,6 +482,14 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   {
     Say(m_engine->OnNav(NavEvent::Progress(t, route.distToTurnM)));
   }
+  // "I'm going to need you to get over into the left lane. Use your blinkers this time." Once per
+  // maneuver, early enough to move over and close enough that it's about this one.
+  if (route.laneSide != LaneSide::None && m_laneSaidFor != route.turnId && route.distToTurnM >= kLaneSayMinM &&
+      route.distToTurnM <= kLaneSayMaxM)
+  {
+    m_laneSaidFor = route.turnId;
+    SayLine(t, Category::Instruction, route.laneSide == LaneSide::Left ? "lane.left" : "lane.right");
+  }
   m_lastDistToTurnM = route.distToTurnM;
 }
 
@@ -487,14 +514,29 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
     SayLine(t, Category::Bossy, m_opener->key, m_opener->vars);
   m_opener.reset();
   SayNav(t, TripGreeting(m_history, m_config.rng));
+  // Before 5 am: "Are we off to make the donuts?"
+  if (KnowsTheDate(t) && LocalTime(t).tm_hour < 5)
+    SayLine(t, Category::Holiday, "early.opener");
   // Already low when the trip starts? Say so after the greeting.
   if (m_batteryPercent && m_charging)
     Say(m_engine->OnNav(NavEvent::Battery(t, *m_batteryPercent / 100.0, *m_charging)));
   std::vector<RouteStep> steps;
   for (auto const k : route.plannedTurns)
     steps.push_back({InstructionText(k, "", ""), StepKindOf(k)});
+  m_sketched = route.sketched;
+  m_sketchMinutesLost = 0;
+  if (m_sketched && route.fastestSeconds > 0 && route.etaSeconds > 0)
+  {
+    auto const verdict = JudgeSketch(route.fastestSeconds / 60, route.etaSeconds / 60);
+    if (verdict.key == "sketch.slower")
+      m_sketchMinutesLost = verdict.minutes;
+  }
   // The first trip's rundown is a speed run: every turn, rattled off, then a request for music.
-  SayNav(t, RouteRundown(steps, m_history, m_config.rng), m_history.empty() ? kRattleSpeed : 1.0);
+  // After that, a drawn route gets "We're doing your route" instead of the rundown.
+  if (m_sketched && !m_history.empty())
+    SayLine(t, Category::Instruction, "sketch.start");
+  else
+    SayNav(t, RouteRundown(steps, m_history, m_config.rng), m_history.empty() ? kRattleSpeed : 1.0);
   if (m_plan.expectedMinutes > 0)
     SayNav(t, PredictTrip(m_history, m_plan, m_config.rng).text);
   Say(m_engine->OnNav(NavEvent::DestinationSet(t, route.destination)));
@@ -557,6 +599,35 @@ void Navigator::TrackWrongWay(Fix const & fix, RouteSnapshot const & route)
   SayLine(fix.tMs, Category::WrongWay, m_wrongWaySaid == 0 ? "wrongWay" : "wrongWay.again");
   ++m_wrongWaySaid;
   m_lastWrongWayT = fix.tMs;
+  // Facing the wrong way already covers turning around.
+  m_lastUTurnT = fix.tMs;
+}
+
+void Navigator::TrackUTurn(Fix const & fix, RouteSnapshot const & route)
+{
+  if (fix.bearingDeg < 0 || fix.speedMps < kUTurnMinMps)
+    return;
+  while (!m_headings.empty() && fix.tMs - m_headings.front().first > kUTurnMaxAgoMs)
+    m_headings.pop_front();
+  m_headings.emplace_back(fix.tMs, fix.bearingDeg);
+  // Going around a roundabout isn't turning back.
+  if (route.turn == TurnKind::Roundabout && route.distToTurnM < 150)
+    return;
+  if (m_uTurnsSaid >= kUTurnMaxPerTrip || fix.tMs - m_lastUTurnT < kUTurnEveryMs)
+    return;
+  for (auto const & [t, deg] : m_headings)
+  {
+    if (fix.tMs - t < kUTurnMinAgoMs)
+      break;
+    if (std::fabs(std::fmod(fix.bearingDeg - deg + 540.0, 360.0) - 180.0) >= kUTurnDeg)
+    {
+      SayLine(fix.tMs, Category::UTurn, "uturn");
+      ++m_uTurnsSaid;
+      m_lastUTurnT = fix.tMs;
+      m_headings.clear();
+      return;
+    }
+  }
 }
 
 std::vector<Routine> Navigator::Routines() const
@@ -758,9 +829,13 @@ void Navigator::ResetTrip()
   m_wrongWaySince = -1;
   m_lastWrongWayT = -1e18;
   m_wrongWaySaid = 0;
+  m_headings.clear();
+  m_lastUTurnT = -1e18;
+  m_uTurnsSaid = 0;
   m_musicAsked = false;
   m_christmasSaid = false;
   m_roundaboutSaid = false;
+  m_laneSaidFor.reset();
   m_musicJudged = false;
   m_musicPlaying = false;
   m_lastSightT = -1e18;

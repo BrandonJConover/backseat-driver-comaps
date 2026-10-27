@@ -41,6 +41,7 @@ import UIKit
   @objc static func install(in view: UIView) {
     BackseatListener.prepare()
     BackseatDriveOverlay.install(in: view)
+    BackseatSketch.installPreviewButton(in: view)
     // The "Where to?" card has the mic now.
     if !showsMapButton { return }
     let button = make()
@@ -65,6 +66,7 @@ import UIKit
 final class BackseatDriveOverlay: NSObject {
   private static var stack: UIStackView?
   private static var pill: UILabel?
+  private static var draw: UIButton?
   private static var timer: Timer?
 
   static func install(in view: UIView) {
@@ -89,7 +91,10 @@ final class BackseatDriveOverlay: NSObject {
       MWMBackseatRewriter.runTool("report_police", argument: "", spoken: "report police")
     }, for: .touchUpInside)
 
-    let stack = UIStackView(arrangedSubviews: [pill, report])
+    // Drawing a route: the driver only while (nearly) stopped; otherwise it says it's for passengers.
+    let draw = BackseatSketch.button()
+
+    let stack = UIStackView(arrangedSubviews: [pill, report, draw])
     stack.axis = .vertical
     stack.spacing = 10
     stack.alignment = .leading
@@ -100,11 +105,13 @@ final class BackseatDriveOverlay: NSObject {
       pill.heightAnchor.constraint(equalToConstant: 44),
       pill.widthAnchor.constraint(greaterThanOrEqualToConstant: 110),
       report.heightAnchor.constraint(equalToConstant: 44),
+      draw.heightAnchor.constraint(equalToConstant: 44),
       stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
       stack.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
     ])
     self.stack = stack
     self.pill = pill
+    self.draw = draw
 
     NotificationCenter.default.addObserver(forName: BackseatTalkButton.navigationVisibilityChanged, object: nil,
                                            queue: .main) { note in
@@ -134,5 +141,9 @@ final class BackseatDriveOverlay: NSObject {
     pill.backgroundColor = over ? .systemRed : .systemBackground
     pill.textColor = over ? .white : .label
     pill.layer.borderColor = (over ? UIColor.white : UIColor.systemRed).cgColor
+    let drawTitle = speedMps < BackseatSketch.parkedMps ? "Draw route" : "Draw route (passenger)"
+    if draw?.configuration?.title != drawTitle {
+      draw?.configuration?.title = drawTitle
+    }
   }
 }

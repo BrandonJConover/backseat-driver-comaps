@@ -53,8 +53,29 @@ struct BackseatWhereToCard: View {
             .accessibilityLabel(Text(verbatim: isListening ? "Stop listening" : "Say where to"))
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(verbatim: isListening ? "Listening…" : "Where to?")
-                    .font(.headline)
+                HStack {
+                    Text(verbatim: isListening ? "Listening…" : "Where to?")
+                        .font(.headline)
+
+                    Spacer(minLength: 0)
+
+                    // Draw a route from here with a finger
+                    Button {
+                        BackseatSketch.open()
+                    } label: {
+                        Label {
+                            Text(verbatim: "Draw route")
+                        } icon: {
+                            Image(systemName: "scribble")
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 36)
+                        .background(Capsule().fill(Color(uiColor: .secondarySystemBackground)))
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
 
                 if places.isEmpty {
                     Text(verbatim: "No trips yet. I'm sure you'll get lost somewhere memorable.")

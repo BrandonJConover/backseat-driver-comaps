@@ -305,6 +305,14 @@ public:
   }
   std::vector<backseat::MileagePlace> BackseatTaggedPlaces() const { return m_backseat.TaggedPlaces(); }
   std::string BackseatMileageYearEnd() { return m_backseat.MileageYearEnd(); }
+  std::string BackseatMileageTurnedOn() { return m_backseat.MileageTurnedOn(); }
+  bool BackseatMileageListening() const { return m_backseat.MileageListening(); }
+  std::string BackseatMileageAnswer(std::string const & spoken) { return m_backseat.MileageAnswer(spoken); }
+  std::string BackseatBusinessOwner() const { return m_backseat.BusinessOwner(); }
+  void BackseatSetBusinessOwner(std::string const & owner) { m_backseat.SetBusinessOwner(owner); }
+  void BackseatSketchApplied(bool addedStop, bool trimmed) { m_backseat.SketchApplied(addedStop, trimmed); }
+  std::string BackseatTakeSketchVerdict() { return m_backseat.TakeSketchVerdict(); }
+  std::string BackseatSketchCleared() { return m_backseat.SketchCleared(); }
   std::vector<std::pair<std::string, std::string>> BackseatLearnedFacts() const { return m_backseat.LearnedFacts(); }
   /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.
   BackseatAdapter const & GetBackseat() const { return m_backseat; }
@@ -322,6 +330,24 @@ public:
   void HideRoutePoint(RouteMarkType type, size_t intermediateIndex = 0);
   bool CouldAddIntermediatePoint() const;
   bool IsMyPosition(RouteMarkType type, size_t intermediateIndex = 0);
+
+  struct RouteSketchResult
+  {
+    bool applied = false;
+    /// The stroke ended on empty map, so a stop (or a new destination) was added there.
+    bool addedStop = false;
+    /// The 100-point limit cut the stroke short.
+    bool trimmed = false;
+    size_t shapingPoints = 0;
+  };
+  /// Backseat: the driver drew `stroke` (mercator, in drawing order) on the map. Reshapes the leg
+  /// between the stops nearest its ends, or adds a stop where it ends on empty map. With no route
+  /// yet, it starts from my position. Replaces any earlier drawing on that leg. Call BuildRoute()
+  /// afterwards. `metersPerPixel` is the screen scale while drawing.
+  RouteSketchResult ApplyRouteSketch(std::vector<m2::PointD> const & stroke, double metersPerPixel);
+  /// Removes every drawn shaping point, keeping the stops. Returns false if there were none.
+  bool ClearRouteSketch();
+  bool HasRouteSketch() const;
 
   void SetRouterImpl(routing::RouterType type);
   void RemoveRoute(bool deactivateFollowing);

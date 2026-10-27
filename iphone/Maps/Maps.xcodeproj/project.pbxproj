@@ -98,6 +98,8 @@
 		3404755F1E081A4600C92850 /* MWMLocationPredictor.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3404752F1E081A4600C92850 /* MWMLocationPredictor.mm */; };
 		340475621E081A4600C92850 /* MWMNetworkPolicy+UI.m in Sources */ = {isa = PBXBuildFile; fileRef = 340475321E081A4600C92850 /* MWMNetworkPolicy+UI.m */; };
 		340475651E081A4600C92850 /* MWMRouter.mm in Sources */ = {isa = PBXBuildFile; fileRef = 340475361E081A4600C92850 /* MWMRouter.mm */; };
+		BD5EA70000000000000000A3 /* MWMRouter+Sketch.mm in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000A1 /* MWMRouter+Sketch.mm */; };
+		BD5EA70000000000000000A4 /* RouteSketchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000A2 /* RouteSketchOverlay.swift */; };
 		3404756B1E081A4600C92850 /* MWMSearch+CoreSpotlight.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3404753B1E081A4600C92850 /* MWMSearch+CoreSpotlight.mm */; };
 		3404756E1E081A4600C92850 /* MWMSearch.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3404753D1E081A4600C92850 /* MWMSearch.mm */; };
 		340475711E081A4600C92850 /* MWMSettings.mm in Sources */ = {isa = PBXBuildFile; fileRef = 340475411E081A4600C92850 /* MWMSettings.mm */; };
@@ -895,6 +897,9 @@
 		340475321E081A4600C92850 /* MWMNetworkPolicy+UI.m */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.objc; path = "MWMNetworkPolicy+UI.m"; sourceTree = "<group>"; tabWidth = 2; };
 		340475351E081A4600C92850 /* MWMRouter.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMRouter.h; sourceTree = "<group>"; tabWidth = 2; };
 		340475361E081A4600C92850 /* MWMRouter.mm */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMRouter.mm; sourceTree = "<group>"; tabWidth = 2; };
+		BD5EA70000000000000000A0 /* MWMRouter+Sketch.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "MWMRouter+Sketch.h"; sourceTree = "<group>"; };
+		BD5EA70000000000000000A1 /* MWMRouter+Sketch.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = "MWMRouter+Sketch.mm"; sourceTree = "<group>"; };
+		BD5EA70000000000000000A2 /* RouteSketchOverlay.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RouteSketchOverlay.swift; sourceTree = "<group>"; };
 		3404753A1E081A4600C92850 /* MWMSearch+CoreSpotlight.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = "MWMSearch+CoreSpotlight.h"; sourceTree = "<group>"; tabWidth = 2; };
 		3404753B1E081A4600C92850 /* MWMSearch+CoreSpotlight.mm */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.cpp.objcpp; path = "MWMSearch+CoreSpotlight.mm"; sourceTree = "<group>"; tabWidth = 2; };
 		3404753C1E081A4600C92850 /* MWMSearch.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMSearch.h; sourceTree = "<group>"; tabWidth = 2; };
@@ -2317,6 +2322,9 @@
 				34AC8FC81EFC01F500E7F910 /* MWMRoutePoint+CPP.h */,
 				340475351E081A4600C92850 /* MWMRouter.h */,
 				340475361E081A4600C92850 /* MWMRouter.mm */,
+				BD5EA70000000000000000A0 /* MWMRouter+Sketch.h */,
+				BD5EA70000000000000000A1 /* MWMRouter+Sketch.mm */,
+				BD5EA70000000000000000A2 /* RouteSketchOverlay.swift */,
 				340B33C41F3AEFDB00A8C1B4 /* MWMRouter+RouteManager.mm */,
 				3426DEB21F45AE5100D1C43C /* MWMRouterRecommendation.h */,
 				34B127E71FBDD410008713D9 /* MWMRouterTransitStepInfo.h */,
@@ -4959,6 +4967,8 @@
 				F6FEA82E1C58F108007223CC /* MWMButton.m in Sources */,
 				34B924431DC8A29C0008D971 /* MWMMailViewController.m in Sources */,
 				340475651E081A4600C92850 /* MWMRouter.mm in Sources */,
+				BD5EA70000000000000000A3 /* MWMRouter+Sketch.mm in Sources */,
+				BD5EA70000000000000000A4 /* RouteSketchOverlay.swift in Sources */,
 				47E3C72F2111F472008B3B27 /* CoverVerticalModalTransitioning.swift in Sources */,
 				34E776101F14B165003040B3 /* VisibleArea.swift in Sources */,
 				ED0C54992C6E6AF000253A5F /* TrackRecordingManager.swift in Sources */,

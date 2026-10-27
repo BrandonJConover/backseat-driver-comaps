@@ -25,6 +25,8 @@ set(
   report.hpp
   rewriter.cpp
   rewriter.hpp
+  route_sketch.cpp
+  route_sketch.hpp
   rundown.cpp
   rundown.hpp
   types.cpp

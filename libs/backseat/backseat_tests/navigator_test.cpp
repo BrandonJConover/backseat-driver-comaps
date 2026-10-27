@@ -908,3 +908,126 @@ TEST(NavigatorRemembersWhatItSaidAcrossTrips)
   CHECK(!saved.empty());  // the trip start's lines were remembered
   CHECK(saved.back().find("wrongWay") == std::string::npos);
 }
+
+namespace
+{
+/// Whether one of `lines` is a "key" line from any mood, with {minutes} filled in.
+bool SaidKey(std::vector<Commentary> const & lines, std::string const & key, std::string const & minutes = "")
+{
+  for (int tier = 0; tier < 3; ++tier)
+  {
+    for (auto option : LinesFor(key, tier))
+    {
+      for (auto const * placeholder : {"{minutes}", "{MINUTES}"})
+        for (auto at = option.find(placeholder); at != std::string::npos; at = option.find(placeholder))
+          option.replace(at, std::string(placeholder).size(), minutes);
+      for (auto const & l : lines)
+        if (l.text == option)
+          return true;
+    }
+  }
+  return false;
+}
+}  // namespace
+
+TEST(DrawnRoutesGetTheirOwnLines)
+{
+  TripRecord before;
+  before.routeKey = "x";
+  before.endedAt = 1;
+  Navigator nav(Config(), {before});
+  RouteSnapshot drawn = OnRoute(1, TurnKind::Left, 800);
+  drawn.sketched = true;
+  drawn.etaSeconds = 1200;
+  drawn.fastestSeconds = 600;
+  nav.OnFix(At(0, 10), drawn);
+  nav.Poll(drawn);
+  CHECK(SaidKey(nav.TakeLines(), "sketch.start"));
+
+  RouteSnapshot off = drawn;
+  off.state = RouteState::OffRoute;
+  nav.OnFix(At(30000, 10), off);
+  nav.Poll(off);
+  CHECK(SaidKey(nav.TakeLines(), "sketch.offRoute"));
+
+  RouteSnapshot done = OnRoute(2, TurnKind::Destination, 0);
+  done.sketched = true;
+  done.state = RouteState::Finished;
+  nav.OnFix(At(600000, 0), done);
+  nav.Poll(done);
+  auto const lines = nav.TakeLines();
+  CHECK(SaidKey(lines, "sketch.arrived", "10"));
+  CHECK(Has(lines, Category::Arrived));
+}
+
+TEST(LaneAdviceOncePerManeuver)
+{
+  Navigator nav(Config());
+  RouteSnapshot far = OnRoute(1, TurnKind::ExitLeft, 3000);
+  far.laneSide = LaneSide::Left;
+  nav.OnFix(At(0, 25), far);
+  nav.Poll(far);
+  CHECK(!SaidKey(nav.TakeLines(), "lane.left"));
+
+  RouteSnapshot near = far;
+  near.distToTurnM = 900;
+  nav.OnFix(At(60000, 25), near);
+  nav.Poll(near);
+  CHECK(SaidKey(nav.TakeLines(), "lane.left"));
+
+  near.distToTurnM = 600;
+  nav.OnFix(At(75000, 25), near);
+  nav.Poll(near);
+  CHECK(!SaidKey(nav.TakeLines(), "lane.left"));
+
+  RouteSnapshot next = OnRoute(2, TurnKind::ExitRight, 1000);
+  next.laneSide = LaneSide::Right;
+  nav.OnFix(At(120000, 25), next);
+  nav.Poll(next);
+  CHECK(SaidKey(nav.TakeLines(), "lane.right"));
+}
+
+TEST(EarlyBirdsGetDonutJokes)
+{
+  auto const at = [](int hour)
+  {
+    return [=](double)
+    {
+      std::tm tm{};
+      tm.tm_mon = 2;
+      tm.tm_mday = 10;
+      tm.tm_hour = hour;
+      return tm;
+    };
+  };
+  Navigator nav(Config());
+  nav.SetLocalTime(at(4));
+  nav.OnFix(At(0, 15), Far());
+  CHECK(SaidKey(nav.TakeLines(), "early.opener"));
+
+  Navigator later(Config());
+  later.SetLocalTime(at(7));
+  later.OnFix(At(0, 15), Far());
+  CHECK(!SaidKey(later.TakeLines(), "early.opener"));
+}
+
+TEST(UTurnsFeelFamiliar)
+{
+  Navigator nav(Config());
+  auto const heading = [](double t, double deg)
+  {
+    Fix f = At(t, 8);
+    f.bearingDeg = deg;
+    return f;
+  };
+  RouteSnapshot const route = OnRoute(1, TurnKind::Left, 2000);
+  for (int i = 0; i < 5; ++i)
+    nav.OnFix(heading(i * 1000, 10), route);
+  CHECK(!SaidKey(nav.TakeLines(), "uturn"));
+  nav.OnFix(heading(6000, 100), route);
+  nav.OnFix(heading(8000, 190), route);
+  CHECK(SaidKey(nav.TakeLines(), "uturn"));
+  // A gentle bend is not a U-turn, and a second one right away isn't mentioned.
+  nav.OnFix(heading(12000, 10), route);
+  CHECK(!SaidKey(nav.TakeLines(), "uturn"));
+}

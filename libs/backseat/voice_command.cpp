@@ -279,6 +279,49 @@ bool SaidYes(std::string const & spoken)
   return false;
 }
 
+bool SaidNo(std::string const & spoken)
+{
+  std::string const words = CommandWords(spoken);
+  for (char const * no : {" no ", " nope ", " nah ", " not ", " negative ", " nuh uh ", " no way "})
+    if (words.find(no) != std::string::npos)
+      return true;
+  return false;
+}
+
+namespace
+{
+char const * const kPartnerWords[] = {"wife", "husband", "partner", "girlfriend", "boyfriend", "fiance", "fiancee"};
+}  // namespace
+
+std::optional<std::string> ParseBusinessOwner(std::string const & spoken)
+{
+  std::string words = CommandWords(spoken);
+  // "wife's" and "wife’s" (which comes through as "wife s") both lose the s.
+  for (std::string const tail : {"'s ", " s "})
+    for (auto at = words.find(tail); at != std::string::npos; at = words.find(tail))
+      words.replace(at, tail.size(), " ");
+  for (char const * partner : kPartnerWords)
+    if (words.find(" " + std::string(partner) + " ") != std::string::npos)
+      return std::string(partner);
+  for (char const * mine : {" me ", " mine ", " myself ", " i do ", " my own ", " my business ", " i own "})
+    if (words.find(mine) != std::string::npos)
+      return std::string();
+  std::string name = ParseNameAnswer(words);
+  if (name.empty())
+    return {};
+  return name;
+}
+
+std::string BusinessOwnerPossessive(std::string const & owner)
+{
+  if (owner.empty())
+    return "your";
+  for (char const * partner : kPartnerWords)
+    if (owner == partner)
+      return "your " + owner + "'s";
+  return owner + "'s";
+}
+
 std::string ParseFavorite(std::string const & spoken, std::vector<std::string> const & drop)
 {
   std::string words = CommandWords(spoken);

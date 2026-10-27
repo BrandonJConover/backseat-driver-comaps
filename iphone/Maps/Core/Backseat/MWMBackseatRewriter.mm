@@ -631,6 +631,41 @@ static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == M
   return @(GetFramework().GetRoutingManager().BackseatMileageYearEnd().c_str());
 }
 
++ (NSString *)mileageTurnedOn
+{
+  return @(GetFramework().GetRoutingManager().BackseatMileageTurnedOn().c_str());
+}
+
++ (BOOL)mileageListening
+{
+  return GetFramework().GetRoutingManager().BackseatMileageListening();
+}
+
++ (NSString *)mileageAnswer:(NSString *)spoken
+{
+  return @(GetFramework().GetRoutingManager().BackseatMileageAnswer(spoken.UTF8String).c_str());
+}
+
++ (NSString *)businessOwner
+{
+  return @(GetFramework().GetRoutingManager().BackseatBusinessOwner().c_str());
+}
+
++ (void)setBusinessOwner:(NSString *)businessOwner
+{
+  GetFramework().GetRoutingManager().BackseatSetBusinessOwner(businessOwner.UTF8String);
+}
+
++ (NSString *)takeSketchVerdict
+{
+  return @(GetFramework().GetRoutingManager().BackseatTakeSketchVerdict().c_str());
+}
+
++ (NSString *)sketchCleared
+{
+  return @(GetFramework().GetRoutingManager().BackseatSketchCleared().c_str());
+}
+
 + (NSArray<NSArray<NSString *> *> *)learnedFacts
 {
   NSMutableArray<NSArray<NSString *> *> * facts = [NSMutableArray array];

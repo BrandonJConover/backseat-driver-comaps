@@ -259,6 +259,8 @@ enum class Category
   Holiday,
   /// Driving away from the route (navigator only).
   WrongWay,
+  /// Turned around: "I feel like I've been here before" (navigator only).
+  UTurn,
   Count
 };
 

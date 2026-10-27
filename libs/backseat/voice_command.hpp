@@ -92,6 +92,15 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken);
 
 /// "Yes", "yeah", "yep", "you got it"...
 bool SaidYes(std::string const & spoken);
+/// "No", "nope", "nah", "not really"...
+bool SaidNo(std::string const & spoken);
+
+/// Whose business the mileage log tracks, said out loud. "Me", "mine", "I do" -> "" (the driver's
+/// own). "My wife", "my wife's" -> "wife" (likewise husband, partner, girlfriend, boyfriend). "Sarah",
+/// "it's Sarah's" -> "Sarah". Empty optional if unclear.
+std::optional<std::string> ParseBusinessOwner(std::string const & spoken);
+/// How to say it: "" -> "your", "wife" -> "your wife's", "Sarah" -> "Sarah's".
+std::string BusinessOwnerPossessive(std::string const & owner);
 
 /// First-run setup answers, said out loud.
 /// "My name is Brandon", "call me B", "it's Brandon", "Brandon" -> "Brandon". Empty if unclear.

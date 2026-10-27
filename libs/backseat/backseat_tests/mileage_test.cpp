@@ -330,3 +330,37 @@ TEST(DrivesSurviveARestart)
   CHECK(!ParseDrive("garbage").has_value());
   CHECK(!ParseDrive("x\ty\t1,2\t3,4\t5\t\t\t\tBusiness\tNoClue\t0\t").has_value());
 }
+
+TEST(FindsWhereThePhoneSleeps)
+{
+  double constexpr kHourMs = 3600'000.0;
+  std::vector<LoggedDrive> log;
+  auto const add = [&](LatLon from, LatLon to, double startedAt) {
+    LoggedDrive d;
+    d.drive = LoggedTrip(from, to, startedAt);
+    log.push_back(d);
+  };
+  for (int day = 0; day < 2; ++day)
+  {
+    add(kHome, kOffice, kMonday8am + day * kDayMs);                // 08:00
+    add(kOffice, kHome, kMonday8am + day * kDayMs + 9 * kHourMs);  // 17:00, home 17:10
+  }
+  CHECK(!LikelyHome(log, MileageUtc).has_value());  // one night so far
+  for (int day = 2; day < 4; ++day)
+  {
+    add(kHome, kOffice, kMonday8am + day * kDayMs);
+    add(kOffice, kHome, kMonday8am + day * kDayMs + 9 * kHourMs);
+  }
+  auto const home = LikelyHome(log, MileageUtc);
+  CHECK(home.has_value());
+  CHECK(SamePlace(*home, kHome));
+  // A lunch run back to the office doesn't count as a night anywhere.
+  CHECK(!SamePlace(*home, kOffice));
+}
+
+TEST(BusinessForSomeoneElse)
+{
+  std::vector<LoggedDrive> log = {Sort(LoggedTrip(kOffice, kClient, kMonday8am))};
+  CHECK(MileageCsv(log, 2026, MileageUtc, "Sarah").find(",Business (Sarah's business),") != std::string::npos);
+  CHECK(MileageCsv(log, 2026, MileageUtc).find(",Business,") != std::string::npos);
+}

@@ -12,6 +12,7 @@
 #include "backseat/rewriter.hpp"
 
 #include <ctime>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -49,6 +50,14 @@ enum class TurnKind
   Destination
 };
 
+/// Which side of the road the lanes for the next maneuver are on, when the driver has to move over.
+enum class LaneSide
+{
+  None,
+  Left,
+  Right
+};
+
 struct RouteSnapshot
 {
   RouteState state = RouteState::Inactive;
@@ -60,6 +69,8 @@ struct RouteSnapshot
   double distToTurnM = 0;
   /// What controls the next maneuver's junction, if the host can tell (stop sign, light).
   Control control = Control::None;
+  /// The next maneuver needs the left or right lanes (and not the ones in the middle).
+  LaneSide laneSide = LaneSide::None;
   /// What the router estimates for the whole trip, read when the trip starts.
   double etaSeconds = 0;
   std::string destination;
@@ -70,6 +81,10 @@ struct RouteSnapshot
   /// Which way the route goes from the car's spot on it, degrees clockwise from north. Negative
   /// when unknown.
   double routeBearingDeg = -1;
+  /// The driver drew this route on the map (route_sketch.hpp), read when the trip starts.
+  bool sketched = false;
+  /// For a drawn route: the fastest route between the same stops, in seconds; 0 if unknown.
+  double fastestSeconds = 0;
 };
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
@@ -230,6 +245,8 @@ private:
   void TrackLongDrive(double tMs, RouteSnapshot const & route);
   void TrackSights(Fix const & fix, RouteSnapshot const & route);
   void TrackWrongWay(Fix const & fix, RouteSnapshot const & route);
+  /// "Strange, it feels as if I've been here before." after the car turns around.
+  void TrackUTurn(Fix const & fix, RouteSnapshot const & route);
   void TrackMusic(double tMs, RouteSnapshot const & route);
   int Tier() const;
   bool Parked() const;
@@ -269,6 +286,8 @@ private:
   std::function<std::tm(double)> m_localTime;
   bool m_christmasSaid = false;
   bool m_roundaboutSaid = false;
+  /// The maneuver the last "get into the left lane" was for; once each.
+  std::optional<uint32_t> m_laneSaidFor;
   /// Punchlines waiting out their awkward pause, by when to say them.
   std::vector<Commentary> m_punchlines;
   double m_lastMusicCheckT = -1e18;
@@ -283,8 +302,16 @@ private:
   double m_wrongWaySince = -1;
   double m_lastWrongWayT = -1e18;
   int m_wrongWaySaid = 0;
+  /// Recent headings while moving (time, degrees), for spotting a U-turn.
+  std::deque<std::pair<double, double>> m_headings;
+  double m_lastUTurnT = -1e18;
+  int m_uTurnsSaid = 0;
   /// Reroutes this trip; the third one gets the autopilot line.
   int m_reroutes = 0;
+  /// This trip follows a route the driver drew, and how many minutes slower it is than the fastest
+  /// one (0 if unknown or not slower).
+  bool m_sketched = false;
+  int m_sketchMinutesLost = 0;
   bool m_carHasAutopilot = false;
   std::string m_partner;
   Pronouns m_partnerPronouns = Pronouns::They;

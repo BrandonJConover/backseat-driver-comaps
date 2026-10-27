@@ -407,3 +407,19 @@ TEST(RatingsAreHeard)
   CHECK_EQUAL(ParseRating("it was fine"), 0);
   CHECK_EQUAL(ParseRating("someone cut me off"), 0);
 }
+
+TEST(BusinessOwnerAnswers)
+{
+  CHECK(SaidNo("nope"));
+  CHECK(SaidNo("No, that's not my house"));
+  CHECK(!SaidNo("yeah that's home"));
+  CHECK(ParseBusinessOwner("my wife does") == std::optional<std::string>("wife"));
+  CHECK(ParseBusinessOwner("My wife’s") == std::optional<std::string>("wife"));
+  CHECK(ParseBusinessOwner("it's mine") == std::optional<std::string>(""));
+  CHECK(ParseBusinessOwner("Sarah") == std::optional<std::string>("Sarah"));
+  CHECK(ParseBusinessOwner("it's Sarah's") == std::optional<std::string>("Sarah"));
+  CHECK(!ParseBusinessOwner("um").has_value());
+  CHECK(BusinessOwnerPossessive("") == "your");
+  CHECK(BusinessOwnerPossessive("wife") == "your wife's");
+  CHECK(BusinessOwnerPossessive("Sarah") == "Sarah's");
+}

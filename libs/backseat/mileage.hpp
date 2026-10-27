@@ -75,6 +75,8 @@ public:
   bool Driving() const { return m_state == State::Driving; }
   /// True once, right after a drive is confirmed.
   bool TakeStarted() { return std::exchange(m_justStarted, false); }
+  /// Where the drive in progress started (the parked spot it pulled away from).
+  LatLon StartedFrom() const { return m_drive.from; }
 
 private:
   enum class State
@@ -139,6 +141,9 @@ struct MileageSettings
   bool homeIsMainWorkplace = false;
   /// StateOf() the driver lives in, e.g. "US_Colorado". Drives that leave it get flagged.
   std::string homeState;
+  /// Whose business the Business bucket is for, when it isn't the driver's ("Sarah"). Empty means
+  /// the driver's own. Brandon: "I don't own a business but my wife does."
+  std::string businessOwner;
 };
 
 /// Why a drive landed in its bucket. Persisted by name, so only append.
@@ -218,6 +223,13 @@ struct MileageYear
   std::vector<size_t> flagged;
 };
 
+/// Where the phone spends the night: the spot drives end at in the evening and start from the next
+/// morning, at least 3 times. For asking "was that your house?" before Home is set.
+std::optional<LatLon> LikelyHome(std::vector<LoggedDrive> const & log, LocalTime const & localTime);
+
+/// True if `a` and `b` are within ~250 m: the same place for the log.
+bool SamePlace(LatLon a, LatLon b);
+
 /// IRS business standard mileage rate, dollars per mile (2024: 0.67, 2025: 0.70, 2026: 0.725).
 /// 0 for years we don't know; the app should then ask.
 double IrsRatePerMile(int year);
@@ -226,7 +238,9 @@ MileageYear SummarizeYear(std::vector<LoggedDrive> const & log, int year, LocalT
 
 /// The year's drives as CSV, oldest first: Date, Start, End, From, To, Miles, Category, Purpose,
 /// Reason, Notes. Totals at the bottom.
-std::string MileageCsv(std::vector<LoggedDrive> const & log, int year, LocalTime const & localTime);
+/// With `businessOwner` set, business rows read "Business (Sarah's business)".
+std::string MileageCsv(std::vector<LoggedDrive> const & log, int year, LocalTime const & localTime,
+                       std::string const & businessOwner = {});
 
 /// One tab-separated line, no newline.
 std::string SerializeDrive(LoggedDrive const & d);

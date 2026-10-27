@@ -414,6 +414,38 @@ size_t Reassign(std::vector<LoggedDrive> & log, size_t index, Bucket bucket, boo
   return changed;
 }
 
+bool SamePlace(LatLon a, LatLon b) { return SameSpot(a, b); }
+
+std::optional<LatLon> LikelyHome(std::vector<LoggedDrive> const & log, LocalTime const & localTime)
+{
+  double constexpr kOvernightMs = 6 * 3600 * 1000.0;
+  int constexpr kNights = 3;
+  std::vector<Drive const *> drives;
+  for (auto const & d : log)
+    drives.push_back(&d.drive);
+  std::stable_sort(drives.begin(), drives.end(), [](auto const * a, auto const * b) { return a->startedAt < b->startedAt; });
+
+  std::vector<std::pair<LatLon, int>> nights;
+  for (size_t i = 0; i + 1 < drives.size(); ++i)
+  {
+    Drive const & evening = *drives[i];
+    Drive const & morning = *drives[i + 1];
+    int const hour = localTime(evening.endedAt).tm_hour;
+    if ((hour < 17 && hour >= 4) || morning.startedAt - evening.endedAt < kOvernightMs ||
+        !SameSpot(evening.to, morning.from))
+      continue;
+    auto const spot = std::find_if(nights.begin(), nights.end(), [&](auto const & n) { return SameSpot(n.first, evening.to); });
+    if (spot == nights.end())
+      nights.emplace_back(evening.to, 1);
+    else
+      ++spot->second;
+  }
+  auto const best = std::max_element(nights.begin(), nights.end(), [](auto const & a, auto const & b) { return a.second < b.second; });
+  if (best == nights.end() || best->second < kNights)
+    return {};
+  return best->first;
+}
+
 // The year --------------------------------------------------------------------------------------
 
 double IrsRatePerMile(int year)
@@ -534,7 +566,8 @@ std::string Clock(std::tm const & t)
 }
 }  // namespace
 
-std::string MileageCsv(std::vector<LoggedDrive> const & log, int year, LocalTime const & localTime)
+std::string MileageCsv(std::vector<LoggedDrive> const & log, int year, LocalTime const & localTime,
+                       std::string const & businessOwner)
 {
   std::vector<LoggedDrive const *> drives;
   for (auto const & d : log)
@@ -555,6 +588,8 @@ std::string MileageCsv(std::vector<LoggedDrive> const & log, int year, LocalTime
     std::string category = BucketName(d->bucket);
     if (d->why == Why::Commute)
       category += " (commute)";
+    if (d->bucket == Bucket::Business && !businessOwner.empty())
+      category += " (" + businessOwner + "'s business)";
     std::string notes;
     auto const note = [&](std::string const & n) { notes += (notes.empty() ? "" : "; ") + n; };
     if (d->flags & kOutOfState)

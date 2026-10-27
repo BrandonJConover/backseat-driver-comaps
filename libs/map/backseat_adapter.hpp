@@ -114,6 +114,8 @@ public:
   static char const * const kMileageOnKey;
   static char const * const kMileageTalkKey;
   static char const * const kHomeIsWorkplaceKey;
+  /// Whose business the mileage log tracks: "" the driver's own, "wife", or a name ("Sarah").
+  static char const * const kBusinessOwnerKey;
   /// Rereads those settings; call after the platform changes them.
   void ReloadPersonality();
   /// Call when the driver opens their profile in Settings, and EndProfileEdit() when they leave it.
@@ -192,9 +194,32 @@ public:
   std::string ReassignDrive(size_t index, backseat::Bucket bucket, bool similarToo, std::string const & purpose);
   void TagPlace(std::string const & name, double lat, double lon, backseat::PlaceRole role);
   std::vector<backseat::MileagePlace> const & TaggedPlaces() const { return m_taggedPlaces; }
+  /// Right after "Log my drives automatically" is turned on, the first time: "Who owns the
+  /// business?" Empty after that.
+  std::string MileageTurnedOn();
+  /// A mileage line just asked something ("was that your house?", "whose business?", "was that trip
+  /// for your wife's business?"). After speaking it, the platform listens once and passes what was
+  /// heard to MileageAnswer(), which records it and returns what to say (empty if it didn't
+  /// understand; the question then lapses).
+  bool MileageListening() const { return m_mileageAsk != MileageAsk::None; }
+  std::string MileageAnswer(std::string const & spoken);
+  std::string BusinessOwner() const;
+  /// For the Mileage screen's "Business owner" field.
+  void SetBusinessOwner(std::string const & owner);
   /// In December and January, once a year: "This year you drove 1,204 miles for work..." Empty
   /// otherwise, or with nothing logged.
   std::string MileageYearEnd();
+
+  /// Draw-your-own route (RoutingManager::ApplyRouteSketch). RoutingManager reports every newly
+  /// built route; one without a drawing is remembered as the fastest way to its finish.
+  void OnRouteBuilt(double totalSeconds, m2::PointD const & finish, bool sketched);
+  /// Call after ApplyRouteSketch() and before BuildRoute(). Once the drawn route is built,
+  /// TakeSketchVerdict() has the GPS's opinion of it.
+  void SketchApplied(bool addedStop, bool trimmed) { m_pendingSketch = {addedStop, trimmed}; }
+  /// "Your route takes 7 minutes longer than mine...", "Another stop. Sure.", or empty. Once.
+  std::string TakeSketchVerdict() { return std::exchange(m_sketchVerdict, std::string()); }
+  /// After ClearRouteSketch(): "Oh, now you want my route."
+  std::string SketchCleared() { return m_navigator.Reply("sketch.cleared"); }
   /// A place driven to before, for the "Where to?" list.
   struct PastRoute
   {
@@ -311,11 +336,37 @@ private:
   std::string m_region;
   /// "Welcome to Utah" was already said on this drive.
   bool m_saidOutOfState = false;
+  enum class MileageAsk
+  {
+    None,
+    Home,
+    Owner,
+    Business
+  };
+  /// What the last mileage line asked, until MileageAnswer().
+  MileageAsk m_mileageAsk = MileageAsk::None;
+  backseat::LatLon m_askedHomeAt;
+  size_t m_askedDrive = 0;
+  /// "I know we are just getting to know each other and all, but the place we just left, was that
+  /// your house?" when a drive starts from where the phone sleeps and Home isn't tagged. Empty
+  /// otherwise. At most three times, a day apart.
+  std::string AskAboutHome();
   /// Home and the regular workplace from trips, plus the places the driver tagged.
   std::vector<backseat::MileagePlace> MileagePlaces() const;
   backseat::MileageSettings MileageSettingsNow() const;
   std::string OnDriveEnded(backseat::Drive const & drive);
   void SaveDriveLog() const;
+  /// The current route was drawn, and the last fastest route (time and where it ended).
+  bool m_routeSketched = false;
+  double m_fastestSeconds = 0;
+  std::optional<m2::PointD> m_fastestTo;
+  struct PendingSketch
+  {
+    bool addedStop = false;
+    bool trimmed = false;
+  };
+  std::optional<PendingSketch> m_pendingSketch;
+  std::string m_sketchVerdict;
   /// Results last read out, waiting for "the first one".
   std::vector<SearchResult> m_results;
   std::vector<backseat::VoiceOption> m_voices;

@@ -12,6 +12,7 @@ add_executable(${PROJECT_NAME}
   plate_game_test.cpp
   voice_command_test.cpp
   rewriter_test.cpp
+  route_sketch_test.cpp
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
 target_compile_definitions(${PROJECT_NAME} PRIVATE BACKSEAT_TRACE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/parity_trace.txt")

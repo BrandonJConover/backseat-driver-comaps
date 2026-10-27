@@ -1,5 +1,6 @@
 #include "map/backseat_adapter.hpp"
 
+#include "backseat/route_sketch.hpp"
 #include "backseat/units.hpp"
 #include "backseat/voice_command.hpp"
 
@@ -321,6 +322,7 @@ char const * const BackseatAdapter::kDriverAgeKey = "BackseatDriverAge";
 char const * const BackseatAdapter::kMileageOnKey = "BackseatMileageOn";
 char const * const BackseatAdapter::kMileageTalkKey = "BackseatMileageTalk";
 char const * const BackseatAdapter::kHomeIsWorkplaceKey = "BackseatHomeIsWorkplace";
+char const * const BackseatAdapter::kBusinessOwnerKey = "BackseatBusinessOwner";
 
 namespace
 {
@@ -611,7 +613,11 @@ std::string BackseatAdapter::OnDriveSample(double lat, double lon, double speedM
     m_saidOutOfState = false;
     // While navigating, the trip already has plenty to say.
     if (talk && !m_navigator.InTrip())
+    {
+      if (auto ask = AskAboutHome(); !ask.empty())
+        return ask;
       return m_navigator.Reply("mileage.started");
+    }
   }
   if (talk && m_drives.Driving() && !m_saidOutOfState && !m_region.empty())
   {
@@ -655,7 +661,14 @@ std::string BackseatAdapter::OnDriveEnded(backseat::Drive const & drive)
 
   if (!SettingOn(kMileageTalkKey, true))
     return {};
-  // One comment at most.
+  // One comment at most. An unsorted drive of 2 miles or more gets asked about, so the log sorts itself.
+  double constexpr kAskBusinessMinMiles = 2;
+  if (logged.bucket == backseat::Bucket::Unknown && logged.drive.Miles() >= kAskBusinessMinMiles)
+  {
+    m_mileageAsk = MileageAsk::Business;
+    m_askedDrive = m_driveLog.size() - 1;
+    return m_navigator.Reply("mileage.askBusiness", {{"owner", backseat::BusinessOwnerPossessive(BusinessOwner())}});
+  }
   if (logged.flags & backseat::kFarFromHome)
     return m_navigator.Reply("mileage.farAway");
   if (logged.flags & backseat::kNewPlace)
@@ -683,7 +696,7 @@ backseat::MileageYear BackseatAdapter::MileageSummary(int year) const
 
 std::string BackseatAdapter::MileageCsv(int year) const
 {
-  return backseat::MileageCsv(m_driveLog, year, &LocalTm);
+  return backseat::MileageCsv(m_driveLog, year, &LocalTm, BusinessOwner());
 }
 
 size_t BackseatAdapter::SimilarDrives(size_t index) const
@@ -720,6 +733,101 @@ void BackseatAdapter::TagPlace(std::string const & name, double lat, double lon,
     out << p.name << '\t' << std::setprecision(9) << p.at.lat << '\t' << p.at.lon << '\t' << static_cast<int>(p.role) << '\n';
 }
 
+std::string BackseatAdapter::AskAboutHome()
+{
+  using backseat::PlaceRole;
+  if (std::any_of(m_taggedPlaces.begin(), m_taggedPlaces.end(), [](auto const & p) { return p.role == PlaceRole::Home; }))
+    return {};
+  char const * const kAskedKey = "BackseatHomeAsked";
+  char const * const kAskedAtKey = "BackseatHomeAskedAt";
+  double constexpr kAskEveryMs = 20 * 3600 * 1000.0;
+  int asked = 0;
+  settings::TryGet(kAskedKey, asked);
+  std::string at;
+  if (asked >= 3 || (settings::Get(kAskedAtKey, at) && NowMs() - std::atof(at.c_str()) < kAskEveryMs))
+    return {};
+  auto const home = backseat::LikelyHome(m_driveLog, &LocalTm);
+  if (!home || !backseat::SamePlace(*home, m_drives.StartedFrom()))
+    return {};
+  // Already tagged, as "Not Brandon's house" or anything else.
+  if (std::any_of(m_taggedPlaces.begin(), m_taggedPlaces.end(),
+                  [&](auto const & p) { return backseat::SamePlace(p.at, *home); }))
+    return {};
+  settings::Set(kAskedKey, asked + 1);
+  settings::Set(kAskedAtKey, std::to_string(static_cast<long long>(NowMs())));
+  m_mileageAsk = MileageAsk::Home;
+  m_askedHomeAt = *home;
+  return m_navigator.Reply("mileage.askHome");
+}
+
+std::string BackseatAdapter::MileageTurnedOn()
+{
+  std::string owner;
+  if (settings::Get(kBusinessOwnerKey, owner))
+    return {};
+  m_mileageAsk = MileageAsk::Owner;
+  return m_navigator.Reply("mileage.askOwner");
+}
+
+std::string BackseatAdapter::BusinessOwner() const
+{
+  std::string owner;
+  settings::TryGet(kBusinessOwnerKey, owner);
+  return owner;
+}
+
+void BackseatAdapter::SetBusinessOwner(std::string const & owner)
+{
+  settings::Set(kBusinessOwnerKey, owner);
+}
+
+std::string BackseatAdapter::MileageAnswer(std::string const & spoken)
+{
+  switch (std::exchange(m_mileageAsk, MileageAsk::None))
+  {
+  case MileageAsk::None: return {};
+  case MileageAsk::Home:
+  {
+    if (backseat::SaidYes(spoken))
+    {
+      TagPlace("Home", m_askedHomeAt.lat, m_askedHomeAt.lon, backseat::PlaceRole::Home);
+      return m_navigator.Reply("mileage.homeYes");
+    }
+    if (!backseat::SaidNo(spoken))
+      return {};
+    // Brandon: "Not x's house", with the driver's real name, not whatever the GPS calls them.
+    std::string name;
+    settings::TryGet(kDriverNameKey, name);
+    if (name.empty())
+      name = "the driver";
+    TagPlace("Not " + name + "'s house", m_askedHomeAt.lat, m_askedHomeAt.lon, backseat::PlaceRole::Personal);
+    return m_navigator.Reply("mileage.homeNo", {{"name", name}});
+  }
+  case MileageAsk::Owner:
+  {
+    auto const owner = backseat::ParseBusinessOwner(spoken);
+    if (!owner)
+      return {};
+    SetBusinessOwner(*owner);
+    return m_navigator.Reply("mileage.ownerSet", {{"owner", backseat::BusinessOwnerPossessive(*owner)}});
+  }
+  case MileageAsk::Business:
+  {
+    if (m_askedDrive >= m_driveLog.size())
+      return {};
+    std::string const owner = backseat::BusinessOwnerPossessive(BusinessOwner());
+    bool const yes = backseat::SaidYes(spoken);
+    if (!yes && !backseat::SaidNo(spoken))
+      return {};
+    backseat::Reassign(m_driveLog, m_askedDrive, yes ? backseat::Bucket::Business : backseat::Bucket::Personal,
+                       true /* similarToo */, yes ? "For " + owner + " business" : "");
+    SaveDriveLog();
+    return m_navigator.Reply(yes ? "mileage.businessYes" : "mileage.businessNo", {{"owner", owner}});
+  }
+  }
+  return {};
+}
+
 std::string BackseatAdapter::MileageYearEnd()
 {
   auto const tm = LocalTm(NowMs());
@@ -740,6 +848,30 @@ std::string BackseatAdapter::MileageYearEnd()
   return m_navigator.Reply("mileage.yearEnd", {{"business", miles(y.businessMiles)},
                                                 {"personal", miles(y.personalMiles)},
                                                 {"unknown", miles(y.unknownMiles)}});
+}
+
+void BackseatAdapter::OnRouteBuilt(double totalSeconds, m2::PointD const & finish, bool sketched)
+{
+  m_routeSketched = sketched;
+  if (!sketched)
+  {
+    m_fastestSeconds = totalSeconds;
+    m_fastestTo = finish;
+    return;
+  }
+  if (!m_pendingSketch)
+    return;
+  auto const sketch = *std::exchange(m_pendingSketch, std::nullopt);
+  // Mid-drive, a new stop is the news; the verdict can wait for arrival.
+  if (sketch.addedStop && m_navigator.InTrip())
+    m_sketchVerdict = m_navigator.Reply("sketch.stopAdded");
+  else if (m_fastestTo && mercator::DistanceOnEarth(*m_fastestTo, finish) < 250 && m_fastestSeconds > 0)
+  {
+    auto const verdict = backseat::JudgeSketch(m_fastestSeconds / 60, totalSeconds / 60);
+    m_sketchVerdict = m_navigator.Reply(verdict.key, {{"minutes", std::to_string(verdict.minutes)}});
+  }
+  if (sketch.trimmed)
+    m_sketchVerdict += (m_sketchVerdict.empty() ? "" : " ") + m_navigator.Reply("sketch.trimmed");
 }
 
 std::string BackseatAdapter::FileAnswer(std::string const & spoken)
@@ -855,6 +987,35 @@ void BackseatAdapter::CheckBattery(double tMs)
     return;
   m_navigator.OnBattery(tMs, Platform::GetBatteryLevel() / 100.0, status == Platform::ChargingStatus::Plugged);
 }
+
+namespace
+{
+// Which side the driver has to move to for a maneuver: the lanes it wants are at one edge of the
+// road and not all of them. Lanes are listed left to right.
+backseat::LaneSide LaneSideFor(routing::turns::lanes::LanesInfo const & lanes)
+{
+  using routing::turns::lanes::LaneWay;
+  size_t const n = lanes.size();
+  if (n < 2)
+    return backseat::LaneSide::None;
+  size_t first = n, last = 0, count = 0;
+  for (size_t i = 0; i < n; ++i)
+  {
+    if (lanes[i].recommendedWay == LaneWay::None)
+      continue;
+    first = std::min(first, i);
+    last = i;
+    ++count;
+  }
+  if (count == 0 || count == n)
+    return backseat::LaneSide::None;
+  if (first == 0 && last < n - 1)
+    return backseat::LaneSide::Left;
+  if (first > 0 && last == n - 1)
+    return backseat::LaneSide::Right;
+  return backseat::LaneSide::None;
+}
+}  // namespace
 
 backseat::Control BackseatAdapter::GuessControl(routing::Route const & route, uint32_t turnIndex) const
 {
@@ -1688,6 +1849,9 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
   {
     snap.origin = ToBackseatLatLon(poly.Front());
     snap.destinationPoint = ToBackseatLatLon(poly.Back());
+    snap.sketched = m_routeSketched;
+    if (m_routeSketched && m_fastestTo && mercator::DistanceOnEarth(*m_fastestTo, poly.Back()) < 250)
+      snap.fastestSeconds = m_fastestSeconds;
   }
   // Which way the route runs from the car's matched spot, for "you're facing the wrong way".
   if (route->GetFollowedPolyline().IsValid())
@@ -1715,6 +1879,7 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
       snap.distToTurnM = distanceToTurnM;
       snap.nextStreet = SpeakableStreetName(info.m_nextStreetName);
       snap.control = GuessControl(*route, turn.m_index);
+      snap.laneSide = LaneSideFor(turn.m_lanes);
     }
   }
   return snap;

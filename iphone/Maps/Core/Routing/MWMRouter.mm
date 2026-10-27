@@ -103,8 +103,12 @@ char const *kRenderAltitudeImagesQueueLabel = "mapsme.mwmrouter.renderAltitudeIm
 + (NSArray<MWMRoutePoint *> *)points {
   NSMutableArray<MWMRoutePoint *> *points = [@[] mutableCopy];
   auto const routePoints = GetFramework().GetRoutingManager().GetRoutePoints();
-  for (auto const &routePoint : routePoints)
+  for (auto const &routePoint : routePoints) {
+    // Drawn-route shaping points aren't stops; keep them out of the stop list.
+    if (routePoint.m_isShaping)
+      continue;
     [points addObject:[[MWMRoutePoint alloc] initWithRouteMarkData:routePoint]];
+  }
   return [points copy];
 }
 
@@ -482,6 +486,8 @@ char const *kRenderAltitudeImagesQueueLabel = "mapsme.mwmrouter.renderAltitudeIm
 
   [[MWMMapViewControlsManager manager] onRouteReady:hasWarnings];
   [self updateFollowingInfo];
+  // Backseat: a drawn route gets the GPS's opinion once it's built.
+  [BackseatSketch routeReady];
 }
 
 - (void)processRouteBuilderEvent:(routing::RouterResultCode)code

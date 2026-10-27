@@ -128,6 +128,19 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 @property(class, nonatomic, readonly) NSArray<NSDictionary<NSString *, id> *> * taggedPlaces;
 /// In December or January, once a year, the year in miles; empty otherwise.
 @property(class, nonatomic, readonly) NSString * mileageYearEnd;
+/// Right after the mileage log is turned on the first time: "Whose business are we tracking?"
+/// Empty after that.
++ (NSString *)mileageTurnedOn;
+/// The last mileage line asked a question; listen once and pass the answer to +mileageAnswer:.
+@property(class, nonatomic, readonly) BOOL mileageListening;
+/// Records the answer and returns what to say, or empty if it wasn't understood.
++ (NSString *)mileageAnswer:(NSString *)spoken;
+/// Whose business the log tracks: "" the driver's own, "wife", or a name.
+@property(class, nonatomic) NSString * businessOwner;
+/// The GPS's opinion of a drawn route, once it's built. Empty otherwise. Once.
++ (NSString *)takeSketchVerdict;
+/// After the drawing is erased: "Oh, now you want my route."
++ (NSString *)sketchCleared;
 /// Kokoro's comeback after the system voice stood in: play a cough, then speak this.
 @property(class, nonatomic, readonly) NSString * voiceRecovered;
 /// Voice search: what the GPS says about the top results (names with their streets, nearest

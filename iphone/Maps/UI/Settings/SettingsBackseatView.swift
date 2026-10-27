@@ -591,6 +591,10 @@ struct SettingsBackseatMileageView: View {
     @State var isHomeWorkplace: Bool = MWMBackseatRewriter.homeIsWorkplace
 
 
+    /// Whose business the log is for: empty for the driver's own, "wife", or a name like "Sarah"
+    @State var businessOwner: String = MWMBackseatRewriter.businessOwner
+
+
     /// The year shown
     @State var year: Int = Calendar.current.component(.year, from: Date())
 
@@ -653,6 +657,17 @@ struct SettingsBackseatMileageView: View {
                         Text(verbatim: "My home office is my main place of business")
                     }
                     .tint(.accent)
+
+                    LabeledContent {
+                        TextField(text: $businessOwner, prompt: Text(verbatim: "Me")) {
+                            Text(verbatim: "Business owner")
+                        }
+                        .multilineTextAlignment(.trailing)
+                        .autocorrectionDisabled()
+                        .onSubmit { MWMBackseatRewriter.businessOwner = businessOwner }
+                    } label: {
+                        Text(verbatim: "Business owner")
+                    }
                 }
             } footer: {
                 Text(verbatim: isOn
@@ -775,6 +790,9 @@ struct SettingsBackseatMileageView: View {
         }
         .onChange(of: isTalking) { changedIsTalking in
             MWMBackseatRewriter.mileageTalk = changedIsTalking
+        }
+        .onChange(of: businessOwner) { changedBusinessOwner in
+            MWMBackseatRewriter.businessOwner = changedBusinessOwner.trimmingCharacters(in: .whitespaces)
         }
         .onChange(of: isHomeWorkplace) { changedIsHomeWorkplace in
             MWMBackseatRewriter.homeIsWorkplace = changedIsHomeWorkplace

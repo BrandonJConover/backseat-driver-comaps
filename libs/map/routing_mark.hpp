@@ -34,6 +34,8 @@ struct RouteMarkData
   bool m_isMyPosition = false;
   bool m_isPassed = false;
   bool m_replaceWithMyPositionAfterRestart = false;
+  /// Backseat: a hidden point from a drawn route. The route must pass it, but it isn't a stop.
+  bool m_isShaping = false;
   m2::PointD m_position;
 };
 
