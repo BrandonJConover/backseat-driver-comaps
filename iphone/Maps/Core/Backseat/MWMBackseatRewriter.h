@@ -66,6 +66,9 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 @property(class, nonatomic, readonly) NSString * askWhereTo;
 /// What to say when nobody answered `askWhereTo`; empty for nothing.
 @property(class, nonatomic, readonly) NSString * noAnswerToWhereTo;
+/// Places driven to before, most driven first, for the "Where to?" list. Each has "label" ("Home",
+/// "Starbucks"), "destination", "lat", "lon", "trips" and "minutes" (usual drive time, 0 if unknown).
++ (NSArray<NSDictionary<NSString *, id> *> *)pastRoutes:(NSInteger)max;
 /// Kokoro's comeback after the system voice stood in: play a cough, then speak this.
 @property(class, nonatomic, readonly) NSString * voiceRecovered;
 /// Voice search: what the GPS says about the top results (names with their streets, nearest

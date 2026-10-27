@@ -78,6 +78,8 @@ struct Routine
   std::array<int, 7> tripsByDay{};
   std::array<bool, 7> usualOn{};
   int trips = 0;
+  /// How long it usually takes, in whole minutes (what routing expected, else what it took).
+  int usualMinutes = 0;
 };
 
 /// The driver's routines, learned from past trips: the same route started within an hour or so of
@@ -103,6 +105,22 @@ struct RoutineBreak
 
 /// The routine usually started from `here` around local time `now` (within 45 minutes), if any.
 std::optional<Routine> UsualTrip(std::vector<Routine> const & routines, LatLon here, std::tm const & now);
+
+/// A place the driver has driven to, for the list of previous routes.
+struct PastPlace
+{
+  /// What it was called last time.
+  std::string destination;
+  LatLon to;
+  int trips = 0;
+  /// When the last trip there ended, ms since the epoch.
+  double lastEndedAt = 0;
+  int usualMinutes = 0;
+};
+
+/// Places driven to before, most trips first (most recent breaks ties), at most `max`. Trips to
+/// within ~250 m of each other count as the same place.
+std::vector<PastPlace> PastPlaces(std::vector<TripRecord> const & history, size_t max);
 
 /// Whether starting `routeKey` at local time `now` breaks one of the routines.
 std::optional<RoutineBreak> CheckRoutine(std::vector<Routine> const & routines, std::string const & routeKey,

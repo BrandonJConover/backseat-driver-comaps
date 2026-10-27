@@ -588,10 +588,14 @@ bool Navigator::SayRoutineBreak(double t, RouteSnapshot const & route)
   Vars vars = {{"usual", PlaceName(broken->routine.to, broken->routine.destination)},
                {"place", PlaceName(route.destinationPoint, route.destination)},
                {"day", kDays[now.tm_wday]},
-               {"daypart", h < 12 ? "morning" : h < 17 ? "afternoon" : h < 21 ? "evening" : "night"}};
+               {"daypart", h < 12 ? "morning" : h < 17 ? "afternoon" : h < 21 ? "evening" : "night"},
+               {"guy", m_pronouns == Pronouns::He ? "guy" : m_pronouns == Pronouns::She ? "girl" : "person"}};
   switch (broken->kind)
   {
-  case RoutineBreak::Kind::Elsewhere: SayLine(t, Category::Routine, "routine.elsewhere", vars); break;
+  case RoutineBreak::Kind::Elsewhere:
+    // Skipping work gets Brandon's "I thought it was Tuesday?" interrogation.
+    SayLine(t, Category::Routine, vars["usual"] == "work" ? "routine.skipWork" : "routine.elsewhere", vars);
+    break;
   case RoutineBreak::Kind::OffDay: SayLine(t, Category::Routine, "routine.offDay", vars); break;
   case RoutineBreak::Kind::Late:
   {

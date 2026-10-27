@@ -618,7 +618,12 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
       guess && std::chrono::steady_clock::now() - guess->at < std::chrono::minutes(2) && backseat::SaidYes(text) &&
       backseat::ParseAppCommands(text).empty())
   {
-    heard.reply = m_navigator.Reply("ask.guessYes", {{"usual", guess->name}});
+    std::string capital = guess->name;
+    capital[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(capital[0])));
+    heard.reply = m_navigator.Reply("ask.guessYes", {{"usual", capital}});
+    // "Let's try to make it there in 12 minutes this time. I still have scars from our last drive."
+    if (guess->routine.usualMinutes > 0)
+      heard.reply += " " + m_navigator.Reply("ask.beatTime", {{"minutes", std::to_string(guess->routine.usualMinutes)}});
     if (guess->routine.to)
     {
       heard.kind = HeardCommand::Kind::RouteTo;
@@ -836,6 +841,19 @@ std::string BackseatAdapter::NoAnswerToWhereTo()
   return still && !m_navigator.InTrip() ? m_navigator.Reply("ask.stayPut") : std::string();
 }
 
+std::vector<BackseatAdapter::PastRoute> BackseatAdapter::PastRoutes(size_t max) const
+{
+  std::vector<PastRoute> out;
+  for (auto const & p : backseat::PastPlaces(m_navigator.History(), max))
+  {
+    std::string name = m_navigator.PlaceName(p.to, p.destination);
+    if (name == "home" || name == "work")
+      name[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
+    out.push_back({name, p.destination, p.to.lat, p.to.lon, p.trips, p.usualMinutes});
+  }
+  return out;
+}
+
 std::string BackseatAdapter::AskWhereTo()
 {
   m_guess.reset();
@@ -855,7 +873,8 @@ std::string BackseatAdapter::AskWhereTo()
       // "work" reads oddly at the start of a sentence.
       std::string capital = name;
       capital[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(capital[0])));
-      return m_navigator.Reply("ask.guess", {{"usual", capital},
+      // Brandon: "Let me guess, you are working today. I thought you would have been fired by now."
+      return m_navigator.Reply(name == "work" ? "ask.guessWork" : "ask.guess", {{"usual", capital},
                                              {"day", kDays[tm.tm_wday]},
                                              {"daypart", h < 12 ? "morning" : h < 17 ? "afternoon" : h < 21 ? "evening" : "night"}});
     }

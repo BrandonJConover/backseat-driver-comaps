@@ -233,6 +233,7 @@ TEST(RoutinesAreLearnedAndBroken)
   CHECK_EQUAL(routines[0].startMinute, 8 * 60);
   CHECK(routines[0].usualOn[1] && routines[0].usualOn[5] && !routines[0].usualOn[6]);
   CHECK_EQUAL(routines[0].destination, std::string("Acme Corp"));
+  CHECK_EQUAL(routines[0].usualMinutes, 25);
 
   auto at = [&](int dayOffset, int hour, int minute) { return Utc(monday + dayOffset * kDay + (hour * 60 + minute) * 60000.0); };
   CHECK(!CheckRoutine(routines, RouteKey(home, work), at(15, 8, 5)));  // a Tuesday, on time
@@ -319,4 +320,40 @@ TEST(HandEditedProfileIsCalledOut)
   // Filling in something new is setup, not changing it up.
   CHECK(!ProfileChanged({"Brandon", "he", ""}, {"Brandon", "he", "34"}));
   CHECK(!ProfileChanged({"", "", ""}, {"Brandon", "he", ""}));
+}
+
+TEST(PastPlacesAreRankedByHowOftenTheyreDriven)
+{
+  LatLon const home{39.70, -104.90};
+  LatLon const work{39.75, -104.99};
+  LatLon const gym{39.72, -104.95};
+  std::vector<TripRecord> history;
+  auto trip = [&](LatLon from, LatLon to, std::string name, double endedAt, double expected)
+  {
+    TripRecord r;
+    r.routeKey = RouteKey(from, to);
+    r.destination = std::move(name);
+    r.to = to;
+    r.endedAt = endedAt;
+    r.expectedMinutes = expected;
+    r.actualMinutes = expected + 5;
+    history.push_back(r);
+  };
+  trip(home, work, "Acme Corp", 1000, 20);
+  trip(home, work, "Acme Corp", 2000, 24);
+  trip(gym, work, "Acme", 3000, 10);  // from somewhere else, same place
+  trip(home, gym, "Gym", 9000, 8);
+  trip(work, home, "Home", 4000, 0);
+  trip(work, home, "Home", 5000, 0);
+  trip(home, {39.80, -105.0}, "", 0, 9);  // never finished: ignored
+
+  auto const places = PastPlaces(history, 10);
+  CHECK_EQUAL(places.size(), size_t(3));
+  CHECK_EQUAL(places[0].destination, std::string("Acme"));  // the latest name
+  CHECK_EQUAL(places[0].trips, 3);
+  CHECK_EQUAL(places[0].usualMinutes, 18);
+  CHECK_EQUAL(places[1].destination, std::string("Home"));
+  CHECK_EQUAL(places[1].usualMinutes, 5);  // no estimate, so how long it took
+  CHECK_EQUAL(places[2].destination, std::string("Gym"));
+  CHECK_EQUAL(PastPlaces(history, 1).size(), size_t(1));
 }

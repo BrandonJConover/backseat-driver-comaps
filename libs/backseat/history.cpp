@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <map>
 
@@ -65,6 +66,64 @@ std::string OrdinalWord(int n)
   return std::to_string(n) + suffix;
 }
 }  // namespace
+
+namespace
+{
+int UsualMinutes(std::vector<TripRecord const *> const & trips)
+{
+  double expected = 0, actual = 0;
+  int withExpected = 0, withActual = 0;
+  for (auto const * t : trips)
+  {
+    if (t->expectedMinutes > 0)
+      expected += t->expectedMinutes, ++withExpected;
+    if (t->actualMinutes > 0)
+      actual += t->actualMinutes, ++withActual;
+  }
+  if (withExpected)
+    return static_cast<int>(std::lround(expected / withExpected));
+  return withActual ? static_cast<int>(std::lround(actual / withActual)) : 0;
+}
+}  // namespace
+
+std::vector<PastPlace> PastPlaces(std::vector<TripRecord> const & history, size_t max)
+{
+  struct Group
+  {
+    std::vector<TripRecord const *> trips;
+    TripRecord const * last = nullptr;
+  };
+  std::map<std::string, Group> byPlace;
+  for (auto const & trip : history)
+  {
+    auto const arrow = trip.routeKey.find('>');
+    if (arrow == std::string::npos || trip.endedAt <= 0)
+      continue;
+    auto & g = byPlace[trip.routeKey.substr(arrow + 1)];
+    g.trips.push_back(&trip);
+    if (!g.last || trip.endedAt >= g.last->endedAt)
+      g.last = &trip;
+  }
+  std::vector<PastPlace> out;
+  for (auto const & [cell, g] : byPlace)
+  {
+    PastPlace p;
+    p.destination = g.last->destination;
+    if (g.last->to)
+      p.to = *g.last->to;
+    else if (std::sscanf(cell.c_str(), "%lf,%lf", &p.to.lat, &p.to.lon) != 2)
+      continue;
+    p.trips = static_cast<int>(g.trips.size());
+    p.lastEndedAt = g.last->endedAt;
+    p.usualMinutes = UsualMinutes(g.trips);
+    out.push_back(std::move(p));
+  }
+  std::sort(out.begin(), out.end(), [](PastPlace const & a, PastPlace const & b)
+  { return a.trips != b.trips ? a.trips > b.trips : a.lastEndedAt > b.lastEndedAt; });
+  if (out.size() > max)
+    out.resize(max);
+  return out;
+}
 
 std::string RouteKey(LatLon origin, LatLon destination)
 {
@@ -191,6 +250,10 @@ std::vector<Routine> LearnRoutines(std::vector<TripRecord> const & history,
         }
         r.trips = static_cast<int>(j - i);
         r.startMinute = sum / r.trips;
+        std::vector<TripRecord const *> trips;
+        for (size_t k = i; k < j; ++k)
+          trips.push_back(starts[k].trip);
+        r.usualMinutes = UsualMinutes(trips);
         bool any = false;
         for (int d = 0; d < 7; ++d)
           any |= r.usualOn[d] = r.tripsByDay[d] >= 2;

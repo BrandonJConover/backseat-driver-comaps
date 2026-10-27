@@ -138,6 +138,21 @@ public:
   /// Said when the app opens with no route, before listening once for a destination: "Where to?",
   /// or a guess at the usual trip ("It's Tuesday morning. Work, I assume?"). A "yes" next routes there.
   std::string AskWhereTo();
+  /// A place driven to before, for the "Where to?" list.
+  struct PastRoute
+  {
+    /// What to show: "Home", "Work", or what it was called ("Starbucks").
+    std::string label;
+    /// What it was called last time (the search text if there's no exact spot).
+    std::string destination;
+    double lat = 0;
+    double lon = 0;
+    int trips = 0;
+    /// How long it usually takes, whole minutes; 0 if unknown.
+    int usualMinutes = 0;
+  };
+  /// Previous destinations, most driven first (most recent breaks ties).
+  std::vector<PastRoute> PastRoutes(size_t max) const;
   /// Call when AskWhereTo() got no answer (about 45 s of silence). Says "Deciding to play it safe
   /// today, huh?" if the car hasn't moved since; empty otherwise.
   std::string NoAnswerToWhereTo();

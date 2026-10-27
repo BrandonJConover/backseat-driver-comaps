@@ -384,6 +384,21 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
 
 static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == MWMBackseatSetupStepPassenger);
 
++ (NSArray<NSDictionary<NSString *, id> *> *)pastRoutes:(NSInteger)max
+{
+  NSMutableArray<NSDictionary<NSString *, id> *> * routes = [NSMutableArray array];
+  for (auto const & r : GetFramework().GetRoutingManager().BackseatPastRoutes(static_cast<size_t>(MAX(max, 0))))
+    [routes addObject:@{
+      @"label": @(r.label.c_str()),
+      @"destination": @(r.destination.c_str()),
+      @"lat": @(r.lat),
+      @"lon": @(r.lon),
+      @"trips": @(r.trips),
+      @"minutes": @(r.usualMinutes),
+    }];
+  return routes;
+}
+
 + (NSArray<NSArray<NSString *> *> *)learnedFacts
 {
   NSMutableArray<NSArray<NSString *> *> * facts = [NSMutableArray array];
