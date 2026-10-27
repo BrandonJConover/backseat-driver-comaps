@@ -472,6 +472,21 @@ static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == M
   return @(GetFramework().GetRoutingManager().BackseatNicenessMoved().c_str());
 }
 
++ (NSString *)mapBrowsed
+{
+  return @(GetFramework().GetRoutingManager().BackseatMapBrowsed().c_str());
+}
+
++ (NSString *)typingDestination
+{
+  return @(GetFramework().GetRoutingManager().BackseatTypingDestination().c_str());
+}
+
++ (NSString *)roughRoad
+{
+  return @(GetFramework().GetRoutingManager().BackseatRoughRoad().c_str());
+}
+
 + (NSString *)nicenessSlidBack
 {
   return @(GetFramework().GetRoutingManager().BackseatNicenessSlidBack().c_str());

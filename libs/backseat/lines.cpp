@@ -54,13 +54,17 @@ std::string Fill(std::string const & tmpl, Vars const & vars)
 }
 namespace
 {
-/// A key's memory holds at most this many lines (and always leaves one fresh option).
-size_t constexpr kSaidKeep = 12;
+/// A key's memory holds at most this many lines (and always leaves one fresh option), so a pool
+/// of up to this size is used up before anything in it comes back.
+size_t constexpr kSaidKeep = 30;
 }  // namespace
 
 std::string const & SaidLog::Pick(std::string const & key, std::vector<std::string> const & options, double r)
 {
   auto & recent = m_recent[key];
+  // A key's first ever line is its first option, which is Brandon's line where there is one.
+  if (recent.empty())
+    r = 0;
   std::vector<std::string const *> fresh;
   for (auto const & l : options)
     if (std::find(recent.begin(), recent.end(), l) == recent.end())

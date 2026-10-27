@@ -10,6 +10,7 @@
 #include "backseat/plate_game.hpp"
 #include "backseat/report.hpp"
 #include "backseat/rewriter.hpp"
+#include "backseat/stop_go.hpp"
 
 #include <ctime>
 #include <deque>
@@ -85,12 +86,18 @@ struct RouteSnapshot
   bool sketched = false;
   /// For a drawn route: the fastest route between the same stops, in seconds; 0 if unknown.
   double fastestSeconds = 0;
+  /// How far ahead the route bends sharply where there's no maneuver (CurveAheadM()); negative if
+  /// not within reach.
+  double curveAheadM = -1;
 };
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
 using PlaceLookup = std::function<std::optional<Place>(LatLon const &)>;
 /// Whether there's a traffic light (or similar reason to wait) right by a point.
 using TrafficLightLookup = std::function<bool(LatLon const &)>;
+/// The road the router would take instead, from a point on the route, avoiding the jam there
+/// (e.g. "I-25"). Empty when there's no real alternative.
+using AlternateLookup = std::function<std::optional<std::string>(LatLon const &)>;
 
 enum class Bridge
 {
@@ -143,6 +150,10 @@ struct Fix
   std::optional<double> speedLimitMps;
 };
 
+/// Distance along `ahead` (the route from the car onward) to the first sharp bend: where the heading
+/// has turned at least `minDeg` within 80 m. Negative if none starts within `maxM`.
+double CurveAheadM(std::vector<LatLon> const & ahead, double maxM, double minDeg = 50);
+
 /// "Turn left onto Elm Street" for a maneuver and the street after it.
 std::string InstructionText(TurnKind turn, std::string const & street, std::string const & destination);
 
@@ -168,6 +179,8 @@ public:
   void SetParkingLookup(ParkingLookup lookup) { m_parkingLookup = std::move(lookup); }
   /// Stops next to a traffic light are red lights, not pulling over.
   void SetTrafficLightLookup(TrafficLightLookup lookup) { m_lightLookup = std::move(lookup); }
+  /// Names the road to blame a jam on ("I told you to take I-25").
+  void SetAlternateLookup(AlternateLookup lookup) { m_alternateLookup = std::move(lookup); }
   void SetDriverPronouns(Pronouns p) { m_pronouns = p; }
   /// What to call the driver, from first-run setup. Empty when they never said.
   void SetDriverName(std::string name) { m_driverName = std::move(name); }
@@ -247,6 +260,10 @@ private:
   void TrackWrongWay(Fix const & fix, RouteSnapshot const & route);
   /// "Strange, it feels as if I've been here before." after the car turns around.
   void TrackUTurn(Fix const & fix, RouteSnapshot const & route);
+  /// "Starting the journey is always the hardest step..." when the car sits after the trip starts.
+  void TrackSlowStart(Fix const & fix);
+  /// "Hey did you know there is a curve ahead? I did."
+  void TrackCurveAhead(Fix const & fix, RouteSnapshot const & route);
   void TrackMusic(double tMs, RouteSnapshot const & route);
   int Tier() const;
   bool Parked() const;
@@ -306,6 +323,8 @@ private:
   std::deque<std::pair<double, double>> m_headings;
   double m_lastUTurnT = -1e18;
   int m_uTurnsSaid = 0;
+  /// The car has got going this trip, or the slow-start line was already said.
+  bool m_startedRolling = false;
   /// Reroutes this trip; the third one gets the autopilot line.
   int m_reroutes = 0;
   /// This trip follows a route the driver drew, and how many minutes slower it is than the fastest
@@ -341,6 +360,10 @@ private:
   double m_lastBridgeYelpT = -1e18;
   double m_lastCurveYelpT = -1e18;
   int m_hardCurveSamples = 0;
+  double m_lastCurveAheadT = -1e18;
+  /// Speeding up through a bend: "Ahh, you are supposed to slow down in curves not accelerate."
+  int m_curveGasSamples = 0;
+  double m_lastCurveGasT = -1e18;
 
   // Traffic: recent (time, speed, limit) to judge a crawl, and whether we're in one.
   struct SpeedSample
@@ -351,6 +374,8 @@ private:
   };
   std::vector<SpeedSample> m_speeds;
   bool m_inTraffic = false;
+  StopGo m_stopGo;
+  AlternateLookup m_alternateLookup;
 
   // License plate game.
   PlateGame m_plates;

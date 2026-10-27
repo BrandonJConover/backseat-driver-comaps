@@ -44,6 +44,14 @@ double constexpr kSeriousOverMps = 4.5;
 double constexpr kScaryLateralMps2 = 3.5;
 double constexpr kScaryCurveMinMps = 11;  // ~25 mph; slower is just a turn
 double constexpr kCurveYelpEveryMs = 90000;
+// "There is a curve ahead": this far out, at road speed, now and then.
+double constexpr kCurveAheadMinM = 120;
+double constexpr kCurveAheadMaxM = 400;
+double constexpr kCurveAheadEveryMs = 8 * 60000;
+// Speeding up in a bend: gentler than a scary curve, but the speed is climbing.
+double constexpr kCurveGasLateralMps2 = 2;
+double constexpr kCurveGasAccelMps2 = 0.7;
+double constexpr kCurveGasEveryMs = 5 * 60000;
 /// Regular bridges are everywhere in a city (every overpass); water is always worth a scream.
 double constexpr kLandBridgeYelpEveryMs = 600000;
 double constexpr kWaterBridgeYelpEveryMs = 60000;
@@ -75,6 +83,9 @@ double constexpr kUTurnMaxAgoMs = 30000;
 double constexpr kUTurnMinMps = 1.5;
 double constexpr kUTurnEveryMs = 120000;
 int constexpr kUTurnMaxPerTrip = 2;
+// Still sitting this long after the trip starts gets the brake-or-gas line.
+double constexpr kSlowStartMs = 45000;
+double constexpr kRollingMps = 3;
 /// Asking for music: once a trip, at least this far in, on a quiet stretch, if nothing is playing.
 double constexpr kMusicAfterMs = 15 * 60000;
 double constexpr kMusicCheckEveryMs = 15000;
@@ -152,6 +163,15 @@ double DistanceM(LatLon const & a, LatLon const & b)
   return 2 * kEarthRadiusM * std::asin(std::min(1.0, std::sqrt(h)));
 }
 
+double Bearing(LatLon const & a, LatLon const & b)
+{
+  double const rad = M_PI / 180;
+  double const y = std::sin((b.lon - a.lon) * rad) * std::cos(b.lat * rad);
+  double const x = std::cos(a.lat * rad) * std::sin(b.lat * rad) -
+                   std::sin(a.lat * rad) * std::cos(b.lat * rad) * std::cos((b.lon - a.lon) * rad);
+  return std::atan2(y, x) / rad;
+}
+
 Maneuver ManeuverOf(TurnKind k)
 {
   switch (k)
@@ -180,6 +200,38 @@ std::optional<RouteStep::Kind> StepKindOf(TurnKind k)
   }
 }
 }  // namespace
+
+double CurveAheadM(std::vector<LatLon> const & ahead, double maxM, double minDeg)
+{
+  double constexpr kBendWithinM = 80;
+  // Segments, skipping points too close together to have a heading.
+  struct Seg
+  {
+    double startM;
+    double lengthM;
+    double bearing;
+  };
+  std::vector<Seg> segs;
+  double along = 0;
+  for (size_t i = 0; i + 1 < ahead.size() && along <= maxM + kBendWithinM; ++i)
+  {
+    double const len = DistanceM(ahead[i], ahead[i + 1]);
+    if (len >= 2)
+      segs.push_back({along, len, Bearing(ahead[i], ahead[i + 1])});
+    along += len;
+  }
+  for (size_t i = 0; i < segs.size() && segs[i].startM <= maxM; ++i)
+  {
+    double turned = 0;
+    for (size_t j = i + 1; j < segs.size() && segs[j].startM - segs[i].startM - segs[i].lengthM <= kBendWithinM; ++j)
+    {
+      turned += std::remainder(segs[j].bearing - segs[j - 1].bearing, 360.0);
+      if (std::fabs(turned) >= minDeg)
+        return segs[j].startM;
+    }
+  }
+  return -1;
+}
 
 std::string InstructionText(TurnKind turn, std::string const & street, std::string const & destination)
 {
@@ -253,6 +305,8 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackSights(fix, route);
   TrackWrongWay(fix, route);
   TrackUTurn(fix, route);
+  TrackSlowStart(fix);
+  TrackCurveAhead(fix, route);
   TrackMusic(fix.tMs, route);
   // Fed up for the first time this trip: from now on it's "wise, omnipotent overseer GPS".
   if (!m_titleDemanded && Tier() == 2)
@@ -369,12 +423,25 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
   if (!m_inTraffic && share < kCrawlShare)
   {
     m_inTraffic = true;
-    Say(m_engine->OnNav(NavEvent::Traffic(fix.tMs, true)));
+    m_stopGo.Reset();
+    std::optional<std::string> alternate;
+    if (m_alternateLookup)
+      alternate = m_alternateLookup({fix.lat, fix.lon});
+    Say(m_engine->OnNav(NavEvent::Traffic(fix.tMs, true, alternate)));
   }
   else if (m_inTraffic && share > kClearShare)
   {
     m_inTraffic = false;
+    m_stopGo.Reset();
     Say(m_engine->OnNav(NavEvent::Traffic(fix.tMs, false)));
+  }
+  if (!m_inTraffic)
+    return;
+  switch (m_stopGo.Update(fix.tMs, std::max(0.0, fix.speedMps)))
+  {
+  case StopGo::Quip::StopGo: SayLine(fix.tMs, Category::Traffic, "traffic.stopGo"); break;
+  case StopGo::Quip::Standstill: SayLine(fix.tMs, Category::Traffic, "traffic.standstill"); break;
+  case StopGo::Quip::None: break;
   }
 }
 
@@ -630,6 +697,33 @@ void Navigator::TrackUTurn(Fix const & fix, RouteSnapshot const & route)
   }
 }
 
+void Navigator::TrackCurveAhead(Fix const & fix, RouteSnapshot const & route)
+{
+  if (route.state != RouteState::OnRoute || route.curveAheadM < kCurveAheadMinM || route.curveAheadM > kCurveAheadMaxM ||
+      fix.speedMps < kScaryCurveMinMps || fix.tMs - m_lastCurveAheadT < kCurveAheadEveryMs)
+    return;
+  // A bend at the next maneuver is the maneuver.
+  if (route.turnId && std::fabs(route.curveAheadM - route.distToTurnM) < 80)
+    return;
+  m_lastCurveAheadT = fix.tMs;
+  SayLine(fix.tMs, Category::Fear, "curve.ahead");
+}
+
+void Navigator::TrackSlowStart(Fix const & fix)
+{
+  if (m_startedRolling)
+    return;
+  if (fix.speedMps >= kRollingMps)
+  {
+    m_startedRolling = true;
+    return;
+  }
+  if (fix.tMs - m_tripStartT < kSlowStartMs)
+    return;
+  m_startedRolling = true;
+  SayLine(fix.tMs, Category::LongStop, "start.slow");
+}
+
 std::vector<Routine> Navigator::Routines() const
 {
   return LearnRoutines(m_history, [this](double ms) { return LocalTime(ms); });
@@ -819,6 +913,9 @@ void Navigator::ResetTrip()
   m_lastBadSpeedingT.reset();
   m_onBridge = false;
   m_hardCurveSamples = 0;
+  m_lastCurveAheadT = -1e18;
+  m_curveGasSamples = 0;
+  m_lastCurveGasT = -1e18;
   m_reroutes = 0;
   m_autopilotClaimed = false;
   m_lemonSaid = false;
@@ -832,6 +929,7 @@ void Navigator::ResetTrip()
   m_headings.clear();
   m_lastUTurnT = -1e18;
   m_uTurnsSaid = 0;
+  m_startedRolling = false;
   m_musicAsked = false;
   m_christmasSaid = false;
   m_roundaboutSaid = false;
@@ -1087,7 +1185,17 @@ void Navigator::TrackFear(Fix const & fix, RouteSnapshot const & route)
     bool const atManeuver = route.turnId && route.distToTurnM < 60;
     bool const scary = dt <= 3 && speed >= kScaryCurveMinMps && lateral >= kScaryLateralMps2 && !atManeuver;
     m_hardCurveSamples = scary ? m_hardCurveSamples + 1 : 0;
-    if (m_hardCurveSamples >= 2 && fix.tMs - m_lastCurveYelpT >= kCurveYelpEveryMs)
+    bool const gassing = dt <= 3 && speed >= kScaryCurveMinMps && lateral >= kCurveGasLateralMps2 && !atManeuver &&
+                         (fix.speedMps - m_lastFix->speedMps) / dt >= kCurveGasAccelMps2;
+    m_curveGasSamples = gassing ? m_curveGasSamples + 1 : 0;
+    if (m_curveGasSamples >= 2 && fix.tMs - m_lastCurveGasT >= kCurveGasEveryMs)
+    {
+      // "Ahh, you are supposed to slow down in curves not accelerate." In place of the yelp.
+      m_lastCurveGasT = fix.tMs;
+      m_lastCurveYelpT = fix.tMs;
+      SayLine(fix.tMs, Category::Fear, "curve.accelerate");
+    }
+    else if (m_hardCurveSamples >= 2 && fix.tMs - m_lastCurveYelpT >= kCurveYelpEveryMs)
     {
       m_lastCurveYelpT = fix.tMs;
       SayLine(fix.tMs, Category::Fear, "fear.curve", weight);

@@ -3,6 +3,9 @@
 #include "backseat/navigator.hpp"
 #include "backseat/plate_game.hpp"
 
+#include <algorithm>
+#include <cctype>
+
 using namespace backseat;
 
 namespace
@@ -232,7 +235,10 @@ TEST(PlateGameCallsParkingLotsCheating)
   game.Offer(0);
   game.OnDriverSaid("yes", 0);
   auto r = game.OnDriverSaid("Texas, Ohio, Oregon", 0, true /* parked */);
-  CHECK_EQUAL(r->text, std::string("Hey that's cheating. New rule, no parking lots."));
+  // Brandon's "Hey that's cheating. New rule, no parking lots." or one of its variants.
+  std::string lower = r->text;
+  std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
+  CHECK(lower.find("cheat") != std::string::npos);
   CHECK(game.Log().lifetime.empty());
   CHECK_EQUAL(game.OnDriverSaid("Texas", 0)->key, std::string("plateGame.newFar"));
 }

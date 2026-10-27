@@ -29,6 +29,8 @@ set(
   route_sketch.hpp
   rundown.cpp
   rundown.hpp
+  stop_go.cpp
+  stop_go.hpp
   types.cpp
   types.hpp
   units.cpp

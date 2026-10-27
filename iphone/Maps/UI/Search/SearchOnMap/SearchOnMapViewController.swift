@@ -455,6 +455,10 @@ extension SearchOnMapViewController: SearchOnMapHeaderViewDelegate {
       interactor?.handle(.clearButtonDidTap)
       return
     }
+    // Backseat: "Typing while driving? Bold."
+    if searchText.count == 1 {
+      BackseatHooks.typingDestination()
+    }
     interactor?.handle(.didType(SearchQuery(searchText, locale: searchBar.textInputMode?.primaryLanguage, source: .typedText)))
   }
 

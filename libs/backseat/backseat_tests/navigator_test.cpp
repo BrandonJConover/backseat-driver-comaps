@@ -251,6 +251,52 @@ TEST(NavigatorBlamesTheRouteInACrawl)
   CHECK(blamed);
 }
 
+namespace
+{
+/// Whether any line from `key` was said while a jam plays out: `go` seconds at 10 mph, then
+/// `stop` seconds still, repeated for `seconds`, on a 65 mph road.
+bool SaidInJam(Navigator & nav, std::string const & key, int go, int stop, int seconds)
+{
+  double const limit = FromDisplay(65, Units::Mph);
+  nav.OnFix(At(0, limit, limit), Far());
+  nav.TakeLines();
+  bool said = false;
+  for (int s = 1; s <= seconds; ++s)
+  {
+    double const mps = (s % (go + stop)) < go ? FromDisplay(10, Units::Mph) : 0;
+    nav.OnFix(At(s * 1000.0, mps, limit), Far());
+    for (auto const & l : nav.TakeLines())
+      said = said || SaidLineOf(l.text, key);
+  }
+  return said;
+}
+}  // namespace
+
+TEST(NavigatorMocksStopAndGo)
+{
+  Navigator nav(Config());
+  CHECK(SaidInJam(nav, "traffic.stopGo", 5, 10, 300));
+}
+
+TEST(NavigatorMocksAStandstill)
+{
+  Navigator nav(Config());
+  CHECK(SaidInJam(nav, "traffic.standstill", 5, 60, 300));
+}
+
+TEST(NavigatorAsksWhichRoadToBlame)
+{
+  Navigator nav(Config());
+  int asked = 0;
+  nav.SetAlternateLookup([&asked](LatLon const &) -> std::optional<std::string>
+  {
+    ++asked;
+    return std::string("I-25");
+  });
+  SaidInJam(nav, "traffic.start", 5, 10, 300);
+  CHECK_EQUAL(asked, 1);
+}
+
 TEST(NavigatorLeavesSlowSideStreetsAlone)
 {
   Navigator nav(Config());
@@ -1030,4 +1076,49 @@ TEST(UTurnsFeelFamiliar)
   // A gentle bend is not a U-turn, and a second one right away isn't mentioned.
   nav.OnFix(heading(12000, 10), route);
   CHECK(!SaidKey(nav.TakeLines(), "uturn"));
+}
+
+TEST(CurvesAheadAreFoundOnTheRouteLine)
+{
+  // North 300 m, then a 90-degree bend east.
+  std::vector<LatLon> ahead;
+  for (int i = 0; i <= 30; ++i)
+    ahead.push_back({40.0 + i * 0.00009, -105.0});
+  for (int i = 1; i <= 20; ++i)
+    ahead.push_back({40.0027, -105.0 + i * 0.00012});
+  double const at = CurveAheadM(ahead, 450);
+  CHECK(at > 250 && at < 320);
+  // A straight road has none.
+  std::vector<LatLon> straight;
+  for (int i = 0; i <= 50; ++i)
+    straight.push_back({40.0 + i * 0.00009, -105.0});
+  CHECK(CurveAheadM(straight, 450) < 0);
+}
+
+TEST(CurveAheadIsMentionedNowAndThen)
+{
+  Navigator nav(Config());
+  RouteSnapshot route = OnRoute(1, TurnKind::Left, 3000);
+  route.curveAheadM = 250;
+  nav.OnFix(At(0, 20), route);
+  CHECK(SaidKey(nav.TakeLines(), "curve.ahead"));
+  nav.OnFix(At(60000, 20), route);
+  CHECK(!SaidKey(nav.TakeLines(), "curve.ahead"));
+}
+
+TEST(SpeedingUpInACurve)
+{
+  Navigator nav(Config());
+  RouteSnapshot const route = OnRoute(1, TurnKind::Left, 3000);
+  auto const fix = [](double t, double mps, double deg)
+  {
+    Fix f = At(t, mps);
+    f.bearingDeg = deg;
+    return f;
+  };
+  // 15 m/s and climbing 2 m/s a second, heading turning 10 degrees a second: ~2.6 m/s^2 sideways.
+  nav.OnFix(fix(0, 15, 0), route);
+  nav.OnFix(fix(1000, 17, 10), route);
+  nav.OnFix(fix(2000, 19, 20), route);
+  CHECK(SaidKey(nav.TakeLines(), "curve.accelerate"));
 }

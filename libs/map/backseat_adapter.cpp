@@ -521,6 +521,37 @@ std::string BackseatAdapter::NicenessMoved()
   return m_navigator.Reply(count == 1 ? "niceness.first" : "niceness.again");
 }
 
+std::string BackseatAdapter::MapBrowsed()
+{
+  double constexpr kEveryMs = 20 * 60000.0;
+  double const now = NowMs();
+  if (!m_navigator.InTrip() || now - m_mapBrowsedAt < kEveryMs)
+    return {};
+  m_mapBrowsedAt = now;
+  return m_navigator.Reply("map.browse");
+}
+
+std::string BackseatAdapter::TypingDestination()
+{
+  double constexpr kEveryMs = 20 * 60000.0;
+  double const now = NowMs();
+  if (now - m_typingSaidAt < kEveryMs)
+    return {};
+  m_typingSaidAt = now;
+  return m_navigator.Reply("search.typing");
+}
+
+std::string BackseatAdapter::RoughRoad()
+{
+  double constexpr kEveryMs = 60 * 60000.0;
+  double const now = NowMs();
+  if (!m_navigator.InTrip() || now - m_roughSaidAt < kEveryMs)
+    return {};
+  m_roughSaidAt = now;
+  // On a route they drew, the road less traveled was their idea.
+  return m_navigator.Reply(m_routeSketched ? "road.rough.sketched" : "road.rough");
+}
+
 std::string BackseatAdapter::ArrivalSurvey()
 {
   double constexpr kSurveyEveryMs = 20 * 3600 * 1000.0;
@@ -1214,6 +1245,7 @@ char const * ReplyKey(backseat::AppAction action, std::string const & argument)
   default: return nullptr;
   }
 }
+
 }  // namespace
 
 BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & text)
@@ -1880,6 +1912,21 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
       snap.nextStreet = SpeakableStreetName(info.m_nextStreetName);
       snap.control = GuessControl(*route, turn.m_index);
       snap.laneSide = LaneSideFor(turn.m_lanes);
+    }
+    // The route ahead, for bends with no maneuver ("Hey did you know there is a curve ahead?").
+    auto const & followed = route->GetFollowedPolyline();
+    if (followed.IsValid())
+    {
+      auto const & poly = followed.GetPolyline();
+      auto const iter = followed.GetCurrentIter();
+      std::vector<backseat::LatLon> ahead = {ToBackseatLatLon(iter.m_pt)};
+      double along = 0;
+      for (size_t i = iter.m_ind + 1; i < poly.GetSize() && along < 600; ++i)
+      {
+        along += mercator::DistanceOnEarth(poly.GetPoint(i - 1), poly.GetPoint(i));
+        ahead.push_back(ToBackseatLatLon(poly.GetPoint(i)));
+      }
+      snap.curveAheadM = backseat::CurveAheadM(ahead, 450);
     }
   }
   return snap;

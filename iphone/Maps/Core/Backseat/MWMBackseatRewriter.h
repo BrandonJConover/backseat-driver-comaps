@@ -88,6 +88,12 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 /// The do-nothing Niceness slider: call when the driver lets go of it, speak the laugh, then animate
 /// the slider back to the mean end ("I guess I could tone it back a bit").
 + (NSString *)nicenessMoved;
+/// The driver panned the map away from the car mid-trip. A line to say, or empty (rate-limited).
++ (NSString *)mapBrowsed;
+/// The first character typed into the search field. A line to say, or empty.
++ (NSString *)typingDestination;
+/// A rough stretch of road (several hard jolts). A line to say, or empty.
++ (NSString *)roughRoad;
 /// Spoken once the slider is back at the mean end: "Don't touch my slider."
 + (NSString *)nicenessSlidBack;
 /// After the arrival line, at most once every 20 hours: the one-to-ten rating question, or empty.

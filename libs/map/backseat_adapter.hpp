@@ -169,6 +169,16 @@ public:
   std::string NicenessMoved();
   /// Once the slider is back on the mean side: "Don't touch my slider."
   std::string NicenessSlidBack() { return m_navigator.Reply("niceness.after"); }
+  /// The driver dragged the map away from the car while navigating: "Put your map away. We don't
+  /// live in the 90s anymore. We went digital." At most once every 20 minutes; empty otherwise.
+  std::string MapBrowsed();
+  /// The driver started typing a destination instead of saying it: "I see we aren't on speaking
+  /// terms. Well, I for one am not offended." At most once every 20 minutes; empty otherwise.
+  std::string TypingDestination();
+  /// The platform felt a rough stretch while driving (several hard vertical jolts within a few
+  /// seconds): "You know there is an expression about taking the road less traveled... I don't
+  /// think it mentions pot holes." Once a trip at most, and only while navigating.
+  std::string RoughRoad();
   /// After the arrival line, at most once every 20 hours: "Test 47 complete. On a scale of one to
   /// ten, how satisfied were you?" Empty otherwise. Listen once, then pass the answer to
   /// SurveyAnswer(), which says it was recorded (and ignored) and keeps it in memory.
@@ -326,6 +336,9 @@ private:
   std::string m_fileQuestion;
   /// Polite destination requests, for the occasional "you're so basic" recap.
   int m_navigates = 0;
+  double m_mapBrowsedAt = -1e18;
+  double m_typingSaidAt = -1e18;
+  double m_roughSaidAt = -1e18;
   /// Waiting for a rating after ArrivalSurvey().
   bool m_surveyAsked = false;
   backseat::DriveDetector m_drives;

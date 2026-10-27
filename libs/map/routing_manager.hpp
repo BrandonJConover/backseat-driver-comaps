@@ -283,6 +283,9 @@ public:
   std::string BackseatFileAnswer(std::string const & spoken) { return m_backseat.FileAnswer(spoken); }
   std::string BackseatNicenessMoved() { return m_backseat.NicenessMoved(); }
   std::string BackseatNicenessSlidBack() { return m_backseat.NicenessSlidBack(); }
+  std::string BackseatMapBrowsed() { return m_backseat.MapBrowsed(); }
+  std::string BackseatTypingDestination() { return m_backseat.TypingDestination(); }
+  std::string BackseatRoughRoad() { return m_backseat.RoughRoad(); }
   std::string BackseatArrivalSurvey() { return m_backseat.ArrivalSurvey(); }
   std::string BackseatSurveyAnswer(std::string const & spoken) { return m_backseat.SurveyAnswer(spoken); }
   std::string BackseatDriveSample(double lat, double lon, double speedMps, double accuracyM, int activity, double tMs)
