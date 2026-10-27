@@ -277,3 +277,15 @@ TEST(NamesAreMisheardSlightly)
       CHECK(MisheardName(name, v) != name);
   CHECK_EQUAL(MisheardName("Brandon Conover", 0), std::string("Brendon"));
 }
+
+TEST(PronounsAreGuessedAndCorrected)
+{
+  CHECK(PronounsForName("Brandon") == std::string("he"));
+  CHECK(PronounsForName("sarah connor") == std::string("she"));
+  CHECK(!PronounsForName("Zorblax"));
+  CHECK(PronounCorrection("excuse me, I'm a woman") == std::string("she"));
+  CHECK(PronounCorrection("I am a guy") == std::string("he"));
+  CHECK(PronounCorrection("my pronouns are they them") == std::string("they"));
+  CHECK(!PronounCorrection("I'm a terrible driver"));
+  CHECK(!PronounCorrection("I'm hungry"));
+}

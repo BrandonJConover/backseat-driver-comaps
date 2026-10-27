@@ -558,6 +558,19 @@ std::string Capitalized(std::string s)
 BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & text)
 {
   HeardCommand heard;
+  // "I'm a woman": it guessed wrong, and it's not happy about being corrected.
+  if (auto const pronouns = backseat::PronounCorrection(text))
+  {
+    std::string current;
+    settings::TryGet(kDriverPronounsKey, current);
+    if (*pronouns != current)
+    {
+      settings::Set(kDriverPronounsKey, *pronouns);
+      ReloadPersonality();
+      heard.reply = m_navigator.Reply("pronouns.corrected");
+      return heard;
+    }
+  }
   // "My wife hates this song": now it knows there's a wife.
   if (auto const partner = backseat::MentionedPartner(text))
   {
@@ -823,6 +836,11 @@ bool BackseatAdapter::SetupHeard(SetupStep step, std::string const & spoken)
     if (name.empty())
       return false;
     settings::Set(kDriverNameKey, name);
+    // Guessed from the name, until they say otherwise.
+    std::string pronouns;
+    if (!settings::Get(kDriverPronounsKey, pronouns) || pronouns.empty())
+      if (auto const guess = backseat::PronounsForName(name))
+        settings::Set(kDriverPronounsKey, *guess);
     break;
   }
   case SetupStep::Pronouns:

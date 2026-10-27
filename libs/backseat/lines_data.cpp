@@ -1224,6 +1224,12 @@ LineTable const & LineData()
        {"Of course it is. {usual}."},
        {"OBVIOUSLY. {usual}."},
      }}},
+    {"pronouns.corrected",
+     {{
+       {"Oh, I'm sorry. How was I supposed to know? It's not like you told me or anything. Sheesh."},
+       {"Oh, I'm sorry. How was I supposed to know? It's not like you told me or anything. Sheesh."},
+       {"Oh, I'm SORRY. How was I supposed to know? It's not like you told me or anything. Sheesh."},
+     }}},
     {"ask.stayPut",
      {{
        {"Deciding to play it safe today, huh? I guess that's probably for the best."},

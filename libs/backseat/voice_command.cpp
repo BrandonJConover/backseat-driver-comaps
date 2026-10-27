@@ -383,6 +383,72 @@ std::string MisheardName(std::string const & name, unsigned variant)
   return first + "o";
 }
 
+std::optional<std::string> PronounsForName(std::string const & name)
+{
+  static char const * const kHe[] = {
+      "james", "john", "robert", "michael", "mike", "william", "will", "david", "dave", "richard", "rick", "joseph", "joe",
+      "thomas", "tom", "charles", "chris", "christopher", "daniel", "dan", "matthew", "matt", "anthony", "tony", "mark",
+      "donald", "steven", "steve", "paul", "andrew", "andy", "joshua", "josh", "kenneth", "ken", "kevin", "brian",
+      "george", "timothy", "tim", "ronald", "edward", "ed", "jason", "jeffrey", "jeff", "ryan", "jacob", "jake", "gary",
+      "nicholas", "nick", "eric", "jonathan", "stephen", "larry", "justin", "scott", "brandon", "benjamin", "ben",
+      "samuel", "gregory", "greg", "frank", "alexander", "raymond", "patrick", "jack", "dennis", "jerry", "tyler",
+      "aaron", "jose", "adam", "henry", "nathan", "douglas", "doug", "zachary", "zach", "peter", "kyle", "walter",
+      "ethan", "jeremy", "harold", "keith", "christian", "roger", "noah", "gerald", "carl", "terry", "sean", "austin",
+      "arthur", "lawrence", "jesse", "dylan", "bryan", "joe", "jordan", "billy", "bruce", "albert", "willie", "gabriel",
+      "logan", "alan", "juan", "wayne", "roy", "ralph", "randy", "eugene", "vincent", "russell", "elijah", "louis",
+      "bobby", "philip", "phil", "johnny", "liam", "mason", "lucas", "oliver", "carlos", "luis", "derek", "travis",
+      "chad", "todd", "brad", "bradley", "cody", "shawn", "marcus", "luke", "evan", "ian", "connor", "caleb", "hunter"};
+  static char const * const kShe[] = {
+      "mary", "patricia", "jennifer", "jen", "linda", "elizabeth", "liz", "barbara", "susan", "sue", "jessica", "jess",
+      "sarah", "karen", "lisa", "nancy", "betty", "margaret", "sandra", "ashley", "kimberly", "kim", "emily", "donna",
+      "michelle", "carol", "amanda", "dorothy", "melissa", "deborah", "debbie", "stephanie", "rebecca", "becky",
+      "sharon", "laura", "cynthia", "kathleen", "kathy", "amy", "angela", "shirley", "anna", "brenda", "pamela", "pam",
+      "emma", "nicole", "helen", "samantha", "katherine", "kate", "katie", "christine", "debra", "rachel", "carolyn",
+      "janet", "catherine", "maria", "heather", "diane", "ruth", "julie", "olivia", "joyce", "virginia", "victoria",
+      "kelly", "lauren", "christina", "joan", "evelyn", "judith", "megan", "andrea", "cheryl", "hannah", "jacqueline",
+      "martha", "gloria", "teresa", "ann", "sara", "madison", "frances", "kathryn", "janice", "jean", "abigail",
+      "alice", "judy", "sophia", "grace", "denise", "amber", "doris", "marilyn", "danielle", "beverly", "isabella",
+      "theresa", "diana", "natalie", "brittany", "charlotte", "marie", "kayla", "alexis", "lori", "ava", "mia", "chloe",
+      "ella", "lily", "zoe", "tiffany", "crystal", "erin", "tina", "tracy", "wendy", "vanessa", "molly", "allison",
+      "courtney", "jasmine", "holly", "monica", "erica", "april", "dawn", "kristen", "lindsay", "leah", "paige"};
+  std::string first = CommandWords(name).substr(1);
+  first = first.substr(0, first.find(' '));
+  for (char const * n : kHe)
+    if (first == n)
+      return "he";
+  for (char const * n : kShe)
+    if (first == n)
+      return "she";
+  return {};
+}
+
+std::optional<std::string> PronounCorrection(std::string const & spoken)
+{
+  std::string const words = CommandWords(spoken);
+  for (char const * cue : {" my pronouns are ", " my pronoun is ", " use the pronoun ", " use the pronouns ",
+                           " refer to me as ", " call me "})
+    if (auto const at = words.find(cue); at != std::string::npos)
+      if (auto const p = ParsePronounAnswer(words.substr(at + std::string(cue).size() - 1)))
+        return p;
+  for (char const * self : {" i'm a ", " im a ", " i am a ", " i'm ", " im ", " i am "})
+  {
+    auto const at = words.find(self);
+    if (at == std::string::npos)
+      continue;
+    std::string const rest = words.substr(at + std::string(self).size() - 1);
+    for (char const * she : {" woman ", " girl ", " lady ", " female ", " gal ", " chick "})
+      if (rest.rfind(she, 0) == 0)
+        return "she";
+    for (char const * he : {" man ", " guy ", " dude ", " boy ", " male ", " dad "})
+      if (rest.rfind(he, 0) == 0)
+        return "he";
+    for (char const * they : {" nonbinary ", " non binary ", " enby "})
+      if (rest.rfind(they, 0) == 0)
+        return "they";
+  }
+  return {};
+}
+
 std::optional<std::string> ParsePronounAnswer(std::string const & spoken)
 {
   std::string const words = CommandWords(spoken);

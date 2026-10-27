@@ -97,6 +97,11 @@ std::string ParseNameAnswer(std::string const & spoken);
 /// The driver's name, heard slightly wrong on purpose: "Brandon" -> "Brendon". `variant` picks
 /// among the ways to get it wrong. Never returns the name unchanged.
 std::string MisheardName(std::string const & name, unsigned variant = 0);
+/// A guess at "he" or "she" from a common first name ("Brandon" -> "he"). Empty when it can't tell.
+std::optional<std::string> PronounsForName(std::string const & name);
+/// The driver setting the record straight ("I'm a woman", "my pronouns are they/them"): the
+/// pronouns they mean. Empty when they didn't.
+std::optional<std::string> PronounCorrection(std::string const & spoken);
 /// "he", "she" or "they" ("I'm a guy" -> "he").
 std::optional<std::string> ParsePronounAnswer(std::string const & spoken);
 
