@@ -356,6 +356,11 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   return @(GetFramework().GetRoutingManager().BackseatNoAnswerToWhereTo().c_str());
 }
 
++ (NSString *)voiceRecovered
+{
+  return @(GetFramework().GetRoutingManager().BackseatVoiceRecovered().c_str());
+}
+
 static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == MWMBackseatSetupStepPassenger);
 
 + (NSArray<NSArray<NSString *> *> *)learnedFacts

@@ -271,6 +271,7 @@ public:
     return m_backseat.PickSearchResult(spoken);
   }
   std::string BackseatNoAnswerToWhereTo() { return m_backseat.NoAnswerToWhereTo(); }
+  std::string BackseatVoiceRecovered() { return m_backseat.VoiceRecovered(); }
   std::vector<std::pair<std::string, std::string>> BackseatLearnedFacts() const { return m_backseat.LearnedFacts(); }
   /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.
   BackseatAdapter const & GetBackseat() const { return m_backseat; }

@@ -134,6 +134,9 @@ public:
   /// Call when AskWhereTo() got no answer (about 45 s of silence). Says "Deciding to play it safe
   /// today, huh?" if the car hasn't moved since; empty otherwise.
   std::string NoAnswerToWhereTo();
+  /// Kokoro's first line after the system voice had to stand in: it coughs (the platform plays a
+  /// cough sound first) and blames something it ate.
+  std::string VoiceRecovered() { return m_navigator.Reply("voice.recovered"); }
 
   /// Spoken search results, after a HeardCommand Search. The platform runs the search, passes the
   /// top results closest first, speaks the returned line, and then:

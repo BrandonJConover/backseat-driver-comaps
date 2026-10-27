@@ -59,6 +59,8 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 @property(class, nonatomic, readonly) NSString * askWhereTo;
 /// What to say when nobody answered `askWhereTo`; empty for nothing.
 @property(class, nonatomic, readonly) NSString * noAnswerToWhereTo;
+/// Kokoro's comeback after the system voice stood in: play a cough, then speak this.
+@property(class, nonatomic, readonly) NSString * voiceRecovered;
 /// Voice search: what the GPS says about the top results (names with their streets, nearest
 /// first). `pick` is the result to route to straight away (only one found); `none` means there's
 /// nothing to choose; otherwise listen and pass the answer to +pickSearchResult:.
