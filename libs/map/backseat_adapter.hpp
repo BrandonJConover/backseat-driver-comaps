@@ -301,6 +301,9 @@ public:
     bool nav = true;
     /// Suggested speech rate, 1 = normal.
     double speed = 1;
+    /// Navigation lines: how long the line may wait for the neural voice before it's too late
+    /// (from the distance and speed to the next maneuver). Wait at least the usual 1.2 s.
+    double maxWaitMs = 0;
   };
 
   /// One entry per line of the last TakeNotifications() batch, in the same order.

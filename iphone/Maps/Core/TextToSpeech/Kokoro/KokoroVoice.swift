@@ -1,8 +1,9 @@
 // Backseat Driver's Kokoro voice on iOS: Kokoro-82M on Core ML (Neural Engine + CPU) through
 // FluidAudio, the same engine EpubToM4B narrates with.
 //
-// Navigation lines never wait long on Kokoro: one that isn't ready to play within `navDeadline`
-// goes to the system voice and isn't rendered. Roasts queue, go stale after `roastMaxAge`, and are
+// Navigation lines never wait long on Kokoro: one that isn't ready to play within its budget (at
+// least `navDeadline`, longer when the engine says the maneuver is far enough off) goes to the
+// system voice and isn't rendered. Roasts queue, go stale after `roastMaxAge`, and are
 // cut off when a navigation line needs the speaker. Settings picks the voice, or the system voice.
 //
 // Apple's BNNS can crash inside Core ML on iOS 26.4 and later (FluidAudio #817/#844). That can't be
@@ -24,7 +25,7 @@ final class KokoroVoice: NSObject {
   @objc var systemIsSpeaking: (() -> Bool)?
 
   private static let log = os.Logger(subsystem: "com.brandonjconover.backseatdriver", category: "Kokoro")
-  private static let navDeadline: TimeInterval = 2.5
+  fileprivate static let navDeadline: TimeInterval = 2.5
   static let roastMaxAge: TimeInterval = 45
   private static let cacheLines = 32
   /// Set once the Core ML models have downloaded, so later launches don't wait for Wi-Fi.
@@ -100,11 +101,13 @@ final class KokoroVoice: NSObject {
     let keep: Bool
     let fallback: () -> Void
     let generation: Int
+    /// Navigation lines: how long to wait for Kokoro before the system voice says it.
+    let budget: TimeInterval
     let queuedAt = Date()
     var state = State.waiting  // guarded by KokoroVoice.lock
 
     init(text: String, nav: Bool, speed: Float, voice: String, keep: Bool, fallback: @escaping () -> Void,
-         generation: Int) {
+         generation: Int, budget: TimeInterval = KokoroVoice.navDeadline) {
       self.text = text
       self.nav = nav
       self.speed = speed
@@ -112,6 +115,7 @@ final class KokoroVoice: NSObject {
       self.keep = keep
       self.fallback = fallback
       self.generation = generation
+      self.budget = budget
     }
   }
 
@@ -299,6 +303,13 @@ final class KokoroVoice: NSObject {
     enqueue(text, nav: nav, speed: speed, voice: nil, keep: false, fallback: fallback)
   }
 
+  /// Like speak(_:nav:speed:fallback:), with the engine's wait budget for a navigation line: the
+  /// maneuver is far enough off that waiting `maxWaitMs` for Kokoro still says it in time.
+  @objc func speak(_ text: String, nav: Bool, speed: Float, maxWaitMs: Double, fallback: @escaping () -> Void) {
+    enqueue(text, nav: nav, speed: speed, voice: nil, keep: false, fallback: fallback,
+            budget: max(Self.navDeadline, maxWaitMs / 1000))
+  }
+
   /// Answers the driver, in `voiceID` (the picked voice when nil or unknown). Replies play in the
   /// order given and never go stale, so a whole line-up of voices can take turns.
   @objc func sayReply(_ text: String, voiceID: String?, fallback: @escaping () -> Void) {
@@ -312,7 +323,7 @@ final class KokoroVoice: NSObject {
   }
 
   private func enqueue(_ text: String, nav: Bool, speed: Float, voice requested: String?, keep: Bool,
-                       fallback: @escaping () -> Void) {
+                       fallback: @escaping () -> Void, budget: TimeInterval = navDeadline) {
     lock.lock()
     let known = requested.flatMap { id in Self.voiceOptions.contains { $0.id == id } ? id : nil }
     // Still loading: everything but a turn instruction waits for Kokoro rather than switching voices.
@@ -321,7 +332,7 @@ final class KokoroVoice: NSObject {
       let say = { [self] in
         guard !said else { return }
         said = true
-        enqueue(text, nav: nav, speed: speed, voice: requested, keep: keep, fallback: fallback)
+        enqueue(text, nav: nav, speed: speed, voice: requested, keep: keep, fallback: fallback, budget: budget)
       }
       waitingForReady.append(say)
       lock.unlock()
@@ -338,7 +349,7 @@ final class KokoroVoice: NSObject {
     guard primary != nil, let picked = Self.voice else {
       let why = CoreMLCrashGuard.isDisabledForThisOS() ? "crashGuard" : failed ? "error" : "notReady"
       lock.unlock()
-      Self.trace(text, voice: "system", why: why)
+      Self.trace(text, voice: "system", why: why, budget: nav ? budget : 0)
       DispatchQueue.main.async { self.player.sayWithSystemVoice(fallback) }
       return
     }
@@ -359,25 +370,26 @@ final class KokoroVoice: NSObject {
     if !recovering, let wav = cache[key] {
       touch(key)
       lock.unlock()
-      Self.trace(text, voice: "kokoro-cached")
+      Self.trace(text, voice: "kokoro-cached", budget: nav ? budget : 0)
       DispatchQueue.main.async { self.player.play(wav, nav: nav, keep: keep) }
       return
     }
     let job = Job(text: text, nav: nav, speed: speed, voice: voice, keep: keep, fallback: fallback,
-                  generation: generation)
+                  generation: generation, budget: budget)
     if nav { navJobs.append(job) } else { roastJobs.append(job) }
     lock.unlock()
     wake?.yield()
 
     guard nav else { return }
-    DispatchQueue.main.asyncAfter(deadline: .now() + Self.navDeadline) { [self] in
+    DispatchQueue.main.asyncAfter(deadline: .now() + job.budget) { [self] in
       lock.lock()
       let fallBack = job.state == .waiting && job.generation == generation
       if fallBack { job.state = .fellBack }
       lock.unlock()
       guard fallBack else { return }
       Self.log.debug("Kokoro too slow for a navigation line, using the system voice")
-      Self.trace(job.text, voice: "system", why: "deadline", waitMs: Date().timeIntervalSince(job.queuedAt) * 1000)
+      Self.trace(job.text, voice: "system", why: "deadline", waitMs: Date().timeIntervalSince(job.queuedAt) * 1000,
+                 budget: job.budget)
       player.sayWithSystemVoice(job.fallback)
     }
   }
@@ -509,7 +521,7 @@ final class KokoroVoice: NSObject {
       let fallBack = job.state == .waiting
       if fallBack { job.state = .fellBack }
       lock.unlock()
-      if fallBack { Self.trace(job.text, voice: "system", why: "error") }
+      if fallBack { Self.trace(job.text, voice: "system", why: "error", budget: job.nav ? job.budget : 0) }
       if fallBack { DispatchQueue.main.async { self.player.sayWithSystemVoice(job.fallback) } }
       return
     }
@@ -524,14 +536,16 @@ final class KokoroVoice: NSObject {
     lock.unlock()
     if play {
       Self.trace(job.text, voice: "kokoro", waitMs: renderStart.timeIntervalSince(job.queuedAt) * 1000,
-                 renderMs: Date().timeIntervalSince(renderStart) * 1000)
+                 renderMs: Date().timeIntervalSince(renderStart) * 1000, budget: job.nav ? job.budget : 0)
     }
     if play { DispatchQueue.main.async { self.player.play(wav, nav: job.nav, keep: job.keep) } }
   }
 
   /// One "voice" line in the drive log: who said it, and why the system voice did if it did.
-  private static func trace(_ text: String, voice: String, why: String = "", waitMs: Double = 0, renderMs: Double = 0) {
+  private static func trace(_ text: String, voice: String, why: String = "", waitMs: Double = 0, renderMs: Double = 0,
+                            budget: TimeInterval = 0) {
     BackseatLog.event("voice", ["voice": voice, "why": why, "wait_ms": String(Int(waitMs)),
+                                "budget_ms": String(Int(budget * 1000)),
                                 "render_ms": String(Int(renderMs)), "text": String(text.prefix(60))])
   }
 

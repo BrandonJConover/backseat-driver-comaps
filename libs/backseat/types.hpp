@@ -263,6 +263,8 @@ enum class Category
   UTurn,
   /// A badge unlocked ("Achievement unlocked: NASCAR Driver").
   Achievement,
+  /// Filling a long silence on an easy stretch (navigator only).
+  Idle,
   Count
 };
 
@@ -285,6 +287,10 @@ struct Commentary
   Priority priority = Priority::Roast;
   /// Suggested TTS speed: angrier is a bit faster.
   double voiceSpeed = 1;
+  /// Navigation lines: how long the host may wait for the good (neural) voice before this line is
+  /// too late to be useful and has to go out in the system voice. 0 means as soon as possible.
+  /// Set by Navigator::TakeLines() from the distance and speed to the next maneuver.
+  double maxWaitMs = 0;
 };
 
 struct TripStats

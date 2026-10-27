@@ -16,6 +16,8 @@ namespace backseat
 namespace
 {
 double constexpr kNever = -std::numeric_limits<double>::infinity();
+/// A heading swing counts as taking (or botching) the pending turn only this close to it.
+double constexpr kWrongTurnWithinM = 120;
 
 /// How much each offense winds the GPS up. Negative values calm it down.
 double FrustrationDelta(Category c)
@@ -301,7 +303,10 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
       m_pendingTurn.reset();
     else
       m_pendingTurn =
-          PendingTurn{dir == Maneuver::Right ? TurnDirection::Right : TurnDirection::Left, shape, e.t, stage, {}};
+          PendingTurn{dir == Maneuver::Right ? TurnDirection::Right : TurnDirection::Left, shape, e.t, stage, {}, false,
+                      e.distanceM};
+    // The heading swing from the turn just finished isn't about this one.
+    m_headings.clear();
     m_turnDoneSaid = false;
     // Only real turns count toward NASCAR; an exit on the left isn't a lap.
     if (dir == Maneuver::Left && shape == TurnShape::Turn)
@@ -362,6 +367,8 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     break;
   }
   case NavEvent::Type::Progress:
+    if (m_pendingTurn)
+      m_pendingTurn->distM = e.distanceM;
     NagStraight(out, e.t, e.distanceM);
     Countdown(out, e.t, e.distanceM);
     break;
@@ -535,6 +542,10 @@ void CritiqueEngine::CheckTurnDirection(TelemetrySample const & s, std::vector<C
   // Only plain turns can be checked by heading: a roundabout swings both ways, and a cloverleaf exit on
   // the right loops left.
   if (!m_pendingTurn || m_pendingTurn->shape != TurnShape::Turn)
+    return;
+  // Only a swing at the maneuver is about it; a bend or a driveway a mile out is the router's
+  // business (missed turn, reroute), not "your other left".
+  if (m_pendingTurn->distM > kWrongTurnWithinM)
     return;
   auto const old =
       std::find_if(m_headings.begin(), m_headings.end(), [&](Heading const & h) { return s.t - h.t >= 6000; });

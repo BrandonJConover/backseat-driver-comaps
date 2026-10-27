@@ -118,9 +118,18 @@ struct Sight
 {
   /// As it should be said: "a Starbucks", "Coors Field".
   std::string name;
+  /// Used when `at` is unknown; with `at`, the side is worked out from the car's heading.
   bool onLeft = false;
+  /// Where it is. With it, the GPS waits until the car is about to pass it before saying anything,
+  /// so the driver can actually see it. Without it, it's said right away.
+  std::optional<LatLon> at;
+  /// What it is, for a line about that kind of place: coffee, food, gas, park, worship, school,
+  /// hospital, museum, store or landmark (stadiums, monuments, attractions). Empty or anything
+  /// else gets the general lines.
+  std::string kind;
 };
-/// A named place just beside the road at a point, given which way the car is heading.
+/// A named place right beside the road ahead of the car (ideally 50-400 m ahead and within ~40 m
+/// of the road), given which way the car is heading.
 using SightLookup = std::function<std::optional<Sight>(LatLon const &, double bearingDeg)>;
 
 /// Whether other audio (music, a podcast) is playing on the phone.
@@ -264,6 +273,9 @@ private:
   bool KnowsTheDate(double ms) const;
   void TrackLongDrive(double tMs, RouteSnapshot const & route);
   void TrackSights(Fix const & fix, RouteSnapshot const & route);
+  void TrackIdle(Fix const & fix, RouteSnapshot const & route);
+  void SaySight(double tMs, Sight const & sight);
+  double NavWaitMs(Commentary const & line) const;
   void TrackWrongWay(Fix const & fix, RouteSnapshot const & route);
   /// "Strange, it feels as if I've been here before." after the car turns around.
   void TrackUTurn(Fix const & fix, RouteSnapshot const & route);
@@ -322,6 +334,16 @@ private:
   double m_lastSightCheckT = -1e18;
   double m_lastSightT = -1e18;
   std::vector<std::string> m_sightsSaid;
+  /// A sight spotted up ahead, waiting until the car is about to pass it.
+  struct UpcomingSight
+  {
+    Sight sight;
+    double spottedT;
+  };
+  std::optional<UpcomingSight> m_upcomingSight;
+  /// When the last line went out (TakeLines), for filling a long silence.
+  double m_lastSpokeT = -1e18;
+  double m_idleGapMs = 0;
   /// When the car started heading away from the route, or negative while it isn't.
   double m_wrongWaySince = -1;
   double m_lastWrongWayT = -1e18;

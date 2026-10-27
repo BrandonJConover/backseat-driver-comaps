@@ -1220,3 +1220,137 @@ TEST(AnExitOnTheLeftIsNotANascarLap)
   }
   CHECK_EQUAL(CountCategory(all, Category::Achievement), size_t{0});
 }
+
+namespace
+{
+double constexpr kMPerDegLat = 6371000 * M_PI / 180;
+
+/// Drives north from the test spot at `mps`, one fix a second, from `fromS` to `toS` seconds.
+/// Returns the tour lines and the car's distance north (m) when each was said.
+std::vector<std::pair<Commentary, double>> DriveNorth(Navigator & nav, int fromS, int toS, double mps,
+                                                      RouteSnapshot const & route)
+{
+  std::vector<std::pair<Commentary, double>> said;
+  for (int s = fromS; s < toS; ++s)
+  {
+    Fix f = Heading(s * 1000.0, mps, 0);
+    f.lat = 39.7 + s * mps / kMPerDegLat;
+    nav.OnFix(f, route);
+    for (auto const & l : LinesOf(nav.TakeLines(), Category::Tour))
+      said.push_back({l, s * mps});
+  }
+  return said;
+}
+
+LatLon NorthOfStart(double northM, double eastM)
+{
+  return {39.7 + northM / kMPerDegLat, -105 + eastM / (kMPerDegLat * std::cos(39.7 * M_PI / 180))};
+}
+}  // namespace
+
+TEST(TourGuideWaitsUntilTheSightIsInView)
+{
+  Navigator nav(Config());
+  // A coffee shop on the right-hand side of the road, about 2.3 km up (the car spots it at ~2 km).
+  LatLon const shop = NorthOfStart(2300, 25);
+  nav.SetSightLookup(
+      [shop](LatLon const & at, double)
+      {
+        if (std::fabs(at.lat - shop.lat) * kMPerDegLat > 400)
+          return std::optional<Sight>{};
+        Sight s{"a Starbucks", true, shop, "coffee"};  // onLeft is wrong on purpose: the position wins
+        return std::optional<Sight>{s};
+      });
+  auto const said = DriveNorth(nav, 0, 200, 15, Far());
+  CHECK_EQUAL(said.size(), size_t(1));
+  // Said as the car is about to pass it (15 m/s x 3 s = 45 m out), not when it was first spotted.
+  double const before = 2300 - said[0].second;
+  CHECK(before > 0 && before <= 50);
+  CHECK(said[0].first.text.find("right") != std::string::npos);
+  CHECK(SaidLineOf(said[0].first.text, "tour.coffee"));
+}
+
+TEST(TourGuideSkipsSightsBehindOrOffTheRoad)
+{
+  Navigator nav(Config());
+  // Behind the car, then far off to the side: the driver can't see either.
+  nav.SetSightLookup(
+      [](LatLon const & at, double)
+      {
+        double const north = (at.lat - 39.7) * kMPerDegLat;
+        Sight s{"Coors Field", false, NorthOfStart(north - 100, 0), "landmark"};
+        if (north > 1500)
+          s.at = NorthOfStart(north + 200, 300);
+        return std::optional<Sight>{s};
+      });
+  CHECK(DriveNorth(nav, 0, 200, 15, Far()).empty());
+}
+
+TEST(TourGuideFallsBackToTheGeneralLinesForUnknownKinds)
+{
+  Navigator nav(Config());
+  nav.SetSightLookup([](LatLon const &, double) { return std::optional<Sight>{Sight{"a water tower", true, {}, "tower"}}; });
+  auto const said = DriveNorth(nav, 0, 200, 15, Far());
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK(SaidLineOf(said[0].first.text, "tour"));
+  CHECK(said[0].first.text.find("left") != std::string::npos);
+}
+
+TEST(GpsFillsLongSilencesOnEasyStretches)
+{
+  Navigator nav(Config());
+  std::vector<double> idleAt;
+  for (int s = 0; s < 20 * 60; ++s)
+  {
+    nav.OnFix(Heading(s * 1000.0, 20, 0), Far());
+    // A punchline (" || ") follows its setup within seconds; count the remark once.
+    for (auto const & l : LinesOf(nav.TakeLines(), Category::Idle))
+      if (idleAt.empty() || s - idleAt.back() > 15)
+        idleAt.push_back(s);
+  }
+  // Twenty quiet minutes: a remark every two and a half to five minutes, never in the first two.
+  CHECK(idleAt.size() >= 3 && idleAt.size() <= 8);
+  CHECK(idleAt.front() >= 120);
+  for (size_t i = 1; i < idleAt.size(); ++i)
+    CHECK(idleAt[i] - idleAt[i - 1] >= 150);
+}
+
+TEST(GpsKeepsIdleChatterAwayFromTurns)
+{
+  Navigator nav(Config());
+  int idle = 0;
+  for (int s = 0; s < 20 * 60; ++s)
+  {
+    nav.OnFix(Heading(s * 1000.0, 20, 0), OnRoute(1, TurnKind::Left, 400));
+    idle += static_cast<int>(LinesOf(nav.TakeLines(), Category::Idle).size());
+  }
+  CHECK_EQUAL(idle, 0);
+}
+
+TEST(NavLinesSayHowLongTheyCanWaitForTheGoodVoice)
+{
+  Navigator nav(Config());
+  // Parked at the start: the opening lines can take their time.
+  nav.OnFix(Heading(0, 0, 0), OnRoute(1, TurnKind::Left, 2000));
+  for (auto const & l : nav.TakeLines())
+    if (l.priority == Priority::Nav)
+      CHECK_EQUAL(l.maxWaitMs, 4000.0);
+  // Highway speed, 500 ft out: only a short wait, or the turn comes first.
+  double maxWait = -1;
+  for (int s = 1; s < 120; ++s)
+  {
+    double const dist = 2000 - s * 29;
+    if (dist < 0)
+      break;
+    nav.OnFix(Heading(s * 1000.0, 29, 0), OnRoute(1, TurnKind::Left, dist));
+    for (auto const & l : nav.TakeLines())
+      if (l.priority == Priority::Nav && dist <= 160 && dist > 100)
+        maxWait = l.maxWaitMs;
+  }
+  CHECK(maxWait >= 0 && maxWait < 3000);
+  // Roasts don't carry one.
+  nav.OnFix(Heading(200000, 29, 0), OnRoute(2, TurnKind::Right, 3000));
+  for (auto const & l : nav.TakeLines())
+    if (l.priority != Priority::Nav)
+      CHECK_EQUAL(l.maxWaitMs, 0.0);
+}

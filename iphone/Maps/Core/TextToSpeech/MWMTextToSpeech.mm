@@ -384,8 +384,9 @@ using Observers = NSHashTable<Observer>;
       NSString * notification = routeNotifications[i];
       BOOL const nav = hinted ? voices[i].nav : YES;
       float const speed = hinted ? static_cast<float>(voices[i].speed) : 1.0f;
+      double const maxWaitMs = hinted ? voices[i].maxWaitMs : 0;
       __weak MWMTextToSpeech * weakSelf = self;
-      [kokoro speak:notification nav:nav speed:speed fallback:^{
+      [kokoro speak:notification nav:nav speed:speed maxWaitMs:maxWaitMs fallback:^{
         [weakSelf speakOneString:notification];
       }];
     }

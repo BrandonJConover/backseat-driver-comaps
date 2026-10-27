@@ -160,6 +160,7 @@ char const * ToString(Category c)
   case Category::WrongWay: return "wrongWay";
   case Category::UTurn: return "uTurn";
   case Category::Achievement: return "achievement";
+  case Category::Idle: return "idle";
   case Category::Count: break;
   }
   return "?";

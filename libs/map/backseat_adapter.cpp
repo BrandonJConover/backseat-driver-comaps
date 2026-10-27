@@ -1805,57 +1805,82 @@ std::optional<backseat::Sight> BackseatAdapter::SightAt(backseat::LatLon const &
   if (!m_dataSource)
     return {};
   auto const & c = classif();
-  // Things a tour guide would point at. Shops and restaurants count; it's that kind of tour.
-  static std::vector<uint32_t> const kSights = {
-      c.GetTypeByPath({"amenity", "cafe"}),       c.GetTypeByPath({"amenity", "restaurant"}),
-      c.GetTypeByPath({"amenity", "fast_food"}),  c.GetTypeByPath({"amenity", "cinema"}),
-      c.GetTypeByPath({"amenity", "theatre"}),    c.GetTypeByPath({"amenity", "library"}),
-      c.GetTypeByPath({"amenity", "place_of_worship"}), c.GetTypeByPath({"tourism", "attraction"}),
-      c.GetTypeByPath({"tourism", "museum"}),     c.GetTypeByPath({"tourism", "hotel"}),
-      c.GetTypeByPath({"leisure", "park"}),       c.GetTypeByPath({"leisure", "stadium"}),
-      c.GetTypeByPath({"shop"}),                  c.GetTypeByPath({"historic"})};
+  // Things a tour guide would point at, and the kind of line each gets. Shops and restaurants
+  // count; it's that kind of tour.
+  static std::vector<std::pair<uint32_t, char const *>> const kSights = {
+      {c.GetTypeByPath({"amenity", "cafe"}), "coffee"},
+      {c.GetTypeByPath({"amenity", "restaurant"}), "food"},
+      {c.GetTypeByPath({"amenity", "fast_food"}), "food"},
+      {c.GetTypeByPath({"amenity", "fuel"}), "gas"},
+      {c.GetTypeByPath({"amenity", "cinema"}), ""},
+      {c.GetTypeByPath({"amenity", "theatre"}), ""},
+      {c.GetTypeByPath({"amenity", "library"}), ""},
+      {c.GetTypeByPath({"amenity", "place_of_worship"}), "worship"},
+      {c.GetTypeByPath({"amenity", "school"}), "school"},
+      {c.GetTypeByPath({"amenity", "college"}), "school"},
+      {c.GetTypeByPath({"amenity", "university"}), "school"},
+      {c.GetTypeByPath({"amenity", "hospital"}), "hospital"},
+      {c.GetTypeByPath({"tourism", "attraction"}), "landmark"},
+      {c.GetTypeByPath({"tourism", "viewpoint"}), "landmark"},
+      {c.GetTypeByPath({"tourism", "museum"}), "museum"},
+      {c.GetTypeByPath({"tourism", "hotel"}), ""},
+      {c.GetTypeByPath({"leisure", "park"}), "park"},
+      {c.GetTypeByPath({"leisure", "stadium"}), "landmark"},
+      {c.GetTypeByPath({"shop"}), "store"},
+      {c.GetTypeByPath({"historic"}), "landmark"}};
 
-  double constexpr kBesideM = 80;
-  m2::PointD const center = mercator::FromLatLon(at.lat, at.lon);
+  // A corridor ahead of the car: 50-400 m along the heading and within 60 m of that line (a
+  // building's center sits back from the road), so the navigator can call it out as it passes.
+  double constexpr kAheadMinM = 50;
+  double constexpr kAheadMaxM = 400;
+  double constexpr kBesideM = 60;
+  m2::PointD const here = mercator::FromLatLon(at.lat, at.lon);
+  double const headingRad = bearingDeg * M_PI / 180;
+  double const midM = (kAheadMinM + kAheadMaxM) / 2;
+  m2::PointD const mid = mercator::GetSmPoint(here, midM * std::sin(headingRad), midM * std::cos(headingRad));
   std::optional<backseat::Sight> best;
-  double bestDistance = 0;
+  double bestAlong = 0;
   m_dataSource().ForEachInRect([&](FeatureType & ft)
   {
     if (ft.GetGeomType() == feature::GeomType::Line)
       return;
-    bool sight = false;
+    std::optional<std::string> kind;
     for (uint32_t type : feature::TypesHolder(ft))
     {
       uint32_t two = type;
       ftype::TruncValue(two, 2);
       uint32_t one = type;
       ftype::TruncValue(one, 1);
-      if (std::find(kSights.begin(), kSights.end(), two) != kSights.end() ||
-          std::find(kSights.begin(), kSights.end(), one) != kSights.end())
-        sight = true;
+      for (auto const & [sightType, sightKind] : kSights)
+        if (sightType == two || sightType == one)
+        {
+          // The most specific kind wins over the general lines.
+          if (!kind || kind->empty())
+            kind = sightKind;
+        }
     }
-    if (!sight)
+    if (!kind)
       return;
     auto const primary = ft.GetTranslatedName().m_primary;
     if (!primary || primary->empty())
       return;
     std::string const & name = *primary;
     m2::PointD const where = feature::GetCenter(ft);
-    double const distance = mercator::DistanceOnEarth(center, where);
-    if (distance > kBesideM)
+    double const distance = mercator::DistanceOnEarth(here, where);
+    double const toIt = std::atan2(where.x - here.x, where.y - here.y) * 180 / M_PI;
+    double const off = std::fmod(toIt - bearingDeg + 540.0, 360.0) - 180;  // -180..180, negative is left
+    double const along = distance * std::cos(off * M_PI / 180);
+    double const beside = std::fabs(distance * std::sin(off * M_PI / 180));
+    if (along < kAheadMinM || along > kAheadMaxM || beside > kBesideM)
       return;
-    // Beside the road, not ahead or behind: 30 to 150 degrees off the heading.
-    double const toIt = std::atan2(where.x - center.x, where.y - center.y) * 180 / M_PI;
-    double off = std::fmod(toIt - bearingDeg + 540.0, 360.0) - 180;  // -180..180, negative is left
-    if (std::fabs(off) < 30 || std::fabs(off) > 150)
-      return;
-    if (best && distance >= bestDistance)
+    if (best && along >= bestAlong)
       return;
     // Chains are "a Starbucks"; one-of-a-kind places are just their name.
     bool const chain = !ft.GetMetadata(feature::Metadata::FMD_BRAND).empty();
-    best = backseat::Sight{chain ? "a " + name : name, off < 0};
-    bestDistance = distance;
-  }, mercator::RectByCenterXYAndSizeInMeters(center, 2 * kBesideM), scales::GetUpperScale());
+    auto const ll = mercator::ToLatLon(where);
+    best = backseat::Sight{chain ? "a " + name : name, off < 0, backseat::LatLon{ll.m_lat, ll.m_lon}, *kind};
+    bestAlong = along;
+  }, mercator::RectByCenterXYAndSizeInMeters(mid, midM + kBesideM), scales::GetUpperScale());
   return best;
 }
 
@@ -1949,7 +1974,7 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
                             {"speed", backseat::LogNum(c.voiceSpeed, 2)},
                             {"text", c.text}});
     out.push_back(c.text);
-    m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed});
+    m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed, c.maxWaitMs});
     if (c.priority == backseat::Priority::Nav)
       m_lastDirection = c.text;
   }

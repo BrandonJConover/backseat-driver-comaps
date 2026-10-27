@@ -230,3 +230,80 @@ TEST(UTurnsAndRoundaboutsGetCountdowns)
       "You should still be going around the roundabout.", "Please stop going around. You're out of the roundabout."};
   CHECK(CountdownFor("Take the roundabout onto Elm Street") == roundabout);
 }
+
+namespace
+{
+TelemetrySample Heading(double t, double deg)
+{
+  TelemetrySample s = Sample(t, 30, std::nullopt);
+  s.headingDeg = deg;
+  return s;
+}
+
+int WrongTurnLines(std::vector<Commentary> const & lines)
+{
+  int n = 0;
+  for (auto const & c : lines)
+    n += c.category == Category::WrongTurn;
+  return n;
+}
+}  // namespace
+
+TEST(FinishingARightAsTheNextLeftIsAnnouncedIsNotAWrongTurn)
+{
+  auto engine = MakeEngine();
+  engine.OnNav(NavEvent::Instruction(0, "Turn right onto Oak", 100));
+  std::vector<Commentary> out;
+  auto add = [&](std::vector<Commentary> v) { out.insert(out.end(), v.begin(), v.end()); };
+  double t = 1000;
+  for (int i = 0; i < 8; ++i, t += 1000)
+    add(engine.OnTelemetry(Heading(t, 0)));
+  // Halfway through the right, the router moves on to the next maneuver: a left, 90 m away.
+  for (int i = 1; i <= 2; ++i, t += 1000)
+    add(engine.OnTelemetry(Heading(t, 22.5 * i)));
+  add(engine.OnNav(NavEvent::TurnCompleted(t, true)));
+  add(engine.OnNav(NavEvent::Instruction(t, "Turn left onto Elm Street", 90)));
+  for (int i = 3; i <= 4; ++i, t += 1000)
+    add(engine.OnTelemetry(Heading(t, 22.5 * i)));
+  for (int i = 0; i < 8; ++i, t += 1000)
+    add(engine.OnTelemetry(Heading(t, 90)));
+  CHECK_EQUAL(WrongTurnLines(out), 0);
+  CHECK_EQUAL(engine.Stats().wrongTurns, 0);
+}
+
+TEST(TurningTheWrongWayAtTheTurnStillCounts)
+{
+  auto engine = MakeEngine();
+  engine.OnNav(NavEvent::Instruction(0, "Turn left onto Elm Street", 100));
+  std::vector<Commentary> out;
+  double t = 1000;
+  for (int i = 0; i < 8; ++i, t += 1000)
+    for (auto & c : engine.OnTelemetry(Heading(t, 0)))
+      out.push_back(c);
+  for (int i = 1; i <= 4; ++i, t += 1000)
+    for (auto & c : engine.OnTelemetry(Heading(t, 22.5 * i)))
+      out.push_back(c);
+  for (int i = 0; i < 8; ++i, t += 1000)
+    for (auto & c : engine.OnTelemetry(Heading(t, 90)))
+      out.push_back(c);
+  CHECK_EQUAL(WrongTurnLines(out), 1);
+}
+
+TEST(ABendFarFromTheNextTurnIsNotAWrongTurn)
+{
+  auto engine = MakeEngine();
+  engine.OnNav(NavEvent::Instruction(0, "Turn left onto Elm Street", 1200));
+  engine.OnNav(NavEvent::Progress(500, 1100));
+  std::vector<Commentary> out;
+  double t = 1000;
+  for (int i = 0; i < 8; ++i, t += 1000)
+    for (auto & c : engine.OnTelemetry(Heading(t, 0)))
+      out.push_back(c);
+  for (int i = 1; i <= 4; ++i, t += 1000)
+    for (auto & c : engine.OnTelemetry(Heading(t, 22.5 * i)))
+      out.push_back(c);
+  for (int i = 0; i < 8; ++i, t += 1000)
+    for (auto & c : engine.OnTelemetry(Heading(t, 90)))
+      out.push_back(c);
+  CHECK_EQUAL(WrongTurnLines(out), 0);
+}

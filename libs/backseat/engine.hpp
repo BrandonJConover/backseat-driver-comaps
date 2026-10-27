@@ -119,6 +119,8 @@ private:
     int stage;  // 0..4, see Countdown()
     std::optional<double> atTurnSince;
     bool mentioned = false;
+    /// Distance to the maneuver at the last instruction or progress update.
+    double distM = 0;
   };
 
   /// "Please continue straight." ... "You should still be going straight." ... "I'm serious."

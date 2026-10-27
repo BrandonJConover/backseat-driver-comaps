@@ -2,6 +2,7 @@
 
 #include "backseat/debug_log.hpp"
 #include "backseat/lines.hpp"
+#include "backseat/lines_data.hpp"
 #include "backseat/route_sketch.hpp"
 #include "backseat/rundown.hpp"
 #include "backseat/units.hpp"
@@ -66,6 +67,26 @@ int constexpr kBegAfterReroutes = 4;
 double constexpr kSightCheckEveryMs = 8000;
 double constexpr kSightEveryMs = 240000;
 double constexpr kSightQuietM = 500;
+/// A sight with a position is said when the car is this many seconds from passing it (the time to
+/// start speaking and get to its name), but never more than kSightSayMaxM out...
+double constexpr kSightLeadS = 3;
+double constexpr kSightSayMinM = 30;
+double constexpr kSightSayMaxM = 120;
+/// ...and only if it's really beside the road ahead: farther off to the side is behind buildings.
+double constexpr kSightMaxAheadM = 450;
+double constexpr kSightMaxSideM = 60;
+/// Dropped once passed, or if the car never gets to it.
+double constexpr kSightPassedM = -15;
+double constexpr kSightGiveUpMs = 90000;
+/// Nothing said for this long (a random stretch in between) on an easy part of the drive: the GPS
+/// fills the silence.
+double constexpr kIdleMinMs = 150000;
+double constexpr kIdleMaxMs = 300000;
+double constexpr kIdleQuietM = 600;
+/// How long a navigation line may wait for the neural voice: at most this long, and only while it
+/// still finishes this far before the maneuver.
+double constexpr kNavWaitMaxMs = 4000;
+double constexpr kNavDoneBeforeTurnM = 40;
 // Facing the wrong way: the GPS course is at least this far off the route's direction...
 double constexpr kWrongWayDeg = 135;
 // How fast the first trip's rundown is spoken.
@@ -317,6 +338,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
   TrackLongDrive(fix.tMs, route);
   TrackSights(fix, route);
+  TrackIdle(fix, route);
   TrackWrongWay(fix, route);
   TrackUTurn(fix, route);
   TrackSlowStart(fix);
@@ -473,7 +495,24 @@ std::vector<Commentary> Navigator::TakeLines()
     m_gate.Push(std::move(m_punchlines.front()), false);
     m_punchlines.erase(m_punchlines.begin());
   }
-  return m_gate.Take();
+  auto lines = m_gate.Take();
+  if (!lines.empty())
+    m_lastSpokeT = m_lastT;
+  for (auto & line : lines)
+    if (line.priority == Priority::Nav)
+      line.maxWaitMs = NavWaitMs(line);
+  return lines;
+}
+
+double Navigator::NavWaitMs(Commentary const & line) const
+{
+  double const mps = m_lastFix ? m_lastFix->speedMps : 0;
+  // Parked, or nowhere near a maneuver: nothing to be late for.
+  if (!m_turnId || mps < kRollingMps)
+    return kNavWaitMaxMs;
+  // Done speaking before the car gets to the maneuver, with a little room to spare.
+  double const untilTurnMs = (m_lastDistToTurnM - kNavDoneBeforeTurnM) / mps * 1000;
+  return std::clamp(untilTurnMs - SpeakingMs(line.text, line.voiceSpeed), 0.0, kNavWaitMaxMs);
 }
 
 void Navigator::Update(double t, RouteSnapshot const & route)
@@ -668,19 +707,87 @@ void Navigator::QueueOpener(double tMs, std::string key, Vars vars)
   m_opener = Opener{tMs, std::move(key), std::move(vars)};
 }
 
+namespace
+{
+/// Where `p` is from the car, in meters along its heading (ahead > 0) and across it (right > 0).
+std::pair<double, double> AheadAndSide(Fix const & fix, LatLon const & p)
+{
+  double const rad = M_PI / 180;
+  double const east = (p.lon - fix.lon) * rad * 6371000 * std::cos(fix.lat * rad);
+  double const north = (p.lat - fix.lat) * rad * 6371000;
+  double const b = fix.bearingDeg * rad;
+  return {east * std::sin(b) + north * std::cos(b), east * std::cos(b) - north * std::sin(b)};
+}
+}  // namespace
+
 void Navigator::TrackSights(Fix const & fix, RouteSnapshot const & route)
 {
-  if (!m_sightLookup || route.state != RouteState::OnRoute || fix.speedMps < kResumedMps || fix.bearingDeg < 0 ||
-      fix.tMs - m_lastSightCheckT < kSightCheckEveryMs || fix.tMs - m_lastSightT < kSightEveryMs ||
-      (route.turnId && route.distToTurnM < kSightQuietM) || fix.tMs - m_tripStartT < 60000)
+  bool const quiet = route.state == RouteState::OnRoute && fix.speedMps >= kResumedMps && fix.bearingDeg >= 0 &&
+                     !(route.turnId && route.distToTurnM < kSightQuietM);
+  // Something spotted up ahead: say it as the car is about to pass it, so it's actually in view.
+  if (m_upcomingSight)
+  {
+    auto const & up = *m_upcomingSight;
+    auto const [ahead, side] = fix.bearingDeg >= 0 ? AheadAndSide(fix, *up.sight.at) : std::pair{0.0, 0.0};
+    double const sayWithinM = std::clamp(fix.speedMps * kSightLeadS, kSightSayMinM, kSightSayMaxM);
+    if (!quiet || ahead < kSightPassedM || std::fabs(side) > kSightMaxSideM || fix.tMs - up.spottedT > kSightGiveUpMs)
+    {
+      Trace("sight.dropped", {{"name", up.sight.name}, {"ahead_m", LogNum(ahead, 0)}, {"side_m", LogNum(side, 0)}});
+      m_upcomingSight.reset();
+    }
+    else if (ahead <= sayWithinM)
+    {
+      Sight sight = up.sight;
+      sight.onLeft = side < 0;
+      m_upcomingSight.reset();
+      SaySight(fix.tMs, sight);
+    }
+    return;
+  }
+  if (!m_sightLookup || !quiet || fix.tMs - m_lastSightCheckT < kSightCheckEveryMs ||
+      fix.tMs - m_lastSightT < kSightEveryMs || fix.tMs - m_tripStartT < 60000)
     return;
   m_lastSightCheckT = fix.tMs;
   auto const sight = m_sightLookup({fix.lat, fix.lon}, fix.bearingDeg);
   if (!sight || std::find(m_sightsSaid.begin(), m_sightsSaid.end(), sight->name) != m_sightsSaid.end())
     return;
-  m_sightsSaid.push_back(sight->name);
-  m_lastSightT = fix.tMs;
-  SayLine(fix.tMs, Category::Tour, "tour", {{"side", sight->onLeft ? "left" : "right"}, {"sight", sight->name}});
+  if (!sight->at)
+  {
+    SaySight(fix.tMs, *sight);
+    return;
+  }
+  auto const [ahead, side] = AheadAndSide(fix, *sight->at);
+  Trace("sight.spotted", {{"name", sight->name}, {"ahead_m", LogNum(ahead, 0)}, {"side_m", LogNum(side, 0)}});
+  // Behind us, or off down a side street: not something the driver can look at.
+  if (ahead < 0 || ahead > kSightMaxAheadM || std::fabs(side) > kSightMaxSideM)
+    return;
+  m_upcomingSight = UpcomingSight{*sight, fix.tMs};
+}
+
+void Navigator::SaySight(double tMs, Sight const & sight)
+{
+  m_sightsSaid.push_back(sight.name);
+  m_lastSightT = tMs;
+  std::string const kindKey = "tour." + sight.kind;
+  std::string const key = !sight.kind.empty() && LineData().count(kindKey) ? kindKey : "tour";
+  SayLine(tMs, Category::Tour, key, {{"side", sight.onLeft ? "left" : "right"}, {"sight", sight.name}});
+}
+
+/// A long silence on an easy stretch: the GPS can't help itself. Every two and a half to five
+/// minutes of nothing, never near a maneuver, in the first minutes, or while crawling.
+void Navigator::TrackIdle(Fix const & fix, RouteSnapshot const & route)
+{
+  if (route.state != RouteState::OnRoute || fix.speedMps < kResumedMps || fix.tMs - m_tripStartT < 120000 ||
+      (route.turnId && route.distToTurnM < kIdleQuietM) || m_upcomingSight)
+    return;
+  if (m_idleGapMs <= 0)
+    m_idleGapMs = kIdleMinMs + (m_config.rng ? m_config.rng() : 0.5) * (kIdleMaxMs - kIdleMinMs);
+  double const quietSince = std::max(m_lastSpokeT, m_tripStartT);
+  if (fix.tMs - quietSince < m_idleGapMs)
+    return;
+  m_idleGapMs = 0;
+  m_lastSpokeT = fix.tMs;
+  SayLine(fix.tMs, Category::Idle, "idle");
 }
 
 void Navigator::TrackWrongWay(Fix const & fix, RouteSnapshot const & route)
@@ -963,6 +1070,9 @@ void Navigator::ResetTrip()
   m_titleDemanded = false;
   m_gameRefused = false;
   m_sightsSaid.clear();
+  m_upcomingSight.reset();
+  m_lastSpokeT = -1e18;
+  m_idleGapMs = 0;
   m_wrongWaySince = -1;
   m_lastWrongWayT = -1e18;
   m_wrongWaySaid = 0;
