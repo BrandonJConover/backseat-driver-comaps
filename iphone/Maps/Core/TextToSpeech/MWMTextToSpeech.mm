@@ -353,7 +353,7 @@ using Observers = NSHashTable<Observer>;
     utterance.voice = self.speechVoice;
     utterance.rate = AVSpeechUtteranceDefaultSpeechRate;
     utterance.preUtteranceDelay = 0.1;
-    utterance.postUtteranceDelay = 0.35;
+    utterance.postUtteranceDelay = 0.4;
     [self.speechSynthesizer speakUtterance:utterance];
   }
 }

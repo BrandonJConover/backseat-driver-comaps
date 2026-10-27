@@ -488,17 +488,22 @@ final class KokoroVoice: NSObject {
     return nil
   }
 
-  /// Silence after a sentence, and at a comma. Kokoro's own pauses run sentences together.
-  private static let sentencePause: TimeInterval = 0.35
-  private static let commaPause: TimeInterval = 0.18
-  /// Roasts any faster than this get hard to follow. Faster still (the first trip's speed run)
-  /// is on purpose and keeps its speed.
-  private static let roastSpeedCap: Float = 1.15
+  /// Silence after a sentence, and at a comma. Kokoro's own pauses run sentences together, and
+  /// a joke needs a beat before its punchline.
+  private static let sentencePause: TimeInterval = 0.5
+  private static let questionPause: TimeInterval = 0.6
+  private static let commaPause: TimeInterval = 0.22
+  /// Kokoro's normal speed is brisk for a car: lines are said a little slower than that.
+  private static let basePace: Float = 0.92
+  /// Frustration speeds the voice up, but only by half as much as the engine asks, and never
+  /// past this: past it the jokes blur together.
+  private static let paceCap: Float = 1.02
+  /// Faster than this (the first trip's speed run) is on purpose and keeps its speed.
   private static let deliberatelyFast: Float = 1.3
 
   private func render(_ text: String, speed: Float, voice: String, with engine: KokoroAneManager) async throws -> Data {
     let fast = speed >= Self.deliberatelyFast
-    let pace = fast ? speed : min(speed, Self.roastSpeedCap)
+    let pace = fast ? speed : min(Self.basePace + (speed - 1) * 0.5, Self.paceCap)
     var samples: [Float] = []
     var sampleRate = KokoroAneConstants.sampleRate
     // A speed run keeps its commas tight: "right, left, right" with pauses isn't fast.
@@ -526,7 +531,9 @@ final class KokoroVoice: NSObject {
       // Only at a word break, so "3.5 miles" and "St. Louis"-style dots mid-token stay put.
       let atBreak = i + 1 == chars.count || chars[i + 1] == " "
       guard atBreak else { continue }
-      if ".?!".contains(ch) {
+      if ch == "?" {
+        flush(questionPause)
+      } else if ".!".contains(ch) {
         flush(sentencePause)
       } else if commas && (ch == "," || ch == ";") {
         flush(commaPause)
@@ -643,8 +650,8 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   private static let systemWaitLimit: TimeInterval = 30
   /// A roast older than this isn't worth saying any more.
   private static let roastStale: TimeInterval = 8
-  /// Silence between two clips.
-  private static let gap: TimeInterval = 0.25
+  /// Silence between two clips, so one line doesn't run into the next.
+  private static let gap: TimeInterval = 0.45
   /// How long a roast takes to fade out when a navigation line cuts in.
   private static let fade: TimeInterval = 0.2
 

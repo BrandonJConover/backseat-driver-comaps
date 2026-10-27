@@ -179,3 +179,18 @@ TEST(NavigatorRewordsRoastsButNotDirections)
   CHECK_EQUAL(model->asked[0].category, std::string("speeding"));
   CHECK(!RewritePrompt(model->asked[0]).empty());
 }
+
+// From the drive home: the model's chatter was spoken instead of the line.
+TEST(RewritesWithoutTheChatter)
+{
+  auto const r = Req("You missed the turn.");
+  CHECK(!AcceptRewrite(r, "Sorry, I can't assist with that request.").has_value());
+  CHECK(!AcceptRewrite(r, "I'm sorry, but I can't help with that.").has_value());
+  CHECK(!AcceptRewrite(r, "Sure, here is your response:").has_value());
+  CHECK(!AcceptRewrite(r, "Here is the line in a fresh, sarcastic way:").has_value());
+  CHECK_EQUAL(*AcceptRewrite(r, "Here is the line in a fresh, sarcastic way:\n\"Missed it. Again.\""),
+              std::string("Missed it. Again."));
+  CHECK_EQUAL(*AcceptRewrite(r, "Line: For crying out loud, that was the turn."),
+              std::string("For crying out loud, that was the turn."));
+  CHECK_EQUAL(*AcceptRewrite(r, "Here's the thing: you missed it."), std::string("Here's the thing: you missed it."));
+}

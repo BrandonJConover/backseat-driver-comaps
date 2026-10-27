@@ -74,9 +74,58 @@ std::vector<std::string> FactsToKeep(std::string const & line)
   return facts;
 }
 
+namespace
+{
+std::string Lower(std::string s)
+{
+  std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  return s;
+}
+
+/// The model talking about the task instead of doing it: "Sure, here is your response:",
+/// "Here is the line in a fresh, sarcastic way:". Said out loud, these were the worst lines of the
+/// drive home.
+bool IsPreamble(std::string const & line)
+{
+  std::string const l = Lower(line);
+  if (!l.empty() && l.back() == ':')
+    return true;
+  for (char const * start : {"sure,", "sure!", "sure.", "here is", "here's", "okay, here", "certainly"})
+    if (l.rfind(start, 0) == 0 && (l.find("line") != std::string::npos || l.find("response") != std::string::npos ||
+                                    l.find("version") != std::string::npos || l.find("rewrite") != std::string::npos))
+      return true;
+  return false;
+}
+
+/// A refusal or a guardrail answer: never say it, keep the canned line.
+bool IsRefusal(std::string const & line)
+{
+  std::string const l = Lower(line);
+  for (char const * refusal : {"i can't assist", "i cannot assist", "i can't help", "i cannot help", "i'm sorry, but",
+                               "i am sorry, but", "sorry, i can't", "sorry, but i can't", "as an ai", "i'm unable to",
+                               "i am unable to", "i can't comply", "i cannot comply", "i can't fulfill", "i cannot fulfill"})
+    if (l.find(refusal) != std::string::npos)
+      return true;
+  return false;
+}
+
+/// "Line: For crying out loud..." -> "For crying out loud..."
+std::string StripLabel(std::string const & line)
+{
+  std::string const l = Lower(line);
+  for (char const * label : {"line:", "response:", "rewrite:", "rewritten:", "new line:", "answer:", "gps:"})
+  {
+    std::string const prefix(label);
+    if (l.rfind(prefix, 0) == 0)
+      return TrimSpace(line.substr(prefix.size()));
+  }
+  return line;
+}
+}  // namespace
+
 std::optional<std::string> AcceptRewrite(RewriteRequest const & request, std::string const & answer)
 {
-  // First non-empty line, without quotes or markdown the model may have added.
+  // The first line that's the line itself: no preamble, no label, no quotes or markdown.
   std::string text;
   size_t start = 0;
   while (start <= answer.size() && text.empty())
@@ -84,9 +133,14 @@ std::optional<std::string> AcceptRewrite(RewriteRequest const & request, std::st
     size_t const end = std::min(answer.find('\n', start), answer.size());
     text = TrimSpace(answer.substr(start, end - start));
     start = end + 1;
+    text.erase(std::remove_if(text.begin(), text.end(), [](char c) { return c == '*' || c == '#' || c == '`'; }),
+               text.end());
+    text = StripLabel(TrimSpace(text));
+    if (IsRefusal(text))
+      return {};
+    if (IsPreamble(text))
+      text.clear();
   }
-  text.erase(std::remove_if(text.begin(), text.end(), [](char c) { return c == '*' || c == '#' || c == '`'; }),
-             text.end());
   text = TrimSpace(text);
   while (text.size() >= 2 && (text.front() == '"' || text.front() == '\'') && text.back() == text.front())
     text = TrimSpace(text.substr(1, text.size() - 2));
