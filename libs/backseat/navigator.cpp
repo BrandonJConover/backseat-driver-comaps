@@ -55,6 +55,8 @@ double constexpr kSightEveryMs = 240000;
 double constexpr kSightQuietM = 500;
 // Facing the wrong way: the GPS course is at least this far off the route's direction...
 double constexpr kWrongWayDeg = 135;
+// How fast the first trip's rundown is spoken.
+double constexpr kRattleSpeed = 1.35;
 // ...at driving speed (GPS course is noise when crawling)...
 double constexpr kWrongWayMinMps = 3;
 // ...for this long, so a wobble or a lane change doesn't count.
@@ -483,7 +485,8 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   std::vector<RouteStep> steps;
   for (auto const k : route.plannedTurns)
     steps.push_back({InstructionText(k, "", ""), StepKindOf(k)});
-  SayNav(t, RouteRundown(steps, m_history, m_config.rng));
+  // The first trip's rundown is a speed run: every turn, rattled off, then a request for music.
+  SayNav(t, RouteRundown(steps, m_history, m_config.rng), m_history.empty() ? kRattleSpeed : 1.0);
   if (m_plan.expectedMinutes > 0)
     SayNav(t, PredictTrip(m_history, m_plan, m_config.rng).text);
   Say(m_engine->OnNav(NavEvent::DestinationSet(t, route.destination)));
@@ -969,9 +972,10 @@ void Navigator::Say(std::vector<Commentary> const & lines, bool mayRewrite)
     m_gate.Push(line, mayRewrite);
 }
 
-void Navigator::SayNav(double t, std::string const & text)
+void Navigator::SayNav(double t, std::string const & text, double voiceSpeed)
 {
   Commentary c;
+  c.voiceSpeed = voiceSpeed;
   c.t = t;
   c.category = Category::Instruction;
   c.text = text;

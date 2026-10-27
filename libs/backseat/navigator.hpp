@@ -199,7 +199,7 @@ private:
   void Update(double tMs, RouteSnapshot const & route);
   void StartTrip(double tMs, RouteSnapshot const & route);
   void Say(std::vector<Commentary> const & lines, bool mayRewrite = true);
-  void SayNav(double tMs, std::string const & text);
+  void SayNav(double tMs, std::string const & text, double voiceSpeed = 1.0);
   void TrackStop(Fix const & fix, RouteSnapshot const & route);
   void TrackTraffic(Fix const & fix, RouteSnapshot const & route);
   void ResetTrip();

@@ -74,7 +74,10 @@ TEST(NavigatorOpensWithGreetingRundownAndInstruction)
   // Greeting, rundown, time prediction, then the first instruction.
   CHECK_EQUAL(lines.size(), size_t{4});
   CHECK(lines[0].text.find("didn't ask to be in this car") != std::string::npos);
-  CHECK(lines[1].text.find("turn left") != std::string::npos);
+  // First trip ever: the turns rattled off at speed, then Brandon's music line.
+  CHECK(lines[1].text.find("Left, right.") != std::string::npos);
+  CHECK(lines[1].text.find("put on some music") != std::string::npos);
+  CHECK(lines[1].voiceSpeed > 1.2);
   CHECK(lines[3].text.find("turn left onto Elm Street") != std::string::npos);
 }
 

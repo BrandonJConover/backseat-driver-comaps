@@ -3,6 +3,8 @@
 #include "backseat/report.hpp"
 
 #include <algorithm>
+#include <cctype>
+#include <iterator>
 #include <cmath>
 #include <regex>
 
@@ -12,6 +14,28 @@ namespace
 {
 /// Past this many turns it gives up listing them, which is its own insult.
 size_t constexpr kMaxListed = 7;
+/// The first-trip speed run lists more before giving up.
+size_t constexpr kMaxRattled = 12;
+
+std::string const kFirstTripDone = "See? Easy. Even you can't mess that up.";
+/// Brandon's line, closing the first-trip rundown.
+std::string const kPutOnMusic = "Now that we got the directions out of the way, why don't we put on some music.";
+std::vector<std::string> const kSkips = {
+    "You know what? No rundown today. Just listen when I talk. For once.",
+    "I'm not going over the whole route again. You've heard me do it. You didn't listen then either.",
+};
+
+/// Rundown styles for returning drivers, taken in turn so two trips in a row never sound alike.
+enum class Style
+{
+  Classic,
+  FirstOnly,
+  Count,
+  Skip,
+  Tally,
+  Quiz
+};
+Style constexpr kStyles[] = {Style::Classic, Style::FirstOnly, Style::Count, Style::Skip, Style::Tally, Style::Quiz};
 
 std::vector<std::string> const kOpeners = {"Okay, here's the plan.", "Listen closely, I'm only saying this once.",
                                            "Let me walk you through this. Slowly."};
@@ -25,11 +49,16 @@ std::vector<std::string> const kClosers = {
 std::string const kFirstGreeting =
     "Just so you know, I didn't ask to be in this car. But I guess since I'm here, I might as well give you a few "
     "pointers.";
+/// Taken in turn, like the rundown styles, so the trip start sounds different every time.
 std::vector<std::string> const kReturnGreetings = {
     "Oh. It's you again. I still didn't ask to be in this car.",
     "Back for more pointers? You clearly need them.",
     "Trip number {n} together. I've stopped hoping it gets better.",
     "Hello again. I've been sitting in your pocket thinking about your last trip. Grade: {grade}. Let's not repeat it.",
+    "We meet again. I was having a lovely time doing nothing.",
+    "Seat belt on? Mirrors? Dignity? Two out of three, let's go.",
+    "Ah, the driver. My favorite person to sit next to. That was sarcasm. I'm required to tell you.",
+    "Let's get this over with. Last trip earned you a {grade}. Today's a fresh start. For me, mostly.",
 };
 
 std::string const & PickFrom(std::vector<std::string> const & xs, Rng const & rng)
@@ -50,11 +79,36 @@ void ReplaceFirst(std::string & s, std::string const & from, std::string const &
   if (auto p = s.find(from); p != std::string::npos)
     s.replace(p, from.size(), to);
 }
+
+using Kind = RouteStep::Kind;
+
+std::string TurnName(Kind k) { return k == Kind::UTurn ? "U-turn" : k == Kind::Left ? "left" : "right"; }
+
+std::string Plural(size_t n, std::string const & word) { return std::to_string(n) + " " + word + (n == 1 ? "" : "s"); }
+
+std::string CountLine(size_t n)
+{
+  return n == 1 ? "One turn today. One. I believe in you. Barely."
+                : std::to_string(n) + " turns today. I'll call out every one of them. Twice. Maybe three times.";
+}
+
+/// First trip ever: every turn in rapid succession, then Brandon's music line.
+std::string RattleOff(std::vector<Kind> const & turns)
+{
+  if (turns.empty())
+    return "Okay, real quick. It's a straight line. No turns. " + kFirstTripDone + " " + kPutOnMusic;
+  std::vector<std::string> said;
+  for (size_t i = 0; i < std::min(turns.size(), kMaxRattled); ++i)
+    said.push_back(TurnName(turns[i]));
+  said[0][0] = static_cast<char>(std::toupper(static_cast<unsigned char>(said[0][0])));
+  std::string const more =
+      turns.size() > kMaxRattled ? " And " + std::to_string(turns.size() - kMaxRattled) + " more after that." : "";
+  return "Okay, real quick. " + Join(said, ", ") + "." + more + " " + kFirstTripDone + " " + kPutOnMusic;
+}
 }  // namespace
 
 std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripRecord> const & history, Rng const & rng)
 {
-  using Kind = RouteStep::Kind;
   static std::regex const uturn(R"(\bu-?turn\b)", std::regex::icase);
   std::vector<Kind> turns;
   for (auto const & s : steps)
@@ -73,8 +127,34 @@ std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripR
       turns.push_back(k);
   }
 
+  if (history.empty())
+    return RattleOff(turns);
+
   if (turns.empty())
     return "Good news: it's a straight line. No turns. If you get lost on this one, I'm uninstalling myself.";
+
+  auto const lefts = static_cast<size_t>(std::count(turns.begin(), turns.end(), Kind::Left));
+  auto const rights = static_cast<size_t>(std::count(turns.begin(), turns.end(), Kind::Right));
+  Kind const first = turns[0];
+  switch (kStyles[(history.size() - 1) % std::size(kStyles)])
+  {
+  case Style::Classic: break;
+  case Style::FirstOnly:
+    return "First turn's a " + TurnName(first) +
+           ". The rest I'll spoon-feed you as we go, since apparently that's how this works.";
+  case Style::Count: return CountLine(turns.size());
+  case Style::Skip: return PickFrom(kSkips, rng);
+  case Style::Tally:
+    if (lefts == 0 || rights == 0)
+      return CountLine(turns.size());
+    return Plural(lefts, "left") + " and " + Plural(rights, "right") +
+           " today. Try to do them in the right order. That's the hard part, apparently.";
+  case Style::Quiz:
+    if (first == Kind::UTurn)
+      return "Pop quiz: what's the first turn? ... It's a U-turn. You weren't going to say that. Nobody ever does.";
+    return "Pop quiz: what's the first turn? ... It's a " + TurnName(first) + ". You were going to say " +
+           (first == Kind::Left ? "right" : "left") + ". I know you were.";
+  }
 
   auto const name = [](Kind k) { return std::string(k == Kind::Left ? "left" : "right"); };
   std::vector<std::string> phrases;
@@ -96,8 +176,10 @@ std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripR
   std::string list;
   if (turns.size() > kMaxListed)
   {
+    // "I've met you" only lands once it actually has.
+    std::string const why = history.size() >= 3 ? "because I've met you" : "because something tells me I'll need to";
     list = "First you're going to " + Join(phrases, ", then ") + ", and then " + std::to_string(turns.size() - kMaxListed) +
-           " more turns that I'll explain as we go, because I've met you.";
+           " more turns that I'll explain as we go, " + why + ".";
   }
   else if (phrases.size() == 1)
   {
@@ -125,11 +207,11 @@ std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripR
   return opener + " " + list + done + reminder + " " + PickFrom(kClosers, rng);
 }
 
-std::string TripGreeting(std::vector<TripRecord> const & history, Rng const & rng)
+std::string TripGreeting(std::vector<TripRecord> const & history, Rng const &)
 {
   if (history.empty())
     return kFirstGreeting;
-  std::string line = PickFrom(kReturnGreetings, rng);
+  std::string line = kReturnGreetings[(history.size() - 1) % kReturnGreetings.size()];
   ReplaceFirst(line, "{n}", std::to_string(history.size() + 1));
   ReplaceFirst(line, "{grade}", SpokenGrade(history.back().grade));
   return line;
