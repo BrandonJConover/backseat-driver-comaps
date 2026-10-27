@@ -1,6 +1,7 @@
 #pragma once
 
 #include "backseat/navigator.hpp"
+#include "backseat/voice_command.hpp"
 
 #include "platform/location.hpp"
 
@@ -49,12 +50,12 @@ public:
   void SetCountryInfoGetter(std::function<storage::CountryInfoGetter const &()> getter);
   /// What the driver said out loud (speech recognition), e.g. "I see a Texas plate".
   /// Call on the same thread as OnLocationUpdate.
-  /// A destination the driver asked for out loud ("take me to work").
+  /// What the driver asked for out loud, and what the GPS says back.
   struct HeardCommand
   {
     enum class Kind
     {
-      /// Not a destination command; the navigator took it (plate game, police...).
+      /// No destination in it.
       None,
       /// Route to `lat`/`lon` (home or work, worked out from past trips).
       RouteTo,
@@ -66,8 +67,28 @@ public:
     double lon = 0;
     std::string name;
     std::string query;
+    /// App actions for the platform to carry out, in the order asked (cancel, mute, change voice,
+    /// zoom...). Destinations, directions, time left, police and the plate game are handled here.
+    std::vector<backseat::AppCommand> actions;
+    /// The GPS's snarky answer, to say right away (before muting, if that's one of the actions).
+    /// Empty when there's nothing to say now.
+    std::string reply;
+    /// Said after `reply`, each in its own voice (the voice line-up, or a new voice saying hello).
+    struct VoiceLine
+    {
+      std::string voiceId;
+      std::string text;
+    };
+    std::vector<VoiceLine> voiceLines;
   };
+  /// The voices the platform can speak in, for "what voice options do you have?" and picking one
+  /// by name or code phrase. Without them, asking for the voices just opens the list.
+  void SetVoices(std::vector<backseat::VoiceOption> voices) { m_voices = std::move(voices); }
+  /// Speech recognition, keyword matching: "avoid tolls and take me home".
   HeardCommand OnDriverSaid(std::string const & text);
+  /// The on-device model picked a tool from backseat::AppTools(). `spoken` is what the driver
+  /// actually said (for manners). Unknown tools do nothing.
+  HeardCommand RunTool(std::string const & name, std::string const & argument, std::string const & spoken);
   /// Traffic lights on the route just built (mercator points). A left turn off a side street
   /// with no light there is treated as a stop sign, since stop signs aren't in the map data.
   void SetTrafficLights(std::vector<m2::PointD> points);
@@ -82,8 +103,12 @@ public:
   static char const * const kPartnerPronounsKey;
   static char const * const kDriverPronounsKey;
   static char const * const kAutopilotKey;
+  /// What to call the driver, from first-run setup.
+  static char const * const kDriverNameKey;
   /// Rereads those settings; call after the platform changes them.
   void ReloadPersonality();
+  /// What the GPS says when first-run setup is done ("Brandon. Fine. I'll try to remember that.").
+  std::string SetupDoneReply() { return m_navigator.Reply("setup.done"); }
 
   /// How to voice one line of the last TakeNotifications() batch.
   struct LineVoice
@@ -106,6 +131,8 @@ private:
   std::optional<backseat::Sight> SightAt(backseat::LatLon const & at, double bearingDeg) const;
   backseat::Bridge BridgeAt(backseat::LatLon const & at, double bearingDeg) const;
   void CheckBattery(double tMs);
+  /// Carries out one command, adding to `heard`; returns the reply to say for it.
+  std::string Run(backseat::AppCommand const & command, bool polite, HeardCommand & heard);
 
   backseat::Navigator m_navigator;
   std::function<DataSource &()> m_dataSource;
@@ -114,4 +141,8 @@ private:
   std::vector<m2::PointD> m_trafficLights;
   double m_lastBatteryCheckMs = 0;
   std::vector<LineVoice> m_lastVoices;
+  /// For "repeat that" and "how long": the last direction said, and time left on the route.
+  std::string m_lastDirection;
+  std::vector<backseat::VoiceOption> m_voices;
+  mutable int m_secondsLeft = -1;
 };

@@ -1,7 +1,9 @@
 #include "backseat/voice_command.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <iterator>
 #include <map>
 
 namespace backseat
@@ -82,13 +84,245 @@ std::optional<DestinationCommand> ParseDestinationCommand(std::string const & sp
   if (target.empty())
     return {};
 
-  bool polite = false;
+  return DestinationCommand{target, SaidPolitely(spoken)};
+}
+
+bool SaidPolitely(std::string const & spoken)
+{
+  std::string const words = CommandWords(spoken);
   for (char const * nice : {" please ", " pls ", " thanks ", " thank you ", " hi ", " hello ", " hey ", " good morning ",
                             " good afternoon ", " good evening ", " morning ", " could you ", " would you ",
                             " can you ", " kindly ", " if you don't mind ", " when you get a chance "})
     if (words.find(nice) != std::string::npos)
-      polite = true;
-  return DestinationCommand{target, polite};
+      return true;
+  return false;
+}
+
+std::vector<AppTool> const & AppTools()
+{
+  static std::vector<AppTool> const tools = {
+      {AppAction::NavigateTo, "navigate_to", "Start directions to a place.", "Where to, as the driver said it: home, work, a name or an address."},
+      {AppAction::CancelRoute, "cancel_route", "Stop navigating and clear the route.", nullptr},
+      {AppAction::Mute, "mute", "Stop speaking directions and comments out loud.", nullptr},
+      {AppAction::Unmute, "unmute", "Speak out loud again after being muted.", nullptr},
+      {AppAction::RepeatInstruction, "repeat_instruction", "Say the last direction again.", nullptr},
+      {AppAction::TimeLeft, "time_left", "Say how long until we get there.", nullptr},
+      {AppAction::ReportPolice, "report_police", "The driver sees police or is being pulled over.", nullptr},
+      {AppAction::PlayPlateGame, "play_plate_game", "Start the license plate game.", nullptr},
+      {AppAction::AvoidTolls, "avoid_tolls", "Reroute without toll roads.", nullptr},
+      {AppAction::AllowTolls, "allow_tolls", "Allow toll roads again.", nullptr},
+      {AppAction::AvoidHighways, "avoid_highways", "Reroute without highways.", nullptr},
+      {AppAction::AllowHighways, "allow_highways", "Allow highways again.", nullptr},
+      {AppAction::ChangeVoice, "change_voice", "Change the speaking voice.", "Voice name, like Echo or Heart; empty to show the list."},
+      {AppAction::ListVoices, "list_voices", "Have every voice introduce itself, with the phrase that picks it.", nullptr},
+      {AppAction::ZoomIn, "zoom_in", "Zoom the map in.", nullptr},
+      {AppAction::ZoomOut, "zoom_out", "Zoom the map out.", nullptr},
+      {AppAction::Recenter, "recenter", "Center the map on the car.", nullptr},
+      {AppAction::RouteOverview, "route_overview", "Show the whole route on the map.", nullptr},
+      {AppAction::OpenSettings, "open_settings", "Open the settings screen.", nullptr},
+      {AppAction::StopListening, "stop_listening", "Turn off the hands-free microphone.", nullptr},
+  };
+  return tools;
+}
+
+AppTool const & ToolFor(AppAction action) { return AppTools()[static_cast<size_t>(action)]; }
+
+std::optional<AppAction> AppActionNamed(std::string const & name)
+{
+  for (auto const & tool : AppTools())
+    if (name == tool.name)
+      return tool.action;
+  return {};
+}
+
+namespace
+{
+/// The voice in "switch to the echo voice", "change your voice to heart", "use george".
+std::string VoiceArgument(std::string const & words)
+{
+  for (char const * cue : {" voice to ", " sound like ", " talk like ", " switch to ", " change to ", " use "})
+  {
+    auto const at = words.find(cue);
+    if (at == std::string::npos)
+      continue;
+    std::string rest = words.substr(at + std::string(cue).size());
+    for (char const * lead : {"the ", "a ", "an "})
+      if (rest.rfind(lead, 0) == 0)
+        rest.erase(0, std::string(lead).size());
+    auto const end = rest.find(' ');
+    std::string name = rest.substr(0, end);
+    if (!name.empty() && name != "voice" && name != "a" && name != "different" && name != "another" && name != "new")
+      return name;
+  }
+  return {};
+}
+}  // namespace
+
+std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
+{
+  std::string const words = CommandWords(spoken);
+  struct Cues
+  {
+    AppAction action;
+    std::vector<char const *> phrases;
+  };
+  // Phrases specific enough for a microphone that's always on: plain chatter shouldn't match.
+  static std::vector<Cues> const cues = {
+      {AppAction::CancelRoute, {" cancel the route ", " cancel route ", " cancel navigation ", " cancel the navigation ",
+                                " stop navigation ", " stop navigating ", " end the route ", " end route ",
+                                " end navigation ", " cancel the trip ", " end the trip ", " forget the route ",
+                                " cancel directions ", " stop the directions ", " stop directions "}},
+      {AppAction::Unmute, {" unmute ", " un mute ", " you can talk again ", " talk to me again ", " start talking again ",
+                           " sound back on ", " turn the sound back on ", " you can speak again "}},
+      {AppAction::Mute, {" mute ", " mute yourself ", " be quiet ", " shut up ", " stop talking ", " quiet please ",
+                         " go quiet ", " turn off the sound ", " turn the sound off ", " hush "}},
+      {AppAction::RepeatInstruction, {" repeat that ", " say that again ", " what did you say ", " come again ",
+                                      " repeat the direction ", " repeat the directions ", " repeat the last ",
+                                      " what was that ", " say again ", " repeat yourself ", " what's the next turn ",
+                                      " whats the next turn ", " where do i turn "}},
+      {AppAction::TimeLeft, {" how long ", " how much longer ", " are we there yet ", " time left ", " when will we get ",
+                             " when do we get ", " when will we be ", " what's the eta ", " whats the eta ", " eta ",
+                             " how far ", " how much further ", " how much farther "}},
+      {AppAction::AvoidTolls, {" avoid tolls ", " avoid toll ", " no tolls ", " no toll roads ", " avoid the tolls ",
+                               " without tolls ", " skip the tolls ", " no toll "}},
+      {AppAction::AllowTolls, {" allow tolls ", " use tolls ", " use toll roads ", " tolls are fine ", " tolls are okay ",
+                               " tolls are ok ", " toll roads are fine ", " take the toll road ", " take toll roads "}},
+      {AppAction::AvoidHighways, {" avoid highways ", " avoid the highway ", " avoid highway ", " no highways ",
+                                  " avoid freeways ", " avoid the freeway ", " no freeways ", " take back roads ",
+                                  " take the back roads ", " stay off the highway "}},
+      {AppAction::AllowHighways, {" allow highways ", " use highways ", " use the highway ", " take the highway ",
+                                  " highways are fine ", " highways are okay ", " take the freeway ", " use the freeway "}},
+      {AppAction::ChangeVoice, {" change your voice ", " change the voice ", " change voice ", " switch voice ",
+                                " switch voices ", " different voice ", " another voice ", " new voice ", " voice to ",
+                                " use the voice ", " voice please "}},
+      {AppAction::ListVoices, {" what voice options ", " what voices ", " which voices ", " voice options ",
+                               " list the voices ", " list voices ", " what other voices ", " show me the voices ",
+                               " other voices ", " voices do you have ", " voice choices "}},
+      {AppAction::ZoomIn, {" zoom in "}},
+      {AppAction::ZoomOut, {" zoom out "}},
+      {AppAction::Recenter, {" recenter ", " re center ", " center the map ", " center on me ", " where am i ",
+                             " show me where i am "}},
+      {AppAction::RouteOverview, {" show the route ", " show me the route ", " route overview ", " show the whole route ",
+                                  " show me the whole route ", " overview "}},
+      {AppAction::OpenSettings, {" open settings ", " open the settings ", " show settings ", " show me the settings ",
+                                 " settings menu ", " go to settings ", " open preferences "}},
+      {AppAction::StopListening, {" stop listening ", " quit listening ", " stop eavesdropping ", " mic off ",
+                                  " microphone off ", " turn off the mic ", " turn off the microphone ",
+                                  " turn the mic off ", " turn the microphone off "}},
+  };
+  std::vector<std::pair<size_t, AppCommand>> found;
+  bool const voiceNamed = words.find(" voice ") != std::string::npos;
+  for (auto const & c : cues)
+  {
+    for (char const * phrase : c.phrases)
+    {
+      auto const at = words.find(phrase);
+      if (at == std::string::npos)
+        continue;
+      AppCommand command{c.action, {}};
+      if (c.action == AppAction::ChangeVoice)
+        command.argument = VoiceArgument(words);
+      found.push_back({at, std::move(command)});
+      break;
+    }
+  }
+  // "Use the echo voice" / "switch to heart voice": a voice named without the cue words above.
+  if (voiceNamed && std::none_of(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::ChangeVoice; }))
+    if (auto name = VoiceArgument(words); !name.empty())
+      found.push_back({words.find(" voice "), AppCommand{AppAction::ChangeVoice, std::move(name)}});
+  // "What other voices do you have?" isn't asking for a particular one.
+  if (std::any_of(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::ListVoices; }))
+    found.erase(std::remove_if(found.begin(), found.end(), [](auto const & f)
+    { return f.second.action == AppAction::ChangeVoice && f.second.argument.empty(); }), found.end());
+  // "Unmute" also contains "mute", and "turn the sound back on" isn't muting.
+  bool const unmuted = std::any_of(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::Unmute; });
+  if (unmuted)
+    found.erase(std::remove_if(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::Mute; }), found.end());
+  if (auto const destination = ParseDestinationCommand(spoken))
+  {
+    // "Go to settings" and "switch to echo" aren't places.
+    std::string const & t = destination->target;
+    bool const notAPlace = t.find("settings") != std::string::npos || t.find("voice") != std::string::npos ||
+                           std::any_of(found.begin(), found.end(), [](auto const & f)
+    { return f.second.action == AppAction::ChangeVoice || f.second.action == AppAction::OpenSettings; });
+    if (!notAPlace)
+    {
+      size_t at = std::string::npos;
+      for (char const * cue : {" take ", " navigate ", " drive ", " directions ", " get ", " route ", " let's ",
+                               " lets ", " head ", " go ", " bring "})
+        at = std::min(at, words.find(cue));
+      found.push_back({at, AppCommand{AppAction::NavigateTo, t}});
+    }
+  }
+  std::stable_sort(found.begin(), found.end(), [](auto const & a, auto const & b) { return a.first < b.first; });
+  std::vector<AppCommand> out;
+  for (auto & f : found)
+    out.push_back(std::move(f.second));
+  return out;
+}
+
+std::vector<std::string> VoicePhrases(std::vector<VoiceOption> const & voices)
+{
+  static char const * const kPool[] = {
+      "banana phone",   "disco potato",   "spicy pickle",    "turbo llama",    "soggy waffle",
+      "ninja toaster",  "wobbly penguin", "cosmic burrito",  "grumpy cactus",  "velvet hamster",
+      "rubber chicken", "sneaky noodle",  "laser walrus",    "polka dot moose", "tofu tornado",
+      "captain meatball", "moon pudding", "sassy lobster",   "pancake wizard", "jelly bean volcano",
+      "funky giraffe",  "pickle parade",  "taco submarine",  "hamster disco",  "bubblegum thunder",
+      "noodle kingdom", "llama drama",    "sock puppet",     "waffle iron",    "marshmallow tank"};
+  auto const brandons = [](std::string const & name) -> char const *
+  {
+    std::string lower;
+    for (unsigned char const ch : name)
+      lower += static_cast<char>(std::tolower(ch));
+    if (lower == "echo")
+      return "purple monkey";
+    if (lower == "adam")
+      return "elephant shoe";
+    return nullptr;
+  };
+  std::vector<std::string> out;
+  size_t next = 0;
+  for (auto const & voice : voices)
+  {
+    if (char const * phrase = brandons(voice.name))
+      out.push_back(phrase);
+    else
+    {
+      size_t const n = std::size(kPool);
+      out.push_back(kPool[next % n] + (next >= n ? " " + std::to_string(next / n + 1) : std::string()));
+      ++next;
+    }
+  }
+  return out;
+}
+
+std::optional<size_t> VoiceByPhrase(std::vector<VoiceOption> const & voices, std::string const & spoken)
+{
+  std::string const words = CommandWords(spoken);
+  auto const phrases = VoicePhrases(voices);
+  for (size_t i = 0; i < phrases.size(); ++i)
+    if (words.find(" " + phrases[i] + " ") != std::string::npos)
+      return i;
+  return {};
+}
+
+std::optional<size_t> VoiceNamed(std::vector<VoiceOption> const & voices, std::string const & said)
+{
+  std::string const target = CommandWords(said);
+  if (target == " ")
+    return {};
+  for (size_t i = 0; i < voices.size(); ++i)
+    if (CommandWords(voices[i].name) == target || CommandWords(voices[i].id) == target)
+      return i;
+  // "echo" for "am_echo".
+  for (size_t i = 0; i < voices.size(); ++i)
+  {
+    auto const underscore = voices[i].id.rfind('_');
+    if (underscore != std::string::npos && CommandWords(voices[i].id.substr(underscore + 1)) == target)
+      return i;
+  }
+  return {};
 }
 
 std::optional<KnownPlace> KnownPlaceOf(std::string const & target)

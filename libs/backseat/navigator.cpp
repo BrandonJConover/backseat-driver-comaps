@@ -892,6 +892,31 @@ void Navigator::SayLine(double tMs, Category category, std::string const & key, 
   m_gate.Push(std::move(c), false);
 }
 
+std::string Navigator::Reply(std::string const & key, Vars const & vars)
+{
+  double const r = m_config.rng ? m_config.rng() : 0;
+  Vars all = vars;
+  auto const add = [&all](char const * k, std::string v) { all.emplace(k, std::move(v)); };
+  add("name", m_driverName.empty() ? "you" : m_driverName);
+  switch (m_pronouns)
+  {
+  case Pronouns::He: add("theycap", "He"); add("theyre", "He's"); add("them", "him"); add("their", "his"); break;
+  case Pronouns::She: add("theycap", "She"); add("theyre", "She's"); add("them", "her"); add("their", "her"); break;
+  case Pronouns::They: add("theycap", "They"); add("theyre", "They're"); add("them", "them"); add("their", "their"); break;
+  }
+  std::string text = Fill(m_said.Pick(key, LinesFor(key, Tier()), r), all);
+  // Said in one go, so a punchline just gets a beat.
+  for (auto pause = text.find(" || "); pause != std::string::npos; pause = text.find(" || "))
+    text.replace(pause, 4, " ... ");
+  if (m_said.Dirty())
+  {
+    m_said.ClearDirty();
+    if (m_onSaid)
+      m_onSaid(m_said);
+  }
+  return text;
+}
+
 static std::string CarWeight(Units units)
 {
   // A typical car or small SUV.

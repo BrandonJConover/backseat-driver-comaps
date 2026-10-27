@@ -154,6 +154,8 @@ public:
   /// Stops next to a traffic light are red lights, not pulling over.
   void SetTrafficLightLookup(TrafficLightLookup lookup) { m_lightLookup = std::move(lookup); }
   void SetDriverPronouns(Pronouns p) { m_pronouns = p; }
+  /// What to call the driver, from first-run setup. Empty when they never said.
+  void SetDriverName(std::string name) { m_driverName = std::move(name); }
   /// The driver's partner ("wife", "husband", "partner") and their pronouns, from settings.
   /// Empty turns off the "I wish your wife was driving" line.
   void SetPartner(std::string word, Pronouns pronouns)
@@ -182,6 +184,10 @@ public:
   /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate".
   /// Same thread as OnFix.
   void OnDriverSaid(double tMs, std::string const & text);
+  /// A line to say right now, outside the queue (e.g. the snarky reply to a voice command), picked
+  /// like any other so it doesn't repeat. Works between trips too. The driver's {name} and
+  /// pronouns ({theycap} {theyre} {them} {their}) are filled in unless `vars` has them.
+  std::string Reply(std::string const & key, Vars const & vars = {});
   /// On-device model that rewords roasts in real time. Without one, canned lines are spoken.
   void SetRewriter(std::shared_ptr<LineRewriter> rewriter) { m_gate.SetRewriter(std::move(rewriter)); }
 
@@ -250,6 +256,7 @@ private:
   std::optional<double> m_lastBadSpeedingT;
   TrafficLightLookup m_lightLookup;
   Pronouns m_pronouns = Pronouns::They;
+  std::string m_driverName;
 
   VenueLookup m_venueLookup;
   SightLookup m_sightLookup;

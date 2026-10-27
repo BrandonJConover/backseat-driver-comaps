@@ -247,6 +247,7 @@ char const * const BackseatAdapter::kPartnerKey = "BackseatPartner";
 char const * const BackseatAdapter::kPartnerPronounsKey = "BackseatPartnerPronouns";
 char const * const BackseatAdapter::kDriverPronounsKey = "BackseatDriverPronouns";
 char const * const BackseatAdapter::kAutopilotKey = "BackseatCarHasAutopilot";
+char const * const BackseatAdapter::kDriverNameKey = "BackseatDriverName";
 
 void BackseatAdapter::ReloadPersonality()
 {
@@ -256,6 +257,9 @@ void BackseatAdapter::ReloadPersonality()
   settings::TryGet(kPartnerPronounsKey, partnerPronouns);
   settings::TryGet(kDriverPronounsKey, driverPronouns);
   settings::TryGet(kAutopilotKey, autopilot);
+  std::string name;
+  settings::TryGet(kDriverNameKey, name);
+  m_navigator.SetDriverName(name);
   m_navigator.SetPartner(partner, PronounsFrom(partnerPronouns));
   m_navigator.SetDriverPronouns(PronounsFrom(driverPronouns));
   m_navigator.SetCarHasAutopilot(autopilot);
@@ -499,42 +503,186 @@ std::optional<backseat::Venue> BackseatAdapter::VenueAt(backseat::LatLon const &
   return best;
 }
 
+namespace
+{
+/// "1 minute", "25 minutes", "1 hour and 5 minutes".
+std::string SpokenDuration(int seconds)
+{
+  int const minutes = std::max(1, (seconds + 30) / 60);
+  auto const plural = [](int n, char const * unit) { return std::to_string(n) + " " + unit + (n == 1 ? "" : "s"); };
+  if (minutes < 60)
+    return plural(minutes, "minute");
+  std::string out = plural(minutes / 60, "hour");
+  if (minutes % 60)
+    out += " and " + plural(minutes % 60, "minute");
+  return out;
+}
+
+/// The reply line for an action the platform carries out.
+char const * ReplyKey(backseat::AppAction action, std::string const & argument)
+{
+  using backseat::AppAction;
+  switch (action)
+  {
+  case AppAction::CancelRoute: return "cmd.cancel";
+  case AppAction::Mute: return "cmd.mute";
+  case AppAction::Unmute: return "cmd.unmute";
+  case AppAction::AvoidTolls: return "cmd.avoidTolls";
+  case AppAction::AllowTolls: return "cmd.allowTolls";
+  case AppAction::AvoidHighways: return "cmd.avoidHighways";
+  case AppAction::AllowHighways: return "cmd.allowHighways";
+  case AppAction::ChangeVoice:
+  case AppAction::ListVoices: return argument.empty() ? "cmd.voice.pick" : "cmd.voice";
+  case AppAction::ZoomIn: return "cmd.zoomIn";
+  case AppAction::ZoomOut: return "cmd.zoomOut";
+  case AppAction::Recenter: return "cmd.recenter";
+  case AppAction::RouteOverview: return "cmd.overview";
+  case AppAction::OpenSettings: return "cmd.settings";
+  case AppAction::StopListening: return "cmd.stopListening";
+  default: return nullptr;
+  }
+}
+
+std::string Capitalized(std::string s)
+{
+  if (!s.empty())
+    s[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(s[0])));
+  return s;
+}
+}  // namespace
+
 BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & text)
 {
   HeardCommand heard;
-  auto const command = backseat::ParseDestinationCommand(text);
-  if (!command)
+  // A voice's code phrase ("purple monkey"): the old voice gets the last word.
+  if (auto const voice = backseat::VoiceByPhrase(m_voices, text))
   {
+    heard.reply = m_navigator.Reply("cmd.voice.fellForIt", {{"voice", m_voices[*voice].name}});
+    Run({backseat::AppAction::ChangeVoice, m_voices[*voice].id}, true, heard);
+    return heard;
+  }
+  auto const commands = backseat::ParseAppCommands(text);
+  if (commands.empty())
+  {
+    // Chatter, police, plates, thanks: the navigator's business.
     m_navigator.OnDriverSaid(0, text);
     return heard;
   }
-  auto const known = backseat::KnownPlaceOf(command->target);
-  std::string const place = !known                                ? command->target
-                            : *known == backseat::KnownPlace::Home ? "your home"
-                                                                   : "your work";
-  if (!command->polite)
+  bool const polite = backseat::SaidPolitely(text);
+  for (auto const & command : commands)
   {
-    double const nowMs = std::chrono::duration<double, std::milli>(
-                             std::chrono::system_clock::now().time_since_epoch()).count();
-    m_navigator.QueueOpener(nowMs, "bossy", {{"place", place}});
+    std::string const reply = Run(command, polite, heard);
+    if (!reply.empty())
+      heard.reply += (heard.reply.empty() ? "" : " ") + reply;
   }
-  if (known)
-  {
-    if (auto const at = backseat::GuessPlace(m_navigator.History(), *known))
-    {
-      heard.kind = HeardCommand::Kind::RouteTo;
-      heard.lat = at->lat;
-      heard.lon = at->lon;
-      heard.name = *known == backseat::KnownPlace::Home ? "Home" : "Work";
-      LOG(LINFO, ("Backseat: heard a command for", heard.name));
-      return heard;
-    }
-  }
-  // Somewhere new (or home/work before there's enough history): let the driver pick.
-  heard.kind = HeardCommand::Kind::Search;
-  heard.query = command->target;
-  LOG(LINFO, ("Backseat: searching for", heard.query));
   return heard;
+}
+
+BackseatAdapter::HeardCommand BackseatAdapter::RunTool(std::string const & name, std::string const & argument,
+                                                       std::string const & spoken)
+{
+  HeardCommand heard;
+  auto const action = backseat::AppActionNamed(name);
+  if (!action)
+  {
+    LOG(LWARNING, ("Backseat: no such tool", name));
+    return heard;
+  }
+  heard.reply = Run({*action, argument}, backseat::SaidPolitely(spoken), heard);
+  return heard;
+}
+
+std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool polite, HeardCommand & heard)
+{
+  using backseat::AppAction;
+  LOG(LINFO, ("Backseat: command", backseat::ToolFor(command.action).name, command.argument));
+  switch (command.action)
+  {
+  case AppAction::NavigateTo:
+  {
+    if (command.argument.empty())
+      return {};
+    auto const known = backseat::KnownPlaceOf(command.argument);
+    std::string const place = !known                                ? command.argument
+                              : *known == backseat::KnownPlace::Home ? "your home"
+                                                                     : "your work";
+    std::string reply;
+    if (!polite)
+    {
+      // Barked orders get Brandon's "Alright, bossy" when the trip starts, not a reply now.
+      double const nowMs = std::chrono::duration<double, std::milli>(
+                               std::chrono::system_clock::now().time_since_epoch()).count();
+      m_navigator.QueueOpener(nowMs, "bossy", {{"place", place}});
+    }
+    else
+    {
+      reply = m_navigator.Reply("cmd.navigate", {{"place", Capitalized(place)}});
+    }
+    if (known)
+    {
+      if (auto const at = backseat::GuessPlace(m_navigator.History(), *known))
+      {
+        heard.kind = HeardCommand::Kind::RouteTo;
+        heard.lat = at->lat;
+        heard.lon = at->lon;
+        heard.name = *known == backseat::KnownPlace::Home ? "Home" : "Work";
+        return reply;
+      }
+    }
+    // Somewhere new (or home/work before there's enough history): let the driver pick.
+    heard.kind = HeardCommand::Kind::Search;
+    heard.query = command.argument;
+    return reply;
+  }
+  case AppAction::RepeatInstruction:
+    return m_lastDirection.empty() ? m_navigator.Reply("cmd.repeat.none")
+                                   : m_navigator.Reply("cmd.repeat", {{"instruction", m_lastDirection}});
+  case AppAction::TimeLeft:
+    return m_secondsLeft < 0 ? m_navigator.Reply("cmd.timeLeft.none")
+                             : m_navigator.Reply("cmd.timeLeft", {{"time", SpokenDuration(m_secondsLeft)}});
+  // The navigator already has lines for these; they come out with the next notifications.
+  case AppAction::ReportPolice: m_navigator.OnDriverSaid(0, "the police are pulling us over"); return {};
+  case AppAction::PlayPlateGame: m_navigator.OnDriverSaid(0, "let's play the license plate game"); return {};
+  case AppAction::ChangeVoice:
+  case AppAction::ListVoices:
+  {
+    auto const voice = backseat::VoiceNamed(m_voices, command.argument);
+    if (voice)
+    {
+      // The new voice says hello itself.
+      auto const & v = m_voices[*voice];
+      heard.actions.push_back({AppAction::ChangeVoice, v.id});
+      heard.voiceLines.push_back({v.id, m_navigator.Reply("cmd.voice", {{"voice", v.name}})});
+      return {};
+    }
+    if (command.argument.empty() && !m_voices.empty())
+    {
+      // "Oh, I see how it is!" Then every voice auditions, with the phrase that picks it.
+      auto const phrases = backseat::VoicePhrases(m_voices);
+      for (size_t i = 0; i < m_voices.size(); ++i)
+      {
+        std::string phrase;
+        bool word = true;
+        for (char const ch : phrases[i])
+        {
+          phrase += word ? static_cast<char>(std::toupper(static_cast<unsigned char>(ch))) : ch;
+          word = ch == ' ';
+        }
+        heard.voiceLines.push_back(
+            {m_voices[i].id, m_navigator.Reply("cmd.voice.audition", {{"voice", m_voices[i].name}, {"phrase", phrase}})});
+      }
+      return m_navigator.Reply("cmd.voice.list");
+    }
+    // A voice we don't know, or no list from the platform: the platform sorts it out.
+    heard.actions.push_back({AppAction::ChangeVoice, command.argument});
+    return m_navigator.Reply(command.argument.empty() ? "cmd.voice.pick" : "cmd.voice",
+                             {{"voice", Capitalized(command.argument)}});
+  }
+  default: break;
+  }
+  heard.actions.push_back(command);
+  char const * key = ReplyKey(command.action, command.argument);
+  return key ? m_navigator.Reply(key, {{"voice", Capitalized(command.argument)}}) : std::string();
 }
 
 std::optional<backseat::Sight> BackseatAdapter::SightAt(backseat::LatLon const & at, double bearingDeg) const
@@ -682,6 +830,8 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
     LOG(LINFO, ("Backseat says:", c.text));
     out.push_back(c.text);
     m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed});
+    if (c.priority == backseat::Priority::Nav)
+      m_lastDirection = c.text;
   }
   return out;
 }
@@ -691,6 +841,7 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
 {
   using routing::SessionState;
   backseat::RouteSnapshot snap;
+  m_secondsLeft = -1;
   if (!session.IsActive() || !session.IsFollowing())
     return snap;
   auto const route = session.GetRouteForTests();
@@ -712,6 +863,8 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
   case SessionState::RouteNoFollowing: return snap;
   }
 
+  if (snap.state == backseat::RouteState::OnRoute || snap.state == backseat::RouteState::OffRoute)
+    m_secondsLeft = info.m_time;
   snap.destination = destinationName;
   snap.etaSeconds = route->GetTotalTimeSec();
   for (auto const & segment : route->GetRouteSegments())

@@ -30,6 +30,81 @@ enum class KnownPlace
 };
 std::optional<KnownPlace> KnownPlaceOf(std::string const & target);
 
+/// Said with a please, a hello or a good morning.
+bool SaidPolitely(std::string const & spoken);
+
+/// Everything the app can do by voice. The platform's on-device model gets these as tools
+/// (MCP-style: a name, what it does, its argument); phones without one use ParseAppCommands().
+enum class AppAction
+{
+  NavigateTo,
+  CancelRoute,
+  Mute,
+  Unmute,
+  RepeatInstruction,
+  TimeLeft,
+  ReportPolice,
+  PlayPlateGame,
+  AvoidTolls,
+  AllowTolls,
+  AvoidHighways,
+  AllowHighways,
+  ChangeVoice,
+  ListVoices,
+  ZoomIn,
+  ZoomOut,
+  Recenter,
+  RouteOverview,
+  OpenSettings,
+  StopListening,
+  Count
+};
+
+struct AppTool
+{
+  AppAction action;
+  /// Tool name, snake_case: "cancel_route".
+  char const * name;
+  /// What it does, for the model.
+  char const * description;
+  /// What the argument is, or null when it takes none.
+  char const * argument;
+};
+
+/// One per AppAction, in enum order.
+std::vector<AppTool> const & AppTools();
+AppTool const & ToolFor(AppAction action);
+std::optional<AppAction> AppActionNamed(std::string const & name);
+
+struct AppCommand
+{
+  AppAction action;
+  /// NavigateTo: the place. ChangeVoice: the voice, or empty to just open the voice list.
+  std::string argument;
+};
+
+/// The commands in what the driver said, in the order said: "avoid tolls and take me home"
+/// gives AvoidTolls, NavigateTo("home"). Police and the plate game are left to the navigator,
+/// which already listens for them.
+std::vector<AppCommand> ParseAppCommands(std::string const & spoken);
+
+/// A voice the platform can speak in.
+struct VoiceOption
+{
+  /// The platform's id ("am_echo").
+  std::string id;
+  /// What it's called out loud ("Echo").
+  std::string name;
+};
+
+/// The silly code phrase that picks each voice, one per voice in order: Echo is "purple monkey"
+/// and Adam "elephant shoe" (Brandon's), the rest come from a pool. Lowercase.
+std::vector<std::string> VoicePhrases(std::vector<VoiceOption> const & voices);
+/// The voice whose code phrase is in `spoken`, as an index into `voices`.
+std::optional<size_t> VoiceByPhrase(std::vector<VoiceOption> const & voices, std::string const & spoken);
+/// The voice called `said` (by name or id, any case), as an index into `voices`.
+std::optional<size_t> VoiceNamed(std::vector<VoiceOption> const & voices, std::string const & said);
+
 /// Where home or work probably is, from past trips. Home is where trips start and end most;
 /// work is the most common other destination. Needs at least two trips there to be sure.
 std::optional<LatLon> GuessPlace(std::vector<TripRecord> const & history, KnownPlace place);
