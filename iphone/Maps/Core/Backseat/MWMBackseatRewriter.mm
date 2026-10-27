@@ -287,6 +287,15 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   return info.m_distToTurn.To(platform::Distance::Units::Meters).GetDistance();
 }
 
++ (double)speedLimitMps
+{
+  if (![MWMRouter isOnRoute])
+    return -1;
+  routing::FollowingInfo info;
+  GetFramework().GetRoutingManager().GetRouteFollowingInfo(info);
+  return info.IsValid() ? info.m_speedLimitMps : -1;
+}
+
 + (void)shareVoices
 {
   std::vector<backseat::VoiceOption> voices;

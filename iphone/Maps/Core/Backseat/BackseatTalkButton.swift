@@ -40,6 +40,7 @@ import UIKit
   /// Puts the mic on the leading edge of the map, halfway down, out of the way of the other controls.
   @objc static func install(in view: UIView) {
     BackseatListener.prepare()
+    BackseatDriveOverlay.install(in: view)
     // The "Where to?" card has the mic now.
     if !showsMapButton { return }
     let button = make()
@@ -55,5 +56,83 @@ import UIKit
       [weak button] note in
       button?.isHidden = (note.object as? Bool) ?? false
     }
+  }
+}
+
+/// While a route is followed: a big speed-against-the-limit pill that turns red when over, and a
+/// one-tap Report button, on the leading edge of the map. Added on top of CoMaps' own navigation
+/// views, which it leaves alone; remove the install call to take it out.
+final class BackseatDriveOverlay: NSObject {
+  private static var stack: UIStackView?
+  private static var pill: UILabel?
+  private static var timer: Timer?
+
+  static func install(in view: UIView) {
+    let pill = UILabel()
+    pill.font = .monospacedDigitSystemFont(ofSize: 22, weight: .bold)
+    pill.textAlignment = .center
+    pill.layer.cornerRadius = 22
+    pill.layer.masksToBounds = true
+    pill.layer.borderWidth = 3
+    pill.accessibilityLabel = "Speed and speed limit"
+
+    var config = UIButton.Configuration.filled()
+    config.image = UIImage(systemName: "exclamationmark.triangle.fill")
+    config.title = "Report"
+    config.imagePadding = 6
+    config.cornerStyle = .capsule
+    config.baseBackgroundColor = .systemBackground
+    config.baseForegroundColor = .label
+    let report = UIButton(configuration: config)
+    report.accessibilityLabel = "Report police ahead"
+    report.addAction(UIAction { _ in
+      MWMBackseatRewriter.runTool("report_police", argument: "", spoken: "report police")
+    }, for: .touchUpInside)
+
+    let stack = UIStackView(arrangedSubviews: [pill, report])
+    stack.axis = .vertical
+    stack.spacing = 10
+    stack.alignment = .leading
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    stack.isHidden = true
+    view.addSubview(stack)
+    NSLayoutConstraint.activate([
+      pill.heightAnchor.constraint(equalToConstant: 44),
+      pill.widthAnchor.constraint(greaterThanOrEqualToConstant: 110),
+      report.heightAnchor.constraint(equalToConstant: 44),
+      stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
+      stack.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
+    ])
+    self.stack = stack
+    self.pill = pill
+
+    NotificationCenter.default.addObserver(forName: BackseatTalkButton.navigationVisibilityChanged, object: nil,
+                                           queue: .main) { note in
+      let navigating = (note.object as? Bool) ?? false
+      stack.isHidden = !navigating
+      timer?.invalidate()
+      timer = nil
+      if navigating {
+        update()
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in update() }
+      }
+    }
+  }
+
+  /// "34 / 35 mph": red with white text when over the limit.
+  private static func update() {
+    guard let pill else { return }
+    let speedMps = max(LocationManager.lastLocation()?.speed ?? 0, 0)
+    let speed = Measure(asSpeed: speedMps)
+    let limitMps = MWMBackseatRewriter.speedLimitMps
+    var text = speed.valueAsString
+    if limitMps > 0 {
+      text += " / " + Measure(asSpeed: limitMps).valueAsString
+    }
+    pill.text = "  \(text) \(speed.unit)  "
+    let over = limitMps > 0 && speedMps > limitMps
+    pill.backgroundColor = over ? .systemRed : .systemBackground
+    pill.textColor = over ? .white : .label
+    pill.layer.borderColor = (over ? UIColor.white : UIColor.systemRed).cgColor
   }
 }
