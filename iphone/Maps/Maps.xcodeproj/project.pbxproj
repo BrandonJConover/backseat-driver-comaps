@@ -52,6 +52,7 @@
 		27362BD72F4284FA00BCB1FB /* drules_proto_public-transport_outdoor_dark.bin in Resources */ = {isa = PBXBuildFile; fileRef = 27362BCB2F4284FA00BCB1FB /* drules_proto_public-transport_outdoor_dark.bin */; };
 		27362BD82F4284FA00BCB1FB /* drules_proto_public-transport_outdoor_light.bin in Resources */ = {isa = PBXBuildFile; fileRef = 27362BCC2F4284FA00BCB1FB /* drules_proto_public-transport_outdoor_light.bin */; };
 		27362BE42F43257A00BCB1FB /* MapSearchButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27362BE32F43257000BCB1FB /* MapSearchButton.swift */; };
+		BD5EA7000000000000000013 /* BackseatWhereToCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000012 /* BackseatWhereToCard.swift */; };
 		27362BE62F434C9900BCB1FB /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27362BE52F434C9200BCB1FB /* MapView.swift */; };
 		27362BE82F434CA400BCB1FB /* MapOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27362BE72F434C9E00BCB1FB /* MapOverlayView.swift */; };
 		2744A9912F23D86D00E7D02C /* AlternativeMapLanguageHandling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2744A98E2F23D86B00E7D02C /* AlternativeMapLanguageHandling.swift */; };
@@ -832,6 +833,7 @@
 		27362BCB2F4284FA00BCB1FB /* drules_proto_public-transport_outdoor_dark.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = "drules_proto_public-transport_outdoor_dark.bin"; path = "../../data/drules_proto_public-transport_outdoor_dark.bin"; sourceTree = "<group>"; };
 		27362BCC2F4284FA00BCB1FB /* drules_proto_public-transport_outdoor_light.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = "drules_proto_public-transport_outdoor_light.bin"; path = "../../data/drules_proto_public-transport_outdoor_light.bin"; sourceTree = "<group>"; };
 		27362BE32F43257000BCB1FB /* MapSearchButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapSearchButton.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000012 /* BackseatWhereToCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackseatWhereToCard.swift; sourceTree = "<group>"; };
 		27362BE52F434C9200BCB1FB /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		27362BE72F434C9E00BCB1FB /* MapOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapOverlayView.swift; sourceTree = "<group>"; };
 		2744A98E2F23D86B00E7D02C /* AlternativeMapLanguageHandling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlternativeMapLanguageHandling.swift; sourceTree = "<group>"; };
@@ -1980,6 +1982,7 @@
 				271146C02F4C966100D982DA /* Layers Button */,
 				27362B9E2F4240CE00BCB1FB /* Custom Button */,
 				27362BE32F43257000BCB1FB /* MapSearchButton.swift */,
+				BD5EA7000000000000000012 /* BackseatWhereToCard.swift */,
 				27362BA12F4240CE00BCB1FB /* Position Button */,
 				27362BA42F4240CE00BCB1FB /* Zoom Buttons */,
 				27362BA52F4240CE00BCB1FB /* MapButtonStyle.swift */,
@@ -4907,6 +4910,7 @@
 				EDF838842C00B640007E4E67 /* SynchronizationFileWriter.swift in Sources */,
 				6741AA191BF340DE002C974C /* MWMDownloaderDialogCell.m in Sources */,
 				27362BE42F43257A00BCB1FB /* MapSearchButton.swift in Sources */,
+				BD5EA7000000000000000013 /* BackseatWhereToCard.swift in Sources */,
 				993DF10823F6BDB100AC231A /* IColors.swift in Sources */,
 				4707E4B12372FE860017DF6E /* PlacePageViewController.swift in Sources */,
 				34AB66441FC5AA330078E451 /* RouteManagerViewModelProtocol.swift in Sources */,

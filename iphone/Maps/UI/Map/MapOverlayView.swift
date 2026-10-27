@@ -180,6 +180,10 @@ struct MapOverlayView: View {
                         if !isSearchPresented {
                             MapSearchButton(controlHeight: controlHeight)
                                 .frame(height: controlHeight)
+
+                            // Backseat Driver: say where to, or tap a usual place.
+                            BackseatWhereToCard()
+                                .padding(.bottom, controlHeight + 12)
                         }
                     }
                 }
