@@ -20,6 +20,10 @@ struct SettingsBackseatView: View {
     @State var driverName: String = ""
 
 
+    /// The driver's age, as typed
+    @State var driverAge: String = ""
+
+
     /// Who rides along, e.g. "my wife" or "Sam"; empty when it's just the driver
     @State var partner: String = ""
 
@@ -128,6 +132,11 @@ struct SettingsBackseatView: View {
 
                 pronounPicker(title: "Your pronouns", selection: $driverPronouns)
 
+                TextField(text: $driverAge) {
+                    Text(verbatim: "Your age (optional)")
+                }
+                .keyboardType(.numberPad)
+
                 TextField(text: $partner) {
                     Text(verbatim: "Passenger, e.g. \"my wife\" or \"Sam\"")
                 }
@@ -185,6 +194,16 @@ struct SettingsBackseatView: View {
         .navigationTitle(Text(verbatim: "Backseat Driver"))
         .onAppear {
             reload()
+            // What's changed by hand is compared when the screen closes, not on every keystroke.
+            MWMBackseatRewriter.beginProfileEdit()
+        }
+        .onDisappear {
+            let callout = MWMBackseatRewriter.endProfileEdit()
+            guard !callout.isEmpty else { return }
+            // Said once Settings is out of the way.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                KokoroVoice.shared.sayReply(callout, voiceID: nil) { MWMTextToSpeech.tts().play(callout) }
+            }
         }
         .onChange(of: scenePhase) { _ in
             voiceStatus = KokoroVoice.shared.status
@@ -199,6 +218,9 @@ struct SettingsBackseatView: View {
         }
         .onChange(of: driverName) { changedDriverName in
             MWMBackseatRewriter.driverName = changedDriverName
+        }
+        .onChange(of: driverAge) { changedDriverAge in
+            MWMBackseatRewriter.driverAge = changedDriverAge.filter(\.isNumber)
         }
         .onChange(of: partner) { changedPartner in
             MWMBackseatRewriter.partner = changedPartner
@@ -233,6 +255,7 @@ struct SettingsBackseatView: View {
         shouldProvideVoiceRouting = Settings.shouldProvideVoiceRouting
         isHandsFree = BackseatListener.handsFree
         driverName = MWMBackseatRewriter.driverName
+        driverAge = MWMBackseatRewriter.driverAge
         partner = MWMBackseatRewriter.partner
         partnerPronouns = MWMBackseatRewriter.partnerPronouns
         driverPronouns = MWMBackseatRewriter.driverPronouns

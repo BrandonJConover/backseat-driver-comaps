@@ -127,6 +127,9 @@ final class KokoroVoice: NSObject {
   private var started = false
   /// Kokoro can't speak on this phone: a Core ML crash on this iOS, or loading failed.
   private var failed = false
+  /// The system voice had to stand in, so Kokoro's next line starts with a comeback (once a session).
+  private var systemStoodIn = false
+  private var recoveredThisSession = false
   /// Lines that came in before Kokoro was ready, to say once it is.
   private var waitingForReady: [() -> Void] = []
   /// How long a line waits for Kokoro to load before the system voice says it instead.
@@ -198,6 +201,10 @@ final class KokoroVoice: NSObject {
       return
     }
     player.systemIsSpeaking = { [weak self] in self?.systemIsSpeaking?() ?? false }
+    player.systemStoodIn = { [weak self] in
+      guard let self else { return }
+      self.lock.lock(); self.systemStoodIn = true; self.lock.unlock()
+    }
     if UserDefaults.standard.bool(forKey: Self.installedKey) {
       load()
       return
@@ -306,8 +313,20 @@ final class KokoroVoice: NSObject {
       return
     }
     let voice = known ?? picked
+    // Back after the system voice filled in: cough, blame lunch, then carry on. It goes ahead of
+    // everything (the navigation queue) and has no deadline, so the line after it waits its turn.
+    let recovering = systemStoodIn && !recoveredThisSession
+    if recovering {
+      systemStoodIn = false
+      recoveredThisSession = true
+      let comeback = MWMBackseatRewriter.voiceRecovered
+      if !comeback.isEmpty {
+        navJobs.append(Job(text: comeback, nav: true, speed: 1, voice: voice, keep: true, fallback: {},
+                           generation: generation))
+      }
+    }
     let key = Self.key(text, speed, voice)
-    if let wav = cache[key] {
+    if !recovering, let wav = cache[key] {
       touch(key)
       lock.unlock()
       DispatchQueue.main.async { self.player.play(wav, nav: nav, keep: keep) }
@@ -496,6 +515,8 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   }
 
   var systemIsSpeaking: () -> Bool = { false }
+  /// Called whenever a line goes to the system voice.
+  var systemStoodIn: () -> Void = {}
   var isPlaying: Bool { current != nil || !navQueue.isEmpty || !roastQueue.isEmpty }
   private var navQueue: [Item] = []
   private var roastQueue: [Item] = []
@@ -520,6 +541,7 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   /// Runs `speak` (which talks with the system voice) once no clip is talking: a roast is cut off,
   /// a navigation clip is allowed to finish first.
   func sayWithSystemVoice(_ speak: @escaping () -> Void) {
+    systemStoodIn()
     if current != nil && !currentIsNav { finishCurrent() }
     if current != nil {
       pendingSystem.append(speak)
