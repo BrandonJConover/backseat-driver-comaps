@@ -15,6 +15,13 @@ import FoundationModels
     KokoroVoice.shared.start()
     BackseatWhereTo.install()
     BackseatFileQuestions.install()
+    BackseatDriveWatcher.startIfEnabled()
+    // December or January, once: the year in miles.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
+      let yearEnd = MWMBackseatRewriter.mileageYearEnd
+      guard !yearEnd.isEmpty else { return }
+      KokoroVoice.shared.sayReply(yearEnd, voiceID: nil) { MWMTextToSpeech.tts().play(yearEnd) }
+    }
     #if canImport(FoundationModels)
     guard #available(iOS 26.0, *) else { return }
     let model = SystemLanguageModel.default

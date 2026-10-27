@@ -487,6 +487,150 @@ static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == M
   return @(GetFramework().GetRoutingManager().BackseatSurveyAnswer(spoken.UTF8String ?: "").c_str());
 }
 
+#pragma mark - Mileage
+
++ (BOOL)mileageOn
+{
+  return GetFramework().GetRoutingManager().BackseatMileageOn();
+}
+
++ (void)setMileageOn:(BOOL)on
+{
+  settings::Set(BackseatAdapter::kMileageOnKey, static_cast<bool>(on));
+}
+
++ (BOOL)mileageTalk
+{
+  bool on = true;
+  settings::TryGet(BackseatAdapter::kMileageTalkKey, on);
+  return on;
+}
+
++ (void)setMileageTalk:(BOOL)on
+{
+  settings::Set(BackseatAdapter::kMileageTalkKey, static_cast<bool>(on));
+}
+
++ (BOOL)homeIsWorkplace
+{
+  bool on = false;
+  settings::TryGet(BackseatAdapter::kHomeIsWorkplaceKey, on);
+  return on;
+}
+
++ (void)setHomeIsWorkplace:(BOOL)on
+{
+  settings::Set(BackseatAdapter::kHomeIsWorkplaceKey, static_cast<bool>(on));
+}
+
++ (NSString *)driveSample:(double)lat
+                      lon:(double)lon
+                    speed:(double)speedMps
+                 accuracy:(double)accuracyM
+                 activity:(NSInteger)activity
+                     time:(double)timeMs
+{
+  return @(GetFramework()
+               .GetRoutingManager()
+               .BackseatDriveSample(lat, lon, speedMps, accuracyM, static_cast<int>(activity), timeMs)
+               .c_str());
+}
+
++ (NSString *)mileageFinish
+{
+  return @(GetFramework().GetRoutingManager().BackseatMileageFinish().c_str());
+}
+
++ (NSDictionary<NSString *, id> *)mileageSummary:(NSInteger)year
+{
+  auto const y = GetFramework().GetRoutingManager().BackseatMileageSummary(static_cast<int>(year));
+  NSMutableArray<NSNumber *> * unknown = [NSMutableArray array];
+  for (auto const i : y.unknown)
+    [unknown addObject:@(i)];
+  NSMutableArray<NSNumber *> * flagged = [NSMutableArray array];
+  for (auto const i : y.flagged)
+    [flagged addObject:@(i)];
+  return @{
+    @"businessMiles": @(y.businessMiles),
+    @"personalMiles": @(y.personalMiles),
+    @"commuteMiles": @(y.commuteMiles),
+    @"unknownMiles": @(y.unknownMiles),
+    @"businessDrives": @(y.businessDrives),
+    @"personalDrives": @(y.personalDrives),
+    @"unknownDrives": @(y.unknownDrives),
+    @"ratePerMile": @(y.ratePerMile),
+    @"estimatedDeduction": @(y.estimatedDeduction),
+    @"unknown": unknown,
+    @"flagged": flagged,
+  };
+}
+
++ (NSArray<NSDictionary<NSString *, id> *> *)mileageLog
+{
+  NSMutableArray<NSDictionary<NSString *, id> *> * log = [NSMutableArray array];
+  auto const drives = GetFramework().GetRoutingManager().BackseatMileageLog();
+  for (size_t i = 0; i < drives.size(); ++i)
+  {
+    auto const & d = drives[i];
+    [log addObject:@{
+      @"index": @(i),
+      @"startedAt": [NSDate dateWithTimeIntervalSince1970:d.drive.startedAt / 1000.0],
+      @"fromName": @(d.fromName.c_str()),
+      @"toName": @(d.toName.c_str()),
+      @"fromLat": @(d.drive.from.lat),
+      @"fromLon": @(d.drive.from.lon),
+      @"toLat": @(d.drive.to.lat),
+      @"toLon": @(d.drive.to.lon),
+      @"miles": @(d.drive.Miles()),
+      @"bucket": @(backseat::BucketName(d.bucket)),
+      @"why": @(backseat::WhyName(d.why)),
+      @"outOfState": @((d.flags & backseat::kOutOfState) != 0),
+      @"farFromHome": @((d.flags & backseat::kFarFromHome) != 0),
+      @"newPlace": @((d.flags & backseat::kNewPlace) != 0),
+      @"purpose": @(d.purpose.c_str()),
+    }];
+  }
+  return log;
+}
+
++ (NSString *)mileageCsv:(NSInteger)year
+{
+  return @(GetFramework().GetRoutingManager().BackseatMileageCsv(static_cast<int>(year)).c_str());
+}
+
++ (NSInteger)similarDrives:(NSInteger)index
+{
+  return static_cast<NSInteger>(GetFramework().GetRoutingManager().BackseatSimilarDrives(static_cast<size_t>(index)));
+}
+
++ (NSString *)reassignDrive:(NSInteger)index bucket:(NSInteger)bucket similar:(BOOL)similar purpose:(NSString *)purpose
+{
+  auto const b = static_cast<backseat::Bucket>(std::clamp<NSInteger>(bucket, 0, 2));
+  return @(GetFramework()
+               .GetRoutingManager()
+               .BackseatReassignDrive(static_cast<size_t>(index), b, similar, purpose.UTF8String ?: "")
+               .c_str());
+}
+
++ (void)tagPlace:(NSString *)name lat:(double)lat lon:(double)lon role:(NSInteger)role
+{
+  GetFramework().GetRoutingManager().BackseatTagPlace(name.UTF8String ?: "", lat, lon,
+                                                      static_cast<backseat::PlaceRole>(std::clamp<NSInteger>(role, 0, 3)));
+}
+
++ (NSArray<NSDictionary<NSString *, id> *> *)taggedPlaces
+{
+  NSMutableArray<NSDictionary<NSString *, id> *> * places = [NSMutableArray array];
+  for (auto const & p : GetFramework().GetRoutingManager().BackseatTaggedPlaces())
+    [places addObject:@{@"name": @(p.name.c_str()), @"lat": @(p.at.lat), @"lon": @(p.at.lon), @"role": @(static_cast<int>(p.role))}];
+  return places;
+}
+
++ (NSString *)mileageYearEnd
+{
+  return @(GetFramework().GetRoutingManager().BackseatMileageYearEnd().c_str());
+}
+
 + (NSArray<NSArray<NSString *> *> *)learnedFacts
 {
   NSMutableArray<NSArray<NSString *> *> * facts = [NSMutableArray array];

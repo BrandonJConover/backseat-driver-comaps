@@ -94,6 +94,40 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 /// Listen once, then say surveyAnswer: (an empty answer gets "That wasn't a number...").
 @property(class, nonatomic, readonly) NSString * arrivalSurvey;
 + (NSString *)surveyAnswer:(NSString *)spoken;
+
+/// The mileage log. Off by default; nothing is recorded until mileageOn is set.
+@property(class, nonatomic) BOOL mileageOn;
+/// Talk about drives the driver didn't start (default on).
+@property(class, nonatomic) BOOL mileageTalk;
+/// Home is the main place of business, so trips from home to work places are business (default off).
+@property(class, nonatomic) BOOL homeIsWorkplace;
+/// Every location fix, in time order. `activity`: 0 unknown, 1 stationary, 2 walking, 3 running,
+/// 4 cycling, 5 automotive. Returns a line to say, or empty.
++ (NSString *)driveSample:(double)lat
+                      lon:(double)lon
+                    speed:(double)speedMps
+                 accuracy:(double)accuracyM
+                 activity:(NSInteger)activity
+                     time:(double)timeMs;
+/// The OS says we arrived (CLVisit) or the app is going away. Returns a line to say, or empty.
++ (NSString *)mileageFinish;
+/// "businessMiles", "personalMiles", "commuteMiles", "unknownMiles", "businessDrives",
+/// "personalDrives", "unknownDrives", "ratePerMile", "estimatedDeduction", "unknown" and "flagged"
+/// (arrays of mileageLog indexes).
++ (NSDictionary<NSString *, id> *)mileageSummary:(NSInteger)year;
+/// Every drive: "index", "startedAt" (NSDate), "fromName", "toName", "miles", "bucket" ("Business",
+/// "Personal", "Unknown"), "why", "outOfState", "farFromHome", "newPlace", "purpose".
+@property(class, nonatomic, readonly) NSArray<NSDictionary<NSString *, id> *> * mileageLog;
++ (NSString *)mileageCsv:(NSInteger)year;
++ (NSInteger)similarDrives:(NSInteger)index;
+/// `bucket`: 0 Unknown, 1 Business, 2 Personal. Returns a line to say.
++ (NSString *)reassignDrive:(NSInteger)index bucket:(NSInteger)bucket similar:(BOOL)similar purpose:(NSString *)purpose;
+/// `role`: 0 Home, 1 Office, 2 Client, 3 Personal.
++ (void)tagPlace:(NSString *)name lat:(double)lat lon:(double)lon role:(NSInteger)role;
+/// "name", "lat", "lon", "role".
+@property(class, nonatomic, readonly) NSArray<NSDictionary<NSString *, id> *> * taggedPlaces;
+/// In December or January, once a year, the year in miles; empty otherwise.
+@property(class, nonatomic, readonly) NSString * mileageYearEnd;
 /// Kokoro's comeback after the system voice stood in: play a cough, then speak this.
 @property(class, nonatomic, readonly) NSString * voiceRecovered;
 /// Voice search: what the GPS says about the top results (names with their streets, nearest

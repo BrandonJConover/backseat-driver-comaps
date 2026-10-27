@@ -190,6 +190,20 @@ struct SettingsBackseatView: View {
             }
 
             Section {
+                NavigationLink {
+                    SettingsBackseatMileageView()
+                } label: {
+                    HStack {
+                        Image(systemName: "car.rear.road.lane")
+
+                        Text(verbatim: "Mileage log")
+                    }
+                }
+            } footer: {
+                Text(verbatim: "Logs drives on its own and sorts them into business and personal for taxes. Off until you turn it on.")
+            }
+
+            Section {
                 VStack(spacing: 6) {
                     Slider(value: $niceness, in: 0...1) { editing in
                         if !editing && niceness > 0 { mockNiceness() }
@@ -535,5 +549,411 @@ struct SettingsBackseatFileView: View {
         }
         topics = all.filter { $0.topic != "note" }
         notes = all.filter { $0.topic == "note" }.sorted { $0.learnedAt > $1.learnedAt }
+    }
+}
+
+
+/// The mileage log: what's been driven this year, the drives to sort, and the CSV for taxes
+struct SettingsBackseatMileageView: View {
+    // MARK: Properties
+
+    /// One logged drive
+    struct LoggedDrive: Identifiable {
+        let id: Int
+        let startedAt: Date
+        let from: String
+        let to: String
+        let toLatitude: Double
+        let toLongitude: Double
+        let miles: Double
+        let outOfState: Bool
+        let farFromHome: Bool
+        let newPlace: Bool
+    }
+
+
+    /// A drive waiting for a purpose before it's sorted as business
+    struct PendingBusiness: Identifiable {
+        let id: Int
+        let similar: Int
+    }
+
+
+    /// If drives are logged at all
+    @State var isOn: Bool = MWMBackseatRewriter.mileageOn
+
+
+    /// If the GPS talks about drives the driver didn't start
+    @State var isTalking: Bool = MWMBackseatRewriter.mileageTalk
+
+
+    /// If home is the main place of business
+    @State var isHomeWorkplace: Bool = MWMBackseatRewriter.homeIsWorkplace
+
+
+    /// The year shown
+    @State var year: Int = Calendar.current.component(.year, from: Date())
+
+
+    /// The year's totals
+    @State var summary: [String: Any] = [:]
+
+
+    /// Unsorted drives, most miles first
+    @State var unsorted: [LoggedDrive] = []
+
+
+    /// Out of state, far from home, or somewhere new
+    @State var flagged: [LoggedDrive] = []
+
+
+    /// Places tagged for sorting
+    @State var places: [(name: String, role: Int)] = []
+
+
+    /// Asking what a business drive was for
+    @State var pendingBusiness: PendingBusiness?
+
+
+    /// What the business drive was for
+    @State var purpose: String = ""
+
+
+    /// Asking whether to sort the similar drives too
+    @State var pendingSimilar: (index: Int, bucket: Int, purpose: String, count: Int)?
+
+
+    /// The year's CSV, written for sharing
+    @State var csvURL: URL?
+
+
+    /// The years with drives, newest first
+    private var years: [Int] {
+        let now = Calendar.current.component(.year, from: Date())
+        return Array((now - 4)...now).reversed()
+    }
+
+
+    /// The actual view
+    var body: some View {
+        List {
+            Section {
+                Toggle(isOn: $isOn) {
+                    Text(verbatim: "Log my drives automatically")
+                }
+                .tint(.accent)
+
+                if isOn {
+                    Toggle(isOn: $isTalking) {
+                        Text(verbatim: "Talk about drives I didn't start")
+                    }
+                    .tint(.accent)
+
+                    Toggle(isOn: $isHomeWorkplace) {
+                        Text(verbatim: "My home office is my main place of business")
+                    }
+                    .tint(.accent)
+                }
+            } footer: {
+                Text(verbatim: isOn
+                     ? "Drives are noticed in the background, even without a route, and stay on this phone. Location must be set to Always."
+                     : "When it's on, drives are noticed in the background and sorted into business and personal. Everything stays on this phone.")
+            }
+
+            if isOn {
+                Section {
+                    Picker(selection: $year) {
+                        ForEach(years, id: \.self) { y in
+                            Text(verbatim: String(y)).tag(y)
+                        }
+                    } label: {
+                        Text(verbatim: "Year")
+                    }
+
+                    HStack(spacing: 8) {
+                        tile(title: "Business", miles: number("businessMiles"), detail: nil)
+                        tile(title: "Personal", miles: number("personalMiles"),
+                             detail: number("commuteMiles") > 0 ? "\(Int(number("commuteMiles").rounded())) commute" : nil)
+                        tile(title: "Unsorted", miles: number("unknownMiles"), detail: nil)
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+
+                    if number("ratePerMile") > 0 {
+                        Text(verbatim: String(format: "Estimated at $%.3f/mile: $%.2f", number("ratePerMile"), number("estimatedDeduction")))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let csvURL {
+                        ShareLink(item: csvURL) {
+                            Label {
+                                Text(verbatim: "Export CSV")
+                            } icon: {
+                                Image(systemName: "square.and.arrow.up")
+                            }
+                        }
+                    }
+                } header: {
+                    Text(verbatim: "This year")
+                } footer: {
+                    Text(verbatim: "Commuting from home to your regular workplace is personal under IRS rules. Note your odometer on January 1 and December 31.")
+                }
+
+                Section {
+                    if unsorted.isEmpty {
+                        Text(verbatim: "Nothing to sort. Suspicious, but fine.")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    ForEach(unsorted) { drive in
+                        row(for: drive)
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    purpose = ""
+                                    pendingBusiness = PendingBusiness(id: drive.id, similar: MWMBackseatRewriter.similarDrives(drive.id))
+                                } label: {
+                                    Text(verbatim: "Business")
+                                }
+                                .tint(.blue)
+                            }
+                            .swipeActions(edge: .trailing) {
+                                Button {
+                                    sort(drive.id, bucket: 2, purpose: "", similar: MWMBackseatRewriter.similarDrives(drive.id))
+                                } label: {
+                                    Text(verbatim: "Personal")
+                                }
+                                .tint(.green)
+                            }
+                            .contextMenu { tagMenu(for: drive) }
+                    }
+                } header: {
+                    Text(verbatim: "Sort these")
+                } footer: {
+                    Text(verbatim: "Swipe right for business, left for personal. Press and hold a drive to tag where it ended.")
+                }
+
+                if !flagged.isEmpty {
+                    Section {
+                        ForEach(flagged) { drive in
+                            row(for: drive)
+                                .contextMenu { tagMenu(for: drive) }
+                        }
+                    } header: {
+                        Text(verbatim: "Flagged")
+                    }
+                }
+
+                Section {
+                    if places.isEmpty {
+                        Text(verbatim: "Home and work are worked out from your trips. Tag other places from a drive.")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    ForEach(places.indices, id: \.self) { index in
+                        HStack {
+                            Text(verbatim: places[index].name)
+
+                            Spacer()
+
+                            Text(verbatim: ["Home", "Office", "Client", "Personal"][min(max(places[index].role, 0), 3)])
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text(verbatim: "Places")
+                }
+            }
+        }
+        .navigationTitle(Text(verbatim: "Mileage log"))
+        .onAppear(perform: reload)
+        .onChange(of: year) { _ in reload() }
+        .onChange(of: isOn) { changedIsOn in
+            if changedIsOn != MWMBackseatRewriter.mileageOn {
+                BackseatDriveWatcher.shared.setEnabled(changedIsOn)
+            }
+            reload()
+        }
+        .onChange(of: isTalking) { changedIsTalking in
+            MWMBackseatRewriter.mileageTalk = changedIsTalking
+        }
+        .onChange(of: isHomeWorkplace) { changedIsHomeWorkplace in
+            MWMBackseatRewriter.homeIsWorkplace = changedIsHomeWorkplace
+        }
+        .alert(Text(verbatim: "What was it for?"), isPresented: Binding(get: { pendingBusiness != nil },
+                                                                          set: { if !$0 { pendingBusiness = nil } })) {
+            TextField(text: $purpose) {
+                Text(verbatim: "e.g. client meeting, Acme")
+            }
+
+            Button {
+                if let pending = pendingBusiness {
+                    sort(pending.id, bucket: 1, purpose: purpose, similar: pending.similar)
+                }
+                pendingBusiness = nil
+            } label: {
+                Text(verbatim: "Business")
+            }
+
+            Button(role: .cancel) {
+                pendingBusiness = nil
+            } label: {
+                Text("cancel")
+            }
+        } message: {
+            Text(verbatim: "Optional, but the IRS likes a reason.")
+        }
+        .confirmationDialog(Text(verbatim: "Do the same for similar trips?"),
+                            isPresented: Binding(get: { pendingSimilar != nil }, set: { if !$0 { pendingSimilar = nil } }),
+                            titleVisibility: .visible) {
+            if let pending = pendingSimilar {
+                Button {
+                    finishSort(pending.index, bucket: pending.bucket, purpose: pending.purpose, similar: true)
+                } label: {
+                    Text(verbatim: "Yes, all \(pending.count + 1)")
+                }
+
+                Button {
+                    finishSort(pending.index, bucket: pending.bucket, purpose: pending.purpose, similar: false)
+                } label: {
+                    Text(verbatim: "Just this one")
+                }
+            }
+        } message: {
+            if let pending = pendingSimilar {
+                Text(verbatim: "\(pending.count) other unsorted \(pending.count == 1 ? "trip goes" : "trips go") between the same two places.")
+            }
+        }
+    }
+
+
+    /// Miles in a box, with an optional line under them
+    private func tile(title: String, miles: Double, detail: String?) -> some View {
+        VStack(spacing: 2) {
+            Text(verbatim: String(Int(miles.rounded())))
+                .font(.title2.weight(.bold))
+                .monospacedDigit()
+
+            Text(verbatim: title)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Text(verbatim: detail ?? " ")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(uiColor: .secondarySystemBackground)))
+    }
+
+
+    /// Date, from → to, miles, and why it's flagged
+    private func row(for drive: LoggedDrive) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(drive.startedAt, style: .date)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text(verbatim: String(format: "%.1f mi", drive.miles))
+                    .monospacedDigit()
+            }
+
+            Text(verbatim: "\(drive.from) → \(drive.to)")
+                .lineLimit(2)
+
+            HStack(spacing: 6) {
+                if drive.outOfState { badge("Out of state") }
+                if drive.farFromHome { badge("Far from home") }
+                if drive.newPlace { badge("New place") }
+            }
+        }
+    }
+
+
+    /// A small colored label
+    private func badge(_ text: String) -> some View {
+        Text(verbatim: text)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Color.orange.opacity(0.2)))
+            .foregroundStyle(.orange)
+    }
+
+
+    /// Tag where a drive ended as home, office, a client, or personal
+    @ViewBuilder
+    private func tagMenu(for drive: LoggedDrive) -> some View {
+        ForEach(Array(["Home", "Office", "Client", "Personal"].enumerated()), id: \.offset) { role, name in
+            Button {
+                let placeName = drive.to.contains(",") || drive.to.isEmpty ? name : drive.to
+                MWMBackseatRewriter.tagPlace(placeName, lat: drive.toLatitude, lon: drive.toLongitude, role: role)
+                reload()
+            } label: {
+                Text(verbatim: "Tag \(drive.to) as \(name)")
+            }
+        }
+    }
+
+
+    /// Sorts a drive, asking about similar ones first if there are any
+    private func sort(_ index: Int, bucket: Int, purpose: String, similar: Int) {
+        if similar > 0 {
+            pendingSimilar = (index, bucket, purpose, similar)
+        } else {
+            finishSort(index, bucket: bucket, purpose: purpose, similar: false)
+        }
+    }
+
+
+    private func finishSort(_ index: Int, bucket: Int, purpose: String, similar: Bool) {
+        pendingSimilar = nil
+        let line = MWMBackseatRewriter.reassignDrive(index, bucket: bucket, similar: similar, purpose: purpose)
+        if !line.isEmpty {
+            KokoroVoice.shared.sayReply(line, voiceID: nil) { MWMTextToSpeech.tts().play(line) }
+        }
+        reload()
+    }
+
+
+    /// A number from the year's totals
+    private func number(_ key: String) -> Double {
+        (summary[key] as? NSNumber)?.doubleValue ?? 0
+    }
+
+
+    /// Reads the log again
+    private func reload() {
+        summary = MWMBackseatRewriter.mileageSummary(year)
+        let log = MWMBackseatRewriter.mileageLog
+        let drives: [Int: LoggedDrive] = Dictionary(uniqueKeysWithValues: log.compactMap { entry in
+            guard let index = (entry["index"] as? NSNumber)?.intValue else { return nil }
+            func name(_ key: String, _ lat: String, _ lon: String) -> String {
+                let given = entry[key] as? String ?? ""
+                if !given.isEmpty { return given }
+                let la = (entry[lat] as? NSNumber)?.doubleValue ?? 0
+                let lo = (entry[lon] as? NSNumber)?.doubleValue ?? 0
+                return String(format: "%.4f, %.4f", la, lo)
+            }
+            return (index, LoggedDrive(id: index, startedAt: entry["startedAt"] as? Date ?? Date(),
+                                       from: name("fromName", "fromLat", "fromLon"), to: name("toName", "toLat", "toLon"),
+                                       toLatitude: (entry["toLat"] as? NSNumber)?.doubleValue ?? 0,
+                                       toLongitude: (entry["toLon"] as? NSNumber)?.doubleValue ?? 0,
+                                       miles: (entry["miles"] as? NSNumber)?.doubleValue ?? 0,
+                                       outOfState: (entry["outOfState"] as? NSNumber)?.boolValue ?? false,
+                                       farFromHome: (entry["farFromHome"] as? NSNumber)?.boolValue ?? false,
+                                       newPlace: (entry["newPlace"] as? NSNumber)?.boolValue ?? false))
+        })
+        unsorted = (summary["unknown"] as? [NSNumber] ?? []).compactMap { drives[$0.intValue] }
+        flagged = (summary["flagged"] as? [NSNumber] ?? []).compactMap { drives[$0.intValue] }
+        places = MWMBackseatRewriter.taggedPlaces.map { ($0["name"] as? String ?? "", ($0["role"] as? NSNumber)?.intValue ?? 3) }
+
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("Backseat-Mileage-\(year).csv")
+        if (try? MWMBackseatRewriter.mileageCsv(year).write(to: file, atomically: true, encoding: .utf8)) != nil {
+            csvURL = file
+        }
     }
 }
