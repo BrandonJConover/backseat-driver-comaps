@@ -96,6 +96,13 @@ bool SaidYes(std::string const & spoken);
 /// First-run setup answers, said out loud.
 /// "My name is Brandon", "call me B", "it's Brandon", "Brandon" -> "Brandon". Empty if unclear.
 std::string ParseNameAnswer(std::string const & spoken);
+/// The answer to a "for your file" question, cleaned up: "Um, I'd say vanilla ice cream" -> "vanilla"
+/// when `drop` is {"ice cream"}. Lowercase, at most four words; empty if nothing's left.
+std::string ParseFavorite(std::string const & spoken, std::vector<std::string> const & drop = {});
+/// "Left side, I guess" -> "left". Empty if it wasn't left, right or middle.
+std::string ParseBedSide(std::string const & spoken);
+/// "None of your business", "pass", "I don't know": the driver won't say.
+bool DeclinedToAnswer(std::string const & spoken);
 /// The driver's name, heard slightly wrong on purpose: "Brandon" -> "Brendon". `variant` picks
 /// among the ways to get it wrong. Never returns the name unchanged.
 std::string MisheardName(std::string const & name, unsigned variant = 0);

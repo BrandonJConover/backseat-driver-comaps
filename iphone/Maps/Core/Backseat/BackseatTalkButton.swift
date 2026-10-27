@@ -3,6 +3,9 @@ import UIKit
 /// Backseat Driver's mic button on the map: tap and say "take me to work" (or answer the license
 /// plate game). The navigation panel has its own while a route is being driven.
 @objc final class BackseatTalkButton: NSObject {
+  /// The map's own mic button, from before the "Where to?" card had one.
+  static let showsMapButton = false
+
   static let navigationVisibilityChanged = Notification.Name("BackseatNavigationVisibilityChanged")
 
   /// A round mic button styled like the other map buttons.
@@ -37,6 +40,8 @@ import UIKit
   /// Puts the mic on the leading edge of the map, halfway down, out of the way of the other controls.
   @objc static func install(in view: UIView) {
     BackseatListener.prepare()
+    // The "Where to?" card has the mic now.
+    if !showsMapButton { return }
     let button = make()
     button.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(button)

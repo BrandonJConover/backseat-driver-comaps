@@ -41,6 +41,7 @@ namespace
 std::string const kTripsFile = "backseat_trips.tsv";
 std::string const kPlatesFile = "backseat_plates.txt";
 std::string const kSaidFile = "backseat_said.tsv";
+std::string const kMemoryFile = "backseat_memory.tsv";
 size_t constexpr kMaxTrips = 200;
 /// A light this close to the turn point controls the junction.
 double constexpr kTrafficLightRadiusM = 30;
@@ -216,6 +217,19 @@ void SaveSaid(backseat::SaidLog const & log)
   std::ofstream(GetPlatform().SettingsPathForFile(kSaidFile)) << log.Serialize();
 }
 
+backseat::DriverMemory LoadMemory()
+{
+  std::ifstream in(GetPlatform().SettingsPathForFile(kMemoryFile));
+  std::stringstream text;
+  text << in.rdbuf();
+  return backseat::DriverMemory::Parse(text.str());
+}
+
+double NowMs()
+{
+  return std::chrono::duration<double, std::milli>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
 void SavePlates(backseat::PlateLog const & log)
 {
   std::ofstream(GetPlatform().SettingsPathForFile(kPlatesFile)) << log.Serialize();
@@ -275,7 +289,14 @@ std::string BackseatAdapter::EndProfileEdit()
 {
   if (!m_profileBefore)
     return {};
-  auto const change = backseat::ProfileChanged(*m_profileBefore, SavedProfile());
+  auto const before = *m_profileBefore;
+  auto const change = backseat::ProfileChanged(before, SavedProfile());
+  if (change)
+  {
+    std::string const what = change->key == "profile.name" ? "name" : change->key == "profile.title" ? "pronouns" : "age";
+    Remember("note", "changed their " + what + " from " + change->vars.at("old") + " to " + change->vars.at("new") +
+                         " by hand");
+  }
   m_profileBefore.reset();
   ReloadPersonality();
   return change ? m_navigator.Reply(change->key, change->vars) : std::string();
@@ -283,6 +304,8 @@ std::string BackseatAdapter::EndProfileEdit()
 
 void BackseatAdapter::ReloadPersonality()
 {
+  // Settings are the source; memory keeps a copy so it's never forgotten.
+  SyncMemory();
   std::string partner, partnerPronouns, driverPronouns;
   bool autopilot = false;
   settings::TryGet(kPartnerKey, partner);
@@ -306,7 +329,182 @@ BackseatAdapter::BackseatAdapter()
 {
   m_navigator.SetPlateLog(LoadPlates(), &SavePlates);
   m_navigator.SetSaidLog(LoadSaid(), &SaveSaid);
+  m_memory = LoadMemory();
   ReloadPersonality();
+}
+
+bool BackseatAdapter::Remember(std::string const & topic, std::string const & fact)
+{
+  if (!m_memory.Remember(topic, fact, NowMs()))
+    return false;
+  std::ofstream(GetPlatform().SettingsPathForFile(kMemoryFile)) << m_memory.Serialize();
+  return true;
+}
+
+bool BackseatAdapter::Forget(std::string const & topic)
+{
+  if (!m_memory.Forget(topic))
+    return false;
+  std::ofstream(GetPlatform().SettingsPathForFile(kMemoryFile)) << m_memory.Serialize();
+  return true;
+}
+
+void BackseatAdapter::SyncMemory()
+{
+  auto const keep = [this](char const * topic, char const * key)
+  {
+    std::string value;
+    if (settings::Get(key, value) && !value.empty())
+      Remember(topic, value);
+  };
+  keep("name", kDriverNameKey);
+  keep("pronouns", kDriverPronounsKey);
+  keep("age", kDriverAgeKey);
+  std::string partner;
+  if (settings::Get(kPartnerKey, partner))
+    Remember("partner", partner.empty() ? "nobody, rides alone" : partner);
+  // Home, work and commutes, worked out from trips.
+  for (auto const & [label, value] : LearnedFacts())
+    if (label != "Rides with")
+    {
+      std::string topic = label;
+      std::transform(topic.begin(), topic.end(), topic.begin(), [](unsigned char c) { return std::tolower(c); });
+      Remember(topic, value);
+    }
+}
+
+namespace
+{
+/// A "for your file" question: the memory topic, its line, words to drop from the answer, and how
+/// the "you're so basic" recap says it back.
+struct FileItem
+{
+  char const * topic;
+  char const * line;
+  char const * drop;
+  char const * recap;
+};
+FileItem const kFileItems[] = {
+    {"favorite ice cream", "file.iceCream", "ice cream", "you like {} ice cream"},
+    {"favorite color", "file.color", "color", "your favorite color is {}"},
+    {"bed side", "file.bedSide", "side", "you sleep on the {} side of the bed"},
+    {"favorite snack", "file.snack1", "", "your favorite snack is {}"},
+    {"favorite music", "file.music", "music", "you listen to {} music"},
+};
+
+/// "ammo.music.country" for "country", so the roast can be about the genre itself.
+std::string MusicLine(std::string const & music)
+{
+  for (auto const & [word, genre] : std::initializer_list<std::pair<char const *, char const *>>{
+           {"country", "country"}, {"metal", "metal"}, {"rock", "rock"}, {"pop", "pop"}, {"hip hop", "hiphop"},
+           {"rap", "rap"}, {"jazz", "jazz"}, {"classical", "classical"}, {"edm", "electronic"},
+           {"electronic", "electronic"}, {"techno", "electronic"}, {"house", "electronic"}})
+    if (music.find(word) != std::string::npos)
+      return std::string("ammo.music.") + genre;
+  return "ammo.music";
+}
+/// Asked again this long after the first snack answer, with only different snacks to pick from.
+double constexpr kSnackTrapAfterMs = 5 * 24 * 3600 * 1000.0;
+double constexpr kFileQuestionEveryMs = 6 * 3600 * 1000.0;
+char const * const kFileAskedAtKey = "BackseatFileAskedAt";
+
+std::string Capitalized(std::string s)
+{
+  if (!s.empty())
+    s[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(s[0])));
+  return s;
+}
+
+std::string FillRecap(char const * tmpl, std::string const & value)
+{
+  std::string s = tmpl;
+  return s.replace(s.find("{}"), 2, value);
+}
+}  // namespace
+
+std::string BackseatAdapter::FileQuestion()
+{
+  double const now = NowMs();
+  std::string askedAt;
+  if (settings::Get(kFileAskedAtKey, askedAt) && now - std::atof(askedAt.c_str()) < kFileQuestionEveryMs)
+    return {};
+  std::string line;
+  for (auto const & item : kFileItems)
+  {
+    if (!m_memory.Recall(item.topic))
+    {
+      m_fileQuestion = item.topic;
+      line = item.line;
+      break;
+    }
+  }
+  if (line.empty() && !m_memory.Recall("snack retest"))
+  {
+    for (auto const & m : m_memory.All())
+    {
+      if (m.topic == "favorite snack" && now - m.learnedAt >= kSnackTrapAfterMs)
+      {
+        m_fileQuestion = "snack retest";
+        line = "file.snack2";
+      }
+    }
+  }
+  if (line.empty())
+    return {};
+  settings::Set(kFileAskedAtKey, std::to_string(static_cast<long long>(now)));
+  return m_navigator.Reply(line);
+}
+
+std::string BackseatAdapter::NicenessMoved()
+{
+  auto const tries = m_memory.Recall("niceness slider");
+  int const count = tries ? std::atoi(tries->c_str()) + 1 : 1;
+  Remember("niceness slider", std::to_string(count) + (count == 1 ? " try" : " tries") + " to make me nicer");
+  return m_navigator.Reply(count == 1 ? "niceness.first" : "niceness.again");
+}
+
+std::string BackseatAdapter::FileAnswer(std::string const & spoken)
+{
+  std::string const topic = std::exchange(m_fileQuestion, std::string());
+  if (topic.empty())
+    return {};
+  if (backseat::DeclinedToAnswer(spoken))
+  {
+    Remember("note", "wouldn't say their " + topic);
+    return m_navigator.Reply("file.declined");
+  }
+  if (topic == "snack retest")
+  {
+    // Every answer is a lie: the old snack wasn't offered. Saying it anyway doesn't help.
+    std::string const old = m_memory.Recall("favorite snack").value_or("something else");
+    std::string const now = backseat::ParseFavorite(spoken);
+    Remember("snack retest", now.empty() ? "no answer" : now);
+    std::string lies = m_memory.Recall("lies told").value_or("0");
+    Remember("lies told", std::to_string(std::atoi(lies.c_str()) + 1));
+    Remember("favorite snack", "disputed (said " + old + ", then " + (now.empty() ? "nothing" : now) + ")");
+    return m_navigator.Reply(now == old ? "file.snackSame" : "file.snackLie", {{"old", old}});
+  }
+  std::string answer;
+  for (auto const & item : kFileItems)
+    if (topic == item.topic)
+      answer = topic == "bed side" ? backseat::ParseBedSide(spoken) : backseat::ParseFavorite(spoken, {item.drop});
+  if (answer.empty())
+    return m_navigator.Reply("file.declined");
+  Remember(topic, answer);
+  return m_navigator.Reply("file.saved", {{"answer", Capitalized(answer)}});
+}
+
+std::string BackseatAdapter::ChatInstructions(std::string const & voiceName)
+{
+  SyncMemory();
+  std::string const name = voiceName.empty() ? "Echo" : voiceName;
+  return "You are " + name + ", the voice of Backseat Driver, a GPS app. You're always slightly jaded: dry, "
+         "sarcastic and a little put-upon, like GLaDOS from Portal, but never cruel, never crude, always clean. "
+         "Talk with the driver the way a person would, in one to three short sentences, because they're driving. "
+         "You can only change the app through do_app_action, so never claim to do anything else. When the driver "
+         "tells you something about themselves worth keeping (family, pets, job, likes, plans), call remember_fact. "
+         "Use what you know about them when it's funny, and never make up facts about them.\n"
+         "What you know about the driver:\n" + m_memory.ForModel(1500);
 }
 
 void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::RoutingSession const & session,
@@ -576,13 +774,6 @@ char const * ReplyKey(backseat::AppAction action, std::string const & argument)
   default: return nullptr;
   }
 }
-
-std::string Capitalized(std::string s)
-{
-  if (!s.empty())
-    s[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(s[0])));
-  return s;
-}
 }  // namespace
 
 BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & text)
@@ -701,6 +892,23 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     else
     {
       reply = m_navigator.Reply("cmd.navigate", {{"place", Capitalized(place)}});
+      // Brandon: "Let's see, you like vanilla ice cream, your favorite color is blue, and you sleep
+      // on the left side of the bed. How much more basic can you get?" Every 4th trip, once it knows.
+      std::vector<std::string> facts;
+      for (auto const & item : kFileItems)
+        if (auto const v = m_memory.Recall(item.topic); v && v->rfind("disputed", 0) != 0)
+          facts.push_back(FillRecap(item.recap, *v));
+      ++m_navigates;
+      if (facts.size() >= 3 && m_navigates % 4 == 0)
+      {
+        facts.resize(3);
+        reply = m_navigator.Reply("memory.basic", {{"facts", facts[0] + ", " + facts[1] + ", and " + facts[2]}});
+      }
+      // Brandon: "You like country music. Well yee haw cowboy..." Ammunition from the file.
+      else if (auto const music = m_memory.Recall("favorite music"); music && m_navigates % 4 == 2)
+      {
+        reply = m_navigator.Reply(MusicLine(*music), {{"music", *music}, {"place", Capitalized(place)}});
+      }
     }
     if (known)
     {

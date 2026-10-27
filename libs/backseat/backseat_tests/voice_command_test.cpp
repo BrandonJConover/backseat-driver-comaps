@@ -357,3 +357,43 @@ TEST(PastPlacesAreRankedByHowOftenTheyreDriven)
   CHECK_EQUAL(places[2].destination, std::string("Gym"));
   CHECK_EQUAL(PastPlaces(history, 1).size(), size_t(1));
 }
+
+TEST(DriverMemoryRemembersAndForgets)
+{
+  DriverMemory memory;
+  CHECK(memory.Remember("name", "Brandon", 1000));
+  CHECK(!memory.Remember("name", "Brandon", 2000));
+  CHECK(memory.Remember("name", "Brendon\twith a tab", 3000));
+  CHECK_EQUAL(*memory.Recall("name"), std::string("Brendon with a tab"));
+  CHECK(memory.Remember("note", "hates country music", 4000));
+  CHECK(memory.Remember("note", "has a dog named Biscuit", 5000));
+  CHECK(!memory.Remember("note", "hates country music", 6000));
+  CHECK(!memory.Remember("snack", "  ", 7000));
+  CHECK_EQUAL(memory.All().size(), size_t(3));
+
+  auto const copy = DriverMemory::Parse(memory.Serialize());
+  CHECK_EQUAL(copy.All().size(), size_t(3));
+  CHECK_EQUAL(copy.All()[2].fact, std::string("has a dog named Biscuit"));
+  CHECK_EQUAL(copy.All()[2].learnedAt, 5000.0);
+
+  // The model sees topics first, then the newest notes.
+  CHECK_EQUAL(memory.ForModel(1000), std::string("name: Brendon with a tab\nnote: has a dog named Biscuit\nnote: hates country music\n"));
+  CHECK_EQUAL(memory.ForModel(60), std::string("name: Brendon with a tab\nnote: has a dog named Biscuit\n"));
+  CHECK(memory.Forget("note"));
+  CHECK(!memory.Forget("note"));
+  CHECK_EQUAL(memory.All().size(), size_t(1));
+}
+
+TEST(FileAnswersAreCleanedUp)
+{
+  CHECK_EQUAL(ParseFavorite("Um, I'd say vanilla ice cream", {"ice cream"}), std::string("vanilla"));
+  CHECK_EQUAL(ParseFavorite("My favorite is blue", {"color"}), std::string("blue"));
+  CHECK_EQUAL(ParseFavorite("probably the gummy worms"), std::string("gummy worms"));
+  CHECK_EQUAL(ParseFavorite("hmm"), std::string());
+  CHECK_EQUAL(ParseBedSide("the left side I guess"), std::string("left"));
+  CHECK_EQUAL(ParseBedSide("whatever side"), std::string());
+  CHECK(DeclinedToAnswer("none of your business"));
+  CHECK(DeclinedToAnswer("I don't know"));
+  CHECK(DeclinedToAnswer(""));
+  CHECK(!DeclinedToAnswer("chocolate"));
+}

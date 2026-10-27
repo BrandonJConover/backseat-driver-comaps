@@ -399,6 +399,53 @@ static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == M
   return routes;
 }
 
++ (BOOL)remember:(NSString *)fact topic:(NSString *)topic
+{
+  return GetFramework().GetRoutingManager().BackseatRemember(topic.UTF8String ?: "", fact.UTF8String ?: "");
+}
+
++ (BOOL)forget:(NSString *)topic
+{
+  return GetFramework().GetRoutingManager().BackseatForget(topic.UTF8String ?: "");
+}
+
++ (NSArray<NSDictionary<NSString *, id> *> *)memories
+{
+  NSMutableArray<NSDictionary<NSString *, id> *> * memories = [NSMutableArray array];
+  for (auto const & m : GetFramework().GetRoutingManager().BackseatMemories())
+    [memories addObject:@{
+      @"topic": @(m.topic.c_str()),
+      @"fact": @(m.fact.c_str()),
+      @"learnedAt": [NSDate dateWithTimeIntervalSince1970:m.learnedAt / 1000.0],
+    }];
+  return memories;
+}
+
++ (NSString *)chatInstructions:(NSString *)voiceName
+{
+  return @(GetFramework().GetRoutingManager().BackseatChatInstructions(voiceName.UTF8String ?: "").c_str());
+}
+
++ (NSString *)fileQuestion
+{
+  return @(GetFramework().GetRoutingManager().BackseatFileQuestion().c_str());
+}
+
++ (NSString *)fileAnswer:(NSString *)spoken
+{
+  return @(GetFramework().GetRoutingManager().BackseatFileAnswer(spoken.UTF8String ?: "").c_str());
+}
+
++ (NSString *)nicenessMoved
+{
+  return @(GetFramework().GetRoutingManager().BackseatNicenessMoved().c_str());
+}
+
++ (NSString *)nicenessSlidBack
+{
+  return @(GetFramework().GetRoutingManager().BackseatNicenessSlidBack().c_str());
+}
+
 + (NSArray<NSArray<NSString *> *> *)learnedFacts
 {
   NSMutableArray<NSArray<NSString *> *> * facts = [NSMutableArray array];

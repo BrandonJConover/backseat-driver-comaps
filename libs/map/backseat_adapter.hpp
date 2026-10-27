@@ -138,6 +138,29 @@ public:
   /// Said when the app opens with no route, before listening once for a destination: "Where to?",
   /// or a guess at the usual trip ("It's Tuesday morning. Work, I assume?"). A "yes" next routes there.
   std::string AskWhereTo();
+
+  /// The GPS's memory of the driver, kept forever in its own file. Everything learned in setup,
+  /// Settings, conversation and from trips lands here.
+  bool Remember(std::string const & topic, std::string const & fact);
+  bool Forget(std::string const & topic);
+  std::vector<backseat::DriverMemory::Memory> const & Memories() const { return m_memory.All(); }
+  /// Instructions for the on-device model when the driver just talks: the jaded persona, the rules
+  /// (app actions only through do_app_action, remember_fact for things worth keeping), and memory.
+  std::string ChatInstructions(std::string const & voiceName);
+
+  /// "For your file" questions, asked one at a time at a quiet moment (not while turning): favorite
+  /// ice cream, color, bed side, snack, and later the snack again with different choices (the
+  /// Portal cake trap). Empty if there's nothing to ask now (at most one every 6 hours). Listen once
+  /// after it and pass the answer to FileAnswer(), which returns the reply.
+  std::string FileQuestion();
+  std::string FileAnswer(std::string const & spoken);
+  /// The Niceness slider in settings does nothing except this: call when the driver lets go of it,
+  /// speak the line, then slide it all the way back to the mean side.
+  /// The first time ever it laughs at them ("You thought you could make me nicer?") and remembers
+  /// that they tried; after that it just laughs.
+  std::string NicenessMoved();
+  /// Once the slider is back on the mean side: "Don't touch my slider."
+  std::string NicenessSlidBack() { return m_navigator.Reply("niceness.after"); }
   /// A place driven to before, for the "Where to?" list.
   struct PastRoute
   {
@@ -237,6 +260,13 @@ private:
   std::optional<m2::PointD> m_askedAt;
   /// The profile as it was when Settings opened it, until EndProfileEdit().
   std::optional<backseat::DriverProfile> m_profileBefore;
+  backseat::DriverMemory m_memory;
+  /// Copies settings and learned facts into memory.
+  void SyncMemory();
+  /// The memory topic FileQuestion() asked about, until FileAnswer().
+  std::string m_fileQuestion;
+  /// Polite destination requests, for the occasional "you're so basic" recap.
+  int m_navigates = 0;
   /// Results last read out, waiting for "the first one".
   std::vector<SearchResult> m_results;
   std::vector<backseat::VoiceOption> m_voices;

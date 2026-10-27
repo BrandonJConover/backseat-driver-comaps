@@ -275,6 +275,14 @@ public:
   std::string BackseatNoAnswerToWhereTo() { return m_backseat.NoAnswerToWhereTo(); }
   std::vector<BackseatAdapter::PastRoute> BackseatPastRoutes(size_t max) const { return m_backseat.PastRoutes(max); }
   std::string BackseatVoiceRecovered() { return m_backseat.VoiceRecovered(); }
+  bool BackseatRemember(std::string const & topic, std::string const & fact) { return m_backseat.Remember(topic, fact); }
+  bool BackseatForget(std::string const & topic) { return m_backseat.Forget(topic); }
+  std::vector<backseat::DriverMemory::Memory> BackseatMemories() const { return m_backseat.Memories(); }
+  std::string BackseatChatInstructions(std::string const & voiceName) { return m_backseat.ChatInstructions(voiceName); }
+  std::string BackseatFileQuestion() { return m_backseat.FileQuestion(); }
+  std::string BackseatFileAnswer(std::string const & spoken) { return m_backseat.FileAnswer(spoken); }
+  std::string BackseatNicenessMoved() { return m_backseat.NicenessMoved(); }
+  std::string BackseatNicenessSlidBack() { return m_backseat.NicenessSlidBack(); }
   std::vector<std::pair<std::string, std::string>> BackseatLearnedFacts() const { return m_backseat.LearnedFacts(); }
   /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.
   BackseatAdapter const & GetBackseat() const { return m_backseat; }

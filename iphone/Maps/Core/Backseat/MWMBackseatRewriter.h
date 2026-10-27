@@ -69,6 +69,22 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 /// Places driven to before, most driven first, for the "Where to?" list. Each has "label" ("Home",
 /// "Starbucks"), "destination", "lat", "lon", "trips" and "minutes" (usual drive time, 0 if unknown).
 + (NSArray<NSDictionary<NSString *, id> *> *)pastRoutes:(NSInteger)max;
+/// The GPS's permanent memory of the driver. Remembering a topic again replaces it, except "note",
+/// which piles up. memories: oldest first, each with "topic", "fact" and "learnedAt" (NSDate).
++ (BOOL)remember:(NSString *)fact topic:(NSString *)topic;
++ (BOOL)forget:(NSString *)topic;
+@property(class, nonatomic, readonly) NSArray<NSDictionary<NSString *, id> *> * memories;
+/// Instructions for the on-device model when the driver is just talking: the jaded persona, the
+/// rules (do_app_action, remember_fact) and everything in memory.
++ (NSString *)chatInstructions:(NSString *)voiceName;
+/// A "for your file" question to ask at a quiet moment, or empty. Listen once, then fileAnswer.
+@property(class, nonatomic, readonly) NSString * fileQuestion;
++ (NSString *)fileAnswer:(NSString *)spoken;
+/// The do-nothing Niceness slider: call when the driver lets go of it, speak the laugh, then animate
+/// the slider back to the mean end ("I guess I could tone it back a bit").
++ (NSString *)nicenessMoved;
+/// Spoken once the slider is back at the mean end: "Don't touch my slider."
++ (NSString *)nicenessSlidBack;
 /// Kokoro's comeback after the system voice stood in: play a cough, then speak this.
 @property(class, nonatomic, readonly) NSString * voiceRecovered;
 /// Voice search: what the GPS says about the top results (names with their streets, nearest

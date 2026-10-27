@@ -279,6 +279,59 @@ bool SaidYes(std::string const & spoken)
   return false;
 }
 
+std::string ParseFavorite(std::string const & spoken, std::vector<std::string> const & drop)
+{
+  std::string words = CommandWords(spoken);
+  auto const erase = [&words](std::string const & phrase)
+  {
+    std::string const padded = " " + phrase + " ";
+    for (auto at = words.find(padded); at != std::string::npos; at = words.find(padded))
+      words.replace(at, padded.size() - 1, "");
+  };
+  // Longest first, so "i would say" goes before "i".
+  for (char const * filler : {"my favorite is", "my favorite", "favorite", "i would say", "i'd say", "i guess",
+                              "i think", "i like", "i love", "probably", "definitely", "obviously", "it's", "its",
+                              "it is", "um", "uh", "hmm", "well", "oh", "the", "flavor", "please", "for sure"})
+    erase(filler);
+  for (auto const & d : drop)
+    erase(d);
+  std::vector<std::string> kept;
+  size_t start = 0;
+  while (kept.size() < 4)
+  {
+    auto const b = words.find_first_not_of(' ', start);
+    if (b == std::string::npos)
+      break;
+    auto const e = words.find(' ', b);
+    kept.push_back(words.substr(b, e - b));
+    start = e;
+  }
+  std::string out;
+  for (auto const & w : kept)
+    out += (out.empty() ? "" : " ") + w;
+  return out;
+}
+
+std::string ParseBedSide(std::string const & spoken)
+{
+  std::string const words = CommandWords(spoken);
+  for (char const * side : {"left", "right", "middle"})
+    if (words.find(std::string(" ") + side + " ") != std::string::npos)
+      return side;
+  return {};
+}
+
+bool DeclinedToAnswer(std::string const & spoken)
+{
+  std::string const words = CommandWords(spoken);
+  for (char const * no : {" none ", " pass ", " skip ", " don't know ", " dont know ", " no idea ", " not telling ",
+                          " none of your business ", " no comment ", " rather not ", " nothing ", " i don't have one ",
+                          " no thanks ", " nope "})
+    if (words.find(no) != std::string::npos)
+      return true;
+  return words.find_first_not_of(' ') == std::string::npos;
+}
+
 std::string ParseNameAnswer(std::string const & spoken)
 {
   std::string words = CommandWords(spoken);

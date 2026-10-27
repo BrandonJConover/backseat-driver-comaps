@@ -308,4 +308,110 @@ std::optional<RoutineBreak> CheckRoutine(std::vector<Routine> const & routines, 
   }
   return {};
 }
+namespace
+{
+/// One memory per line, tab-separated, so tabs and line breaks in a fact become spaces.
+std::string OneLine(std::string s)
+{
+  std::replace_if(s.begin(), s.end(), [](char c) { return c == '\t' || c == '\n' || c == '\r'; }, ' ');
+  auto const first = s.find_first_not_of(' ');
+  auto const last = s.find_last_not_of(' ');
+  return first == std::string::npos ? std::string() : s.substr(first, last - first + 1);
+}
+}  // namespace
+
+bool DriverMemory::Remember(std::string const & topicIn, std::string const & factIn, double nowMs)
+{
+  std::string const topic = OneLine(topicIn);
+  std::string const fact = OneLine(factIn);
+  if (topic.empty() || fact.empty())
+    return false;
+  if (topic != "note")
+  {
+    for (auto & m : m_memories)
+    {
+      if (m.topic != topic)
+        continue;
+      if (m.fact == fact)
+        return false;
+      m.fact = fact;
+      m.learnedAt = nowMs;
+      return true;
+    }
+  }
+  else
+  {
+    for (auto const & m : m_memories)
+      if (m.topic == topic && m.fact == fact)
+        return false;
+  }
+  m_memories.push_back({topic, fact, nowMs});
+  return true;
+}
+
+bool DriverMemory::Forget(std::string const & topic)
+{
+  auto const before = m_memories.size();
+  m_memories.erase(std::remove_if(m_memories.begin(), m_memories.end(), [&](Memory const & m) { return m.topic == topic; }),
+                   m_memories.end());
+  return m_memories.size() != before;
+}
+
+std::optional<std::string> DriverMemory::Recall(std::string const & topic) const
+{
+  for (auto const & m : m_memories)
+    if (m.topic == topic)
+      return m.fact;
+  return {};
+}
+
+std::string DriverMemory::ForModel(size_t maxChars) const
+{
+  // Topics first (they're the facts that matter), then notes newest first, until it's full.
+  std::vector<std::string> lines;
+  for (auto const & m : m_memories)
+    if (m.topic != "note")
+      lines.push_back(m.topic + ": " + m.fact);
+  for (auto it = m_memories.rbegin(); it != m_memories.rend(); ++it)
+    if (it->topic == "note")
+      lines.push_back("note: " + it->fact);
+  std::string out;
+  for (auto const & line : lines)
+  {
+    if (out.size() + line.size() + 1 > maxChars)
+      break;
+    out += line + "\n";
+  }
+  return out;
+}
+
+std::string DriverMemory::Serialize() const
+{
+  std::string out;
+  for (auto const & m : m_memories)
+    out += ToFixed(m.learnedAt, 0) + "\t" + m.topic + "\t" + m.fact + "\n";
+  return out;
+}
+
+DriverMemory DriverMemory::Parse(std::string const & text)
+{
+  DriverMemory memory;
+  size_t start = 0;
+  while (start < text.size())
+  {
+    size_t end = text.find('\n', start);
+    if (end == std::string::npos)
+      end = text.size();
+    std::string const line = text.substr(start, end - start);
+    start = end + 1;
+    auto const a = line.find('\t');
+    auto const b = a == std::string::npos ? a : line.find('\t', a + 1);
+    if (b == std::string::npos)
+      continue;
+    char * stop = nullptr;
+    double const at = std::strtod(line.c_str(), &stop);
+    memory.m_memories.push_back({line.substr(a + 1, b - a - 1), line.substr(b + 1), stop == line.c_str() ? 0 : at});
+  }
+  return memory;
+}
 }  // namespace backseat

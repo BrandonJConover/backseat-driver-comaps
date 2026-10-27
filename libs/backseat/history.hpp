@@ -125,4 +125,34 @@ std::vector<PastPlace> PastPlaces(std::vector<TripRecord> const & history, size_
 /// Whether starting `routeKey` at local time `now` breaks one of the routines.
 std::optional<RoutineBreak> CheckRoutine(std::vector<Routine> const & routines, std::string const & routeKey,
                                          std::tm const & now);
+/// Everything the GPS has learned about the driver, kept forever (Brandon: "it should have its own
+/// memories like Claude that it can pull on"). Each memory has a topic; remembering a topic again
+/// replaces it ("snack", "partner"), except "note", which piles up (things said in conversation).
+class DriverMemory
+{
+public:
+  struct Memory
+  {
+    std::string topic;
+    std::string fact;
+    /// When it was learned or last changed, ms since the epoch.
+    double learnedAt = 0;
+  };
+
+  /// Returns false if nothing changed (the same fact again, or an empty one).
+  bool Remember(std::string const & topic, std::string const & fact, double nowMs);
+  /// Returns false if there was nothing to forget.
+  bool Forget(std::string const & topic);
+  std::optional<std::string> Recall(std::string const & topic) const;
+  /// Oldest first.
+  std::vector<Memory> const & All() const { return m_memories; }
+  /// Topic: fact lines for a language model's instructions, newest notes kept when over `maxChars`.
+  std::string ForModel(size_t maxChars) const;
+
+  std::string Serialize() const;
+  static DriverMemory Parse(std::string const & text);
+
+private:
+  std::vector<Memory> m_memories;
+};
 }  // namespace backseat
