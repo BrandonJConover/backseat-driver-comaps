@@ -3,6 +3,7 @@
 // engine/src/engine.ts; given the same seed and inputs both say exactly the same thing.
 #pragma once
 
+#include "backseat/lines.hpp"
 #include "backseat/report.hpp"
 #include "backseat/types.hpp"
 
@@ -57,6 +58,8 @@ struct EngineConfig
   double frustrationDecayPerMin = 6;
   Rng rng;
   LineSource * lineSource = nullptr;
+  /// Lines said on earlier trips, so picks avoid them too. Not owned; null keeps it per trip.
+  SaidLog * saidLog = nullptr;
 };
 
 /// "Turn left onto Elm" -> Left. "Keep right at the fork" -> Right. "Continue" -> Other.

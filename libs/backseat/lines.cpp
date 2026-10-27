@@ -2,7 +2,10 @@
 
 #include "backseat/lines_data.hpp"
 
+#include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <sstream>
 
 namespace backseat
 {
@@ -48,5 +51,56 @@ std::string Fill(std::string const & tmpl, Vars const & vars)
     out += tmpl[i++];
   }
   return out;
+}
+namespace
+{
+/// A key's memory holds at most this many lines (and always leaves one fresh option).
+size_t constexpr kSaidKeep = 12;
+}  // namespace
+
+std::string const & SaidLog::Pick(std::string const & key, std::vector<std::string> const & options, double r)
+{
+  auto & recent = m_recent[key];
+  std::vector<std::string const *> fresh;
+  for (auto const & l : options)
+    if (std::find(recent.begin(), recent.end(), l) == recent.end())
+      fresh.push_back(&l);
+  if (fresh.empty())
+    for (auto const & l : options)
+      fresh.push_back(&l);
+  std::string const & line = *fresh[std::min(fresh.size() - 1, static_cast<size_t>(std::floor(r * fresh.size())))];
+  recent.erase(std::remove(recent.begin(), recent.end(), line), recent.end());
+  recent.push_back(line);
+  size_t const keep = std::min(kSaidKeep, options.size() - 1);
+  if (recent.size() > keep)
+    recent.erase(recent.begin(), recent.end() - static_cast<std::ptrdiff_t>(keep));
+  m_dirty = true;
+  return line;
+}
+
+std::string SaidLog::Serialize() const
+{
+  std::string out;
+  for (auto const & [key, lines] : m_recent)
+    for (auto const & l : lines)
+      out += key + "\t" + l + "\n";
+  return out;
+}
+
+SaidLog SaidLog::Parse(std::string const & text)
+{
+  SaidLog log;
+  std::istringstream in(text);
+  std::string row;
+  while (std::getline(in, row))
+  {
+    auto const tab = row.find('\t');
+    if (tab == std::string::npos || tab == 0 || tab + 1 >= row.size())
+      continue;
+    auto & lines = log.m_recent[row.substr(0, tab)];
+    if (lines.size() < kSaidKeep)
+      lines.push_back(row.substr(tab + 1));
+  }
+  return log;
 }
 }  // namespace backseat

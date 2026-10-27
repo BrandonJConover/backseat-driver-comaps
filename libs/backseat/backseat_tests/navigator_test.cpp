@@ -4,6 +4,7 @@
 #include "backseat/lines.hpp"
 #include "backseat/units.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 using namespace backseat;
@@ -874,4 +875,36 @@ TEST(NavigatorLeavesTheDirectionAloneWhenItCantTell)
     said = said || Has(nav.TakeLines(), Category::WrongWay);
   }
   CHECK(!said);
+}
+
+TEST(SaidLogGoesThroughEveryLineBeforeRepeating)
+{
+  std::vector<std::string> const options = {"a", "b", "c", "d"};
+  SaidLog log;
+  std::vector<std::string> said;
+  for (int i = 0; i < 4; ++i)
+    said.push_back(log.Pick("k", options, 0.0));
+  std::sort(said.begin(), said.end());
+  CHECK(said == options);
+  CHECK(log.Dirty());
+
+  // Survives a save and load, so the next trip remembers.
+  SaidLog loaded = SaidLog::Parse(log.Serialize());
+  std::string const last = said.empty() ? "" : log.Pick("k", options, 0.0);
+  CHECK(loaded.Pick("k", options, 0.0) == last);
+  CHECK(!SaidLog::Parse("junk\n\tno key\n").Dirty());
+}
+
+TEST(NavigatorRemembersWhatItSaidAcrossTrips)
+{
+  std::vector<std::string> saved;
+  SaidLog log;
+  // The first music judgement, already used on an earlier trip.
+  log.Pick("music.judge", LinesFor("music.judge", 0), 0.0);
+  Navigator nav(Config());
+  nav.SetSaidLog(SaidLog::Parse(log.Serialize()), [&](SaidLog const & l) { saved.push_back(l.Serialize()); });
+  nav.OnFix(At(0, 10), Far());
+  nav.TakeLines();
+  CHECK(!saved.empty());  // the trip start's lines were remembered
+  CHECK(saved.back().find("wrongWay") == std::string::npos);
 }

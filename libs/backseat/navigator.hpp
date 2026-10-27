@@ -176,6 +176,8 @@ public:
   void SetVenueLookup(VenueLookup lookup) { m_venueLookup = std::move(lookup); }
   /// Plates spotted on earlier trips, and where to save the log when it changes.
   void SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange);
+  /// What was said on earlier trips, and where to save it when it changes (from TakeLines()).
+  void SetSaidLog(SaidLog log, std::function<void(SaidLog const &)> onChange);
   PlateLog const & GetPlateLog() const { return m_plates.Log(); }
   /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate".
   /// Same thread as OnFix.
@@ -318,6 +320,8 @@ private:
   /// The last real fix, for judging whether the driver is parked when they talk.
   std::optional<Fix> m_lastFix;
   std::function<void(PlateLog const &)> m_onPlateLog;
+  SaidLog m_said;
+  std::function<void(SaidLog const &)> m_onSaid;
   int m_tripsOnRoute = 0;
   double m_tripStartT = 0;
   double m_lastRegionCheckT = -1e18;

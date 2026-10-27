@@ -367,6 +367,12 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
 
 std::vector<Commentary> Navigator::TakeLines()
 {
+  if (m_said.Dirty())
+  {
+    m_said.ClearDirty();
+    if (m_onSaid)
+      m_onSaid(m_said);
+  }
   // Punchlines whose awkward pause is over.
   while (!m_punchlines.empty() && m_punchlines.front().t <= m_lastT)
   {
@@ -462,7 +468,9 @@ void Navigator::Update(double t, RouteSnapshot const & route)
 
 void Navigator::StartTrip(double t, RouteSnapshot const & route)
 {
-  m_engine = std::make_unique<CritiqueEngine>(m_config, t);
+  EngineConfig config = m_config;
+  config.saidLog = &m_said;
+  m_engine = std::make_unique<CritiqueEngine>(config, t);
   m_plan = {};
   m_plan.origin = route.origin;
   m_plan.destination = route.destinationPoint;
@@ -710,6 +718,12 @@ void Navigator::ResetTrip()
   m_punchlines.clear();
 }
 
+void Navigator::SetSaidLog(SaidLog log, std::function<void(SaidLog const &)> onChange)
+{
+  m_said = std::move(log);
+  m_onSaid = std::move(onChange);
+}
+
 void Navigator::SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange)
 {
   m_plates.SetLog(std::move(log));
@@ -860,7 +874,7 @@ void Navigator::SayLine(double tMs, Category category, std::string const & key, 
   Commentary c;
   c.t = tMs;
   c.category = category;
-  c.text = Fill(options[std::min(options.size() - 1, static_cast<size_t>(r * options.size()))], vars);
+  c.text = Fill(m_said.Pick(key, options, r), vars);
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = Priority::Roast;
   c.voiceSpeed = 1 + c.frustration / 250.0;

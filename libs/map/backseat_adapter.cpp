@@ -35,6 +35,7 @@ namespace
 {
 std::string const kTripsFile = "backseat_trips.tsv";
 std::string const kPlatesFile = "backseat_plates.txt";
+std::string const kSaidFile = "backseat_said.tsv";
 size_t constexpr kMaxTrips = 200;
 /// A light this close to the turn point controls the junction.
 double constexpr kTrafficLightRadiusM = 30;
@@ -197,6 +198,19 @@ backseat::PlateLog LoadPlates()
   return backseat::PlateLog::Parse(text.str());
 }
 
+backseat::SaidLog LoadSaid()
+{
+  std::ifstream in(GetPlatform().SettingsPathForFile(kSaidFile));
+  std::stringstream text;
+  text << in.rdbuf();
+  return backseat::SaidLog::Parse(text.str());
+}
+
+void SaveSaid(backseat::SaidLog const & log)
+{
+  std::ofstream(GetPlatform().SettingsPathForFile(kSaidFile)) << log.Serialize();
+}
+
 void SavePlates(backseat::PlateLog const & log)
 {
   std::ofstream(GetPlatform().SettingsPathForFile(kPlatesFile)) << log.Serialize();
@@ -227,6 +241,7 @@ BackseatAdapter::BackseatAdapter()
 })
 {
   m_navigator.SetPlateLog(LoadPlates(), &SavePlates);
+  m_navigator.SetSaidLog(LoadSaid(), &SaveSaid);
 }
 
 void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::RoutingSession const & session,

@@ -738,6 +738,8 @@ std::string CritiqueEngine::Pick(std::string const & key, int tier)
     if (auto generated = m_config.lineSource->Take(key, tier))
       return *generated;
   auto const & options = LinesFor(key, tier);
+  if (m_config.saidLog)
+    return m_config.saidLog->Pick(key, options, m_config.rng());
   auto & recent = m_recentLines[key];
   std::vector<std::string> fresh;
   for (auto const & l : options)

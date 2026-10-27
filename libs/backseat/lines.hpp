@@ -17,4 +17,24 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier);
 /// Fills {placeholders} from vars. {NAME} in capitals inserts the value in capitals.
 /// Unknown placeholders are left as they are.
 std::string Fill(std::string const & tmpl, Vars const & vars);
+
+/// What the GPS said lately, per key, kept across trips so it keeps the driver guessing: a line
+/// doesn't come back until the others for its key have had a turn.
+class SaidLog
+{
+public:
+  /// A line from `options` not said recently for `key`, chosen by `r` in [0, 1), and remembered.
+  std::string const & Pick(std::string const & key, std::vector<std::string> const & options, double r);
+
+  /// Whether anything was picked since the last ClearDirty(), i.e. the log needs saving.
+  bool Dirty() const { return m_dirty; }
+  void ClearDirty() { m_dirty = false; }
+
+  std::string Serialize() const;
+  static SaidLog Parse(std::string const & text);
+
+private:
+  std::map<std::string, std::vector<std::string>> m_recent;
+  bool m_dirty = false;
+};
 }  // namespace backseat
