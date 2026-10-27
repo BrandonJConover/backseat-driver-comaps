@@ -260,6 +260,8 @@ public:
   {
     return m_backseat.SetupHeard(step, spoken);
   }
+  std::string BackseatAskWhereTo() { return m_backseat.AskWhereTo(); }
+  std::string BackseatNoAnswerToWhereTo() { return m_backseat.NoAnswerToWhereTo(); }
   std::vector<std::pair<std::string, std::string>> BackseatLearnedFacts() const { return m_backseat.LearnedFacts(); }
   /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.
   BackseatAdapter const & GetBackseat() const { return m_backseat; }

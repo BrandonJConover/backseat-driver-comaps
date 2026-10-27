@@ -88,6 +88,9 @@ struct AppCommand
 /// which already listens for them.
 std::vector<AppCommand> ParseAppCommands(std::string const & spoken);
 
+/// "Yes", "yeah", "yep", "you got it"...
+bool SaidYes(std::string const & spoken);
+
 /// First-run setup answers, said out loud.
 /// "My name is Brandon", "call me B", "it's Brandon", "Brandon" -> "Brandon". Empty if unclear.
 std::string ParseNameAnswer(std::string const & spoken);

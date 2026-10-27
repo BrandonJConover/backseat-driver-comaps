@@ -7,6 +7,7 @@
 
 #include "geometry/point2d.hpp"
 
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -127,6 +128,13 @@ public:
   /// False when the answer wasn't understood; ask again. Saves what it understood to settings.
   bool SetupHeard(SetupStep step, std::string const & spoken);
 
+  /// Said when the app opens with no route, before listening once for a destination: "Where to?",
+  /// or a guess at the usual trip ("It's Tuesday morning. Work, I assume?"). A "yes" next routes there.
+  std::string AskWhereTo();
+  /// Call when AskWhereTo() got no answer (about 45 s of silence). Says "Deciding to play it safe
+  /// today, huh?" if the car hasn't moved since; empty otherwise.
+  std::string NoAnswerToWhereTo();
+
   /// What the GPS has worked out about the driver, for the profile screen: label and value, e.g.
   /// {"Works at", "Acme Corp"}, {"Commute", "Mon to Fri, around 8:05 AM"}.
   std::vector<std::pair<std::string, std::string>> LearnedFacts() const;
@@ -171,6 +179,16 @@ private:
   std::optional<m2::PointD> m_here;
   bool m_askStateNext = false;
   int m_searches = 0;
+  /// The usual trip AskWhereTo() guessed, waiting for a "yes".
+  struct Guess
+  {
+    backseat::Routine routine;
+    std::string name;
+    std::chrono::steady_clock::time_point at;
+  };
+  std::optional<Guess> m_guess;
+  /// Where the phone was when AskWhereTo() asked.
+  std::optional<m2::PointD> m_askedAt;
   std::vector<backseat::VoiceOption> m_voices;
   mutable int m_secondsLeft = -1;
 };

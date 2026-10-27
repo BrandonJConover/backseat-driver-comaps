@@ -203,6 +203,19 @@ std::vector<Routine> LearnRoutines(std::vector<TripRecord> const & history,
   return out;
 }
 
+std::optional<Routine> UsualTrip(std::vector<Routine> const & routines, LatLon here, std::tm const & now)
+{
+  std::string const key = RouteKey(here, here);
+  std::string const from = key.substr(0, key.find('>'));
+  int const minute = now.tm_hour * 60 + now.tm_min;
+  std::optional<Routine> best;
+  for (auto const & r : routines)
+    if (r.routeKey.compare(0, from.size() + 1, from + ">") == 0 && r.usualOn[now.tm_wday] &&
+        std::abs(minute - r.startMinute) <= 45 && (!best || r.trips > best->trips))
+      best = r;
+  return best;
+}
+
 std::optional<RoutineBreak> CheckRoutine(std::vector<Routine> const & routines, std::string const & routeKey,
                                          std::tm const & now)
 {

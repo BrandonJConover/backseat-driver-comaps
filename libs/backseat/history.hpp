@@ -101,6 +101,9 @@ struct RoutineBreak
   int minutesLate = 0;
 };
 
+/// The routine usually started from `here` around local time `now` (within 45 minutes), if any.
+std::optional<Routine> UsualTrip(std::vector<Routine> const & routines, LatLon here, std::tm const & now);
+
 /// Whether starting `routeKey` at local time `now` breaks one of the routines.
 std::optional<RoutineBreak> CheckRoutine(std::vector<Routine> const & routines, std::string const & routeKey,
                                          std::tm const & now);

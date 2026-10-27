@@ -243,3 +243,26 @@ TEST(RoutinesAreLearnedAndBroken)
   CHECK(elsewhere && elsewhere->kind == RoutineBreak::Kind::Elsewhere);
   CHECK(!CheckRoutine(routines, RouteKey(home, gym), at(15, 19, 0)));
 }
+
+TEST(UsualTripIsGuessed)
+{
+  LatLon const home{39.70, -104.90};
+  LatLon const work{39.75, -104.99};
+  Routine r;
+  r.routeKey = RouteKey(home, work);
+  r.startMinute = 8 * 60;
+  r.usualOn = {false, true, true, true, true, true, false};
+  r.trips = 10;
+  std::tm tue{};
+  tue.tm_wday = 2;
+  tue.tm_hour = 8;
+  tue.tm_min = 20;
+  CHECK(UsualTrip({r}, home, tue).has_value());
+  CHECK(!UsualTrip({r}, work, tue));
+  tue.tm_hour = 14;
+  CHECK(!UsualTrip({r}, home, tue));
+  CHECK(SaidYes("yeah"));
+  CHECK(SaidYes("yes please"));
+  CHECK(!SaidYes("no, not today"));
+  CHECK(!SaidYes("the gym"));
+}

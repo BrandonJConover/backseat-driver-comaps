@@ -261,6 +261,19 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   return out;
 }
 
+bool SaidYes(std::string const & spoken)
+{
+  std::string const words = CommandWords(spoken);
+  for (char const * no : {" no ", " nope ", " not ", " nah "})
+    if (words.find(no) != std::string::npos)
+      return false;
+  for (char const * yes : {" yes ", " yeah ", " yep ", " yup ", " sure ", " correct ", " right ", " you got it ",
+                           " uh huh ", " ok ", " okay ", " affirmative ", " exactly ", " you know it ", " of course "})
+    if (words.find(yes) != std::string::npos)
+      return true;
+  return false;
+}
+
 std::string ParseNameAnswer(std::string const & spoken)
 {
   std::string words = CommandWords(spoken);

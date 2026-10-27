@@ -32,6 +32,7 @@
 #include <iomanip>
 #include <map>
 #include <sstream>
+#include <utility>
 
 namespace
 {
@@ -568,6 +569,26 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
       LOG(LINFO, ("Backseat: learned the driver has a", partner->word));
     }
   }
+  // "Yes" to "Work, I assume?"
+  if (auto guess = std::exchange(m_guess, std::nullopt);
+      guess && std::chrono::steady_clock::now() - guess->at < std::chrono::minutes(2) && backseat::SaidYes(text) &&
+      backseat::ParseAppCommands(text).empty())
+  {
+    heard.reply = m_navigator.Reply("ask.guessYes", {{"usual", guess->name}});
+    if (guess->routine.to)
+    {
+      heard.kind = HeardCommand::Kind::RouteTo;
+      heard.lat = guess->routine.to->lat;
+      heard.lon = guess->routine.to->lon;
+      heard.name = guess->routine.destination.empty() ? guess->name : guess->routine.destination;
+    }
+    else
+    {
+      heard.kind = HeardCommand::Kind::Search;
+      heard.query = guess->routine.destination;
+    }
+    return heard;
+  }
   // A voice's code phrase ("purple monkey"): the old voice gets the last word.
   if (auto const voice = backseat::VoiceByPhrase(m_voices, text))
   {
@@ -718,6 +739,41 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
   heard.actions.push_back(command);
   char const * key = ReplyKey(command.action, command.argument);
   return key ? m_navigator.Reply(key, {{"voice", Capitalized(command.argument)}}) : std::string();
+}
+
+std::string BackseatAdapter::NoAnswerToWhereTo()
+{
+  double constexpr kStillM = 30;
+  bool const still = m_askedAt && m_here && mercator::DistanceOnEarth(*m_askedAt, *m_here) < kStillM;
+  m_askedAt.reset();
+  return still && !m_navigator.InTrip() ? m_navigator.Reply("ask.stayPut") : std::string();
+}
+
+std::string BackseatAdapter::AskWhereTo()
+{
+  m_guess.reset();
+  m_askedAt = m_here;
+  if (m_here)
+  {
+    auto const now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm tm{};
+    localtime_r(&now, &tm);
+    auto const here = mercator::ToLatLon(*m_here);
+    if (auto const usual = backseat::UsualTrip(m_navigator.Routines(), {here.m_lat, here.m_lon}, tm))
+    {
+      static char const * const kDays[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+      int const h = tm.tm_hour;
+      std::string name = m_navigator.PlaceName(usual->to, usual->destination);
+      m_guess = Guess{*usual, name, std::chrono::steady_clock::now()};
+      // "work" reads oddly at the start of a sentence.
+      std::string capital = name;
+      capital[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(capital[0])));
+      return m_navigator.Reply("ask.guess", {{"usual", capital},
+                                             {"day", kDays[tm.tm_wday]},
+                                             {"daypart", h < 12 ? "morning" : h < 17 ? "afternoon" : h < 21 ? "evening" : "night"}});
+    }
+  }
+  return m_navigator.Reply("ask.whereTo");
 }
 
 std::string BackseatAdapter::SetupLine(SetupStep step, std::string const & voiceName)
