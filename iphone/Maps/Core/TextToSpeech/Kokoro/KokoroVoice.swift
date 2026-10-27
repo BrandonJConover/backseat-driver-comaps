@@ -29,9 +29,9 @@ final class KokoroVoice: NSObject {
   /// Set once the Core ML models have downloaded, so later launches don't wait for Wi-Fi.
   private static let installedKey = "backseat.kokoro.coreMLInstalled"
 
-  /// The voice picked in Settings: a Kokoro voice id, or `systemVoiceID` for the iPhone voice.
+  /// The Kokoro voice picked in Settings. The system voice is never picked: it only fills in while
+  /// Kokoro loads, after a Core ML crash, or for an instruction language Kokoro can't speak.
   static let voiceKey = "backseat.kokoro.voice"
-  static let systemVoiceID = "system"
   static let defaultVoice = KokoroAneConstants.defaultVoice
 
   struct VoiceOption: Identifiable, Hashable {
@@ -49,16 +49,25 @@ final class KokoroVoice: NSObject {
     }
   }()
 
-  /// The picked voice id as stored, `systemVoiceID` for the iPhone voice.
+  /// The picked voice. Anything else stored (such as the old "system" choice) means the default.
   static var selectedVoiceID: String {
     let id = UserDefaults.standard.string(forKey: voiceKey) ?? defaultVoice
-    return id == systemVoiceID || voiceOptions.contains { $0.id == id } ? id : defaultVoice
+    return voiceOptions.contains { $0.id == id } ? id : defaultVoice
   }
 
-  /// The Kokoro voice to speak with, or nil when the iPhone voice is picked.
+  static var selectedVoiceName: String {
+    voiceOptions.first { $0.id == selectedVoiceID }?.name ?? selectedVoiceID
+  }
+
+  /// Kokoro speaks English only; other instruction languages stay with the system voice.
+  private static var speaksInstructionLanguage: Bool {
+    let language: String? = MWMTextToSpeech.savedLanguage()
+    return language?.lowercased().hasPrefix("en") ?? true
+  }
+
+  /// The Kokoro voice to speak with, or nil when the instruction language isn't English.
   private static var voice: String? {
-    let id = selectedVoiceID
-    return id == systemVoiceID ? nil : id
+    speaksInstructionLanguage ? selectedVoiceID : nil
   }
 
   private enum State { case waiting, playing, fellBack }
@@ -96,21 +105,23 @@ final class KokoroVoice: NSObject {
   private var started = false
   private let player = ClipPlayer()
 
-  /// True when Kokoro is loaded and picked over the iPhone voice.
+  /// True when Kokoro is loaded and can speak the instruction language.
   @objc var isReady: Bool {
     lock.lock(); defer { lock.unlock() }
     return primary != nil && Self.voice != nil
   }
 
-  /// A line for Settings saying which voice speaks right now.
+  /// A line for Settings saying when the system voice fills in, if it does right now.
   var status: String {
-    if Self.voice == nil { return "The iPhone voice speaks." }
+    if Self.voice == nil {
+      return "These voices speak English only, so the iPhone voice reads instructions in the language you picked."
+    }
     if CoreMLCrashGuard.isDisabledForThisOS() {
-      return "Kokoro crashed on this iOS version, so the iPhone voice speaks until iOS updates."
+      return "Kokoro crashed on this iOS version, so the iPhone voice fills in until iOS updates."
     }
     lock.lock(); defer { lock.unlock() }
-    if primary != nil { return "Kokoro is ready. A voice you haven't used yet downloads on its first line." }
-    return "Kokoro is still downloading (it waits for Wi-Fi). Until then the iPhone voice speaks."
+    if primary != nil { return "A voice you haven't used yet downloads the first time it speaks." }
+    return "The voices are still downloading or loading (the download waits for Wi-Fi). Until then the iPhone voice fills in."
   }
 
   /// Switches voices and forgets queued and cached lines, so the old voice doesn't come back.
@@ -124,7 +135,7 @@ final class KokoroVoice: NSObject {
   }
 
   /// Says `text` in the picked voice for the test button in Settings; `fallback` says it with the
-  /// iPhone voice when that's picked or Kokoro isn't ready.
+  /// system voice when Kokoro can't.
   func test(_ text: String, fallback: @escaping () -> Void) {
     speak(text, nav: false, speed: 1, fallback: fallback)
   }

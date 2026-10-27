@@ -73,6 +73,7 @@
 		279367562E1BE16300AA5C3D /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279367552E1BE16300AA5C3D /* Settings.swift */; };
 		2793675A2E1BE17300AA5C3D /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279367592E1BE17300AA5C3D /* SettingsView.swift */; };
 		27AF184C2E1D5B2D00CD41E2 /* SettingsNavigationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AF184B2E1D5A2700CD41E2 /* SettingsNavigationView.swift */; };
+		BD5EA7000000000000000011 /* SettingsBackseatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000010 /* SettingsBackseatView.swift */; };
 		27AF18502E1DB61600CD41E2 /* VoiceRoutingLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AF184F2E1DB61500CD41E2 /* VoiceRoutingLanguage.swift */; };
 		27AF18522E1DB62000CD41E2 /* DistanceUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AF18512E1DB61F00CD41E2 /* DistanceUnit.swift */; };
 		27AF18542E1DB62700CD41E2 /* MobileDataPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AF18532E1DB62600CD41E2 /* MobileDataPolicy.swift */; };
@@ -852,6 +853,7 @@
 		279367552E1BE16300AA5C3D /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
 		279367592E1BE17300AA5C3D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = UI/Settings/SettingsView.swift; sourceTree = SOURCE_ROOT; };
 		27AF184B2E1D5A2700CD41E2 /* SettingsNavigationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsNavigationView.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000010 /* SettingsBackseatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsBackseatView.swift; sourceTree = "<group>"; };
 		27AF184F2E1DB61500CD41E2 /* VoiceRoutingLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRoutingLanguage.swift; sourceTree = "<group>"; };
 		27AF18512E1DB61F00CD41E2 /* DistanceUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DistanceUnit.swift; sourceTree = "<group>"; };
 		27AF18532E1DB62600CD41E2 /* MobileDataPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileDataPolicy.swift; sourceTree = "<group>"; };
@@ -4023,6 +4025,7 @@
 				6F6D3992304DEAF3005FDA3E /* CustomMapServerView.swift */,
 				279367592E1BE17300AA5C3D /* SettingsView.swift */,
 				27AF184B2E1D5A2700CD41E2 /* SettingsNavigationView.swift */,
+				BD5EA7000000000000000010 /* SettingsBackseatView.swift */,
 				272F1F352E0EE00B00FA52EF /* Profile */,
 			);
 			path = Settings;
@@ -4717,6 +4720,7 @@
 				349A13831DEC138C00C7DB60 /* MWMMobileInternetAlert.m in Sources */,
 				6741A9EC1BF340DE002C974C /* MWMCircularProgress.m in Sources */,
 				27AF184C2E1D5B2D00CD41E2 /* SettingsNavigationView.swift in Sources */,
+				BD5EA7000000000000000011 /* SettingsBackseatView.swift in Sources */,
 				993DF11923F6BDB100AC231A /* UITextFieldRenderer.swift in Sources */,
 				272F1F462E0EEF9400FA52EF /* SafariView.swift in Sources */,
 				340475591E081A4600C92850 /* WebViewController.m in Sources */,

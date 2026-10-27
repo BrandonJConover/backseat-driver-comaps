@@ -104,7 +104,26 @@ struct SettingsView: View {
                         }
                     }
                 }
-                
+
+                Section {
+                    NavigationLink {
+                        SettingsBackseatView()
+                    } label: {
+                        HStack {
+                            Image(systemName: "car.side")
+
+                            Text(verbatim: "Backseat Driver")
+                                .lineLimit(1)
+
+                            Spacer(minLength: 0)
+
+                            Text(verbatim: KokoroVoice.selectedVoiceName)
+                                .lineLimit(1)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 Section {
                     Toggle("autodownload", isOn: $hasAutomaticDownload)
                         .tint(.accent)

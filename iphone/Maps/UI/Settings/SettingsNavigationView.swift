@@ -32,14 +32,6 @@ struct SettingsNavigationView: View {
     @State var selectedAnnouncingSpeedTrapsWhileVoiceRouting: Settings.AnnouncingSpeedTrapsWhileVoiceRouting = .never
     
     
-    /// The Backseat Driver voice: a Kokoro voice id, or the iPhone voice
-    @State var selectedBackseatVoice: String = KokoroVoice.selectedVoiceID
-
-
-    /// What Kokoro is doing, shown under the Backseat Driver voice
-    @State var backseatVoiceStatus: String = ""
-
-
     /// If toll roads should be avoided during routing
     @State var shouldAvoidTollRoadsWhileRouting: Bool = false
     
@@ -93,26 +85,18 @@ struct SettingsNavigationView: View {
                         Text("pref_tts_language_title")
                     }
                     
-                    HStack {
-                        VStack(alignment: .leading) {
+                    NavigationLink {
+                        SettingsBackseatView()
+                    } label: {
+                        HStack {
                             Text("voice")
-                            
-                            if #available(iOS 26, *) {
-                                Text("voice_explanation")
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text("voice_explanation_before_version26")
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            }
+
+                            Spacer()
+
+                            Text(verbatim: KokoroVoice.selectedVoiceName)
+                                .foregroundStyle(.secondary)
+                                .id(UUID())
                         }
-                        
-                        Spacer()
-                        
-                        Text(Settings.voiceForVoiceRouting ?? "unknown")
-                            .foregroundStyle(.secondary)
-                            .id(UUID())
                     }
                     
                     Toggle(isOn: $shouldAnnounceStreetnamesWhileVoiceRouting) {
@@ -144,7 +128,9 @@ struct SettingsNavigationView: View {
             } footer: {
                 if shouldProvideVoiceRouting {
                     Button {
-                        Settings.playVoiceRoutingTest()
+                        KokoroVoice.shared.test("In five hundred feet, turn right. Try to keep up.") {
+                            Settings.playVoiceRoutingTest()
+                        }
                     } label: {
                         Text("pref_tts_test_voice_title")
                             .bold()
@@ -159,53 +145,7 @@ struct SettingsNavigationView: View {
                 }
             }
             .id(forceRefreshDate)
-
-            if shouldProvideVoiceRouting {
-                Section {
-                    Picker(selection: $selectedBackseatVoice) {
-                        Text(verbatim: "iPhone voice (no Kokoro)")
-                            .tag(KokoroVoice.systemVoiceID)
-
-                        ForEach(KokoroVoice.voiceOptions) { voiceOption in
-                            Text(verbatim: voiceOption.name)
-                                .tag(voiceOption.id)
-                        }
-                    } label: {
-                        Text(verbatim: "Voice")
-                    }
-                    .pickerStyle(.navigationLink)
-                } header: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "car.side")
-                            .imageScale(.small)
-
-                        Text(verbatim: "Backseat Driver")
-                    }
-                } footer: {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(verbatim: backseatVoiceStatus)
-
-                        Button {
-                            let sample = "Oh good, you found the gas pedal. Now try the turn signal."
-                            KokoroVoice.shared.test(sample) {
-                                MWMTextToSpeech.tts().play(sample)
-                            }
-                            backseatVoiceStatus = KokoroVoice.shared.status
-                        } label: {
-                            Text(verbatim: "Test Backseat Driver voice")
-                                .bold()
-                                .lineLimit(1)
-                                .padding(4)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(BorderedButtonStyle())
-                        .foregroundStyle(.alternativeAccent)
-                        .padding([.top, .bottom])
-                        .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
-                    }
-                }
-            }
-
+            
             Section {
                 Toggle(isOn: $shouldAvoidTollRoadsWhileRouting) {
                     Label {
@@ -287,8 +227,6 @@ struct SettingsNavigationView: View {
             selectedLanguageForVoiceRouting = Settings.languageForVoiceRouting
             shouldAnnounceStreetnamesWhileVoiceRouting = Settings.shouldAnnounceStreetnamesWhileVoiceRouting
             selectedAnnouncingSpeedTrapsWhileVoiceRouting = Settings.announcingSpeedTrapsWhileVoiceRouting
-            selectedBackseatVoice = KokoroVoice.selectedVoiceID
-            backseatVoiceStatus = KokoroVoice.shared.status
             shouldAvoidTollRoadsWhileRouting = Settings.shouldAvoidTollRoadsWhileRouting
             shouldAvoidUnpavedRoadsWhileRouting = Settings.shouldAvoidUnpavedRoadsWhileRouting
             shouldAvoidPavedRoadsWhileRouting = Settings.shouldAvoidPavedRoadsWhileRouting
@@ -298,13 +236,6 @@ struct SettingsNavigationView: View {
         }
         .onChange(of: scenePhase) { _ in
             forceRefreshDate = Date.now
-            backseatVoiceStatus = KokoroVoice.shared.status
-        }
-        .onChange(of: selectedBackseatVoice) { changedSelectedBackseatVoice in
-            if changedSelectedBackseatVoice != KokoroVoice.selectedVoiceID {
-                KokoroVoice.shared.selectVoice(changedSelectedBackseatVoice)
-            }
-            backseatVoiceStatus = KokoroVoice.shared.status
         }
         .onChange(of: hasPerspectiveViewWhileRouting) { changedHasPerspectiveViewWhileRouting in
             Settings.hasPerspectiveViewWhileRouting = changedHasPerspectiveViewWhileRouting
