@@ -477,6 +477,16 @@ static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == M
   return @(GetFramework().GetRoutingManager().BackseatNicenessSlidBack().c_str());
 }
 
++ (NSString *)arrivalSurvey
+{
+  return @(GetFramework().GetRoutingManager().BackseatArrivalSurvey().c_str());
+}
+
++ (NSString *)surveyAnswer:(NSString *)spoken
+{
+  return @(GetFramework().GetRoutingManager().BackseatSurveyAnswer(spoken.UTF8String ?: "").c_str());
+}
+
 + (NSArray<NSArray<NSString *> *> *)learnedFacts
 {
   NSMutableArray<NSArray<NSString *> *> * facts = [NSMutableArray array];

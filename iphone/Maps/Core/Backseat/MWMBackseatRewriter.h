@@ -90,6 +90,10 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 + (NSString *)nicenessMoved;
 /// Spoken once the slider is back at the mean end: "Don't touch my slider."
 + (NSString *)nicenessSlidBack;
+/// After the arrival line, at most once every 20 hours: the one-to-ten rating question, or empty.
+/// Listen once, then say surveyAnswer: (an empty answer gets "That wasn't a number...").
+@property(class, nonatomic, readonly) NSString * arrivalSurvey;
++ (NSString *)surveyAnswer:(NSString *)spoken;
 /// Kokoro's comeback after the system voice stood in: play a cough, then speak this.
 @property(class, nonatomic, readonly) NSString * voiceRecovered;
 /// Voice search: what the GPS says about the top results (names with their streets, nearest

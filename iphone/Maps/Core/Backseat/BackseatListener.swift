@@ -536,6 +536,36 @@ import Speech
 
   @objc static func install() {
     timer = Timer.scheduledTimer(withTimeInterval: checkEvery, repeats: true) { _ in checkWhileDriving() }
+    arrivalTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in checkArrival() }
+  }
+
+  private static var arrivalTimer: Timer?
+  private static var arrived = false
+
+  /// Once the route is finished and the arrival line has been said: "Test 47 complete. On a scale
+  /// of one to ten..." Listen once, and the navigator answers whatever was said, or nothing.
+  private static func checkArrival() {
+    let finished = MWMRouter.isRouteFinished()
+    defer { arrived = finished }
+    guard finished, !arrived else { return }
+    afterSpeaking {
+      let question = MWMBackseatRewriter.arrivalSurvey
+      guard !question.isEmpty else { return }
+      KokoroVoice.shared.sayReply(question, voiceID: nil) { MWMTextToSpeech.tts().play(question) }
+      BackseatSetup.listen(waiting: 6) { answer in
+        let reply = MWMBackseatRewriter.surveyAnswer(answer)
+        if !reply.isEmpty {
+          KokoroVoice.shared.sayReply(reply, voiceID: nil) { MWMTextToSpeech.tts().play(reply) }
+        }
+      }
+    }
+  }
+
+  /// Runs `then` once Kokoro and the system voice have both finished.
+  private static func afterSpeaking(_ then: @escaping () -> Void) {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+      if KokoroVoice.shared.anyVoiceSpeaking { afterSpeaking(then) } else { then() }
+    }
   }
 
   private static func checkWhileDriving() {
