@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreLocation
 import UIKit
 import Speech
 
@@ -426,5 +427,92 @@ import Speech
         }
       }
     }
+  }
+}
+
+/// "Take me to Starbucks": searches like the search screen does (and shows it there), then reads
+/// the three nearest results out loud and routes to the one the driver picks by voice.
+@objc final class BackseatVoiceSearch: NSObject, MWMSearchObserver {
+  private static var current: BackseatVoiceSearch?
+  /// How long to wait for the search, and for the driver to pick.
+  private static let searchWait: TimeInterval = 10
+  private static let pickWait: TimeInterval = 20
+
+  private let query: String
+  private var results: [SearchResult] = []
+  private var finished = false
+
+  private init(query: String) {
+    self.query = query
+  }
+
+  @objc static func start(_ query: String) {
+    current?.finish()
+    let search = BackseatVoiceSearch(query: query)
+    current = search
+    Search.add(search)
+    MapsAppDelegate.theApp().searchText(query)
+    DispatchQueue.main.asyncAfter(deadline: .now() + searchWait) { [weak search] in search?.speakResults() }
+  }
+
+  func onSearchCompleted() {
+    speakResults()
+  }
+
+  /// The three nearest results, named with their street: "Starbucks Colfax Avenue".
+  private func speakResults() {
+    guard !finished else { return }
+    finish()
+    let here = LocationManager.lastLocation()
+    let found = Search.getResults().filter { $0.itemType == .regular }.map { result -> (SearchResult, Double) in
+      let place = CLLocation(latitude: result.coordinate.latitude, longitude: result.coordinate.longitude)
+      return (result, here.map { $0.distance(from: place) } ?? 0)
+    }.sorted { $0.1 < $1.1 }.prefix(3)
+    results = found.map(\.0)
+    let names = found.map { result, _ -> String in
+      let street = result.addressText.split(separator: ",").first.map { String($0).trimmingCharacters(in: .whitespaces) }
+      guard let street, !street.isEmpty, street != result.titleText else { return result.titleText }
+      return "\(result.titleText) \(street)"
+    }
+    var pick = -1
+    var none = ObjCBool(false)
+    let line = MWMBackseatRewriter.speakSearchResults(query, names: names, distances: found.map { NSNumber(value: $0.1) },
+                                                      pick: &pick, none: &none)
+    say(line)
+    if pick >= 0 {
+      route(to: pick)
+    } else if !none.boolValue {
+      listenForPick(tries: 2)
+    }
+  }
+
+  private func listenForPick(tries: Int) {
+    BackseatSetup.listen(waiting: Self.pickWait) { [self] answer in
+      guard !answer.isEmpty else { return }
+      var index = -1
+      let line = MWMBackseatRewriter.pickSearchResult(answer, index: &index)
+      say(line)
+      if index >= 0 {
+        route(to: index)
+      } else if tries > 1 {
+        listenForPick(tries: tries - 1)
+      }
+    }
+  }
+
+  private func route(to index: Int) {
+    guard results.indices.contains(index) else { return }
+    let result = results[index]
+    MWMBackseatRewriter.route(to: result.coordinate, title: result.titleText)
+  }
+
+  private func say(_ line: String) {
+    guard !line.isEmpty else { return }
+    KokoroVoice.shared.sayReply(line, voiceID: nil) { MWMTextToSpeech.tts().play(line) }
+  }
+
+  private func finish() {
+    finished = true
+    Search.remove(self)
   }
 }

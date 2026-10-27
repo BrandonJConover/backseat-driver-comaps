@@ -1,3 +1,4 @@
+#import <CoreLocation/CoreLocation.h>
 #import <Foundation/Foundation.h>
 
 NS_ASSUME_NONNULL_BEGIN
@@ -58,6 +59,18 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 @property(class, nonatomic, readonly) NSString * askWhereTo;
 /// What to say when nobody answered `askWhereTo`; empty for nothing.
 @property(class, nonatomic, readonly) NSString * noAnswerToWhereTo;
+/// Voice search: what the GPS says about the top results (names with their streets, nearest
+/// first). `pick` is the result to route to straight away (only one found); `none` means there's
+/// nothing to choose; otherwise listen and pass the answer to +pickSearchResult:.
++ (NSString *)speakSearchResults:(NSString *)query
+                           names:(NSArray<NSString *> *)names
+                       distances:(NSArray<NSNumber *> *)distances
+                            pick:(NSInteger * _Nullable)pick
+                            none:(BOOL * _Nullable)none;
+/// "The second one": the result picked (-1 when not understood) and the line to say.
++ (NSString *)pickSearchResult:(NSString *)answer index:(NSInteger *)index;
+/// Builds a route to a place by voice.
++ (void)routeTo:(CLLocationCoordinate2D)coordinate title:(NSString *)title;
 /// What the GPS has worked out about the driver, as label / value pairs ("Works at", "Acme Corp").
 @property(class, nonatomic, readonly) NSArray<NSArray<NSString *> *> * learnedFacts;
 

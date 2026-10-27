@@ -125,6 +125,12 @@ final class KokoroVoice: NSObject {
   private var fallbackEngine: KokoroAneManager?
   private var pathMonitor: NWPathMonitor?
   private var started = false
+  /// Kokoro can't speak on this phone: a Core ML crash on this iOS, or loading failed.
+  private var failed = false
+  /// Lines that came in before Kokoro was ready, to say once it is.
+  private var waitingForReady: [() -> Void] = []
+  /// How long a line waits for Kokoro to load before the system voice says it instead.
+  private static let readyWait: TimeInterval = 20
   private let player = ClipPlayer()
 
   /// True when Kokoro is loaded and can speak the instruction language.
@@ -188,6 +194,7 @@ final class KokoroVoice: NSObject {
     }
     guard !CoreMLCrashGuard.isDisabledForThisOS() else {
       Self.log.info("Kokoro is off on this iOS build after a Core ML crash; the system voice speaks")
+      giveUp()
       return
     }
     player.systemIsSpeaking = { [weak self] in self?.systemIsSpeaking?() ?? false }
@@ -208,7 +215,9 @@ final class KokoroVoice: NSObject {
   }
 
   private func load() {
-    Task.detached(priority: .utility) { [self] in
+    // Loads right away at launch: every line but an imminent turn waits for it.
+    Task.detached(priority: .userInitiated) { [self] in
+      let began = Date()
       do {
         // CPU + Neural Engine with the noise and tail stages on the CPU: iOS refuses GPU work from
         // the background, where a navigation app spends most of its time.
@@ -218,14 +227,31 @@ final class KokoroVoice: NSObject {
         UserDefaults.standard.set(true, forKey: Self.installedKey)
         // The first line compiles the Neural Engine graph; pay for it now, not on a turn.
         _ = try await render("Hello.", speed: 1, voice: voice, with: engine)
-        lock.lock(); primary = engine; lock.unlock()
-        Self.log.info("Kokoro voice ready")
+        lock.lock()
+        primary = engine
+        failed = false
+        let waiting = waitingForReady
+        waitingForReady.removeAll()
+        lock.unlock()
+        Self.log.info("Kokoro voice ready in \(Int(Date().timeIntervalSince(began) * 1000)) ms")
         startWorker()
+        waiting.forEach { $0() }
       } catch {
         Self.log.error("Kokoro unavailable, the system voice stays on: \(error.localizedDescription, privacy: .public)")
+        giveUp()
         allowRetry()
       }
     }
+  }
+
+  /// Kokoro won't be speaking: the lines waiting for it go to the system voice now.
+  private func giveUp() {
+    lock.lock()
+    failed = true
+    let waiting = waitingForReady
+    waitingForReady.removeAll()
+    lock.unlock()
+    waiting.forEach { $0() }
   }
 
   /// Lets the next start() try the download again.
@@ -254,6 +280,26 @@ final class KokoroVoice: NSObject {
                        fallback: @escaping () -> Void) {
     lock.lock()
     let known = requested.flatMap { id in Self.voiceOptions.contains { $0.id == id } ? id : nil }
+    // Still loading: everything but a turn instruction waits for Kokoro rather than switching voices.
+    if primary == nil, Self.voice != nil, !failed, !nav {
+      var said = false
+      let say = { [self] in
+        guard !said else { return }
+        said = true
+        enqueue(text, nav: nav, speed: speed, voice: requested, keep: keep, fallback: fallback)
+      }
+      waitingForReady.append(say)
+      lock.unlock()
+      DispatchQueue.main.asyncAfter(deadline: .now() + Self.readyWait) { [self] in
+        lock.lock()
+        let stillWaiting = primary == nil
+        if stillWaiting { failed = true }
+        lock.unlock()
+        // After the wait, enqueue() hands it to the system voice.
+        if stillWaiting { say() }
+      }
+      return
+    }
     guard primary != nil, let picked = Self.voice else {
       lock.unlock()
       DispatchQueue.main.async { self.player.sayWithSystemVoice(fallback) }

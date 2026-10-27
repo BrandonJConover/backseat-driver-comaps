@@ -133,22 +133,12 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
 {
   SayReply(heard.reply, {});
   using Kind = BackseatAdapter::HeardCommand::Kind;
+  // "Take me to work": route there when the GPS knows where it is, otherwise search for it and
+  // read out what it finds.
   if (heard.kind == Kind::RouteTo)
-  {
-    // "Take me to work": route there when the GPS knows where it is, otherwise search for it.
-    MWMRoutePoint * to = [[MWMRoutePoint alloc] initWithPoint:mercator::FromLatLon(heard.lat, heard.lon)
-                                                        title:@(heard.name.c_str())
-                                                     subtitle:@""
-                                                         type:MWMRoutePointTypeFinish
-                                            intermediateIndex:0];
-    if (![MWMRouter isRoutingActive])
-      [MWMRouter removePoints];
-    [MWMRouter buildToPoint:to bestRouter:NO];
-  }
+    [MWMBackseatRewriter routeTo:CLLocationCoordinate2DMake(heard.lat, heard.lon) title:@(heard.name.c_str())];
   else if (heard.kind == Kind::Search)
-  {
-    [[MapsAppDelegate theApp] searchText:@(heard.query.c_str())];
-  }
+    [BackseatVoiceSearch start:@(heard.query.c_str())];
   for (auto const & command : heard.actions)
     Perform(command);
   for (auto const & line : heard.voiceLines)
@@ -222,6 +212,43 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
     [guide appendString:@"\n"];
   }
   return guide;
+}
+
++ (void)routeTo:(CLLocationCoordinate2D)coordinate title:(NSString *)title
+{
+  MWMRoutePoint * to = [[MWMRoutePoint alloc] initWithPoint:mercator::FromLatLon(coordinate.latitude, coordinate.longitude)
+                                                      title:title
+                                                   subtitle:@""
+                                                       type:MWMRoutePointTypeFinish
+                                          intermediateIndex:0];
+  if (![MWMRouter isRoutingActive])
+    [MWMRouter removePoints];
+  [MWMRouter buildToPoint:to bestRouter:NO];
+}
+
++ (NSString *)speakSearchResults:(NSString *)query
+                           names:(NSArray<NSString *> *)names
+                       distances:(NSArray<NSNumber *> *)distances
+                            pick:(NSInteger *)pick
+                            none:(BOOL *)none
+{
+  std::vector<BackseatAdapter::SearchResult> results;
+  for (NSUInteger i = 0; i < names.count && i < distances.count; ++i)
+    results.push_back({names[i].UTF8String, distances[i].doubleValue});
+  auto const speech = GetFramework().GetRoutingManager().BackseatSpeakSearchResults(query.UTF8String ?: "",
+                                                                                    std::move(results));
+  if (pick)
+    *pick = speech.pick ? static_cast<NSInteger>(*speech.pick) : -1;
+  if (none)
+    *none = speech.none;
+  return @(speech.line.c_str());
+}
+
++ (NSString *)pickSearchResult:(NSString *)answer index:(NSInteger *)index
+{
+  auto const [picked, line] = GetFramework().GetRoutingManager().BackseatPickSearchResult(answer.UTF8String ?: "");
+  *index = picked ? static_cast<NSInteger>(*picked) : -1;
+  return @(line.c_str());
 }
 
 + (NSArray<NSString *> *)commandDescriptions

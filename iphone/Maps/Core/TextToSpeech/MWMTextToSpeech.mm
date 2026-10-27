@@ -380,12 +380,8 @@ using Observers = NSHashTable<Observer>;
     BackseatKokoroVoice * kokoro = BackseatKokoroVoice.shared;
     for (NSUInteger i = 0; i < routeNotifications.count; ++i)
     {
+      // While Kokoro loads, roasts wait for it and turn instructions go to the system voice.
       NSString * notification = routeNotifications[i];
-      if (!kokoro.isReady)
-      {
-        [self speakOneString:notification];
-        continue;
-      }
       BOOL const nav = hinted ? voices[i].nav : YES;
       float const speed = hinted ? static_cast<float>(voices[i].speed) : 1.0f;
       __weak MWMTextToSpeech * weakSelf = self;
