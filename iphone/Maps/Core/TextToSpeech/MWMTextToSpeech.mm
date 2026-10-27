@@ -334,10 +334,28 @@ using Observers = NSHashTable<Observer>;
 
 
 - (void)speakOneString:(NSString *)textToSpeak {
-  AVSpeechUtterance * utterance = [AVSpeechUtterance speechUtteranceWithString:textToSpeak];
-  utterance.voice = self.speechVoice;
-  utterance.rate = AVSpeechUtteranceDefaultSpeechRate;
-  [self.speechSynthesizer speakUtterance:utterance];
+  // Backseat: one utterance per sentence with a breath between them; run together, the system
+  // voice barely pauses and sounds rushed.
+  NSString * text = [textToSpeak stringByReplacingOccurrencesOfString:@" || " withString:@". "];
+  NSMutableArray<NSString *> * sentences = [NSMutableArray array];
+  [text enumerateSubstringsInRange:NSMakeRange(0, text.length)
+                           options:NSStringEnumerationBySentences
+                        usingBlock:^(NSString * sentence, NSRange, NSRange, BOOL *) {
+    NSString * trimmed = [sentence stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if (trimmed.length > 0)
+      [sentences addObject:trimmed];
+  }];
+  if (sentences.count == 0)
+    [sentences addObject:text];
+  for (NSString * sentence in sentences)
+  {
+    AVSpeechUtterance * utterance = [AVSpeechUtterance speechUtteranceWithString:sentence];
+    utterance.voice = self.speechVoice;
+    utterance.rate = AVSpeechUtteranceDefaultSpeechRate;
+    utterance.preUtteranceDelay = 0.1;
+    utterance.postUtteranceDelay = 0.35;
+    [self.speechSynthesizer speakUtterance:utterance];
+  }
 }
 
 - (void)playRouteNotifications:(NSArray<NSString *> *)routeNotifications {

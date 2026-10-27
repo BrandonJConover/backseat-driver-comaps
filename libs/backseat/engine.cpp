@@ -18,6 +18,10 @@ namespace
 double constexpr kNever = -std::numeric_limits<double>::infinity();
 /// A heading swing counts as taking (or botching) the pending turn only this close to it.
 double constexpr kWrongTurnWithinM = 120;
+/// The far countdown call comes at least this many seconds out at the current speed...
+double constexpr kCountdownFarS = 12;
+/// ...but never farther than this (half a mile).
+double constexpr kCountdownFarMaxM = 805;
 
 /// How much each offense winds the GPS up. Negative values calm it down.
 double FrustrationDelta(Category c)
@@ -297,7 +301,7 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     Maneuver const dir = e.maneuver ? *e.maneuver : TurnDirectionOf(e.text);
     TurnShape const shape = TurnShapeOf(e.text);
     // Already inside the 500 ft mark when announced? Skip straight to the closer nags.
-    int const stage = e.distanceM <= m_config.countdownFarM ? 1 : 0;
+    int const stage = e.distanceM <= FarM() ? 1 : 0;
     // U-turns and roundabouts get the countdown too, without a side.
     if (dir == Maneuver::Other && shape != TurnShape::UTurn && shape != TurnShape::Roundabout)
       m_pendingTurn.reset();
@@ -592,7 +596,7 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   if (!m_pendingTurn)
     return;
   auto & p = *m_pendingTurn;
-  double const far = m_config.countdownFarM;
+  double const far = FarM();
   double const near = m_config.countdownNearM;
   double const mention = m_config.countdownMentionM;
   char const * stage = nullptr;
@@ -637,6 +641,14 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   std::string const distance = FormatDistance(sayM, m_config.units);
   std::string const text = Fill(Pick(key, Tier()), {{"dir", DirName(p.dir)}, {"distance", distance}});
   out.push_back(Make(t, Category::Instruction, Capitalize(text), Priority::Nav));
+}
+
+/// Where the "In 500 feet" call goes: 500 ft in town, farther out at speed so there are still
+/// ~12 seconds to get over (about 0.2 miles at 65 mph), never more than half a mile.
+double CritiqueEngine::FarM() const
+{
+  double const mps = m_lastSample ? m_lastSample->speedMps : 0;
+  return std::min(std::max(m_config.countdownFarM, mps * kCountdownFarS), kCountdownFarMaxM);
 }
 
 /// The turn is done after the full countdown: "Please stop turning right." Once per maneuver.

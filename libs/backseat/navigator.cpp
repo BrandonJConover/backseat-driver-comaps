@@ -83,6 +83,8 @@ double constexpr kSightGiveUpMs = 90000;
 double constexpr kIdleMinMs = 150000;
 double constexpr kIdleMaxMs = 300000;
 double constexpr kIdleQuietM = 600;
+/// SaidLog counter: trips started, finished or not.
+char const * const kTripsStartedKey = "_trips.started";
 /// How long a navigation line may wait for the neural voice: at most this long, and only while it
 /// still finishes this far before the maneuver.
 double constexpr kNavWaitMaxMs = 4000;
@@ -657,7 +659,14 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   if (m_opener && std::fabs(t - m_opener->t) <= kOpenerValidMs)
     SayLine(t, Category::Bossy, m_opener->key, m_opener->vars);
   m_opener.reset();
-  SayNav(t, TripGreeting(m_history, m_config.rng));
+  // Counted when the trip starts, so a trip that never reaches "arrived" (ended early, app closed)
+  // still counts: the first-trip greeting and speed run happen once ever, and the rundown styles
+  // keep rotating.
+  size_t const tripsBefore =
+      std::max(m_history.size(), static_cast<size_t>(std::max(0, m_said.Counter(kTripsStartedKey))));
+  m_said.SetCounter(kTripsStartedKey, static_cast<int>(tripsBefore + 1));
+  Trace("trip.number", {{"before", std::to_string(tripsBefore)}});
+  SayNav(t, TripGreeting(m_history, m_config.rng, tripsBefore));
   // Before 5 am: "Are we off to make the donuts?"
   if (KnowsTheDate(t) && LocalTime(t).tm_hour < 5)
     SayLine(t, Category::Holiday, "early.opener");
@@ -677,10 +686,10 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   }
   // The first trip's rundown is a speed run: every turn, rattled off, then a request for music.
   // After that, a drawn route gets "We're doing your route" instead of the rundown.
-  if (m_sketched && !m_history.empty())
+  if (m_sketched && tripsBefore > 0)
     SayLine(t, Category::Instruction, "sketch.start");
   else
-    SayNav(t, RouteRundown(steps, m_history, m_config.rng), m_history.empty() ? kRattleSpeed : 1.0);
+    SayNav(t, RouteRundown(steps, m_history, m_config.rng, tripsBefore), tripsBefore == 0 ? kRattleSpeed : 1.0);
   if (m_plan.expectedMinutes > 0)
     SayNav(t, PredictTrip(m_history, m_plan, m_config.rng).text);
   Say(m_engine->OnNav(NavEvent::DestinationSet(t, route.destination)));

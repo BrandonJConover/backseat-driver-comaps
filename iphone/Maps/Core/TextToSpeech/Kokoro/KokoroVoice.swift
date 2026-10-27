@@ -7,8 +7,9 @@
 // cut off when a navigation line needs the speaker. Settings picks the voice, or the system voice.
 //
 // Apple's BNNS can crash inside Core ML on iOS 26.4 and later (FluidAudio #817/#844). That can't be
-// caught, so `CoreMLCrashGuard` notices it at the next launch and keeps the system voice for that
-// iOS build: a crash while driving should happen at most once.
+// caught, so `CoreMLCrashGuard` notices a crash during Kokoro's own model load at the next launch.
+// Kokoro stays the voice regardless: after such a crash it loads lazily on the first line instead
+// of at launch, and only three load crashes in a row keep the system voice, for one session.
 
 import AVFoundation
 import FluidAudio
@@ -135,10 +136,18 @@ final class KokoroVoice: NSObject {
   /// The system voice had to stand in, so Kokoro's next line starts with a comeback (once a session).
   private var systemStoodIn = false
   private var recoveredThisSession = false
+  /// The guard's lazy mode: the first line starts the load.
+  private var loadOnFirstLine = false
+  private var loading = false
+  private var lastLoadAttempt = Date.distantPast
+  /// After a failed load (not a crash), the next line tries again at most this often.
+  private static let reloadEvery: TimeInterval = 60
   /// Lines that came in before Kokoro was ready, to say once it is.
   private var waitingForReady: [() -> Void] = []
   /// How long a line waits for Kokoro to load before the system voice says it instead.
   private static let readyWait: TimeInterval = 20
+  /// How long after launch the warm-up starts, so loading the models isn't part of opening the app.
+  private static let warmUpDelay: TimeInterval = 2
   private let player = ClipPlayer()
 
   /// The picked Kokoro voice, for the drive log; nil if Kokoro doesn't speak this language.
@@ -155,8 +164,8 @@ final class KokoroVoice: NSObject {
     if Self.voice == nil {
       return "These voices speak English only, so the iPhone voice reads instructions in the language you picked."
     }
-    if CoreMLCrashGuard.isDisabledForThisOS() {
-      return "Kokoro crashed on this iOS version, so the iPhone voice fills in until iOS updates."
+    if CoreMLCrashGuard.mode == .paused {
+      return "Kokoro paused after a crash, retrying next launch. The iPhone voice fills in until then."
     }
     lock.lock(); defer { lock.unlock() }
     if primary != nil { return "A voice you haven't used yet downloads the first time it speaks." }
@@ -200,22 +209,27 @@ final class KokoroVoice: NSObject {
     if started { lock.unlock(); return }
     started = true
     lock.unlock()
-    if CoreMLCrashGuard.checkAtLaunch() {
-      Self.log.error("Core ML crashed during the last Kokoro line")
-      BackseatLog.event("voice.crashGuard", ["os": UIDevice.current.systemVersion])
-    }
-    guard !CoreMLCrashGuard.isDisabledForThisOS() else {
-      Self.log.info("Kokoro is off on this iOS build after a Core ML crash; the system voice speaks")
-      giveUp()
-      return
-    }
+    let mode = CoreMLCrashGuard.checkAtLaunch()
     player.systemIsSpeaking = { [weak self] in self?.systemIsSpeaking?() ?? false }
     player.systemStoodIn = { [weak self] in
       guard let self else { return }
       self.lock.lock(); self.systemStoodIn = true; self.lock.unlock()
     }
+    switch mode {
+    case .paused:
+      Self.log.warning("Kokoro's load crashed three launches in a row; the system voice speaks this session")
+      giveUp()
+      return
+    case .lazy:
+      // The last launch died loading Kokoro: wait for the first line rather than load at open.
+      lock.lock(); loadOnFirstLine = true; lock.unlock()
+      return
+    case .normal:
+      break
+    }
     if UserDefaults.standard.bool(forKey: Self.installedKey) {
-      load()
+      // Not during launch itself: give the first screen a moment, then load in the background.
+      DispatchQueue.main.asyncAfter(deadline: .now() + Self.warmUpDelay) { [self] in load() }
       return
     }
     // The first download is a few hundred MB: wait for a network that isn't cellular or Low Data.
@@ -230,18 +244,38 @@ final class KokoroVoice: NSObject {
     monitor.start(queue: DispatchQueue(label: "KokoroNetwork"))
   }
 
+  /// "Use Kokoro now" in Settings, after the guard sat this session out.
+  func retryNow() {
+    CoreMLCrashGuard.override()
+    lock.lock()
+    let idle = primary == nil
+    failed = false
+    loadOnFirstLine = false
+    lock.unlock()
+    if idle { load() }
+  }
+
   private func load() {
-    // Loads right away at launch: every line but an imminent turn waits for it.
+    lock.lock()
+    if loading || primary != nil { lock.unlock(); return }
+    loading = true
+    lastLoadAttempt = Date()
+    lock.unlock()
+    // Every line but an imminent turn waits for it.
     Task.detached(priority: .userInitiated) { [self] in
+      defer { lock.lock(); loading = false; lock.unlock() }
       let began = Date()
       let voice = Self.voice ?? Self.defaultVoice
       // The CPU first: after an install or update the Neural Engine recompiles the models, which
       // took a minute on an iPhone 15 Pro. The CPU is ready in seconds.
       do {
+        CoreMLCrashGuard.beginLoad()
+        defer { CoreMLCrashGuard.endLoad() }
         let cpu = KokoroAneManager(computeUnits: .cpuOnly)
         try await cpu.initialize(preloadVoices: [voice])
         UserDefaults.standard.set(true, forKey: Self.installedKey)
         _ = try await render("Hello.", speed: 1, voice: voice, with: cpu)
+        CoreMLCrashGuard.loadSucceeded()
         becomeReady(cpu, cpuFallback: true, after: began, on: "the CPU")
       } catch {
         Self.log.error("Kokoro on the CPU failed: \(error.localizedDescription, privacy: .public)")
@@ -251,9 +285,12 @@ final class KokoroVoice: NSObject {
       // spends most of its time. Its first line compiles the rest, so it isn't warmed with a render
       // here: that would run alongside the CPU's renders, and concurrent renders crash BNNS.
       do {
+        CoreMLCrashGuard.beginLoad()
+        defer { CoreMLCrashGuard.endLoad() }
         let engine = KokoroAneManager(computeUnits: .aneTailCpu)
         try await engine.initialize(preloadVoices: [voice])
         UserDefaults.standard.set(true, forKey: Self.installedKey)
+        CoreMLCrashGuard.loadSucceeded()
         becomeReady(engine, cpuFallback: false, after: began, on: "the Neural Engine")
       } catch {
         Self.log.error("Kokoro unavailable, the system voice stays on: \(error.localizedDescription, privacy: .public)")
@@ -323,34 +360,50 @@ final class KokoroVoice: NSObject {
   }
 
   private func enqueue(_ text: String, nav: Bool, speed: Float, voice requested: String?, keep: Bool,
-                       fallback: @escaping () -> Void, budget: TimeInterval = navDeadline) {
+                       fallback: @escaping () -> Void, budget: TimeInterval = navDeadline,
+                       noWait: Bool = false) {
     lock.lock()
+    if loadOnFirstLine {
+      loadOnFirstLine = false
+      lock.unlock()
+      BackseatLog.event("voice.reload", ["reason": "lazy load after a crash"])
+      load()
+      lock.lock()
+    } else if primary == nil, failed, !loading, CoreMLCrashGuard.mode != .paused,
+              Date().timeIntervalSince(lastLoadAttempt) > Self.reloadEvery {
+      // The load failed earlier (no crash): try again rather than stay on the system voice.
+      lock.unlock()
+      BackseatLog.event("voice.reload", ["reason": "retry after a failed load"])
+      load()
+      lock.lock()
+    }
     let known = requested.flatMap { id in Self.voiceOptions.contains { $0.id == id } ? id : nil }
     // Still loading: everything but a turn instruction waits for Kokoro rather than switching voices.
-    if primary == nil, Self.voice != nil, !failed, !nav {
+    if primary == nil, Self.voice != nil, !failed, !nav, !noWait {
       var said = false
       let say = { [self] in
         guard !said else { return }
         said = true
-        enqueue(text, nav: nav, speed: speed, voice: requested, keep: keep, fallback: fallback, budget: budget)
+        enqueue(text, nav: nav, speed: speed, voice: requested, keep: keep, fallback: fallback, budget: budget,
+                noWait: true)
       }
       waitingForReady.append(say)
       lock.unlock()
       DispatchQueue.main.asyncAfter(deadline: .now() + Self.readyWait) { [self] in
         lock.lock()
         let stillWaiting = primary == nil
-        if stillWaiting { failed = true }
         lock.unlock()
-        // After the wait, enqueue() hands it to the system voice.
+        // After the wait, enqueue() hands this line to the system voice; the next one still waits
+        // for Kokoro, which may yet finish loading.
         if stillWaiting { say() }
       }
       return
     }
     guard primary != nil, let picked = Self.voice else {
-      let why = CoreMLCrashGuard.isDisabledForThisOS() ? "crashGuard" : failed ? "error" : "notReady"
+      let why = CoreMLCrashGuard.mode == .paused ? "crashGuard" : failed ? "error" : "notReady"
       lock.unlock()
       Self.trace(text, voice: "system", why: why, budget: nav ? budget : 0)
-      DispatchQueue.main.async { self.player.sayWithSystemVoice(fallback) }
+      DispatchQueue.main.async { self.player.sayWithSystemVoice(nav: nav, fallback) }
       return
     }
     let voice = known ?? picked
@@ -390,7 +443,7 @@ final class KokoroVoice: NSObject {
       Self.log.debug("Kokoro too slow for a navigation line, using the system voice")
       Self.trace(job.text, voice: "system", why: "deadline", waitMs: Date().timeIntervalSince(job.queuedAt) * 1000,
                  budget: job.budget)
-      player.sayWithSystemVoice(job.fallback)
+      player.sayWithSystemVoice(nav: true, job.fallback)
     }
   }
 
@@ -444,8 +497,6 @@ final class KokoroVoice: NSObject {
   private static let deliberatelyFast: Float = 1.3
 
   private func render(_ text: String, speed: Float, voice: String, with engine: KokoroAneManager) async throws -> Data {
-    CoreMLCrashGuard.begin()
-    defer { CoreMLCrashGuard.end() }
     let fast = speed >= Self.deliberatelyFast
     let pace = fast ? speed : min(speed, Self.roastSpeedCap)
     var samples: [Float] = []
@@ -522,7 +573,7 @@ final class KokoroVoice: NSObject {
       if fallBack { job.state = .fellBack }
       lock.unlock()
       if fallBack { Self.trace(job.text, voice: "system", why: "error", budget: job.nav ? job.budget : 0) }
-      if fallBack { DispatchQueue.main.async { self.player.sayWithSystemVoice(job.fallback) } }
+      if fallBack { DispatchQueue.main.async { self.player.sayWithSystemVoice(nav: job.nav, job.fallback) } }
       return
     }
 
@@ -561,9 +612,12 @@ final class KokoroVoice: NSObject {
   private static func key(_ text: String, _ speed: Float, _ voice: String) -> String { "\(voice)|\(speed)|\(text)" }
 }
 
-/// Plays clips one at a time on the main queue: navigation clips first, and they cut off a roast.
-/// Only one voice talks at a time: a line handed to the system voice waits for a navigation clip to
-/// end, and a clip waits for the system voice.
+/// Plays clips one at a time on the main queue, and is the one gate every spoken line goes through
+/// (Kokoro clips and system-voice lines alike), so two voices never talk at once:
+/// - nothing starts while something is talking, and clips get a short pause between them;
+/// - a navigation line goes first, and if a roast is talking it fades the roast out and takes over;
+///   a navigation line is never cut;
+/// - a roast that has waited more than `roastStale` is dropped (replies to the driver are kept).
 private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   private struct Item {
     let wav: Data
@@ -575,34 +629,46 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   var systemIsSpeaking: () -> Bool = { false }
   /// Called whenever a line goes to the system voice.
   var systemStoodIn: () -> Void = {}
-  var isPlaying: Bool { current != nil || !navQueue.isEmpty || !roastQueue.isEmpty }
+  var isPlaying: Bool { current != nil || !navQueue.isEmpty || !roastQueue.isEmpty || !pendingSystem.isEmpty }
   private var navQueue: [Item] = []
   private var roastQueue: [Item] = []
   private var current: AVAudioPlayer?
   private var currentIsNav = false
   private var waitingSince: Date?
-  /// System-voice lines waiting for the current navigation clip to finish.
-  private var pendingSystem: [() -> Void] = []
+  /// System-voice lines waiting for the clip that's talking to finish.
+  private var pendingSystem: [(nav: Bool, speak: () -> Void)] = []
+  /// No clip starts before this: the pause after the last one.
+  private var quietUntil = Date.distantPast
   /// How long a clip waits for the system voice before giving up on politeness.
   private static let systemWaitLimit: TimeInterval = 30
+  /// A roast older than this isn't worth saying any more.
+  private static let roastStale: TimeInterval = 8
+  /// Silence between two clips.
+  private static let gap: TimeInterval = 0.25
+  /// How long a roast takes to fade out when a navigation line cuts in.
+  private static let fade: TimeInterval = 0.2
 
   func play(_ wav: Data, nav: Bool, keep: Bool) {
     if nav {
       navQueue.append(Item(wav: wav, nav: true))
-      if current != nil && !currentIsNav { finishCurrent() }
+      if current != nil && !currentIsNav { cutRoast(for: "clip") }
     } else {
       roastQueue.append(Item(wav: wav, nav: false, keep: keep))
+    }
+    if current != nil || systemIsSpeaking() {
+      BackseatLog.event("audio.queue", ["depth": String(navQueue.count + roastQueue.count), "nav": nav ? "1" : "0"])
     }
     playNext()
   }
 
-  /// Runs `speak` (which talks with the system voice) once no clip is talking: a roast is cut off,
-  /// a navigation clip is allowed to finish first.
-  func sayWithSystemVoice(_ speak: @escaping () -> Void) {
+  /// Runs `speak` (which talks with the system voice) once no clip is talking. A navigation line
+  /// fades out a roast and goes now; anything else waits for the clip to finish.
+  func sayWithSystemVoice(nav: Bool, _ speak: @escaping () -> Void) {
     systemStoodIn()
-    if current != nil && !currentIsNav { finishCurrent() }
+    if nav && current != nil && !currentIsNav { cutRoast(for: "system") }
     if current != nil {
-      pendingSystem.append(speak)
+      pendingSystem.append((nav, speak))
+      BackseatLog.event("audio.queue", ["depth": String(pendingSystem.count), "nav": nav ? "1" : "0", "system": "1"])
     } else {
       speak()
     }
@@ -619,6 +685,7 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
     guard player === current else { return }
     current = nil
+    quietUntil = Date().addingTimeInterval(Self.gap)
     flushSystemLines()
     playNext()
   }
@@ -627,28 +694,42 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
     audioPlayerDidFinishPlaying(player, successfully: false)
   }
 
-  /// The system voice queues its own utterances, so the waiting lines can all be handed over.
+  /// The system voice queues its own utterances, so the waiting lines can all be handed over,
+  /// navigation lines first.
   private func flushSystemLines() {
-    let lines = pendingSystem
+    let lines = pendingSystem.filter(\.nav) + pendingSystem.filter { !$0.nav }
     pendingSystem.removeAll()
-    lines.forEach { $0() }
+    lines.forEach { $0.speak() }
   }
 
-  private func finishCurrent() {
-    current?.stop()
+  /// Fades the roast that's talking and frees the speaker for a navigation line.
+  private func cutRoast(for reason: String) {
+    guard let roast = current, !currentIsNav else { return }
+    BackseatLog.event("voice.cut", ["for": reason])
     current = nil
+    roast.setVolume(0, fadeDuration: Self.fade)
+    DispatchQueue.main.asyncAfter(deadline: .now() + Self.fade) { roast.stop() }
+    quietUntil = Date().addingTimeInterval(Self.fade)
+    flushSystemLines()
   }
 
   private func playNext() {
     guard current == nil else { return }
-    // Don't talk over the system voice (a navigation line it took over).
+    let now = Date()
+    if now < quietUntil {
+      DispatchQueue.main.asyncAfter(deadline: .now() + quietUntil.timeIntervalSince(now)) { [weak self] in
+        self?.playNext()
+      }
+      return
+    }
+    // Don't talk over the system voice (a line it took over).
     if systemIsSpeaking() && (waitingSince.map { Date().timeIntervalSince($0) < Self.systemWaitLimit } ?? true) {
       if waitingSince == nil { waitingSince = Date() }
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.playNext() }
       return
     }
     waitingSince = nil
-    roastQueue.removeAll { !$0.keep && Date().timeIntervalSince($0.queuedAt) > KokoroVoice.roastMaxAge }
+    roastQueue.removeAll { !$0.keep && Date().timeIntervalSince($0.queuedAt) > Self.roastStale }
     let item: Item
     if !navQueue.isEmpty { item = navQueue.removeFirst() }
     else if !roastQueue.isEmpty { item = roastQueue.removeFirst() }
@@ -670,47 +751,92 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   }
 }
 
-/// A Core ML crash can't be caught, so a marker file is written before each render and removed
-/// after; finding it at launch means Core ML crashed mid-line. After `crashLimit` crashes within
-/// `window` on one iOS build, Kokoro stays off for that build; an iOS update tries again.
-/// (EpubToM4B's guard, with a lower limit because this app is used while driving.)
+/// A Core ML crash can't be caught, so a marker file is written right before Kokoro loads its
+/// models (and warms up) and removed right after; finding it at launch means the app died during
+/// that load. Crashes anywhere else (search, the listener, the map) never count, and nor do
+/// per-line renders: one in flight on another thread when something else crashes proves nothing.
+///
+/// After a load crash, the next launch skips the eager warm-up and loads Kokoro on the first line
+/// instead. A load that succeeds clears the streak. Three load crashes in a row keep the system
+/// voice for that session only; the next launch tries again. Kokoro is never off for longer.
 enum CoreMLCrashGuard {
-  static let crashesKey = "backseat.coreML.crashes"  // [String: [Double]]: OS build → crash times
-  static let crashLimit = 1
-  static let window: TimeInterval = 30 * 24 * 3600
+  /// Launches in a row that found the load marker.
+  static let streakKey = "backseat.coreML.loadCrashStreak"
+  /// Load crashes in a row before one session goes without Kokoro.
+  static let sessionLimit = 3
+  /// The old guard (one crash anywhere switched Kokoro off for 30 days on that iOS build).
+  private static let legacyKey = "backseat.coreML.crashes"
+  private static let migratedKey = "backseat.coreML.guardV2"
+
+  /// This session: what the guard decided at launch.
+  enum Mode: Equatable {
+    case normal
+    /// Last launch died during the load: load on the first line, not at launch.
+    case lazy
+    /// Three load crashes in a row: the system voice this session.
+    case paused
+  }
+
+  private(set) static var mode: Mode = .normal
 
   private static var markerURL: URL {
     FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
       .appendingPathComponent("BackseatKokoroRender.inflight")
   }
 
-  static var currentOSBuild: String { ProcessInfo.processInfo.operatingSystemVersionString }
-
-  static func begin() {
+  /// Right before a model load or warm-up.
+  static func beginLoad() {
     let url = markerURL
     try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-    try? Data(currentOSBuild.utf8).write(to: url, options: .atomic)
+    try? Data("load".utf8).write(to: url, options: .atomic)
   }
 
-  static func end() {
+  /// Right after it, whether it worked or threw.
+  static func endLoad() {
     try? FileManager.default.removeItem(at: markerURL)
   }
 
-  /// Records a crash if the last render never returned. Returns true then.
-  @discardableResult
-  static func checkAtLaunch(defaults: UserDefaults = .standard, now: Date = Date()) -> Bool {
-    let marker = markerURL
-    guard FileManager.default.fileExists(atPath: marker.path) else { return false }
-    let build = (try? String(contentsOf: marker, encoding: .utf8)) ?? currentOSBuild
-    var crashes = defaults.dictionary(forKey: crashesKey) as? [String: [Double]] ?? [:]
-    crashes[build, default: []].append(now.timeIntervalSince1970)
-    defaults.set(crashes, forKey: crashesKey)
-    try? FileManager.default.removeItem(at: marker)
-    return true
+  /// The load worked: the streak is over.
+  static func loadSucceeded(defaults: UserDefaults = .standard) {
+    defaults.set(0, forKey: streakKey)
+    if mode != .normal { BackseatLog.event("voice.crashGuard", ["reason": "cleared after a good load"]) }
+    mode = .normal
   }
 
-  static func isDisabledForThisOS(defaults: UserDefaults = .standard, now: Date = Date()) -> Bool {
-    let crashes = (defaults.dictionary(forKey: crashesKey) as? [String: [Double]])?[currentOSBuild] ?? []
-    return crashes.filter { now.timeIntervalSince1970 - $0 <= window }.count >= crashLimit
+  /// Once per launch, before Kokoro starts: decides `mode`.
+  @discardableResult
+  static func checkAtLaunch(defaults: UserDefaults = .standard) -> Mode {
+    // This build replaces the old guard: forget what it recorded, so Kokoro is back right away.
+    if !defaults.bool(forKey: migratedKey) {
+      defaults.removeObject(forKey: legacyKey)
+      defaults.set(0, forKey: streakKey)
+      defaults.set(true, forKey: migratedKey)
+      endLoad()
+      BackseatLog.event("voice.crashGuard", ["reason": "reset for the new guard"])
+    }
+    guard FileManager.default.fileExists(atPath: markerURL.path) else {
+      mode = .normal
+      return mode
+    }
+    endLoad()
+    let streak = defaults.integer(forKey: streakKey) + 1
+    if streak >= sessionLimit {
+      // Sit this session out, then start counting again.
+      defaults.set(0, forKey: streakKey)
+      mode = .paused
+      BackseatLog.event("voice.crashGuard", ["reason": "Kokoro load crashed \(streak) launches in a row; system voice this session"])
+    } else {
+      defaults.set(streak, forKey: streakKey)
+      mode = .lazy
+      BackseatLog.event("voice.crashGuard", ["reason": "Kokoro load crashed last launch (\(streak) in a row); loading on the first line"])
+    }
+    return mode
+  }
+
+  /// "Use Kokoro now" in Settings.
+  static func override(defaults: UserDefaults = .standard) {
+    defaults.set(0, forKey: streakKey)
+    mode = .normal
+    BackseatLog.event("voice.crashGuard", ["reason": "driver chose Kokoro now"])
   }
 }

@@ -27,8 +27,12 @@ struct RouteStep
   std::optional<Kind> maneuver;
 };
 
-std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripRecord> const & history, Rng const & rng);
+/// `tripsBefore` is how many trips the driver has started before this one (finished or not); it
+/// defaults to the finished ones in `history`. 0 means the first trip ever.
+std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripRecord> const & history, Rng const & rng,
+                         std::optional<size_t> tripsBefore = std::nullopt);
 
 /// First thing said when a trip starts, before the route rundown.
-std::string TripGreeting(std::vector<TripRecord> const & history, Rng const & rng);
+std::string TripGreeting(std::vector<TripRecord> const & history, Rng const & rng,
+                         std::optional<size_t> tripsBefore = std::nullopt);
 }  // namespace backseat

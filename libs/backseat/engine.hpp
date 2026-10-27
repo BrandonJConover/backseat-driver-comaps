@@ -163,6 +163,7 @@ private:
   EngineConfig m_config;
   double m_frustration = 0;
   std::optional<TelemetrySample> m_lastSample;
+  double FarM() const;
   double m_lastRoastAt;
   std::map<Category, double> m_lastByCategory;
   std::map<std::string, std::vector<std::string>> m_recentLines;

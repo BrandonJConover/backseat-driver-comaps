@@ -107,6 +107,22 @@ struct SettingsBackseatView: View {
                     }
                 }
 
+                // Only while the crash guard has Kokoro sitting this session out.
+                if CoreMLCrashGuard.mode == .paused {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(verbatim: "Kokoro paused after a crash, retrying next launch")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        Button {
+                            KokoroVoice.shared.retryNow()
+                            voiceStatus = KokoroVoice.shared.status
+                        } label: {
+                            Text(verbatim: "Use Kokoro now")
+                        }
+                    }
+                }
+
                 if !shouldProvideVoiceRouting {
                     Toggle(isOn: $shouldProvideVoiceRouting) {
                         VStack(alignment: .leading) {
@@ -206,7 +222,7 @@ struct SettingsBackseatView: View {
             BackseatDriveLogSection {
                 [
                     "kokoro": KokoroVoice.shared.isReady ? "ready" : "notReady",
-                    "crashGuard": CoreMLCrashGuard.isDisabledForThisOS() ? "tripped" : "ok",
+                    "crashGuard": String(describing: CoreMLCrashGuard.mode),
                     "voice": KokoroVoice.shared.selectedVoiceID ?? "system",
                 ]
             }

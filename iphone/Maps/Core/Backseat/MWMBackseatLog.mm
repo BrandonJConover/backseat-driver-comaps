@@ -37,6 +37,20 @@ NSString * DeviceModel()
   backseat::TraceThrottled(event.UTF8String, key.UTF8String, ToFields(fields));
 }
 
++ (void)initialize
+{
+  if (self != [MWMBackseatLog class])
+    return;
+  // One time: an earlier build could leave the log stored as off without the driver touching the
+  // toggle. Turn it back on once; from then on the toggle is the driver's.
+  NSString * const migrated = @"BackseatDebugLogMigrated";
+  if (![NSUserDefaults.standardUserDefaults boolForKey:migrated])
+  {
+    GetFramework().GetRoutingManager().GetBackseat().SetDebugLogEnabled(true);
+    [NSUserDefaults.standardUserDefaults setBool:YES forKey:migrated];
+  }
+}
+
 + (BOOL)enabled
 {
   return GetFramework().GetRoutingManager().GetBackseat().DebugLogEnabled();

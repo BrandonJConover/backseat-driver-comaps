@@ -59,7 +59,7 @@ import FoundationModels
             schema: DynamicGenerationSchema(type: String.self), isOptional: true),
     ])
     guard let parameters = try? GenerationSchema(root: arguments, dependencies: []) else {
-      LOG(.error, "Backseat: couldn't describe the app actions to the model")
+      LOG(.warning, "Backseat: couldn't describe the app actions to the model")
       return
     }
     let conversation = Conversation(model: model, parameters: parameters)

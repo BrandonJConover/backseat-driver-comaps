@@ -107,8 +107,10 @@ std::string RattleOff(std::vector<Kind> const & turns)
 }
 }  // namespace
 
-std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripRecord> const & history, Rng const & rng)
+std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripRecord> const & history, Rng const & rng,
+                         std::optional<size_t> tripsBefore)
 {
+  size_t const before = tripsBefore.value_or(history.size());
   static std::regex const uturn(R"(\bu-?turn\b)", std::regex::icase);
   std::vector<Kind> turns;
   for (auto const & s : steps)
@@ -127,7 +129,7 @@ std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripR
       turns.push_back(k);
   }
 
-  if (history.empty())
+  if (before == 0)
     return RattleOff(turns);
 
   if (turns.empty())
@@ -136,7 +138,7 @@ std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripR
   auto const lefts = static_cast<size_t>(std::count(turns.begin(), turns.end(), Kind::Left));
   auto const rights = static_cast<size_t>(std::count(turns.begin(), turns.end(), Kind::Right));
   Kind const first = turns[0];
-  switch (kStyles[(history.size() - 1) % std::size(kStyles)])
+  switch (kStyles[(before - 1) % std::size(kStyles)])
   {
   case Style::Classic: break;
   case Style::FirstOnly:
@@ -177,7 +179,7 @@ std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripR
   if (turns.size() > kMaxListed)
   {
     // "I've met you" only lands once it actually has.
-    std::string const why = history.size() >= 3 ? "because I've met you" : "because something tells me I'll need to";
+    std::string const why = before >= 3 ? "because I've met you" : "because something tells me I'll need to";
     list = "First you're going to " + Join(phrases, ", then ") + ", and then " + std::to_string(turns.size() - kMaxListed) +
            " more turns that I'll explain as we go, " + why + ".";
   }
@@ -207,13 +209,19 @@ std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripR
   return opener + " " + list + done + reminder + " " + PickFrom(kClosers, rng);
 }
 
-std::string TripGreeting(std::vector<TripRecord> const & history, Rng const &)
+std::string TripGreeting(std::vector<TripRecord> const & history, Rng const &, std::optional<size_t> tripsBefore)
 {
-  if (history.empty())
+  size_t const before = tripsBefore.value_or(history.size());
+  if (before == 0)
     return kFirstGreeting;
-  std::string line = kReturnGreetings[(history.size() - 1) % kReturnGreetings.size()];
-  ReplaceFirst(line, "{n}", std::to_string(history.size() + 1));
-  ReplaceFirst(line, "{grade}", SpokenGrade(history.back().grade));
+  size_t i = (before - 1) % kReturnGreetings.size();
+  // No finished trip to grade yet: skip the greetings that need one.
+  while (history.empty() && kReturnGreetings[i].find("{grade}") != std::string::npos)
+    i = (i + 1) % kReturnGreetings.size();
+  std::string line = kReturnGreetings[i];
+  ReplaceFirst(line, "{n}", std::to_string(before + 1));
+  if (!history.empty())
+    ReplaceFirst(line, "{grade}", SpokenGrade(history.back().grade));
   return line;
 }
 }  // namespace backseat

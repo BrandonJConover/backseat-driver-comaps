@@ -1335,8 +1335,9 @@ TEST(NavLinesSayHowLongTheyCanWaitForTheGoodVoice)
   for (auto const & l : nav.TakeLines())
     if (l.priority == Priority::Nav)
       CHECK_EQUAL(l.maxWaitMs, 4000.0);
-  // Highway speed, 500 ft out: only a short wait, or the turn comes first.
+  // Highway speed: the far call comes ~0.2 miles out (12 s at 65 mph).
   double maxWait = -1;
+  double farAt = -1;
   for (int s = 1; s < 120; ++s)
   {
     double const dist = 2000 - s * 29;
@@ -1344,13 +1345,47 @@ TEST(NavLinesSayHowLongTheyCanWaitForTheGoodVoice)
       break;
     nav.OnFix(Heading(s * 1000.0, 29, 0), OnRoute(1, TurnKind::Left, dist));
     for (auto const & l : nav.TakeLines())
-      if (l.priority == Priority::Nav && dist <= 160 && dist > 100)
+      if (l.priority == Priority::Nav && dist <= 400 && dist > 100)
+        farAt = dist;
+      else if (l.priority == Priority::Nav && dist <= 80)
         maxWait = l.maxWaitMs;
   }
-  CHECK(maxWait >= 0 && maxWait < 3000);
+  // The far call comes early enough to wait for Kokoro; the 250 ft nag can't wait long.
+  CHECK(farAt > 300 && farAt <= 360);
+  CHECK(maxWait >= 0 && maxWait < 1000);
   // Roasts don't carry one.
   nav.OnFix(Heading(200000, 29, 0), OnRoute(2, TurnKind::Right, 3000));
   for (auto const & l : nav.TakeLines())
     if (l.priority != Priority::Nav)
       CHECK_EQUAL(l.maxWaitMs, 0.0);
+}
+
+TEST(FirstTripBitPlaysOnceEvenIfTheTripNeverArrives)
+{
+  SaidLog saved;
+  auto drive = [&saved](double t0)
+  {
+    Navigator nav(Config());
+    nav.SetSaidLog(SaidLog::Parse(saved.Serialize()), [&saved](SaidLog const & log) { saved = log; });
+    nav.OnFix(At(t0, 10), OnRoute(1, TurnKind::Left, 400));
+    std::string all;
+    for (auto const & l : nav.TakeLines())
+      all += l.text + "\n";
+    // Navigation ended by hand before the destination: no "arrived", nothing in the history.
+    nav.OnFix(At(t0 + 60000, 10), RouteSnapshot{});
+    nav.TakeLines();
+    return all;
+  };
+  std::string const first = drive(0);
+  CHECK(first.find("didn't ask to be in this car") != std::string::npos);
+  CHECK(first.find("put on some music") != std::string::npos);
+  std::string const second = drive(1e6);
+  CHECK(second.find("since I'm here") == std::string::npos);
+  CHECK(second.find("put on some music") == std::string::npos);
+  CHECK(second.find("{grade}") == std::string::npos);
+  // And the trip after that sounds different again.
+  std::string const third = drive(2e6);
+  CHECK(third.find("put on some music") == std::string::npos);
+  CHECK(third != second);
+  CHECK_EQUAL(saved.Counter("_trips.started"), 3);
 }

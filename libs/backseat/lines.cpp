@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <sstream>
 
 namespace backseat
@@ -85,6 +86,20 @@ std::string const & SaidLog::Pick(std::string const & key, std::vector<std::stri
                  {"option", std::to_string(std::find(options.begin(), options.end(), line) - options.begin())},
                  {"of", std::to_string(options.size())}});
   return line;
+}
+
+int SaidLog::Counter(std::string const & key) const
+{
+  auto const it = m_recent.find(key);
+  if (it == m_recent.end() || it->second.empty())
+    return 0;
+  return std::atoi(it->second.back().c_str());
+}
+
+void SaidLog::SetCounter(std::string const & key, int value)
+{
+  m_recent[key] = {std::to_string(value)};
+  m_dirty = true;
 }
 
 std::string SaidLog::Serialize() const

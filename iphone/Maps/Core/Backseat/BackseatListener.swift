@@ -168,7 +168,10 @@ import Speech
       }
       try session.setActive(true, options: .notifyOthersOnDeactivation)
     } catch {
-      LOG(.error, "Backseat: audio session failed: \(error)")
+      // Not .error: in Debug builds that aborts the app, and this is recoverable (usually the app is
+      // in the background or another app holds the mic).
+      LOG(.warning, "Backseat: audio session failed: \(error)")
+      BackseatLog.event("stt.error", ["where": "session", "error": error.localizedDescription])
       Self.restorePlayback()
       return
     }
@@ -182,7 +185,8 @@ import Speech
     do {
       try audioEngine.start()
     } catch {
-      LOG(.error, "Backseat: audio engine failed: \(error)")
+      LOG(.warning, "Backseat: audio engine failed: \(error)")
+      BackseatLog.event("stt.error", ["where": "engine.start", "error": error.localizedDescription])
       cleanUp()
       return
     }
@@ -206,10 +210,19 @@ import Speech
     } else if !speaking && pausedForSpeech {
       pausedForSpeech = false
       do {
+        // The voices' session handling (or the app going to the background) may have deactivated
+        // the session while the mic was paused; the engine can't start on a dead session.
+        try AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
         try audioEngine.start()
       } catch {
-        LOG(.error, "Backseat: audio engine didn't restart: \(error)")
+        LOG(.warning, "Backseat: audio engine didn't restart: \(error)")
+        BackseatLog.event("stt.error", ["where": "engine.restart", "error": error.localizedDescription])
+        // Start over from scratch in a moment instead of leaving hands-free dead for the trip.
+        let wasContinuous = continuous
         cleanUp()
+        if wasContinuous {
+          DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.followNavigation() }
+        }
         return
       }
       startSegment()
@@ -530,7 +543,9 @@ import Speech
 
   private func finish() {
     finished = true
-    Search.remove(self)
+    // Not from inside MWMSearch's observer loop: removing an observer while it enumerates them
+    // threw "mutated while being enumerated" and took the app down.
+    DispatchQueue.main.async { [self] in Search.remove(self) }
   }
 }
 

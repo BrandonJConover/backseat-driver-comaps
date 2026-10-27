@@ -29,6 +29,8 @@ struct BackseatDriveLogSection: View {
     } footer: {
       Text("A record of what the GPS said and why on recent drives, so problems can be tracked down. It stays on this iPhone and is only sent if you share it.")
     }
+    // The engine may have changed it since this view was made (or it was made before the engine).
+    .onAppear { enabled = BackseatLog.enabled }
     .sheet(item: $shareURL) { url in
       ActivitySheet(items: [url])
     }

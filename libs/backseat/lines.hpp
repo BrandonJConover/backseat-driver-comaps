@@ -26,6 +26,10 @@ public:
   /// A line from `options` not said recently for `key`, chosen by `r` in [0, 1), and remembered.
   std::string const & Pick(std::string const & key, std::vector<std::string> const & options, double r);
 
+  /// A number kept with the log, like how many trips have started (0 when never set).
+  int Counter(std::string const & key) const;
+  void SetCounter(std::string const & key, int value);
+
   /// Whether anything was picked since the last ClearDirty(), i.e. the log needs saving.
   bool Dirty() const { return m_dirty; }
   void ClearDirty() { m_dirty = false; }
