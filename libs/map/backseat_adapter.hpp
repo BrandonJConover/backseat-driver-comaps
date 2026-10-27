@@ -161,6 +161,11 @@ public:
   std::string NicenessMoved();
   /// Once the slider is back on the mean side: "Don't touch my slider."
   std::string NicenessSlidBack() { return m_navigator.Reply("niceness.after"); }
+  /// After the arrival line, at most once every 20 hours: "Test 47 complete. On a scale of one to
+  /// ten, how satisfied were you?" Empty otherwise. Listen once, then pass the answer to
+  /// SurveyAnswer(), which says it was recorded (and ignored) and keeps it in memory.
+  std::string ArrivalSurvey();
+  std::string SurveyAnswer(std::string const & spoken);
   /// A place driven to before, for the "Where to?" list.
   struct PastRoute
   {
@@ -267,6 +272,8 @@ private:
   std::string m_fileQuestion;
   /// Polite destination requests, for the occasional "you're so basic" recap.
   int m_navigates = 0;
+  /// Waiting for a rating after ArrivalSurvey().
+  bool m_surveyAsked = false;
   /// Results last read out, waiting for "the first one".
   std::vector<SearchResult> m_results;
   std::vector<backseat::VoiceOption> m_voices;

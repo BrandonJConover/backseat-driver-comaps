@@ -283,6 +283,8 @@ public:
   std::string BackseatFileAnswer(std::string const & spoken) { return m_backseat.FileAnswer(spoken); }
   std::string BackseatNicenessMoved() { return m_backseat.NicenessMoved(); }
   std::string BackseatNicenessSlidBack() { return m_backseat.NicenessSlidBack(); }
+  std::string BackseatArrivalSurvey() { return m_backseat.ArrivalSurvey(); }
+  std::string BackseatSurveyAnswer(std::string const & spoken) { return m_backseat.SurveyAnswer(spoken); }
   std::vector<std::pair<std::string, std::string>> BackseatLearnedFacts() const { return m_backseat.LearnedFacts(); }
   /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.
   BackseatAdapter const & GetBackseat() const { return m_backseat; }

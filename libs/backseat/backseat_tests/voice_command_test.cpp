@@ -397,3 +397,13 @@ TEST(FileAnswersAreCleanedUp)
   CHECK(DeclinedToAnswer(""));
   CHECK(!DeclinedToAnswer("chocolate"));
 }
+
+TEST(RatingsAreHeard)
+{
+  CHECK_EQUAL(ParseRating("I'd give it a seven"), 7);
+  CHECK_EQUAL(ParseRating("10"), 10);
+  CHECK_EQUAL(ParseRating("solid ten out of ten"), 10);
+  CHECK_EQUAL(ParseRating("one"), 1);
+  CHECK_EQUAL(ParseRating("it was fine"), 0);
+  CHECK_EQUAL(ParseRating("someone cut me off"), 0);
+}

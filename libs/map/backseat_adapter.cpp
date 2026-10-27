@@ -463,6 +463,33 @@ std::string BackseatAdapter::NicenessMoved()
   return m_navigator.Reply(count == 1 ? "niceness.first" : "niceness.again");
 }
 
+std::string BackseatAdapter::ArrivalSurvey()
+{
+  double constexpr kSurveyEveryMs = 20 * 3600 * 1000.0;
+  char const * const kSurveyAtKey = "BackseatSurveyAt";
+  double const now = NowMs();
+  std::string at;
+  if (settings::Get(kSurveyAtKey, at) && now - std::atof(at.c_str()) < kSurveyEveryMs)
+    return {};
+  settings::Set(kSurveyAtKey, std::to_string(static_cast<long long>(now)));
+  m_surveyAsked = true;
+  return m_navigator.Reply("survey.ask", {{"test", std::to_string(std::max<size_t>(1, m_navigator.History().size()))}});
+}
+
+std::string BackseatAdapter::SurveyAnswer(std::string const & spoken)
+{
+  if (!std::exchange(m_surveyAsked, false))
+    return {};
+  int const rating = backseat::ParseRating(spoken);
+  if (rating == 0)
+    return m_navigator.Reply("survey.none");
+  // Kept as "7 4 9" so the model and the file page can bring it up later.
+  std::string ratings = m_memory.Recall("drive ratings").value_or("");
+  Remember("drive ratings", ratings + (ratings.empty() ? "" : " ") + std::to_string(rating));
+  return m_navigator.Reply(rating <= 3 ? "survey.low" : rating <= 7 ? "survey.mid" : "survey.high",
+                           {{"rating", std::to_string(rating)}});
+}
+
 std::string BackseatAdapter::FileAnswer(std::string const & spoken)
 {
   std::string const topic = std::exchange(m_fileQuestion, std::string());

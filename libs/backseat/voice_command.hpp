@@ -103,6 +103,8 @@ std::string ParseFavorite(std::string const & spoken, std::vector<std::string> c
 std::string ParseBedSide(std::string const & spoken);
 /// "None of your business", "pass", "I don't know": the driver won't say.
 bool DeclinedToAnswer(std::string const & spoken);
+/// A 1 to 10 rating, said as a digit or a word ("a seven", "10", "solid eight"). 0 if there's none.
+int ParseRating(std::string const & spoken);
 /// The driver's name, heard slightly wrong on purpose: "Brandon" -> "Brendon". `variant` picks
 /// among the ways to get it wrong. Never returns the name unchanged.
 std::string MisheardName(std::string const & name, unsigned variant = 0);

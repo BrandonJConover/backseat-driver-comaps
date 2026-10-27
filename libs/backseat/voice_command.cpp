@@ -332,6 +332,19 @@ bool DeclinedToAnswer(std::string const & spoken)
   return words.find_first_not_of(' ') == std::string::npos;
 }
 
+int ParseRating(std::string const & spoken)
+{
+  std::string const words = CommandWords(spoken);
+  char const * const names[] = {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"};
+  for (int n = 10; n >= 1; --n)
+  {
+    if (words.find(" " + std::to_string(n) + " ") != std::string::npos ||
+        words.find(std::string(" ") + names[n - 1] + " ") != std::string::npos)
+      return n;
+  }
+  return 0;
+}
+
 std::string ParseNameAnswer(std::string const & spoken)
 {
   std::string words = CommandWords(spoken);
