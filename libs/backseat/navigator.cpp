@@ -1001,7 +1001,11 @@ void Navigator::CountLefts(double t)
   // Counted the same way as the engine's NASCAR line: rights break the streak, the rest don't count.
   switch (ManeuverOf(m_turnKind))
   {
-  case Maneuver::Left: ++m_leftsInARow; break;
+  case Maneuver::Left:
+    if (m_turnKind == TurnKind::ExitLeft)  // an exit on the left isn't a lap
+      return;
+    ++m_leftsInARow;
+    break;
   case Maneuver::Right: m_leftsInARow = 0; return;
   case Maneuver::Other: return;
   }

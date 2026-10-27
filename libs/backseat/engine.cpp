@@ -169,6 +169,50 @@ Maneuver TurnDirectionOf(std::string const & text)
   return Maneuver::Other;
 }
 
+TurnShape TurnShapeOf(std::string const & text)
+{
+  static std::regex const uturn(R"(\bu-?turn\b)", std::regex::icase);
+  static std::regex const roundabout(R"(\b(roundabout|traffic circle|rotary)\b)", std::regex::icase);
+  static std::regex const exit(R"(\b(exit|ramp)\b)", std::regex::icase);
+  if (std::regex_search(text, uturn))
+    return TurnShape::UTurn;
+  if (std::regex_search(text, roundabout))
+    return TurnShape::Roundabout;
+  if (std::regex_search(text, exit))
+    return TurnShape::Exit;
+  return TurnShape::Turn;
+}
+
+namespace
+{
+/// The countdown pool for this stage: "countdown.far" for a plain turn, "countdown.exit.far" for an
+/// exit, and so on.
+std::string CountdownKey(TurnShape shape, char const * stage)
+{
+  switch (shape)
+  {
+  case TurnShape::Turn: break;
+  case TurnShape::Exit: return std::string("countdown.exit.") + stage;
+  case TurnShape::UTurn: return std::string("countdown.uturn.") + stage;
+  case TurnShape::Roundabout: return std::string("countdown.roundabout.") + stage;
+  }
+  return std::string("countdown.") + stage;
+}
+
+/// What the GPS told you to do, for "I said left."
+std::string SaidWhat(TurnShape shape, TurnDirection dir)
+{
+  switch (shape)
+  {
+  case TurnShape::UTurn: return "a U-turn";
+  case TurnShape::Roundabout: return "the roundabout";
+  case TurnShape::Turn:
+  case TurnShape::Exit: break;
+  }
+  return DirName(dir);
+}
+}  // namespace
+
 CritiqueEngine::CritiqueEngine(EngineConfig config, double startedAt)
   : m_config(std::move(config))
   , m_lastRoastAt(kNever)
@@ -249,14 +293,18 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     m_lastInstructionText = e.text;
     m_lastInstructionDistanceM = e.distanceM;
     Maneuver const dir = e.maneuver ? *e.maneuver : TurnDirectionOf(e.text);
+    TurnShape const shape = TurnShapeOf(e.text);
     // Already inside the 500 ft mark when announced? Skip straight to the closer nags.
     int const stage = e.distanceM <= m_config.countdownFarM ? 1 : 0;
-    if (dir == Maneuver::Other)
+    // U-turns and roundabouts get the countdown too, without a side.
+    if (dir == Maneuver::Other && shape != TurnShape::UTurn && shape != TurnShape::Roundabout)
       m_pendingTurn.reset();
     else
-      m_pendingTurn = PendingTurn{dir == Maneuver::Left ? TurnDirection::Left : TurnDirection::Right, e.t, stage, {}};
+      m_pendingTurn =
+          PendingTurn{dir == Maneuver::Right ? TurnDirection::Right : TurnDirection::Left, shape, e.t, stage, {}};
     m_turnDoneSaid = false;
-    if (dir == Maneuver::Left)
+    // Only real turns count toward NASCAR; an exit on the left isn't a lap.
+    if (dir == Maneuver::Left && shape == TurnShape::Turn)
       ++m_leftStreak;
     else if (dir == Maneuver::Right)
     {
@@ -297,7 +345,7 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     // with "Please stop turning right." instead of the usual verdict.
     bool const nagged = m_pendingTurn && m_pendingTurn->stage >= 4;
     if (nagged && e.onTime)
-      SayTurnDone(out, e.t, m_pendingTurn->dir);
+      SayTurnDone(out, e.t, *m_pendingTurn);
     bool const doneSaid = m_turnDoneSaid;
     m_turnDoneSaid = false;
     m_pendingTurn.reset();
@@ -322,7 +370,7 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     PlaceKind const kind = e.place ? e.place->kind : PlaceKind::Other;
     std::optional<std::string> const placeName = e.place ? e.place->name : std::nullopt;
     std::string const said =
-        m_pendingTurn ? std::string("I said ") + DirName(m_pendingTurn->dir) + "." : "I said nothing about stopping.";
+        m_pendingTurn ? "I said " + SaidWhat(m_pendingTurn->shape, m_pendingTurn->dir) + "." : "I said nothing about stopping.";
     Log(MakeIncident(e.t, IncidentKind::UnplannedStop, placeName.value_or(PlaceName(kind))), e.at);
     Roast(out, e.t, Category::UnplannedStop, std::string("unplannedStop.") + PlaceName(kind),
           {{"said", said}, {"name", placeName.value_or(PlaceFallback(kind))}}, true);
@@ -484,7 +532,9 @@ void CritiqueEngine::CheckTurnDirection(TelemetrySample const & s, std::vector<C
   m_headings.push_back({s.t, *s.headingDeg});
   m_headings.erase(std::remove_if(m_headings.begin(), m_headings.end(), [&](Heading const & h) { return s.t - h.t > 12000; }),
                    m_headings.end());
-  if (!m_pendingTurn)
+  // Only plain turns can be checked by heading: a roundabout swings both ways, and a cloverleaf exit on
+  // the right loops left.
+  if (!m_pendingTurn || m_pendingTurn->shape != TurnShape::Turn)
     return;
   auto const old =
       std::find_if(m_headings.begin(), m_headings.end(), [&](Heading const & h) { return s.t - h.t >= 6000; });
@@ -498,7 +548,7 @@ void CritiqueEngine::CheckTurnDirection(TelemetrySample const & s, std::vector<C
   if (turned == m_pendingTurn->dir)
   {
     if (m_pendingTurn->stage >= 4)
-      SayTurnDone(out, s.t, m_pendingTurn->dir);
+      SayTurnDone(out, s.t, *m_pendingTurn);
     m_pendingTurn.reset();
     return;
   }
@@ -534,15 +584,15 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   double const far = m_config.countdownFarM;
   double const near = m_config.countdownNearM;
   double const mention = m_config.countdownMentionM;
-  char const * key = nullptr;
+  char const * stage = nullptr;
   double sayM = near;
   if (p.stage == 0 && distanceM <= far && distanceM > near)
   {
-    key = "countdown.far";
+    stage = "far";
     // The third left in a row and beyond: going around in circles, NASCAR style.
-    if (p.dir == TurnDirection::Left && m_leftStreak >= 3 && !m_nascarSaid)
+    if (p.shape == TurnShape::Turn && p.dir == TurnDirection::Left && m_leftStreak >= 3 && !m_nascarSaid)
     {
-      key = "countdown.nascar";
+      stage = "nascar";
       m_nascarSaid = true;
     }
     sayM = far;
@@ -550,40 +600,41 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   }
   else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > near)
   {
-    key = "countdown.mention";
+    stage = "mention";
     sayM = mention;
     p.mentioned = true;
   }
   else if (p.stage <= 1 && !p.mentioned && distanceM <= near && distanceM > 5)
   {
-    key = "countdown.near";
+    stage = "near";
     p.stage = 2;
   }
   else if (p.stage <= 2 && distanceM <= 5)
   {
-    key = "countdown.now";
+    stage = "now";
     p.stage = 3;
     p.atTurnSince = t;
   }
   else if (p.stage == 3 && p.atTurnSince && t - *p.atTurnSince >= 3000)
   {
-    key = "countdown.still";
+    stage = "still";
     p.stage = 4;
   }
-  if (!key)
+  if (!stage)
     return;
+  std::string const key = CountdownKey(p.shape, stage);
   std::string const distance = FormatDistance(sayM, m_config.units);
   std::string const text = Fill(Pick(key, Tier()), {{"dir", DirName(p.dir)}, {"distance", distance}});
   out.push_back(Make(t, Category::Instruction, Capitalize(text), Priority::Nav));
 }
 
 /// The turn is done after the full countdown: "Please stop turning right." Once per maneuver.
-void CritiqueEngine::SayTurnDone(std::vector<Commentary> & out, double t, TurnDirection dir)
+void CritiqueEngine::SayTurnDone(std::vector<Commentary> & out, double t, PendingTurn const & p)
 {
   if (m_turnDoneSaid)
     return;
   m_turnDoneSaid = true;
-  std::string const text = Fill(Pick("countdown.done", Tier()), {{"dir", DirName(dir)}});
+  std::string const text = Fill(Pick(CountdownKey(p.shape, "done"), Tier()), {{"dir", DirName(p.dir)}});
   out.push_back(Make(t, Category::Instruction, Capitalize(text), Priority::Nav));
 }
 

@@ -1205,3 +1205,18 @@ TEST(ARightTurnBreaksTheNascarStreak)
   CHECK_EQUAL(CountCategory(all, Category::Achievement), size_t{0});
   CHECK(!nav.GetAchievements().Has("nascar"));
 }
+
+TEST(AnExitOnTheLeftIsNotANascarLap)
+{
+  Navigator nav(Config());
+  nav.SetAchievements({}, nullptr);
+  TurnKind const turns[] = {TurnKind::Left, TurnKind::ExitLeft, TurnKind::Left, TurnKind::Destination};
+  std::vector<Commentary> all;
+  double t = 0;
+  for (uint32_t i = 0; i < 4; ++i, t += 60000)
+  {
+    nav.OnFix(At(t, 10), OnRoute(i + 1, turns[i], 400));
+    for (auto & l : nav.TakeLines()) all.push_back(std::move(l));
+  }
+  CHECK_EQUAL(CountCategory(all, Category::Achievement), size_t{0});
+}

@@ -188,3 +188,45 @@ TEST(NascarOnTheThirdLeftInARow)
   }
   CHECK(hits == (std::vector<int>{2, 7}));
 }
+
+namespace
+{
+/// A maneuver from 400 m out through "still" and the completed turn: everything said.
+std::vector<std::string> CountdownFor(std::string const & text)
+{
+  auto e = FirstLineEngine();
+  e.OnNav(NavEvent::Instruction(0, text, 400));
+  std::vector<std::string> said;
+  double const ds[] = {300, 140, 70, 40, 3, 0, 0, 0};
+  for (size_t i = 0; i < std::size(ds); ++i)
+    for (auto const & t : Texts(e.OnNav(NavEvent::Progress(1000.0 * (i + 1), ds[i]))))
+      said.push_back(t);
+  for (auto const & t : Texts(e.OnNav(NavEvent::TurnCompleted(10000, true))))
+    said.push_back(t);
+  return said;
+}
+}  // namespace
+
+TEST(ExitsUseExitWordingNotTurnRight)
+{
+  std::vector<std::string> const want = {
+      "In 500 feet you are going to take the exit on the right.",
+      "By the way, did I mention you should take the exit on the right.", "Hey, you should be taking the exit.",
+      "You should still be taking the exit.", "Please stop exiting. You've exited."};
+  CHECK(CountdownFor("Take the exit on the right onto I-25") == want);
+  CHECK(TurnShapeOf("Take the exit on the left") == TurnShape::Exit);
+}
+
+TEST(UTurnsAndRoundaboutsGetCountdowns)
+{
+  std::vector<std::string> const uturn = {
+      "In 500 feet you are going to make a U-turn.", "By the way, did I mention you should make a U-turn.",
+      "Hey, you should be making a U-turn.", "You should still be making a U-turn.",
+      "Please stop making a U-turn. If you keep going, we'll be headed the wrong way again."};
+  CHECK(CountdownFor("Make a U-turn") == uturn);
+  std::vector<std::string> const roundabout = {
+      "In 500 feet you are going to take the roundabout.",
+      "By the way, did I mention you should take the roundabout.", "Hey, you should be taking the roundabout.",
+      "You should still be going around the roundabout.", "Please stop going around. You're out of the roundabout."};
+  CHECK(CountdownFor("Take the roundabout onto Elm Street") == roundabout);
+}

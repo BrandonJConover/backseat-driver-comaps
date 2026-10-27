@@ -75,6 +75,18 @@ struct EngineConfig
 /// "Turn left onto Elm" -> Left. "Keep right at the fork" -> Right. "Continue" -> Other.
 Maneuver TurnDirectionOf(std::string const & text);
 
+/// What kind of maneuver an instruction is, for the countdown's wording.
+enum class TurnShape
+{
+  Turn,
+  Exit,
+  UTurn,
+  Roundabout
+};
+
+/// "Make a U-turn" -> UTurn. "Take the roundabout" -> Roundabout. "Take the exit on the left" -> Exit.
+TurnShape TurnShapeOf(std::string const & text);
+
 class CritiqueEngine
 {
 public:
@@ -101,7 +113,8 @@ private:
 
   struct PendingTurn
   {
-    TurnDirection dir;
+    TurnDirection dir;  // meaningless for a U-turn or roundabout
+    TurnShape shape;
     double since;
     int stage;  // 0..4, see Countdown()
     std::optional<double> atTurnSince;
@@ -130,7 +143,7 @@ private:
   void CheckNoDestination(TelemetrySample const & s, std::vector<Commentary> & out);
   void Countdown(std::vector<Commentary> & out, double t, double distanceM);
   void NagStraight(std::vector<Commentary> & out, double t, double distanceM);
-  void SayTurnDone(std::vector<Commentary> & out, double t, TurnDirection dir);
+  void SayTurnDone(std::vector<Commentary> & out, double t, PendingTurn const & p);
   void WrongTurn(std::vector<Commentary> & out, double t, TurnDirection expected, TurnDirection turned,
                  std::optional<LatLon> at = {});
   std::optional<std::string> Grievance() const;
