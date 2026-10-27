@@ -137,7 +137,7 @@ final class KokoroVoice: NSObject {
     lock.lock()
     guard primary != nil else {
       lock.unlock()
-      DispatchQueue.main.async(execute: fallback)
+      DispatchQueue.main.async { self.player.sayWithSystemVoice(fallback) }
       return
     }
     let key = Self.key(text, speed)
@@ -160,9 +160,7 @@ final class KokoroVoice: NSObject {
       lock.unlock()
       guard fallBack else { return }
       Self.log.debug("Kokoro too slow for a navigation line, using the system voice")
-      // The system voice must not talk over a roast.
-      player.interruptRoast()
-      job.fallback()
+      player.sayWithSystemVoice(job.fallback)
     }
   }
 
@@ -238,7 +236,7 @@ final class KokoroVoice: NSObject {
       let fallBack = job.state == .waiting
       if fallBack { job.state = .fellBack }
       lock.unlock()
-      if fallBack { DispatchQueue.main.async(execute: job.fallback) }
+      if fallBack { DispatchQueue.main.async { self.player.sayWithSystemVoice(job.fallback) } }
       return
     }
 
@@ -266,6 +264,8 @@ final class KokoroVoice: NSObject {
 }
 
 /// Plays clips one at a time on the main queue: navigation clips first, and they cut off a roast.
+/// Only one voice talks at a time: a line handed to the system voice waits for a navigation clip to
+/// end, and a clip waits for the system voice.
 private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   private struct Item {
     let wav: Data
@@ -280,6 +280,10 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   private var current: AVAudioPlayer?
   private var currentIsNav = false
   private var waitingSince: Date?
+  /// System-voice lines waiting for the current navigation clip to finish.
+  private var pendingSystem: [() -> Void] = []
+  /// How long a clip waits for the system voice before giving up on politeness.
+  private static let systemWaitLimit: TimeInterval = 30
 
   func play(_ wav: Data, nav: Bool) {
     if nav {
@@ -291,14 +295,21 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
     playNext()
   }
 
-  func interruptRoast() {
+  /// Runs `speak` (which talks with the system voice) once no clip is talking: a roast is cut off,
+  /// a navigation clip is allowed to finish first.
+  func sayWithSystemVoice(_ speak: @escaping () -> Void) {
     if current != nil && !currentIsNav { finishCurrent() }
-    playNext()
+    if current != nil {
+      pendingSystem.append(speak)
+    } else {
+      speak()
+    }
   }
 
   func stop() {
     navQueue.removeAll()
     roastQueue.removeAll()
+    pendingSystem.removeAll()
     current?.stop()
     current = nil
   }
@@ -306,7 +317,19 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
     guard player === current else { return }
     current = nil
+    flushSystemLines()
     playNext()
+  }
+
+  func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+    audioPlayerDidFinishPlaying(player, successfully: false)
+  }
+
+  /// The system voice queues its own utterances, so the waiting lines can all be handed over.
+  private func flushSystemLines() {
+    let lines = pendingSystem
+    pendingSystem.removeAll()
+    lines.forEach { $0() }
   }
 
   private func finishCurrent() {
@@ -316,8 +339,8 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
 
   private func playNext() {
     guard current == nil else { return }
-    // Don't talk over the system voice (a navigation line it took over); give it up to 8 s.
-    if systemIsSpeaking() && (waitingSince.map { Date().timeIntervalSince($0) < 8 } ?? true) {
+    // Don't talk over the system voice (a navigation line it took over).
+    if systemIsSpeaking() && (waitingSince.map { Date().timeIntervalSince($0) < Self.systemWaitLimit } ?? true) {
       if waitingSince == nil { waitingSince = Date() }
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.playNext() }
       return
