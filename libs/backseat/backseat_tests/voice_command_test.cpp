@@ -266,3 +266,14 @@ TEST(UsualTripIsGuessed)
   CHECK(!SaidYes("no, not today"));
   CHECK(!SaidYes("the gym"));
 }
+
+TEST(NamesAreMisheardSlightly)
+{
+  CHECK_EQUAL(MisheardName("Brandon", 0), std::string("Brendon"));
+  CHECK_EQUAL(MisheardName("Brandon", 1), std::string("Brandom"));
+  CHECK_EQUAL(MisheardName("Brandon", 2), std::string("Brandy"));
+  for (unsigned v = 0; v < 6; ++v)
+    for (std::string const name : {"Sarah", "Al", "Bo", "Ian", "Jess", "Kate", "Mike", "X"})
+      CHECK(MisheardName(name, v) != name);
+  CHECK_EQUAL(MisheardName("Brandon Conover", 0), std::string("Brendon"));
+}

@@ -314,6 +314,75 @@ std::string ParseNameAnswer(std::string const & spoken)
   return name;
 }
 
+std::string MisheardName(std::string const & name, unsigned variant)
+{
+  if (name.empty())
+    return "Gary";
+  std::string const first = name.substr(0, name.find(' '));
+  auto const isVowel = [](char c) { return std::string("aeiouAEIOU").find(c) != std::string::npos; };
+  // Ways to mishear it, tried in turn from `variant` until one changes something.
+  auto const shiftVowel = [&](std::string n)
+  {
+    // The first vowel after the first letter: Brandon -> Brendon, Sarah -> Serah, Mike -> Moke.
+    static std::string const from = "aeiou", to = "eiauo";
+    for (size_t i = 1; i < n.size(); ++i)
+      if (auto const at = from.find(static_cast<char>(std::tolower(static_cast<unsigned char>(n[i]))));
+          at != std::string::npos)
+      {
+        n[i] = to[at];
+        return n;
+      }
+    return n;
+  };
+  auto const shiftEnding = [&](std::string n)
+  {
+    // The last consonant: Brandon -> Brandom, David -> Davit, Jess -> Jezz.
+    static std::string const from = "ndtsmkgbpl", to = "mtdznmkpbr";
+    for (size_t i = n.size(); i-- > 1;)
+    {
+      char const c = static_cast<char>(std::tolower(static_cast<unsigned char>(n[i])));
+      if (auto const at = from.find(c); at != std::string::npos)
+      {
+        n[i] = to[at];
+        return n;
+      }
+      if (!isVowel(n[i]))
+        break;
+    }
+    return n;
+  };
+  auto const addY = [&](std::string n)
+  {
+    // Brandon -> Brandy, Kate -> Katy: the first syllable and the consonants after it, plus a y.
+    size_t i = 1;
+    while (i < n.size() && !isVowel(n[i]))
+      ++i;
+    while (i < n.size() && isVowel(n[i]))
+      ++i;
+    while (i < n.size() && !isVowel(n[i]))
+      ++i;
+    return n.substr(0, i) + "y";
+  };
+  for (unsigned k = 0; k < 3; ++k)
+  {
+    std::string heard;
+    switch ((variant + k) % 3)
+    {
+    case 0: heard = shiftVowel(first); break;
+    case 1: heard = shiftEnding(first); break;
+    default: heard = addY(first); break;
+    }
+    std::string lowerHeard, lowerFirst;
+    for (char const c : heard)
+      lowerHeard += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    for (char const c : first)
+      lowerFirst += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (lowerHeard != lowerFirst)
+      return heard;
+  }
+  return first + "o";
+}
+
 std::optional<std::string> ParsePronounAnswer(std::string const & spoken)
 {
   std::string const words = CommandWords(spoken);

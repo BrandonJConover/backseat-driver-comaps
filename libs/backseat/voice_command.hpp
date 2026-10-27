@@ -94,6 +94,9 @@ bool SaidYes(std::string const & spoken);
 /// First-run setup answers, said out loud.
 /// "My name is Brandon", "call me B", "it's Brandon", "Brandon" -> "Brandon". Empty if unclear.
 std::string ParseNameAnswer(std::string const & spoken);
+/// The driver's name, heard slightly wrong on purpose: "Brandon" -> "Brendon". `variant` picks
+/// among the ways to get it wrong. Never returns the name unchanged.
+std::string MisheardName(std::string const & name, unsigned variant = 0);
 /// "he", "she" or "they" ("I'm a guy" -> "he").
 std::optional<std::string> ParsePronounAnswer(std::string const & spoken);
 

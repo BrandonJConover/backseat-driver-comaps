@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <chrono>
 #include <fstream>
 #include <iomanip>
@@ -800,7 +801,11 @@ std::string BackseatAdapter::SetupLine(SetupStep step, std::string const & voice
     m_wrongName = wrong;
     if (step == SetupStep::WhereTo)
       m_askStateNext = true;
-    return m_navigator.Reply(step == SetupStep::WrongName ? "setup.wrongName" : "setup.whereTo", {{"wrong", wrong}});
+    if (step == SetupStep::WhereTo)
+      return m_navigator.Reply("setup.whereTo", {{"wrong", wrong}});
+    // Their name, said back slightly wrong, then the wrong-name bit.
+    std::string const misheard = backseat::MisheardName(name, static_cast<unsigned>(std::rand()));
+    return misheard + ". " + m_navigator.Reply("setup.wrongName", {{"wrong", wrong}});
   }
   case SetupStep::Pronouns: return m_navigator.Reply("setup.askPronouns");
   case SetupStep::Passenger: return m_navigator.Reply("setup.askPassenger");
