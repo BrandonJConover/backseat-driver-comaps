@@ -225,29 +225,52 @@ final class KokoroVoice: NSObject {
     // Loads right away at launch: every line but an imminent turn waits for it.
     Task.detached(priority: .userInitiated) { [self] in
       let began = Date()
+      let voice = Self.voice ?? Self.defaultVoice
+      // The CPU first: after an install or update the Neural Engine recompiles the models, which
+      // took a minute on an iPhone 15 Pro. The CPU is ready in seconds.
       do {
-        // CPU + Neural Engine with the noise and tail stages on the CPU: iOS refuses GPU work from
-        // the background, where a navigation app spends most of its time.
+        let cpu = KokoroAneManager(computeUnits: .cpuOnly)
+        try await cpu.initialize(preloadVoices: [voice])
+        UserDefaults.standard.set(true, forKey: Self.installedKey)
+        _ = try await render("Hello.", speed: 1, voice: voice, with: cpu)
+        becomeReady(cpu, cpuFallback: true, after: began, on: "the CPU")
+      } catch {
+        Self.log.error("Kokoro on the CPU failed: \(error.localizedDescription, privacy: .public)")
+      }
+      // Then the Neural Engine, quicker per line; CPU + Neural Engine with the noise and tail
+      // stages on the CPU, since iOS refuses GPU work from the background, where a navigation app
+      // spends most of its time. Its first line compiles the rest, so it isn't warmed with a render
+      // here: that would run alongside the CPU's renders, and concurrent renders crash BNNS.
+      do {
         let engine = KokoroAneManager(computeUnits: .aneTailCpu)
-        let voice = Self.voice ?? Self.defaultVoice
         try await engine.initialize(preloadVoices: [voice])
         UserDefaults.standard.set(true, forKey: Self.installedKey)
-        // The first line compiles the Neural Engine graph; pay for it now, not on a turn.
-        _ = try await render("Hello.", speed: 1, voice: voice, with: engine)
-        lock.lock()
-        primary = engine
-        failed = false
-        let waiting = waitingForReady
-        waitingForReady.removeAll()
-        lock.unlock()
-        Self.log.info("Kokoro voice ready in \(Int(Date().timeIntervalSince(began) * 1000)) ms")
-        startWorker()
-        waiting.forEach { $0() }
+        becomeReady(engine, cpuFallback: false, after: began, on: "the Neural Engine")
       } catch {
         Self.log.error("Kokoro unavailable, the system voice stays on: \(error.localizedDescription, privacy: .public)")
-        giveUp()
-        allowRetry()
+        lock.lock(); let ready = primary != nil; lock.unlock()
+        if !ready {
+          giveUp()
+          allowRetry()
+        }
       }
+    }
+  }
+
+  /// Speaks with `engine` from now on, and says the lines that were waiting if it's the first.
+  private func becomeReady(_ engine: KokoroAneManager, cpuFallback: Bool, after began: Date, on name: String) {
+    lock.lock()
+    let first = primary == nil
+    primary = engine
+    if cpuFallback { fallbackEngine = engine }
+    failed = false
+    let waiting = first ? waitingForReady : []
+    if first { waitingForReady.removeAll() }
+    lock.unlock()
+    Self.log.info("Kokoro voice ready on \(name, privacy: .public) in \(Int(Date().timeIntervalSince(began) * 1000)) ms")
+    if first {
+      startWorker()
+      waiting.forEach { $0() }
     }
   }
 
