@@ -53,6 +53,14 @@ int constexpr kBegAfterReroutes = 4;
 double constexpr kSightCheckEveryMs = 8000;
 double constexpr kSightEveryMs = 240000;
 double constexpr kSightQuietM = 500;
+// Facing the wrong way: the GPS course is at least this far off the route's direction...
+double constexpr kWrongWayDeg = 135;
+// ...at driving speed (GPS course is noise when crawling)...
+double constexpr kWrongWayMinMps = 3;
+// ...for this long, so a wobble or a lane change doesn't count.
+double constexpr kWrongWayHoldMs = 3000;
+double constexpr kWrongWayEveryMs = 90000;
+int constexpr kWrongWayMaxPerTrip = 3;
 /// Asking for music: once a trip, at least this far in, on a quiet stretch, if nothing is playing.
 double constexpr kMusicAfterMs = 15 * 60000;
 double constexpr kMusicCheckEveryMs = 15000;
@@ -229,6 +237,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
   TrackLongDrive(fix.tMs, route);
   TrackSights(fix, route);
+  TrackWrongWay(fix, route);
   TrackMusic(fix.tMs, route);
   // Fed up for the first time this trip: from now on it's "wise, omnipotent overseer GPS".
   if (!m_titleDemanded && Tier() == 2)
@@ -516,6 +525,29 @@ void Navigator::TrackSights(Fix const & fix, RouteSnapshot const & route)
   SayLine(fix.tMs, Category::Tour, "tour", {{"side", sight->onLeft ? "left" : "right"}, {"sight", sight->name}});
 }
 
+void Navigator::TrackWrongWay(Fix const & fix, RouteSnapshot const & route)
+{
+  bool const followingRoute = route.state == RouteState::OnRoute || route.state == RouteState::NotStarted;
+  double off = 0;
+  if (followingRoute && fix.bearingDeg >= 0 && route.routeBearingDeg >= 0 && fix.speedMps >= kWrongWayMinMps)
+  {
+    off = std::fabs(std::fmod(fix.bearingDeg - route.routeBearingDeg + 540.0, 360.0) - 180.0);
+  }
+  if (off < kWrongWayDeg)
+  {
+    m_wrongWaySince = -1;
+    return;
+  }
+  if (m_wrongWaySince < 0)
+    m_wrongWaySince = fix.tMs;
+  if (fix.tMs - m_wrongWaySince < kWrongWayHoldMs || fix.tMs - m_lastWrongWayT < kWrongWayEveryMs ||
+      m_wrongWaySaid >= kWrongWayMaxPerTrip)
+    return;
+  SayLine(fix.tMs, Category::WrongWay, m_wrongWaySaid == 0 ? "wrongWay" : "wrongWay.again");
+  ++m_wrongWaySaid;
+  m_lastWrongWayT = fix.tMs;
+}
+
 void Navigator::SayRoutine(double t, RouteSnapshot const & route)
 {
   // Work trips this year: every fifth one from the tenth on gets the count.
@@ -660,6 +692,9 @@ void Navigator::ResetTrip()
   m_titleDemanded = false;
   m_gameRefused = false;
   m_sightsSaid.clear();
+  m_wrongWaySince = -1;
+  m_lastWrongWayT = -1e18;
+  m_wrongWaySaid = 0;
   m_musicAsked = false;
   m_christmasSaid = false;
   m_roundaboutSaid = false;

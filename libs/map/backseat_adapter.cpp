@@ -682,6 +682,19 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
     snap.origin = ToBackseatLatLon(poly.Front());
     snap.destinationPoint = ToBackseatLatLon(poly.Back());
   }
+  // Which way the route runs from the car's matched spot, for "you're facing the wrong way".
+  if (route->GetFollowedPolyline().IsValid())
+  {
+    m2::PointD const here = route->GetFollowedPolyline().GetCurrentIter().m_pt;
+    m2::PointD ahead;
+    route->GetCurrentDirectionPoint(ahead);
+    if (mercator::DistanceOnEarth(here, ahead) > 1)
+    {
+      // Mercator keeps angles, so the bearing is the plain screen angle turned to compass degrees.
+      double const screenDeg = std::atan2(ahead.y - here.y, ahead.x - here.x) * 180.0 / M_PI;
+      snap.routeBearingDeg = std::fmod(450.0 - screenDeg, 360.0);
+    }
+  }
 
   if (snap.state == backseat::RouteState::OnRoute && session.IsNavigable())
   {

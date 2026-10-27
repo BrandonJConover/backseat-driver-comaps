@@ -257,6 +257,8 @@ enum class Category
   Music,
   /// Holidays, Grinch edition (navigator only).
   Holiday,
+  /// Driving away from the route (navigator only).
+  WrongWay,
   Count
 };
 

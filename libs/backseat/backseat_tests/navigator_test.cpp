@@ -822,3 +822,53 @@ TEST(NavigatorPointsAtTheVolumeKnobAtRoundabouts)
   quiet.OnFix(At(0, 10), OnRoute(1, TurnKind::Roundabout, 300));
   CHECK(LinesOf(quiet.TakeLines(), Category::Music).empty());
 }
+
+TEST(NavigatorSaysWhenTheCarFacesTheWrongWay)
+{
+  Navigator nav(Config());
+  RouteSnapshot north = Far();
+  north.routeBearingDeg = 5;
+  std::vector<Commentary> said;
+  auto drive = [&](double tMs, double bearing) {
+    nav.OnFix(Heading(tMs, 10, bearing), north);
+    for (auto const & l : LinesOf(nav.TakeLines(), Category::WrongWay))
+      said.push_back(l);
+  };
+  drive(0, 10);
+  drive(1000, 190);  // a wobble isn't enough...
+  drive(2000, 0);
+  drive(3000, 175);
+  drive(5000, 180);
+  CHECK(said.empty());
+  drive(6500, 185);  // ...but three seconds heading south is
+  CHECK_EQUAL(said.size(), size_t(1));
+  drive(10000, 180);  // not every fix
+  CHECK_EQUAL(said.size(), size_t(1));
+
+  drive(20000, 5);  // turned around
+  drive(120000, 185);
+  drive(124000, 185);
+  CHECK_EQUAL(said.size(), size_t(2));  // and again, later
+}
+
+TEST(NavigatorLeavesTheDirectionAloneWhenItCantTell)
+{
+  Navigator nav(Config());
+  RouteSnapshot unknown = Far();  // no route direction
+  RouteSnapshot off = Far();
+  off.routeBearingDeg = 0;
+  off.state = RouteState::OffRoute;
+  RouteSnapshot north = Far();
+  north.routeBearingDeg = 0;
+  bool said = false;
+  for (int i = 0; i < 10; ++i)
+  {
+    nav.OnFix(Heading(i * 1000.0, 10, 180), unknown);
+    said = said || Has(nav.TakeLines(), Category::WrongWay);
+    nav.OnFix(Heading(20000 + i * 1000.0, 10, 180), off);
+    said = said || Has(nav.TakeLines(), Category::WrongWay);
+    nav.OnFix(Heading(40000 + i * 1000.0, 1, 180), north);  // crawling: GPS course is noise
+    said = said || Has(nav.TakeLines(), Category::WrongWay);
+  }
+  CHECK(!said);
+}

@@ -67,6 +67,9 @@ struct RouteSnapshot
   std::vector<TurnKind> plannedTurns;
   LatLon origin;
   LatLon destinationPoint;
+  /// Which way the route goes from the car's spot on it, degrees clockwise from north. Negative
+  /// when unknown.
+  double routeBearingDeg = -1;
 };
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
@@ -213,6 +216,7 @@ private:
   bool KnowsTheDate(double ms) const;
   void TrackLongDrive(double tMs, RouteSnapshot const & route);
   void TrackSights(Fix const & fix, RouteSnapshot const & route);
+  void TrackWrongWay(Fix const & fix, RouteSnapshot const & route);
   void TrackMusic(double tMs, RouteSnapshot const & route);
   int Tier() const;
   bool Parked() const;
@@ -261,6 +265,10 @@ private:
   double m_lastSightCheckT = -1e18;
   double m_lastSightT = -1e18;
   std::vector<std::string> m_sightsSaid;
+  /// When the car started heading away from the route, or negative while it isn't.
+  double m_wrongWaySince = -1;
+  double m_lastWrongWayT = -1e18;
+  int m_wrongWaySaid = 0;
   /// Reroutes this trip; the third one gets the autopilot line.
   int m_reroutes = 0;
   bool m_carHasAutopilot = false;

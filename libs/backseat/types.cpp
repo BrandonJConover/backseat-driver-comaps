@@ -157,6 +157,7 @@ char const * ToString(Category c)
   case Category::Partner: return "partner";
   case Category::Music: return "music";
   case Category::Holiday: return "holiday";
+  case Category::WrongWay: return "wrongWay";
   case Category::Count: break;
   }
   return "?";
