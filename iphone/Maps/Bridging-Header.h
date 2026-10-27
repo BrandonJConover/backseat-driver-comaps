@@ -79,3 +79,4 @@
 #import "MWMSearch.h"
 #import "SearchResult.h"
 #import "MWMBackseatRewriter.h"
+#import "MWMBackseatLog.h"

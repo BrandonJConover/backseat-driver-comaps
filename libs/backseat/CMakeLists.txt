@@ -7,6 +7,8 @@ project(backseat)
 
 set(
   SRC
+  debug_log.cpp
+  debug_log.hpp
   engine.cpp
   engine.hpp
   history.cpp

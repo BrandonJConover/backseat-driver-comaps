@@ -1,3 +1,5 @@
+import AVFoundation
+import UIKit
 import CoreMotion
 
 /// Small moments the GPS has opinions about: panning the map mid-trip, typing a destination, and
@@ -19,6 +21,31 @@ import CoreMotion
     NotificationCenter.default.addObserver(forName: BackseatTalkButton.navigationVisibilityChanged, object: nil,
                                            queue: .main) { note in
       if (note.object as? Bool) ?? false { startRoughRoad() } else { stopRoughRoad() }
+    }
+    traceAppAndAudio()
+  }
+
+  /// App and audio session moments for the drive log, to explain a line that never played.
+  private static func traceAppAndAudio() {
+    let center = NotificationCenter.default
+    center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in
+      BackseatLog.event("app.background", [:])
+    }
+    center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { _ in
+      BackseatLog.event("app.foreground", [:])
+    }
+    center.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { _ in
+      BackseatLog.event("app.memoryWarning", [:])
+    }
+    center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { note in
+      let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+      let type = raw.flatMap(AVAudioSession.InterruptionType.init)
+      BackseatLog.event("audio.interrupted", ["phase": type == .began ? "began" : "ended"])
+    }
+    center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { note in
+      let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt ?? 0
+      let outputs = AVAudioSession.sharedInstance().currentRoute.outputs.map { "\($0.portType.rawValue):\($0.portName)" }
+      BackseatLog.event("audio.route", ["output": outputs.joined(separator: ","), "reason": String(raw)])
     }
   }
 

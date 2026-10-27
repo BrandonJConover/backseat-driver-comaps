@@ -47,6 +47,8 @@ import Speech
   private var pausedForSpeech = false
   /// Takes the next thing heard instead of the navigator, e.g. an answer to a setup question.
   private var answerHandler: ((String) -> Void)?
+  /// What the answer is for, in the drive log: destination, survey, mileage...
+  private var answerPurpose = "answer"
   /// How long the mic waits for the first word when opened for one phrase.
   private var firstWordWait: TimeInterval = 6
 
@@ -99,8 +101,10 @@ import Speech
 
   /// Sends the next thing the driver says (empty when they say nothing) to `handler` instead of the
   /// navigator, listening for it if the mic is off.
-  func listenForAnswer(waiting: TimeInterval = 6, _ handler: @escaping (String) -> Void) {
+  func listenForAnswer(waiting: TimeInterval = 6, for purpose: String = "answer",
+                       _ handler: @escaping (String) -> Void) {
     answerHandler = handler
+    answerPurpose = purpose
     firstWordWait = waiting
     if !isListening {
       withPermission { self.start(continuous: false) }
@@ -246,7 +250,12 @@ import Speech
           // A short pause after speaking ends it; a final result ends it at once.
           self.restartTimeout(after: result.isFinal ? 0 : Self.pauseToFinish)
         }
-        if error != nil {
+        if let error {
+          let code = (error as NSError).code
+          // 1110 is "no speech detected", the normal end of a quiet listen.
+          if code != 1110 && code != 216 && code != 301 {
+            BackseatLog.event("stt.error", ["error": error.localizedDescription, "code": String(code)])
+          }
           self.finish()
         }
       }
@@ -287,6 +296,7 @@ import Speech
       // An empty answer only counts when the mic was opened just for it.
       if !text.isEmpty || !continuous {
         answerHandler = nil
+        BackseatLog.event("stt", ["for": answerPurpose, "text": text])
         answer(text)
       }
       return
@@ -297,6 +307,7 @@ import Speech
       return
     }
     LOG(.info, "Backseat heard: \(text)")
+    BackseatLog.event("stt", ["for": "command", "text": text])
     MWMBackseatRewriter.driverSaid(text)
   }
 
@@ -375,12 +386,12 @@ import Speech
   }
 
   /// Listens once the GPS has finished talking, so it doesn't hear itself.
-  static func listen(waiting: TimeInterval = 6, _ handler: @escaping (String) -> Void) {
+  static func listen(waiting: TimeInterval = 6, for purpose: String = "answer", _ handler: @escaping (String) -> Void) {
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
       if KokoroVoice.shared.anyVoiceSpeaking {
-        listen(waiting: waiting, handler)
+        listen(waiting: waiting, for: purpose, handler)
       } else {
-        BackseatListener.shared.listenForAnswer(waiting: waiting, handler)
+        BackseatListener.shared.listenForAnswer(waiting: waiting, for: purpose, handler)
       }
     }
   }
@@ -421,7 +432,7 @@ import Speech
       let question = MWMBackseatRewriter.askWhereTo
       guard !question.isEmpty else { return }
       KokoroVoice.shared.sayReply(question, voiceID: nil) { MWMTextToSpeech.tts().play(question) }
-      BackseatSetup.listen(waiting: answerWait) { answer in
+      BackseatSetup.listen(waiting: answerWait, for: "destination") { answer in
         if answer.isEmpty {
           let shrug = MWMBackseatRewriter.noAnswerToWhereTo
           if !shrug.isEmpty {
@@ -493,7 +504,7 @@ import Speech
   }
 
   private func listenForPick(tries: Int) {
-    BackseatSetup.listen(waiting: Self.pickWait) { [self] answer in
+    BackseatSetup.listen(waiting: Self.pickWait, for: "destination") { [self] answer in
       guard !answer.isEmpty else { return }
       var index = -1
       let line = MWMBackseatRewriter.pickSearchResult(answer, index: &index)
@@ -552,7 +563,7 @@ import Speech
       let question = MWMBackseatRewriter.arrivalSurvey
       guard !question.isEmpty else { return }
       KokoroVoice.shared.sayReply(question, voiceID: nil) { MWMTextToSpeech.tts().play(question) }
-      BackseatSetup.listen(waiting: 6) { answer in
+      BackseatSetup.listen(waiting: 6, for: "survey") { answer in
         let reply = MWMBackseatRewriter.surveyAnswer(answer)
         if !reply.isEmpty {
           KokoroVoice.shared.sayReply(reply, voiceID: nil) { MWMTextToSpeech.tts().play(reply) }
@@ -599,7 +610,7 @@ import Speech
       asking = false
       BackseatListener.shared.stopWaitingForAnswer()
     }
-    BackseatSetup.listen(waiting: 15) { answer in
+    BackseatSetup.listen(waiting: 15, for: "file") { answer in
       guard asking else { return }
       asking = false
       let reply = MWMBackseatRewriter.fileAnswer(answer)

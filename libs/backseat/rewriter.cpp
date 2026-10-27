@@ -1,5 +1,7 @@
 #include "backseat/rewriter.hpp"
 
+#include "backseat/debug_log.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <set>
@@ -169,9 +171,20 @@ std::vector<Commentary> RewriteGate::Take()
       kept.push_back(std::move(e));
       continue;
     }
+    char const * result = "timeout";
     if (answer)
+    {
+      result = "rejected";
       if (auto const accepted = AcceptRewrite(e.request, *answer))
+      {
         e.line.text = *accepted;
+        result = "used";
+      }
+    }
+    Trace("rewrite", {{"result", result},
+                      {"ms", std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                now - (e.deadline - m_budget))
+                                                .count())}});
     out.push_back(std::move(e.line));
   }
   m_queue = std::move(kept);

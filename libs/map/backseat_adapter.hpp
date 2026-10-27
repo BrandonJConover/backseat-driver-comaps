@@ -1,5 +1,6 @@
 #pragma once
 
+#include "backseat/debug_log.hpp"
 #include "backseat/mileage.hpp"
 #include "backseat/navigator.hpp"
 #include "backseat/voice_command.hpp"
@@ -36,6 +37,22 @@ class BackseatAdapter
 {
 public:
   BackseatAdapter();
+  ~BackseatAdapter();
+  BackseatAdapter(BackseatAdapter const &) = delete;
+  BackseatAdapter & operator=(BackseatAdapter const &) = delete;
+
+  /// The drive log (Settings > Backseat Driver > Share drive log): what the GPS did on recent
+  /// drives, kept on the phone so test drives can be troubleshot. On by default.
+  bool DebugLogEnabled() const { return m_debugLog.Enabled(); }
+  void SetDebugLogEnabled(bool on);
+  /// Writes the whole log to `path`, starting with `header` (app version, device, voice state).
+  bool ExportDebugLog(std::string const & path, backseat::LogFields const & header) const
+  {
+    return m_debugLog.ExportTo(path, header);
+  }
+  void ClearDebugLog() { m_debugLog.Clear(); }
+  /// For events only the platform sees (which voice spoke, speech recognition, audio interruptions).
+  void LogEvent(std::string const & ev, backseat::LogFields const & fields) { backseat::Trace(ev, fields); }
 
   /// A real (not extrapolated) GPS fix.
   void OnLocationUpdate(location::GpsInfo const & info, routing::RoutingSession const & session,
@@ -301,6 +318,8 @@ private:
   /// Carries out one command, adding to `heard`; returns the reply to say for it.
   std::string Run(backseat::AppCommand const & command, bool polite, HeardCommand & heard);
 
+  /// First, so it's there before the navigator and gone after it.
+  backseat::DebugLog m_debugLog;
   backseat::Navigator m_navigator;
   std::function<DataSource &()> m_dataSource;
   std::function<storage::CountryInfoGetter const &()> m_countryInfo;
@@ -342,6 +361,8 @@ private:
   /// Waiting for a rating after ArrivalSurvey().
   bool m_surveyAsked = false;
   backseat::DriveDetector m_drives;
+  /// For the drive log's drive start and end marks.
+  bool m_wasInTrip = false;
   std::vector<backseat::LoggedDrive> m_driveLog;
   std::vector<backseat::MileagePlace> m_taggedPlaces;
   /// Region lookups are cached until the car has moved a couple of kilometers.

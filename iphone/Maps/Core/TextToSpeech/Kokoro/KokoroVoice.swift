@@ -14,6 +14,7 @@ import FluidAudio
 import Foundation
 import Network
 import os
+import UIKit
 
 @objc(BackseatKokoroVoice)
 final class KokoroVoice: NSObject {
@@ -136,6 +137,9 @@ final class KokoroVoice: NSObject {
   private static let readyWait: TimeInterval = 20
   private let player = ClipPlayer()
 
+  /// The picked Kokoro voice, for the drive log; nil if Kokoro doesn't speak this language.
+  var selectedVoiceID: String? { Self.voice }
+
   /// True when Kokoro is loaded and can speak the instruction language.
   @objc var isReady: Bool {
     lock.lock(); defer { lock.unlock() }
@@ -194,6 +198,7 @@ final class KokoroVoice: NSObject {
     lock.unlock()
     if CoreMLCrashGuard.checkAtLaunch() {
       Self.log.error("Core ML crashed during the last Kokoro line")
+      BackseatLog.event("voice.crashGuard", ["os": UIDevice.current.systemVersion])
     }
     guard !CoreMLCrashGuard.isDisabledForThisOS() else {
       Self.log.info("Kokoro is off on this iOS build after a Core ML crash; the system voice speaks")
@@ -331,7 +336,9 @@ final class KokoroVoice: NSObject {
       return
     }
     guard primary != nil, let picked = Self.voice else {
+      let why = CoreMLCrashGuard.isDisabledForThisOS() ? "crashGuard" : failed ? "error" : "notReady"
       lock.unlock()
+      Self.trace(text, voice: "system", why: why)
       DispatchQueue.main.async { self.player.sayWithSystemVoice(fallback) }
       return
     }
@@ -352,6 +359,7 @@ final class KokoroVoice: NSObject {
     if !recovering, let wav = cache[key] {
       touch(key)
       lock.unlock()
+      Self.trace(text, voice: "kokoro-cached")
       DispatchQueue.main.async { self.player.play(wav, nav: nav, keep: keep) }
       return
     }
@@ -369,6 +377,7 @@ final class KokoroVoice: NSObject {
       lock.unlock()
       guard fallBack else { return }
       Self.log.debug("Kokoro too slow for a navigation line, using the system voice")
+      Self.trace(job.text, voice: "system", why: "deadline", waitMs: Date().timeIntervalSince(job.queuedAt) * 1000)
       player.sayWithSystemVoice(job.fallback)
     }
   }
@@ -495,10 +504,12 @@ final class KokoroVoice: NSObject {
       }
     } catch {
       Self.log.error("Kokoro failed on a line: \(error.localizedDescription, privacy: .public)")
+      BackseatLog.event("voice.error", ["error": error.localizedDescription, "text": String(job.text.prefix(60))])
       lock.lock()
       let fallBack = job.state == .waiting
       if fallBack { job.state = .fellBack }
       lock.unlock()
+      if fallBack { Self.trace(job.text, voice: "system", why: "error") }
       if fallBack { DispatchQueue.main.async { self.player.sayWithSystemVoice(job.fallback) } }
       return
     }
@@ -511,7 +522,17 @@ final class KokoroVoice: NSObject {
     let play = job.state == .waiting && job.generation == generation
     if play { job.state = .playing }
     lock.unlock()
+    if play {
+      Self.trace(job.text, voice: "kokoro", waitMs: renderStart.timeIntervalSince(job.queuedAt) * 1000,
+                 renderMs: Date().timeIntervalSince(renderStart) * 1000)
+    }
     if play { DispatchQueue.main.async { self.player.play(wav, nav: job.nav, keep: job.keep) } }
+  }
+
+  /// One "voice" line in the drive log: who said it, and why the system voice did if it did.
+  private static func trace(_ text: String, voice: String, why: String = "", waitMs: Double = 0, renderMs: Double = 0) {
+    BackseatLog.event("voice", ["voice": voice, "why": why, "wait_ms": String(Int(waitMs)),
+                                "render_ms": String(Int(renderMs)), "text": String(text.prefix(60))])
   }
 
   /// Call with `lock` held.

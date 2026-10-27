@@ -1,5 +1,7 @@
 #include "backseat/lines.hpp"
 
+#include "backseat/debug_log.hpp"
+
 #include "backseat/lines_data.hpp"
 
 #include <algorithm>
@@ -79,6 +81,9 @@ std::string const & SaidLog::Pick(std::string const & key, std::vector<std::stri
   if (recent.size() > keep)
     recent.erase(recent.begin(), recent.end() - static_cast<std::ptrdiff_t>(keep));
   m_dirty = true;
+  Trace("pick", {{"key", key},
+                 {"option", std::to_string(std::find(options.begin(), options.end(), line) - options.begin())},
+                 {"of", std::to_string(options.size())}});
   return line;
 }
 

@@ -311,6 +311,40 @@ std::optional<std::string> PlateRegionOfMap(std::string const & countryId)
   }
   return {};
 }
+
+char const * const kDebugLogKey = "BackseatDebugLog";
+
+/// CoMaps warnings and errors go into the drive log too (while it's on), throttled per message.
+base::LogMessageFn g_previousLogMessage = nullptr;
+
+void LogMessageAndTrace(base::LogLevel level, base::SrcPoint const & src, std::string const & msg)
+{
+  if (g_previousLogMessage)
+    g_previousLogMessage(level, src, msg);
+  if (level >= base::LWARNING)
+    backseat::TraceThrottled("error", msg.substr(0, 80),
+                             {{"level", base::ToString(level)}, {"where", src.FileName()}, {"msg", msg}});
+}
+
+void TeeWarningsToDriveLog()
+{
+  if (g_previousLogMessage)
+    return;
+  g_previousLogMessage = base::SetLogMessageFn(&LogMessageAndTrace);
+}
+
+char const * RouteStateName(backseat::RouteState s)
+{
+  switch (s)
+  {
+  case backseat::RouteState::Inactive: return "Inactive";
+  case backseat::RouteState::NotStarted: return "NotStarted";
+  case backseat::RouteState::OnRoute: return "OnRoute";
+  case backseat::RouteState::OffRoute: return "OffRoute";
+  case backseat::RouteState::Finished: return "Finished";
+  }
+  return "?";
+}
 }  // namespace
 
 char const * const BackseatAdapter::kPartnerKey = "BackseatPartner";
@@ -377,7 +411,8 @@ void BackseatAdapter::ReloadPersonality()
 }
 
 BackseatAdapter::BackseatAdapter()
-  : m_navigator({}, LoadTrips(), [](backseat::TripRecord const & r, backseat::TripReport const & report)
+  : m_debugLog({.dir = GetPlatform().SettingsDir()})
+  , m_navigator({}, LoadTrips(), [](backseat::TripRecord const & r, backseat::TripReport const & report)
 {
   LOG(LINFO, ("Backseat Driver trip to", r.destination, "graded", report.overall.letter));
   AppendTrip(r);
@@ -389,6 +424,21 @@ BackseatAdapter::BackseatAdapter()
   m_driveLog = LoadDrives();
   m_taggedPlaces = LoadMileagePlaces();
   ReloadPersonality();
+  m_debugLog.SetEnabled(SettingOn(kDebugLogKey, true));
+  backseat::SetDebugLog(&m_debugLog);
+  TeeWarningsToDriveLog();
+  backseat::Trace("app.start", {{"trips", std::to_string(m_navigator.History().size())}});
+}
+
+BackseatAdapter::~BackseatAdapter()
+{
+  backseat::SetDebugLog(nullptr);
+}
+
+void BackseatAdapter::SetDebugLogEnabled(bool on)
+{
+  settings::Set(kDebugLogKey, on);
+  m_debugLog.SetEnabled(on);
 }
 
 bool BackseatAdapter::Remember(std::string const & topic, std::string const & fact)
@@ -635,12 +685,24 @@ std::string BackseatAdapter::OnDriveSample(double lat, double lon, double speedM
   s.accuracyM = accuracyM;
   s.activity = static_cast<backseat::Activity>(std::clamp(activity, 0, 5));
   s.region = m_region;
-  if (auto const ended = m_drives.Feed(s))
+  bool const wasDriving = m_drives.Driving();
+  if (!m_navigator.InTrip() && m_debugLog.SampleDue(tMs))
+    backseat::Trace("fix", {{"lat", backseat::LogNum(lat, 4)},
+                            {"lon", backseat::LogNum(lon, 4)},
+                            {"mph", backseat::LogNum(speedMps * 2.23694, 0)},
+                            {"acc_m", backseat::LogNum(accuracyM, 0)},
+                            {"activity", std::to_string(activity)},
+                            {"driving", wasDriving ? "yes" : "no"}});
+  auto const ended = m_drives.Feed(s);
+  if (m_drives.Driving() != wasDriving)
+    backseat::Trace("mileage.state", {{"state", m_drives.Driving() ? "Driving" : "NotDriving"}});
+  if (ended)
     return OnDriveEnded(*ended);
 
   bool const talk = SettingOn(kMileageTalkKey, true);
   if (m_drives.TakeStarted())
   {
+    m_debugLog.BeginDrive("mileage");
     m_saidOutOfState = false;
     // While navigating, the trip already has plenty to say.
     if (talk && !m_navigator.InTrip())
@@ -687,6 +749,15 @@ std::string BackseatAdapter::OnDriveEnded(backseat::Drive const & drive)
     logged.fromName = nameNear(drive.from);
   if (logged.toName.empty())
     logged.toName = nameNear(drive.to);
+  backseat::Trace("mileage.drive", {{"miles", backseat::LogNum(logged.drive.Miles())},
+                                    {"bucket", backseat::BucketName(logged.bucket)},
+                                    {"why", backseat::WhyName(logged.why)},
+                                    {"flags", std::to_string(logged.flags)},
+                                    {"from", logged.fromName},
+                                    {"to", logged.toName}});
+  if (!m_navigator.InTrip())
+    m_debugLog.EndDrive("mileage", {{"miles", backseat::LogNum(logged.drive.Miles())},
+                                    {"bucket", backseat::BucketName(logged.bucket)}});
   m_driveLog.push_back(logged);
   std::ofstream(GetPlatform().SettingsPathForFile(kDrivesFile), std::ios::app) << backseat::SerializeDrive(logged) << '\n';
 
@@ -814,6 +885,13 @@ void BackseatAdapter::SetBusinessOwner(std::string const & owner)
 
 std::string BackseatAdapter::MileageAnswer(std::string const & spoken)
 {
+  if (m_mileageAsk != MileageAsk::None)
+    backseat::Trace("mileage.answer",
+                    {{"asked", m_mileageAsk == MileageAsk::Home    ? "Home"
+                               : m_mileageAsk == MileageAsk::Owner ? "Owner"
+                                                                   : "Business"},
+                     {"heard", spoken},
+                     {"understood", backseat::SaidYes(spoken) ? "yes" : backseat::SaidNo(spoken) ? "no" : "none"}});
   switch (std::exchange(m_mileageAsk, MileageAsk::None))
   {
   case MileageAsk::None: return {};
@@ -968,8 +1046,23 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
     if (limit > 0)
       fix.speedLimitMps = limit;
   }
+  if (m_debugLog.SampleDue(fix.tMs))
+    backseat::Trace("fix", {{"lat", backseat::LogNum(fix.lat, 4)},
+                            {"lon", backseat::LogNum(fix.lon, 4)},
+                            {"mph", backseat::LogNum(fix.speedMps * 2.23694, 0)},
+                            {"limit", fix.speedLimitMps ? backseat::LogNum(*fix.speedLimitMps * 2.23694, 0) : ""},
+                            {"bearing", backseat::LogNum(fix.bearingDeg, 0)},
+                            {"acc_m", backseat::LogNum(info.m_horizontalAccuracy, 0)},
+                            {"route", RouteStateName(route.state)},
+                            {"turn_m", backseat::LogNum(route.distToTurnM, 0)}});
   m_navigator.OnFix(fix, route);
   CheckBattery(fix.tMs);
+  bool const inTrip = m_navigator.InTrip();
+  if (inTrip && !m_wasInTrip)
+    m_debugLog.BeginDrive("trip", {{"to", destinationName}});
+  else if (!inTrip && m_wasInTrip && !m_drives.Driving())
+    m_debugLog.EndDrive("trip over");
+  m_wasInTrip = inTrip;
 }
 
 void BackseatAdapter::SetDataSource(std::function<DataSource &()> getter)
@@ -1250,6 +1343,7 @@ char const * ReplyKey(backseat::AppAction action, std::string const & argument)
 
 BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & text)
 {
+  backseat::Trace("heard.app", {{"text", text}});
   HeardCommand heard;
   // "I'm a woman": it guessed wrong, and it's not happy about being corrected.
   if (auto const pronouns = backseat::PronounCorrection(text))
@@ -1343,6 +1437,9 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
 {
   using backseat::AppAction;
   LOG(LINFO, ("Backseat: command", backseat::ToolFor(command.action).name, command.argument));
+  backseat::Trace("command", {{"tool", backseat::ToolFor(command.action).name},
+                              {"arg", command.argument},
+                              {"polite", polite ? "yes" : "no"}});
   switch (command.action)
   {
   case AppAction::NavigateTo:
@@ -1831,6 +1928,11 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
   for (auto const & c : m_navigator.TakeLines())
   {
     LOG(LINFO, ("Backseat says:", c.text));
+    backseat::Trace("say", {{"prio", c.priority == backseat::Priority::Nav ? "nav" : "roast"},
+                            {"cat", backseat::ToString(c.category)},
+                            {"frustration", std::to_string(c.frustration)},
+                            {"speed", backseat::LogNum(c.voiceSpeed, 2)},
+                            {"text", c.text}});
     out.push_back(c.text);
     m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed});
     if (c.priority == backseat::Priority::Nav)

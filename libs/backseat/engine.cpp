@@ -1,5 +1,7 @@
 #include "backseat/engine.hpp"
 
+#include "backseat/debug_log.hpp"
+
 #include "backseat/lines.hpp"
 #include "backseat/units.hpp"
 
@@ -694,9 +696,17 @@ bool CritiqueEngine::Roast(std::vector<Commentary> & out, double t, Category cat
   auto const it = m_lastByCategory.find(category);
   double const lastSame = it == m_lastByCategory.end() ? kNever : it->second;
   if (t - lastSame < CooldownMs(category))
+  {
+    TraceThrottled("roast.held", key + "/cooldown",
+                   {{"key", key}, {"why", "cooldown"}, {"wait_s", LogNum((CooldownMs(category) - (t - lastSame)) / 1000)}});
     return false;
+  }
   if (!urgent && t - m_lastRoastAt < m_config.minRoastGapMs)
+  {
+    TraceThrottled("roast.held", key + "/gap",
+                   {{"key", key}, {"why", "gap"}, {"wait_s", LogNum((m_config.minRoastGapMs - (t - m_lastRoastAt)) / 1000)}});
     return false;
+  }
 
   if (category != Category::TurnCompleted)
     Bump(category);
@@ -704,6 +714,8 @@ bool CritiqueEngine::Roast(std::vector<Commentary> & out, double t, Category cat
   m_lastRoastAt = t;
   m_lastByCategory[category] = t;
   m_stats.roastsDelivered++;
+  Trace("roast", {{"key", key}, {"tier", std::to_string(Tier())}, {"frustration", std::to_string(Frustration())},
+                  {"urgent", urgent ? "yes" : "no"}});
   out.push_back(Make(t, category, text, Priority::Roast));
   return true;
 }

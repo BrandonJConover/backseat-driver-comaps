@@ -1,5 +1,6 @@
 #include "backseat/navigator.hpp"
 
+#include "backseat/debug_log.hpp"
 #include "backseat/lines.hpp"
 #include "backseat/route_sketch.hpp"
 #include "backseat/rundown.hpp"
@@ -198,6 +199,19 @@ std::optional<RouteStep::Kind> StepKindOf(TurnKind k)
   case Maneuver::Right: return RouteStep::Kind::Right;
   default: return RouteStep::Kind::Other;
   }
+}
+
+char const * RouteStateName(RouteState s)
+{
+  switch (s)
+  {
+  case RouteState::Inactive: return "Inactive";
+  case RouteState::NotStarted: return "NotStarted";
+  case RouteState::OnRoute: return "OnRoute";
+  case RouteState::OffRoute: return "OffRoute";
+  case RouteState::Finished: return "Finished";
+  }
+  return "?";
 }
 }  // namespace
 
@@ -467,6 +481,8 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   if (route.state == RouteState::Inactive)
   {
     // Route cancelled or finished and closed: the trip is over either way.
+    if (m_engine)
+      Trace("route", {{"to", "Inactive"}});
     m_engine.reset();
     ResetTrip();
     return;
@@ -479,6 +495,8 @@ void Navigator::Update(double t, RouteSnapshot const & route)
 
   RouteState const prev = m_lastState;
   m_lastState = route.state;
+  if (route.state != prev)
+    Trace("route", {{"from", RouteStateName(prev)}, {"to", RouteStateName(route.state)}});
 
   if (route.state == RouteState::Finished)
   {
@@ -492,6 +510,7 @@ void Navigator::Update(double t, RouteSnapshot const & route)
       SayPlate(t, *wrap);
     TripRecord const record = RecordTrip(*m_engine, m_plan);
     m_history.push_back(record);
+    Trace("trip.arrived", {{"grade", m_engine->Report().overall.letter}});
     if (m_onTripRecorded)
       m_onTripRecorded(record, m_engine->Report());
     return;
@@ -506,6 +525,8 @@ void Navigator::Update(double t, RouteSnapshot const & route)
       Say(m_engine->OnNav(NavEvent::Rerouted(t)));
       m_rerouting = true;
       ++m_reroutes;
+      Trace("nav.offroute", {{"missed", (m_turnId && m_lastDistToTurnM < kMissedTurnWithinM) ? "yes" : "no"},
+                             {"reroutes", std::to_string(m_reroutes)}});
       // Missing a route they drew themselves gets its own line, in place of the "lost again" ones.
       if (m_sketched)
         SayLine(t, Category::Rerouted, "sketch.offRoute");
@@ -537,6 +558,13 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     m_rerouting = false;
     m_turnId = route.turnId;
     std::string const text = InstructionText(route.turn, route.nextStreet, route.destination);
+    Trace("nav.turn", {{"id", std::to_string(*route.turnId)},
+                       {"text", text},
+                       {"dist_m", LogNum(route.distToTurnM, 0)},
+                       {"control", std::to_string(static_cast<int>(route.control))},
+                       {"lane", route.laneSide == LaneSide::Left    ? "left"
+                                : route.laneSide == LaneSide::Right ? "right"
+                                                                    : ""}});
     Say(m_engine->OnNav(NavEvent::Instruction(t, text, route.distToTurnM, ManeuverOf(route.turn), route.control)));
     // A roundabout with the music on: a hint about the other round thing in the car. Once a trip.
     if (route.turn == TurnKind::Roundabout && !m_roundaboutSaid && m_musicLookup && m_musicLookup())
@@ -572,6 +600,10 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   m_plan.expectedMinutes = route.etaSeconds / 60;
   ResetTrip();
   m_tripStartT = t;
+  Trace("trip.start", {{"to", route.destination},
+                       {"eta_min", LogNum(route.etaSeconds / 60, 0)},
+                       {"turns", std::to_string(route.plannedTurns.size())},
+                       {"sketched", route.sketched ? "yes" : "no"}});
   std::string const routeKey = RouteKey(m_plan.origin, m_plan.destination);
   m_tripsOnRoute = static_cast<int>(
       std::count_if(m_history.begin(), m_history.end(), [&](TripRecord const & r) { return r.routeKey == routeKey; }));
@@ -994,6 +1026,7 @@ void Navigator::TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot co
 
 void Navigator::OnDriverSaid(double tMs, std::string const & text)
 {
+  Trace("heard", {{"text", text}, {"parked", m_engine && !m_arrived && Parked() ? "yes" : "no"}});
   if (!m_engine || m_arrived)
     return;
   m_lastT = std::max(m_lastT, tMs);

@@ -319,6 +319,7 @@ public:
   std::vector<std::pair<std::string, std::string>> BackseatLearnedFacts() const { return m_backseat.LearnedFacts(); }
   /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.
   BackseatAdapter const & GetBackseat() const { return m_backseat; }
+  BackseatAdapter & GetBackseat() { return m_backseat; }
 
   void AddRoutePoint(RouteMarkData && markData, bool reorderIntermediatePoints = true);
   void ContinueRouteToPoint(RouteMarkData && markData);

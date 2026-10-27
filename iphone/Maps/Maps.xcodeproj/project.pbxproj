@@ -153,6 +153,8 @@
 		3213DE744AEA509300F3828A /* BackseatListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = A134DCF11C5D2C0CF4DD010A /* BackseatListener.swift */; };
 		BD5EA7000000000000000031 /* BackseatDriveWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000030 /* BackseatDriveWatcher.swift */; };
 		BD5EA70000000000000000B1 /* BackseatHooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000B0 /* BackseatHooks.swift */; };
+		BD5EA70000000000000000C4 /* MWMBackseatLog.mm in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000C1 /* MWMBackseatLog.mm */; };
+		BD5EA70000000000000000C5 /* BackseatDriveLogSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */; };
 		8A5DF1798F484411EEE1E998 /* BackseatTalkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */; };
 		34845DAF1E1649F6003D55B9 /* DownloaderNoResultsEmbedViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DAD1E1649F6003D55B9 /* DownloaderNoResultsEmbedViewController.swift */; };
 		34845DB31E165E24003D55B9 /* SearchNoResultsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DB11E165E24003D55B9 /* SearchNoResultsViewController.swift */; };
@@ -991,6 +993,9 @@
 		A134DCF11C5D2C0CF4DD010A /* BackseatListener.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatListener.swift; sourceTree = "<group>"; };
 		BD5EA7000000000000000030 /* BackseatDriveWatcher.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatDriveWatcher.swift; sourceTree = "<group>"; };
 		BD5EA70000000000000000B0 /* BackseatHooks.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatHooks.swift; sourceTree = "<group>"; };
+		BD5EA70000000000000000C0 /* MWMBackseatLog.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MWMBackseatLog.h; sourceTree = "<group>"; };
+		BD5EA70000000000000000C1 /* MWMBackseatLog.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatLog.mm; sourceTree = "<group>"; };
+		BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatDriveLogSection.swift; sourceTree = "<group>"; };
 		DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatTalkButton.swift; sourceTree = "<group>"; };
 		34763EE91F2F394D00F4D2D3 /* MWMTextToSpeech+CPP.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = "MWMTextToSpeech+CPP.h"; sourceTree = "<group>"; tabWidth = 2; };
 		34763EEA1F2F3AD700F4D2D3 /* MWMTextToSpeechObserver.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMTextToSpeechObserver.h; sourceTree = "<group>"; tabWidth = 2; };
@@ -2592,6 +2597,9 @@
 				A134DCF11C5D2C0CF4DD010A /* BackseatListener.swift */,
 				BD5EA7000000000000000030 /* BackseatDriveWatcher.swift */,
 				BD5EA70000000000000000B0 /* BackseatHooks.swift */,
+				BD5EA70000000000000000C0 /* MWMBackseatLog.h */,
+				BD5EA70000000000000000C1 /* MWMBackseatLog.mm */,
+				BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */,
 				DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */,
 				E26D17103928978C28885B55 /* MWMBackseatRewriter.h */,
 				0CBA5579CD04841A09E00696 /* MWMBackseatRewriter.mm */,
@@ -4890,6 +4898,8 @@
 				3213DE744AEA509300F3828A /* BackseatListener.swift in Sources */,
 				BD5EA7000000000000000031 /* BackseatDriveWatcher.swift in Sources */,
 				BD5EA70000000000000000B1 /* BackseatHooks.swift in Sources */,
+				BD5EA70000000000000000C4 /* MWMBackseatLog.mm in Sources */,
+				BD5EA70000000000000000C5 /* BackseatDriveLogSection.swift in Sources */,
 				8A5DF1798F484411EEE1E998 /* BackseatTalkButton.swift in Sources */,
 				F6E2FE221E097BA00083EBEC /* MWMOpeningHoursEditorViewController.mm in Sources */,
 				ED79A5D72BDF8D6100952D1F /* SynchronizationStateResolver.swift in Sources */,

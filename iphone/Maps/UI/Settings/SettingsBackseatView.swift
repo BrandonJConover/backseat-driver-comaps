@@ -203,6 +203,14 @@ struct SettingsBackseatView: View {
                 Text(verbatim: "Logs drives on its own and sorts them into business and personal for taxes. Off until you turn it on.")
             }
 
+            BackseatDriveLogSection {
+                [
+                    "kokoro": KokoroVoice.shared.isReady ? "ready" : "notReady",
+                    "crashGuard": CoreMLCrashGuard.isDisabledForThisOS() ? "tripped" : "ok",
+                    "voice": KokoroVoice.shared.selectedVoiceID ?? "system",
+                ]
+            }
+
             Section {
                 VStack(spacing: 6) {
                     Slider(value: $niceness, in: 0...1) { editing in

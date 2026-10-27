@@ -40,6 +40,8 @@ import FoundationModels
     // The model can finish downloading, or Apple Intelligence can be switched on, while the app runs.
     MWMBackseatRewriter.setAvailable(model.isAvailable)
     MWMBackseatRewriter.setToolsAvailable(model.isAvailable)
+    BackseatLog.event("llm.available", ["available": model.isAvailable ? "yes" : "no",
+                                        "reason": model.isAvailable ? "" : String(describing: model.availability)])
     availabilityTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
       MWMBackseatRewriter.setAvailable(model.isAvailable)
       MWMBackseatRewriter.setToolsAvailable(model.isAvailable)
