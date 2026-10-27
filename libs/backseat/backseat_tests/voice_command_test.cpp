@@ -119,6 +119,7 @@ TEST(AppCommandsAreHeardInOrder)
   CHECK(ParseAppCommands("go to settings")[0].action == AppAction::OpenSettings);
   CHECK_EQUAL(ParseAppCommands("go to settings").size(), size_t(1));
   CHECK(ParseAppCommands("stop listening")[0].action == AppAction::StopListening);
+  CHECK(ParseAppCommands("so what can you do?")[0].action == AppAction::ListCommands);
 
   auto const voice = ParseAppCommands("switch to the echo voice");
   CHECK_EQUAL(voice.size(), size_t(1));

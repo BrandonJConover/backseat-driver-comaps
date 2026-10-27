@@ -543,6 +543,7 @@ char const * ReplyKey(backseat::AppAction action, std::string const & argument)
   case AppAction::RouteOverview: return "cmd.overview";
   case AppAction::OpenSettings: return "cmd.settings";
   case AppAction::StopListening: return "cmd.stopListening";
+  case AppAction::ListCommands: return "cmd.help";
   default: return nullptr;
   }
 }

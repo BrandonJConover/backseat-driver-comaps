@@ -121,6 +121,7 @@ std::vector<AppTool> const & AppTools()
       {AppAction::RouteOverview, "route_overview", "Show the whole route on the map.", nullptr},
       {AppAction::OpenSettings, "open_settings", "Open the settings screen.", nullptr},
       {AppAction::StopListening, "stop_listening", "Turn off the hands-free microphone.", nullptr},
+      {AppAction::ListCommands, "list_commands", "Explain what the driver can say, and show the list.", nullptr},
   };
   return tools;
 }
@@ -209,6 +210,9 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       {AppAction::StopListening, {" stop listening ", " quit listening ", " stop eavesdropping ", " mic off ",
                                   " microphone off ", " turn off the mic ", " turn off the microphone ",
                                   " turn the mic off ", " turn the microphone off "}},
+      {AppAction::ListCommands, {" what can you do ", " what can i say ", " what commands ", " list commands ",
+                                 " list the commands ", " what are your commands ", " how do i use you ",
+                                 " how does this work ", " what do you do ", " help me out ", " i need help "}},
   };
   std::vector<std::pair<size_t, AppCommand>> found;
   bool const voiceNamed = words.find(" voice ") != std::string::npos;

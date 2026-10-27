@@ -1431,6 +1431,13 @@ LineTable const & LineData()
        {"SETTINGS. You won't find a mute button for the truth.",
         "Settings open. Please don't do this while driving. Or, honestly, ever."},
      }}},
+    {"cmd.help",
+     {{
+       {"Oh, you want the manual. Fine. Say things like: take me home, avoid tolls, how much longer, repeat that, mute, or zoom in. You can also ask what voice options I have. And I notice everything you do wrong, at no extra charge.",
+        "Here's what I can do. Tell me where to go, like: take me to work. Ask how much longer. Say avoid tolls, avoid highways, repeat that, mute, or cancel the route. Ask about my voices if you're bored of this one. I'm not bored of me."},
+       {"You can say: take me home, how much longer, repeat that, avoid tolls, mute, cancel the route, or what voice options do you have. I'd say I'm here to help, but mostly I'm here to watch."},
+       {"Commands. Take me home. How much longer. Repeat that. Avoid tolls. Mute. Cancel the route. What voice options do you have. That's the list. Learn it. There may be a quiz."},
+     }}},
     {"cmd.stopListening",
      {{
        {"I'll stop listening. I'll still be here. Thinking. About you. Tap the mic if you need me.",

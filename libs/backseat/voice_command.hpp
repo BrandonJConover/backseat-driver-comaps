@@ -57,6 +57,7 @@ enum class AppAction
   RouteOverview,
   OpenSettings,
   StopListening,
+  ListCommands,
   Count
 };
 
