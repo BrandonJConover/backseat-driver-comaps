@@ -86,7 +86,7 @@ TEST(TurnDirectionFromText)
 TEST(CountdownNagsInOrder)
 {
   auto engine = MakeEngine();
-  engine.OnNav(NavEvent::Instruction(0, "Turn left onto Elm Street", 400));
+  engine.OnNav(NavEvent::Instruction(-10000, "Turn left onto Elm Street", 400));
   CHECK_EQUAL(engine.OnNav(NavEvent::Progress(1000, 140)).size(), size_t{1});
   CHECK_EQUAL(engine.OnNav(NavEvent::Progress(2000, 100)).size(), size_t{0});
   CHECK_EQUAL(engine.OnNav(NavEvent::Progress(3000, 12)).size(), size_t{1});
@@ -140,13 +140,14 @@ CritiqueEngine FirstLineEngine()
 TEST(TurnNagsRunInOrderAndEndWithPleaseStop)
 {
   auto e = FirstLineEngine();
-  e.OnNav(NavEvent::Instruction(0, "Turn left onto Elm", 400));
+  e.OnNav(NavEvent::Instruction(-10000, "Turn left onto Elm", 400));
   std::vector<std::string> said;
   double const ds[] = {300, 200, 140, 100, 40, 14, 8, 3, 2, 1, 0, 0};
   for (size_t i = 0; i < std::size(ds); ++i)
-    for (auto const & t : Texts(e.OnNav(NavEvent::Progress(1000.0 * (i + 1), ds[i]))))
+    // City speed: the 250 ft mark comes well after the 500 ft call.
+    for (auto const & t : Texts(e.OnNav(NavEvent::Progress(1000.0 * (i + 1) + (i >= 4 ? 10000 : 0), ds[i]))))
       said.push_back(t);
-  for (auto const & t : Texts(e.OnNav(NavEvent::TurnCompleted(13000, true))))
+  for (auto const & t : Texts(e.OnNav(NavEvent::TurnCompleted(23000, true))))
     said.push_back(t);
   std::vector<std::string> const want = {
       "Just in case you forgot, you are turning left in 500 feet.", "By the way, did I mention you should turn left.",
@@ -179,12 +180,12 @@ TEST(NascarOnTheThirdLeftInARow)
   char const * const dirs[] = {"left", "left", "left", "left", "right", "left", "left", "left"};
   for (int i = 0; i < 8; ++i)
   {
-    double const t = i * 10000.0;
+    double const t = i * 20000.0;
     e.OnNav(NavEvent::Instruction(t, std::string("Turn ") + dirs[i] + " onto Elm", 400));
-    for (auto const & s : Texts(e.OnNav(NavEvent::Progress(t + 1000, 140))))
+    for (auto const & s : Texts(e.OnNav(NavEvent::Progress(t + 9000, 140))))
       if (std::find(nascar.begin(), nascar.end(), s) != nascar.end())
         hits.push_back(i);
-    e.OnNav(NavEvent::TurnCompleted(t + 2000, true));
+    e.OnNav(NavEvent::TurnCompleted(t + 9500, true));
   }
   CHECK(hits == (std::vector<int>{2, 7}));
 }
@@ -195,13 +196,13 @@ namespace
 std::vector<std::string> CountdownFor(std::string const & text)
 {
   auto e = FirstLineEngine();
-  e.OnNav(NavEvent::Instruction(0, text, 400));
+  e.OnNav(NavEvent::Instruction(-10000, text, 400));
   std::vector<std::string> said;
   double const ds[] = {300, 140, 70, 40, 3, 0, 0, 0};
   for (size_t i = 0; i < std::size(ds); ++i)
-    for (auto const & t : Texts(e.OnNav(NavEvent::Progress(1000.0 * (i + 1), ds[i]))))
+    for (auto const & t : Texts(e.OnNav(NavEvent::Progress(1000.0 * (i + 1) + (i >= 2 ? 10000 : 0), ds[i]))))
       said.push_back(t);
-  for (auto const & t : Texts(e.OnNav(NavEvent::TurnCompleted(10000, true))))
+  for (auto const & t : Texts(e.OnNav(NavEvent::TurnCompleted(20000, true))))
     said.push_back(t);
   return said;
 }

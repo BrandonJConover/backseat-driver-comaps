@@ -46,9 +46,11 @@ struct EngineConfig
   /// Stopped this long (and not arrived) before the GPS gets impatient.
   double longStopAfterMs = 45000;
   /// Minimum gap between any two roasts so the driver can hear the actual directions.
-  double minRoastGapMs = 6000;
+  double minRoastGapMs = 9000;
+  /// After a direction, no roasts for this long (except urgent ones and turn verdicts): let it sink in.
+  double navBreathMs = 5000;
   /// Re-nag interval while the driver stays over the limit.
-  double speedingRenagMs = 20000;
+  double speedingRenagMs = 40000;
   /// Distances for the "you are turning left in 500 feet / 50 feet" nags.
   double countdownFarM = 152;  // 500 ft
   double countdownNearM = 15;  // 50 ft
@@ -119,6 +121,8 @@ private:
     int stage;  // 0..4, see Countdown()
     std::optional<double> atTurnSince;
     bool mentioned = false;
+    /// When the far ("in 500 feet") call was said.
+    std::optional<double> farAt;
     /// Distance to the maneuver at the last instruction or progress update.
     double distM = 0;
   };
@@ -165,6 +169,9 @@ private:
   std::optional<TelemetrySample> m_lastSample;
   double FarM() const;
   double m_lastRoastAt;
+  /// Set by Make() for every navigation line.
+  mutable double m_lastNavAt = -1e18;
+  int m_instructionCount = 0;
   std::map<Category, double> m_lastByCategory;
   std::map<std::string, std::vector<std::string>> m_recentLines;
 

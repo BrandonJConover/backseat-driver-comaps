@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 using namespace backseat;
 
@@ -72,14 +73,18 @@ TEST(NavigatorOpensWithGreetingRundownAndInstruction)
   Navigator nav(Config());
   nav.OnFix(At(0, 10), OnRoute(1, TurnKind::Left, 400));
   auto const lines = nav.TakeLines();
-  // Greeting, rundown, time prediction, then the first instruction.
-  CHECK_EQUAL(lines.size(), size_t{4});
+  // Greeting, rundown, then the first instruction; the time prediction waits until we're rolling.
+  CHECK_EQUAL(lines.size(), size_t{3});
   CHECK(lines[0].text.find("didn't ask to be in this car") != std::string::npos);
   // First trip ever: the turns rattled off at speed, then Brandon's music line.
   CHECK(lines[1].text.find("Left, right.") != std::string::npos);
   CHECK(lines[1].text.find("put on some music") != std::string::npos);
   CHECK(lines[1].voiceSpeed > 1.2);
-  CHECK(lines[3].text.find("turn left onto Elm Street") != std::string::npos);
+  CHECK(lines[2].text.find("turn left onto Elm Street") != std::string::npos);
+  nav.OnFix(At(30000, 10), OnRoute(1, TurnKind::Left, 380));
+  auto const later = nav.TakeLines();
+  CHECK_EQUAL(later.size(), size_t{1});
+  CHECK(later[0].priority == Priority::Nav);
 }
 
 TEST(NavigatorTurnsStepChangesIntoCompletedTurns)
@@ -87,7 +92,7 @@ TEST(NavigatorTurnsStepChangesIntoCompletedTurns)
   Navigator nav(Config());
   nav.OnFix(At(0, 10), OnRoute(1, TurnKind::Left, 400));
   nav.TakeLines();
-  nav.OnFix(At(1000, 10), OnRoute(1, TurnKind::Left, 140));
+  nav.OnFix(At(10000, 10), OnRoute(1, TurnKind::Left, 140));
   CHECK(Has(nav.TakeLines(), Category::Instruction));  // the 500 ft nag
   nav.OnFix(At(30000, 10), OnRoute(2, TurnKind::Right, 300, "Oak Avenue"));
   auto const lines = nav.TakeLines();
@@ -118,7 +123,10 @@ TEST(NavigatorRoastsSpeedingFromTheFix)
   Navigator nav(Config());
   nav.OnFix(At(0, FromDisplay(50, Units::Mph), FromDisplay(50, Units::Mph)), OnRoute(1, TurnKind::Left, 900));
   nav.TakeLines();
+  // A few seconds after the direction: right on top of it, the roast waits its turn.
   nav.OnFix(At(1000, FromDisplay(51, Units::Mph), FromDisplay(50, Units::Mph)), OnRoute(1, TurnKind::Left, 880));
+  CHECK(!Has(nav.TakeLines(), Category::Speeding));
+  nav.OnFix(At(6000, FromDisplay(51, Units::Mph), FromDisplay(50, Units::Mph)), OnRoute(1, TurnKind::Left, 800));
   CHECK(Has(nav.TakeLines(), Category::Speeding));
 }
 
@@ -157,8 +165,9 @@ Fix AtPos(double tMs, double mps, double lat, double lon, std::optional<double> 
 bool SaidLineOf(std::string const & text, std::string const & key)
 {
   for (int tier = 0; tier < 3; ++tier)
-    for (auto const & line : LinesFor(key, tier))
+    for (auto const & raw : LinesFor(key, tier))
     {
+      std::string const line = SpeakableText(raw);  // as the navigator hands it out
       size_t at = 0;
       bool match = true;
       for (size_t i = 0; i < line.size() && match;)
@@ -1030,6 +1039,11 @@ TEST(LaneAdviceOncePerManeuver)
   next.laneSide = LaneSide::Right;
   nav.OnFix(At(120000, 25), next);
   nav.Poll(next);
+  // Not on top of the direction itself; a few seconds later.
+  CHECK(!SaidKey(nav.TakeLines(), "lane.right"));
+  next.distToTurnM = 850;
+  nav.OnFix(At(126000, 25), next);
+  nav.Poll(next);
   CHECK(SaidKey(nav.TakeLines(), "lane.right"));
 }
 
@@ -1388,4 +1402,49 @@ TEST(FirstTripBitPlaysOnceEvenIfTheTripNeverArrives)
   CHECK(third.find("put on some music") == std::string::npos);
   CHECK(third != second);
   CHECK_EQUAL(saved.Counter("_trips.started"), 3);
+}
+
+TEST(RelaunchMidTripPicksUpWithoutANewGreeting)
+{
+  SaidLog saved;
+  double const now = 1.79e12;
+  auto launch = [&saved](double t, RouteSnapshot const & route)
+  {
+    auto nav = std::make_unique<Navigator>(Config());
+    nav->SetSaidLog(SaidLog::Parse(saved.Serialize()), [&saved](SaidLog const & log) { saved = log; });
+    // The app starts with no route, then CoMaps restores the one under way.
+    nav->OnFix(At(t, 10), RouteSnapshot{});
+    nav->TakeLines();
+    nav->OnFix(At(t + 1000, 10), route);
+    return nav;
+  };
+  auto first = launch(now, OnRoute(1, TurnKind::Left, 2000));
+  CHECK(Has(first->TakeLines(), Category::Instruction));
+  first->OnFix(At(now + 120000, 10), OnRoute(1, TurnKind::Left, 1500));
+  first->TakeLines();
+  first.reset();  // crash: no Inactive, no Finished
+
+  auto second = launch(now + 180000, OnRoute(1, TurnKind::Left, 1200));
+  std::string all;
+  bool welcomedBack = false;
+  for (auto const & l : second->TakeLines())
+  {
+    all += l.text + "\n";
+    welcomedBack = welcomedBack || SaidLineOf(l.text, "trip.resumed");
+  }
+  CHECK(welcomedBack);
+  CHECK(all.find("pointers") == std::string::npos);
+  CHECK(all.find("Okay, real quick") == std::string::npos);
+  CHECK_EQUAL(saved.Counter("_trips.started"), 1);
+
+  // Ended properly this time: the next start, even to the same place, is a new trip.
+  second->OnFix(At(now + 240000, 10), RouteSnapshot{});
+  second->TakeLines();
+  second.reset();
+  auto third = launch(now + 300000, OnRoute(1, TurnKind::Left, 2000));
+  std::string next;
+  for (auto const & l : third->TakeLines())
+    next += l.text + "\n";
+  CHECK(next.find("Okay, real quick") == std::string::npos);  // not the first trip either
+  CHECK_EQUAL(saved.Counter("_trips.started"), 2);
 }

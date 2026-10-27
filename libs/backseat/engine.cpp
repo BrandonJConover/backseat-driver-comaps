@@ -22,6 +22,10 @@ double constexpr kWrongTurnWithinM = 120;
 double constexpr kCountdownFarS = 12;
 /// ...but never farther than this (half a mile).
 double constexpr kCountdownFarMaxM = 805;
+/// Countdown calls this soon after the instruction are skipped; it just said the distance.
+double constexpr kJustAnnouncedMs = 8000;
+/// "Did I mention..." only if the far call was at least this long ago.
+double constexpr kMentionAfterFarMs = 10000;
 
 /// How much each offense winds the GPS up. Negative values calm it down.
 double FrustrationDelta(Category c)
@@ -53,6 +57,8 @@ double CooldownMs(Category c)
   case Category::HardBraking: return 8000;
   case Category::HardAccel: return 8000;
   case Category::LongStop: return 40000;
+  // A verdict on every single turn gets old; the good ones still count toward the grade.
+  case Category::TurnCompleted: return 40000;
   default: return 0;
   }
 }
@@ -327,8 +333,11 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     if (e.at && !m_position)
       m_position = e.at;
     int const tier = Tier();
-    std::string const prefix = Pick("instruction.prefix", tier);
-    std::string const suffix = Pick("instruction.suffix", tier);
+    // A remark on every direction wears thin: one in three gets an opener, one in three a
+    // closer, and the rest are just the direction.
+    int const n = m_instructionCount++ % 3;
+    std::string const prefix = n == 1 ? Pick("instruction.prefix", tier) : std::string();
+    std::string const suffix = n == 2 ? Pick("instruction.suffix", tier) : std::string();
     std::string const text = prefix + "In " + FormatDistance(e.distanceM, units) + ", " + LowerFirst(e.text) + "." + suffix;
     out.push_back(Make(e.t, Category::Instruction, text, Priority::Nav));
     if (m_straight && m_straight->longHaul)
@@ -601,7 +610,18 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   double const mention = m_config.countdownMentionM;
   char const * stage = nullptr;
   double sayM = near;
-  if (p.stage == 0 && distanceM <= far && distanceM > near)
+  // The instruction itself ("In 50 feet, turn left") was just said: a "by the way, in 250 feet"
+  // on top of it is noise, and wrong. Those stages are passed over quietly.
+  bool const justAnnounced = t - p.since < kJustAnnouncedMs;
+  if (p.stage == 0 && distanceM <= far && distanceM > near && justAnnounced)
+  {
+    p.stage = 1;
+  }
+  else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > near && justAnnounced)
+  {
+    p.mentioned = true;
+  }
+  else if (p.stage == 0 && distanceM <= far && distanceM > near)
   {
     stage = "far";
     // The third left in a row and beyond: going around in circles, NASCAR style.
@@ -612,8 +632,11 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
     }
     sayM = far;
     p.stage = 1;
+    p.farAt = t;
   }
-  else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > near)
+  // At speed the 250 ft mark comes seconds after the 500 ft one; once is enough then.
+  else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > near &&
+           (!p.farAt || t - *p.farAt >= kMentionAfterFarMs))
   {
     stage = "mention";
     sayM = mention;
@@ -863,6 +886,11 @@ bool CritiqueEngine::Roast(std::vector<Commentary> & out, double t, Category cat
                    {{"key", key}, {"why", "gap"}, {"wait_s", LogNum((m_config.minRoastGapMs - (t - m_lastRoastAt)) / 1000)}});
     return false;
   }
+  if (!urgent && category != Category::TurnCompleted && t - m_lastNavAt < m_config.navBreathMs)
+  {
+    TraceThrottled("roast.held", key + "/breath", {{"key", key}, {"why", "breath"}});
+    return false;
+  }
 
   if (category != Category::TurnCompleted)
     Bump(category);
@@ -932,7 +960,10 @@ Commentary CritiqueEngine::Make(double t, Category category, std::string const &
   c.text = Trim(text);
   c.frustration = Frustration();
   c.priority = priority;
-  c.voiceSpeed = RoundTo(1 + m_frustration / 250, 2);
+  if (priority == Priority::Nav)
+    m_lastNavAt = t;
+  // Fed up talks a touch faster, never rushed: at most 10% faster at full frustration.
+  c.voiceSpeed = RoundTo(1 + m_frustration / 1000, 2);
   return c;
 }
 }  // namespace backseat

@@ -17,6 +17,45 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
   return LineData().at(key).at(static_cast<size_t>(tier));
 }
 
+std::string SpeakableText(std::string const & text)
+{
+  static char const * const kKeep[] = {"GPS", "ETA", "NASCAR", "OK", "TV", "AI", "ID", "USA", "SUV", "DMV", "DUI", "MPH",
+                                       "I", "I'M", "I'LL", "I'D", "I'VE"};
+  std::string out = text;
+  bool sentenceStart = true;
+  size_t i = 0;
+  while (i < out.size())
+  {
+    if (!std::isalpha(static_cast<unsigned char>(out[i])))
+    {
+      if (out[i] == '.' || out[i] == '!' || out[i] == '?')
+        sentenceStart = true;
+      ++i;
+      continue;
+    }
+    size_t j = i;
+    while (j < out.size() && (std::isalpha(static_cast<unsigned char>(out[j])) || out[j] == '\''))
+      ++j;
+    std::string const word = out.substr(i, j - i);
+    bool const allCaps = std::none_of(word.begin(), word.end(), [](char c) { return std::islower(static_cast<unsigned char>(c)); });
+    bool const keep = std::any_of(std::begin(kKeep), std::end(kKeep), [&](char const * k) { return word == k; });
+    if (allCaps && !keep && (word.size() >= 2 || (word == "A" && !sentenceStart)))
+    {
+      for (size_t k = i + (sentenceStart ? 1 : 0); k < j; ++k)
+        out[k] = static_cast<char>(std::tolower(static_cast<unsigned char>(out[k])));
+    }
+    else if (allCaps && keep && word.size() > 1 && word[0] == 'I' && (word[1] == '\''))
+    {
+      // "I'M" reads fine as "I'm".
+      for (size_t k = i + 2; k < j; ++k)
+        out[k] = static_cast<char>(std::tolower(static_cast<unsigned char>(out[k])));
+    }
+    sentenceStart = false;
+    i = j;
+  }
+  return out;
+}
+
 std::string Fill(std::string const & tmpl, Vars const & vars)
 {
   std::string out;
@@ -88,18 +127,22 @@ std::string const & SaidLog::Pick(std::string const & key, std::vector<std::stri
   return line;
 }
 
-int SaidLog::Counter(std::string const & key) const
+std::string SaidLog::Value(std::string const & key) const
 {
   auto const it = m_recent.find(key);
-  if (it == m_recent.end() || it->second.empty())
-    return 0;
-  return std::atoi(it->second.back().c_str());
+  return it == m_recent.end() || it->second.empty() ? std::string() : it->second.back();
 }
 
-void SaidLog::SetCounter(std::string const & key, int value)
+void SaidLog::SetValue(std::string const & key, std::string value)
 {
-  m_recent[key] = {std::to_string(value)};
+  m_recent[key] = {std::move(value)};
   m_dirty = true;
+}
+
+void SaidLog::Erase(std::string const & key)
+{
+  if (m_recent.erase(key))
+    m_dirty = true;
 }
 
 std::string SaidLog::Serialize() const

@@ -172,7 +172,7 @@ TEST(NavigatorRewordsRoastsButNotDirections)
   auto const opening = nav.TakeLines();
   CHECK(!opening.empty());
   CHECK(model->asked.empty());  // greeting, rundown and directions are never reworded
-  f.tMs = 1000;
+  f.tMs = 6000;
   f.speedMps = FromDisplay(51, Units::Mph);
   nav.OnFix(f, r);
   CHECK_EQUAL(model->asked.size(), size_t{1});
@@ -193,4 +193,21 @@ TEST(RewritesWithoutTheChatter)
   CHECK_EQUAL(*AcceptRewrite(r, "Line: For crying out loud, that was the turn."),
               std::string("For crying out loud, that was the turn."));
   CHECK_EQUAL(*AcceptRewrite(r, "Here's the thing: you missed it."), std::string("Here's the thing: you missed it."));
+}
+
+TEST(RewritesThatAreTheModelTalkingAreThrownOut)
+{
+  RewriteRequest r;
+  r.line = "That was a right. I said left.";
+  r.category = "wrongTurn";
+  // All spoken on Brandon's drive home (2026-10-27).
+  CHECK(!AcceptRewrite(r, "Sorry, I can't assist with that request.").has_value());
+  CHECK(!AcceptRewrite(r, "Sure, here is your response:").has_value());
+  CHECK(!AcceptRewrite(r, "Here is the line in a fresh, sarcastic way:").has_value());
+  CHECK(!AcceptRewrite(r, "As an AI, I can't judge your driving.").has_value());
+  // A preamble line is skipped, and an echoed label is dropped.
+  CHECK_EQUAL(AcceptRewrite(r, "Here is the line in a fresh, sarcastic way:\nLeft. The other left.").value_or(""),
+              std::string("Left. The other left."));
+  CHECK_EQUAL(AcceptRewrite(r, "Line: Left. The other left.").value_or(""), std::string("Left. The other left."));
+  CHECK(AcceptRewrite(r, "Left means left. Wild concept, I know.").has_value());
 }

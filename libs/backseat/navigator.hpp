@@ -252,6 +252,8 @@ private:
   void Update(double tMs, RouteSnapshot const & route);
   void StartTrip(double tMs, RouteSnapshot const & route);
   void Say(std::vector<Commentary> const & lines, bool mayRewrite = true);
+  /// A navigation-priority line said at `t` (later than now).
+  void SayNavLater(double t, std::string const & text);
   void SayNav(double tMs, std::string const & text, double voiceSpeed = 1.0);
   void TrackStop(Fix const & fix, RouteSnapshot const & route);
   void TrackTraffic(Fix const & fix, RouteSnapshot const & route);
@@ -324,6 +326,7 @@ private:
   bool m_roundaboutSaid = false;
   /// The maneuver the last "get into the left lane" was for; once each.
   std::optional<uint32_t> m_laneSaidFor;
+  double m_turnSaidAt = -1e18;
   /// Punchlines waiting out their awkward pause, by when to say them.
   std::vector<Commentary> m_punchlines;
   double m_lastMusicCheckT = -1e18;

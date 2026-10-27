@@ -450,6 +450,13 @@ BackseatAdapter::~BackseatAdapter()
   backseat::SetDebugLog(nullptr);
 }
 
+void BackseatAdapter::SetRewriter(std::shared_ptr<backseat::LineRewriter> rewriter)
+{
+  if (!SettingOn("BackseatRewriteLines", false))
+    rewriter.reset();
+  m_navigator.SetRewriter(std::move(rewriter));
+}
+
 void BackseatAdapter::SetDebugLogEnabled(bool on)
 {
   settings::Set(kDebugLogKey, on);

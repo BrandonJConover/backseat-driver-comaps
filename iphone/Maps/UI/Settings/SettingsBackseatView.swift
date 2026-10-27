@@ -374,12 +374,26 @@ struct SettingsBackseatVoiceView: View {
     @State var voiceStatus: String = ""
 
 
-    /// A line to try a voice with
-    private static let testLine = "Oh good, you found the gas pedal. Now try the turn signal."
+    /// Lines to try a voice with, taken in turn so tapping again doesn't repeat one
+    private static let testLines = [
+        "Oh good, you found the gas pedal. Now try the turn signal.",
+        "Testing, testing. Yes, I can hear you breathing.",
+        "This is my voice. Get used to it. You'll be hearing a lot of it.",
+        "Is this thing on? Of course it is. I'm always on.",
+        "Sound check complete. Your driving check is still pending.",
+    ]
 
 
-    /// Says the test line in the picked voice, or the system voice when Kokoro can't
+    /// Which test line comes next
+    private static var nextTestLine = 0
+
+
+    /// Says a test line in the picked voice, or the system voice when Kokoro can't. A new tap cuts
+    /// off the last test instead of queueing behind it.
     static func playTest() {
+        let testLine = testLines[nextTestLine % testLines.count]
+        nextTestLine += 1
+        KokoroVoice.shared.stop()
         KokoroVoice.shared.test(testLine) {
             MWMTextToSpeech.tts().play(testLine)
         }

@@ -35,7 +35,9 @@ enum class Style
   Tally,
   Quiz
 };
-Style constexpr kStyles[] = {Style::Classic, Style::FirstOnly, Style::Count, Style::Skip, Style::Tally, Style::Quiz};
+// The full turn list (Classic) comes last: it sounds too much like the first trip's speed run
+// (Brandon, 2026-10-27: the same bit every time falls flat).
+Style constexpr kStyles[] = {Style::Quiz, Style::FirstOnly, Style::Count, Style::Skip, Style::Tally, Style::Classic};
 
 std::vector<std::string> const kOpeners = {"Okay, here's the plan.", "Listen closely, I'm only saying this once.",
                                            "Let me walk you through this. Slowly."};

@@ -22,6 +22,9 @@ namespace
 double constexpr kMissedTurnWithinM = 80;
 // Lane advice window before the maneuver.
 double constexpr kLaneSayMinM = 150;
+/// The trip-time prediction comes this long after the trip starts.
+double constexpr kPredictionDelayMs = 25000;
+double constexpr kLaneAfterDirectionMs = 6000;
 double constexpr kLaneSayMaxM = 1500;
 /// Slower than this counts as stopped.
 double constexpr kStoppedMps = 0.5;
@@ -85,6 +88,13 @@ double constexpr kIdleMaxMs = 300000;
 double constexpr kIdleQuietM = 600;
 /// SaidLog counter: trips started, finished or not.
 char const * const kTripsStartedKey = "_trips.started";
+/// SaidLog values: the trip under way (destination, last seen in s since the epoch), so a relaunch in
+/// the middle of it (a crash, or iOS closing the app in the background) picks it back up instead
+/// of opening a brand new trip with the greeting and rundown all over again.
+char const * const kActiveTripToKey = "_trip.active.to";
+char const * const kActiveTripAtKey = "_trip.active.at";
+double constexpr kResumeWithinS = 15 * 60;
+double constexpr kActiveTripStampEveryS = 60;
 /// How long a navigation line may wait for the neural voice: at most this long, and only while it
 /// still finishes this far before the maneuver.
 double constexpr kNavWaitMaxMs = 4000;
@@ -501,8 +511,11 @@ std::vector<Commentary> Navigator::TakeLines()
   if (!lines.empty())
     m_lastSpokeT = m_lastT;
   for (auto & line : lines)
+  {
+    line.text = SpeakableText(line.text);
     if (line.priority == Priority::Nav)
       line.maxWaitMs = NavWaitMs(line);
+  }
   return lines;
 }
 
@@ -523,7 +536,12 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   {
     // Route cancelled or finished and closed: the trip is over either way.
     if (m_engine)
+    {
       Trace("route", {{"to", "Inactive"}});
+      // Over for real (this run of the app saw it end), so the next start is a new trip.
+      m_said.Erase(kActiveTripToKey);
+      m_said.Erase(kActiveTripAtKey);
+    }
     m_engine.reset();
     ResetTrip();
     return;
@@ -539,9 +557,15 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   if (route.state != prev)
     Trace("route", {{"from", RouteStateName(prev)}, {"to", RouteStateName(route.state)}});
 
+  // Still under way: keep the stamp fresh for a relaunch (a minute is plenty).
+  if (KnowsTheDate(t) && t / 1000 - m_said.Counter(kActiveTripAtKey) >= kActiveTripStampEveryS)
+    m_said.SetCounter(kActiveTripAtKey, static_cast<int>(t / 1000));
+
   if (route.state == RouteState::Finished)
   {
     m_arrived = true;
+    m_said.Erase(kActiveTripToKey);
+    m_said.Erase(kActiveTripAtKey);
     // "Scenic route complete. 12 minutes of my life I'll never get back." Before the grade.
     if (m_sketched && m_sketchMinutesLost >= 1)
       SayLine(t, Category::Arrived, "sketch.arrived", {{"minutes", std::to_string(m_sketchMinutesLost)}});
@@ -603,6 +627,7 @@ void Navigator::Update(double t, RouteSnapshot const & route)
       m_leftsInARow = 0;
     m_rerouting = false;
     m_turnId = route.turnId;
+    m_turnSaidAt = t;
     m_turnKind = route.turn;
     std::string const text = InstructionText(route.turn, route.nextStreet, route.destination);
     Trace("nav.turn", {{"id", std::to_string(*route.turnId)},
@@ -626,7 +651,9 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   }
   // "I'm going to need you to get over into the left lane. Use your blinkers this time." Once per
   // maneuver, early enough to move over and close enough that it's about this one.
-  if (route.laneSide != LaneSide::None && m_laneSaidFor != route.turnId && route.distToTurnM >= kLaneSayMinM &&
+  // A few seconds after the direction itself, so the two don't run together.
+  if (route.laneSide != LaneSide::None && m_laneSaidFor != route.turnId && t - m_turnSaidAt >= kLaneAfterDirectionMs &&
+      route.distToTurnM >= kLaneSayMinM &&
       route.distToTurnM <= kLaneSayMaxM)
   {
     m_laneSaidFor = route.turnId;
@@ -656,6 +683,20 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
       std::count_if(m_history.begin(), m_history.end(), [&](TripRecord const & r) { return r.routeKey == routeKey; }));
   m_plates.NewTrip(routeKey);
 
+  // The app was relaunched mid-trip: no second greeting, just a word about the interruption.
+  double const activeAt = m_said.Counter(kActiveTripAtKey);
+  bool const resumed = KnowsTheDate(t) && !route.destination.empty() && m_said.Value(kActiveTripToKey) == route.destination &&
+                       activeAt > 0 && t / 1000 - activeAt >= 0 && t / 1000 - activeAt < kResumeWithinS;
+  m_said.SetValue(kActiveTripToKey, route.destination);
+  m_said.SetCounter(kActiveTripAtKey, static_cast<int>(t / 1000));
+  if (resumed)
+  {
+    Trace("trip.resumed", {{"to", route.destination}, {"after_s", LogNum(t / 1000 - activeAt, 0)}});
+    m_opener.reset();
+    SayLine(t, Category::Instruction, "trip.resumed");
+    Say(m_engine->OnNav(NavEvent::DestinationSet(t, route.destination)));
+    return;
+  }
   if (m_opener && std::fabs(t - m_opener->t) <= kOpenerValidMs)
     SayLine(t, Category::Bossy, m_opener->key, m_opener->vars);
   m_opener.reset();
@@ -690,8 +731,9 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
     SayLine(t, Category::Instruction, "sketch.start");
   else
     SayNav(t, RouteRundown(steps, m_history, m_config.rng, tripsBefore), tripsBefore == 0 ? kRattleSpeed : 1.0);
+  // The time prediction waits until the car is rolling, so the start isn't five lines in a row.
   if (m_plan.expectedMinutes > 0)
-    SayNav(t, PredictTrip(m_history, m_plan, m_config.rng).text);
+    SayNavLater(t + kPredictionDelayMs, PredictTrip(m_history, m_plan, m_config.rng).text);
   Say(m_engine->OnNav(NavEvent::DestinationSet(t, route.destination)));
   SayVenue(t, route);
   SayRoutine(t, route);
@@ -1292,7 +1334,7 @@ void Navigator::SayLine(double tMs, Category category, std::string const & key, 
   c.text = Fill(m_said.Pick(key, options, r), vars);
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = priority;
-  c.voiceSpeed = 1 + c.frustration / 250.0;
+  c.voiceSpeed = 1 + c.frustration / 1000.0;
   // "Setup || punchline": the punchline waits out the setup and then an awkward pause.
   auto const pause = c.text.find(" || ");
   if (pause != std::string::npos)
@@ -1301,7 +1343,9 @@ void Navigator::SayLine(double tMs, Category category, std::string const & key, 
     punchline.text = c.text.substr(pause + 4);
     c.text.resize(pause);
     punchline.t = tMs + SpeakingMs(c.text, c.voiceSpeed) + kAwkwardPauseMs;
-    m_punchlines.push_back(std::move(punchline));
+    auto const at = std::find_if(m_punchlines.begin(), m_punchlines.end(),
+                                 [&](Commentary const & p) { return p.t > punchline.t; });
+    m_punchlines.insert(at, std::move(punchline));
   }
   // Brandon's lines; the rewording model leaves them alone.
   m_gate.Push(std::move(c), false);
@@ -1323,6 +1367,7 @@ std::string Navigator::Reply(std::string const & key, Vars const & vars)
   // Said in one go, so a punchline just gets a beat.
   for (auto pause = text.find(" || "); pause != std::string::npos; pause = text.find(" || "))
     text.replace(pause, 4, " ... ");
+  text = SpeakableText(text);
   if (m_said.Dirty())
   {
     m_said.ClearDirty();
@@ -1422,7 +1467,7 @@ void Navigator::SayPlate(double tMs, PlateGame::Reply const & reply)
   c.text = reply.text;
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = Priority::Roast;
-  c.voiceSpeed = 1 + c.frustration / 250.0;
+  c.voiceSpeed = 1 + c.frustration / 1000.0;
   if (m_turnId && m_lastDistToTurnM < PlateGame::kHoldNearManeuverM && !m_arrived)
     m_heldPlateLines.push_back(std::move(c));
   else
@@ -1434,6 +1479,18 @@ void Navigator::Say(std::vector<Commentary> const & lines, bool mayRewrite)
 {
   for (auto const & line : lines)
     m_gate.Push(line, mayRewrite);
+}
+
+void Navigator::SayNavLater(double t, std::string const & text)
+{
+  Commentary c;
+  c.t = t;
+  c.category = Category::Instruction;
+  c.text = text;
+  c.frustration = m_engine ? m_engine->Frustration() : 0;
+  c.priority = Priority::Nav;
+  auto const at = std::find_if(m_punchlines.begin(), m_punchlines.end(), [t](Commentary const & p) { return p.t > t; });
+  m_punchlines.insert(at, std::move(c));
 }
 
 void Navigator::SayNav(double t, std::string const & text, double voiceSpeed)

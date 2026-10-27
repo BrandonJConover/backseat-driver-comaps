@@ -114,7 +114,10 @@ public:
   /// Whether other audio is playing (the platform's audio session), so the GPS can ask for music.
   void SetMusicCheck(std::function<bool()> check) { m_navigator.SetMusicLookup(std::move(check)); }
   /// The platform's on-device language model, for rewording roasts in real time.
-  void SetRewriter(std::shared_ptr<backseat::LineRewriter> rewriter) { m_navigator.SetRewriter(std::move(rewriter)); }
+  /// The on-device model that rewords roasts. Off unless the "BackseatRewriteLines" setting is on:
+  /// on the first test drives its rewrites were worse than the written lines (refusals, chatter,
+  /// lines that said the opposite), and the written pools are big enough to stay fresh.
+  void SetRewriter(std::shared_ptr<backseat::LineRewriter> rewriter);
 
   /// Settings keys for who's in the car, written by the platform's Settings screen. Pronouns are
   /// "they", "he" or "she"; the partner is a word like "wife" or a name, empty for nobody.

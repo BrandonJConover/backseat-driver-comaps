@@ -18,6 +18,33 @@ std::string TrimSpace(std::string s)
   return s;
 }
 
+std::string Lower(std::string s)
+{
+  for (auto & c : s)
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return s;
+}
+
+bool StartsWith(std::string const & s, std::string const & prefix) { return s.compare(0, prefix.size(), prefix) == 0; }
+
+/// The model answering us instead of saying the line: refusals, "Sure, here is your response:",
+/// talk about rewriting. Seen on Brandon's drive (2026-10-27): "Sorry, I can't assist with that
+/// request." and "Sure, here is your response:" were spoken out loud.
+bool SoundsLikeTheModelTalking(std::string const & text)
+{
+  std::string const t = Lower(text);
+  for (char const * opener : {"sure", "certainly", "of course", "here is", "here's a", "here's the line", "here's your",
+                              "here's my", "okay, here", "ok, here", "alright, here", "sorry", "i'm sorry", "i am sorry",
+                              "i can't", "i cannot", "i can not", "i won't", "as an ai", "as a language model"})
+    if (StartsWith(t, opener))
+      return true;
+  for (char const * phrase : {"as an ai", "language model", "assist with", "your response", "your request", "rewrite",
+                              "rewritten", "rephrase", "sarcastic way", "fresh words", "the line", "situation:", "mood:"})
+    if (t.find(phrase) != std::string::npos)
+      return true;
+  return false;
+}
+
 std::string Mood(int frustration)
 {
   if (frustration < 25)
@@ -76,12 +103,6 @@ std::vector<std::string> FactsToKeep(std::string const & line)
 
 namespace
 {
-std::string Lower(std::string s)
-{
-  std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-  return s;
-}
-
 /// The model talking about the task instead of doing it: "Sure, here is your response:",
 /// "Here is the line in a fresh, sarcastic way:". Said out loud, these were the worst lines of the
 /// drive home.
@@ -125,10 +146,11 @@ std::string StripLabel(std::string const & line)
 
 std::optional<std::string> AcceptRewrite(RewriteRequest const & request, std::string const & answer)
 {
-  // The first line that's the line itself: no preamble, no label, no quotes or markdown.
+  // The first line that's the line itself: no preamble ("Here is the line in a fresh, sarcastic
+  // way:"), no label, no quotes or markdown. A refusal keeps the canned line.
   std::string text;
   size_t start = 0;
-  while (start <= answer.size() && text.empty())
+  while (start <= answer.size() && (text.empty() || text.back() == ':'))
   {
     size_t const end = std::min(answer.find('\n', start), answer.size());
     text = TrimSpace(answer.substr(start, end - start));
@@ -142,8 +164,17 @@ std::optional<std::string> AcceptRewrite(RewriteRequest const & request, std::st
       text.clear();
   }
   text = TrimSpace(text);
+  // "Line: ..." / "Rewrite: ..." echoing the prompt's labels.
+  for (char const * label : {"line:", "rewrite:", "rewritten line:", "rewritten:", "response:", "answer:", "new line:"})
+    if (StartsWith(Lower(text), label))
+      text = TrimSpace(text.substr(std::string(label).size()));
   while (text.size() >= 2 && (text.front() == '"' || text.front() == '\'') && text.back() == text.front())
     text = TrimSpace(text.substr(1, text.size() - 2));
+  if (text.empty() || text.back() == ':' || SoundsLikeTheModelTalking(text))
+  {
+    Trace("rewrite.rejected", {{"text", text.substr(0, 60)}});
+    return {};
+  }
   if (text.empty() || text.size() > std::min<size_t>(request.line.size() * 2 + 60, 320))
     return {};
 
