@@ -15,6 +15,8 @@ set(
   lines.hpp
   lines_data.cpp
   lines_data.hpp
+  mileage.cpp
+  mileage.hpp
   navigator.cpp
   navigator.hpp
   plate_game.cpp

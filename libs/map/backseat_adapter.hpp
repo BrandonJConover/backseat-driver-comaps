@@ -1,5 +1,6 @@
 #pragma once
 
+#include "backseat/mileage.hpp"
 #include "backseat/navigator.hpp"
 #include "backseat/voice_command.hpp"
 
@@ -108,6 +109,11 @@ public:
   static char const * const kDriverNameKey;
   /// The driver's age as typed in Settings ("34"), empty if never given.
   static char const * const kDriverAgeKey;
+  /// Mileage settings, all "true"/"false": the log itself (default off), talking about drives the
+  /// driver didn't start (default on), and home being the main place of business (default off).
+  static char const * const kMileageOnKey;
+  static char const * const kMileageTalkKey;
+  static char const * const kHomeIsWorkplaceKey;
   /// Rereads those settings; call after the platform changes them.
   void ReloadPersonality();
   /// Call when the driver opens their profile in Settings, and EndProfileEdit() when they leave it.
@@ -166,6 +172,29 @@ public:
   /// SurveyAnswer(), which says it was recorded (and ignored) and keeps it in memory.
   std::string ArrivalSurvey();
   std::string SurveyAnswer(std::string const & spoken);
+
+  /// The mileage log (backseat/mileage.hpp). It does nothing unless the driver turned on "Log my
+  /// drives automatically" (kMileageOnKey). The platform feeds every location fix, navigating or
+  /// not; `activity` follows backseat::Activity (0 unknown ... 5 automotive). Returns a line to say,
+  /// or empty: "Oh, we're driving?" when a drive starts without a route, "Welcome to Utah" once per
+  /// drive out of the home state, and a comment when a drive is logged.
+  std::string OnDriveSample(double lat, double lon, double speedMps, double accuracyM, int activity, double tMs);
+  /// The OS says we arrived somewhere (CLVisit) or the app is going away: ends the drive, if any.
+  std::string MileageFinish();
+  bool MileageOn() const;
+  std::vector<backseat::LoggedDrive> const & MileageLog() const { return m_driveLog; }
+  backseat::MileageYear MileageSummary(int year) const;
+  std::string MileageCsv(int year) const;
+  /// How many other unsorted drives go between the same two places, for "Do the same for 3 similar
+  /// trips?" before calling ReassignDrive().
+  size_t SimilarDrives(size_t index) const;
+  /// Sorts drive `index` (and the similar ones too, if asked) and returns what to say about it.
+  std::string ReassignDrive(size_t index, backseat::Bucket bucket, bool similarToo, std::string const & purpose);
+  void TagPlace(std::string const & name, double lat, double lon, backseat::PlaceRole role);
+  std::vector<backseat::MileagePlace> const & TaggedPlaces() const { return m_taggedPlaces; }
+  /// In December and January, once a year: "This year you drove 1,204 miles for work..." Empty
+  /// otherwise, or with nothing logged.
+  std::string MileageYearEnd();
   /// A place driven to before, for the "Where to?" list.
   struct PastRoute
   {
@@ -274,6 +303,19 @@ private:
   int m_navigates = 0;
   /// Waiting for a rating after ArrivalSurvey().
   bool m_surveyAsked = false;
+  backseat::DriveDetector m_drives;
+  std::vector<backseat::LoggedDrive> m_driveLog;
+  std::vector<backseat::MileagePlace> m_taggedPlaces;
+  /// Region lookups are cached until the car has moved a couple of kilometers.
+  std::optional<m2::PointD> m_regionAt;
+  std::string m_region;
+  /// "Welcome to Utah" was already said on this drive.
+  bool m_saidOutOfState = false;
+  /// Home and the regular workplace from trips, plus the places the driver tagged.
+  std::vector<backseat::MileagePlace> MileagePlaces() const;
+  backseat::MileageSettings MileageSettingsNow() const;
+  std::string OnDriveEnded(backseat::Drive const & drive);
+  void SaveDriveLog() const;
   /// Results last read out, waiting for "the first one".
   std::vector<SearchResult> m_results;
   std::vector<backseat::VoiceOption> m_voices;

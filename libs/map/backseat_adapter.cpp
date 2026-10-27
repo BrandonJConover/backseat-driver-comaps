@@ -42,6 +42,10 @@ std::string const kTripsFile = "backseat_trips.tsv";
 std::string const kPlatesFile = "backseat_plates.txt";
 std::string const kSaidFile = "backseat_said.tsv";
 std::string const kMemoryFile = "backseat_memory.tsv";
+/// Every drive the mileage log saw, never capped: it's the driver's tax record.
+std::string const kDrivesFile = "backseat_drives.tsv";
+/// Places the driver tagged for mileage: name, lat, lon, role.
+std::string const kMileagePlacesFile = "backseat_mileage_places.tsv";
 size_t constexpr kMaxTrips = 200;
 /// A light this close to the turn point controls the junction.
 double constexpr kTrafficLightRadiusM = 30;
@@ -225,6 +229,53 @@ backseat::DriverMemory LoadMemory()
   return backseat::DriverMemory::Parse(text.str());
 }
 
+std::vector<backseat::LoggedDrive> LoadDrives()
+{
+  std::vector<backseat::LoggedDrive> drives;
+  std::ifstream in(GetPlatform().SettingsPathForFile(kDrivesFile));
+  std::string line;
+  while (std::getline(in, line))
+    if (auto d = backseat::ParseDrive(line))
+      drives.push_back(std::move(*d));
+  return drives;
+}
+
+std::vector<backseat::MileagePlace> LoadMileagePlaces()
+{
+  std::vector<backseat::MileagePlace> places;
+  std::ifstream in(GetPlatform().SettingsPathForFile(kMileagePlacesFile));
+  std::string line;
+  while (std::getline(in, line))
+  {
+    std::istringstream fields(line);
+    std::string name, lat, lon, role;
+    if (!std::getline(fields, name, '\t') || !std::getline(fields, lat, '\t') || !std::getline(fields, lon, '\t') ||
+        !std::getline(fields, role, '\t'))
+      continue;
+    backseat::MileagePlace p;
+    p.name = name;
+    p.at = {std::atof(lat.c_str()), std::atof(lon.c_str())};
+    p.role = static_cast<backseat::PlaceRole>(std::clamp(std::atoi(role.c_str()), 0, 3));
+    places.push_back(std::move(p));
+  }
+  return places;
+}
+
+std::tm LocalTm(double ms)
+{
+  auto const s = static_cast<std::time_t>(ms / 1000);
+  std::tm tm{};
+  localtime_r(&s, &tm);
+  return tm;
+}
+
+bool SettingOn(char const * key, bool fallback)
+{
+  bool on = fallback;
+  settings::TryGet(key, on);
+  return on;
+}
+
 double NowMs()
 {
   return std::chrono::duration<double, std::milli>(std::chrono::system_clock::now().time_since_epoch()).count();
@@ -267,6 +318,9 @@ char const * const BackseatAdapter::kDriverPronounsKey = "BackseatDriverPronouns
 char const * const BackseatAdapter::kAutopilotKey = "BackseatCarHasAutopilot";
 char const * const BackseatAdapter::kDriverNameKey = "BackseatDriverName";
 char const * const BackseatAdapter::kDriverAgeKey = "BackseatDriverAge";
+char const * const BackseatAdapter::kMileageOnKey = "BackseatMileageOn";
+char const * const BackseatAdapter::kMileageTalkKey = "BackseatMileageTalk";
+char const * const BackseatAdapter::kHomeIsWorkplaceKey = "BackseatHomeIsWorkplace";
 
 namespace
 {
@@ -330,6 +384,8 @@ BackseatAdapter::BackseatAdapter()
   m_navigator.SetPlateLog(LoadPlates(), &SavePlates);
   m_navigator.SetSaidLog(LoadSaid(), &SaveSaid);
   m_memory = LoadMemory();
+  m_driveLog = LoadDrives();
+  m_taggedPlaces = LoadMileagePlaces();
   ReloadPersonality();
 }
 
@@ -488,6 +544,202 @@ std::string BackseatAdapter::SurveyAnswer(std::string const & spoken)
   Remember("drive ratings", ratings + (ratings.empty() ? "" : " ") + std::to_string(rating));
   return m_navigator.Reply(rating <= 3 ? "survey.low" : rating <= 7 ? "survey.mid" : "survey.high",
                            {{"rating", std::to_string(rating)}});
+}
+
+bool BackseatAdapter::MileageOn() const
+{
+  return SettingOn(kMileageOnKey, false);
+}
+
+std::vector<backseat::MileagePlace> BackseatAdapter::MileagePlaces() const
+{
+  std::vector<backseat::MileagePlace> places = m_taggedPlaces;
+  auto const tagged = [&places](backseat::PlaceRole role)
+  { return std::any_of(places.begin(), places.end(), [role](auto const & p) { return p.role == role; }); };
+  auto const & history = m_navigator.History();
+  if (!tagged(backseat::PlaceRole::Home))
+    if (auto const home = backseat::GuessPlace(history, backseat::KnownPlace::Home))
+      places.push_back({"Home", *home, backseat::PlaceRole::Home});
+  if (!tagged(backseat::PlaceRole::Office))
+    if (auto const work = backseat::GuessPlace(history, backseat::KnownPlace::Work))
+      places.push_back({"Work", *work, backseat::PlaceRole::Office});
+  return places;
+}
+
+backseat::MileageSettings BackseatAdapter::MileageSettingsNow() const
+{
+  backseat::MileageSettings s;
+  s.homeIsMainWorkplace = SettingOn(kHomeIsWorkplaceKey, false);
+  if (m_countryInfo)
+  {
+    for (auto const & p : MileagePlaces())
+    {
+      if (p.role == backseat::PlaceRole::Home)
+      {
+        s.homeState = backseat::StateOf(m_countryInfo().GetRegionCountryId(mercator::FromLatLon(p.at.lat, p.at.lon)));
+        break;
+      }
+    }
+  }
+  return s;
+}
+
+std::string BackseatAdapter::OnDriveSample(double lat, double lon, double speedMps, double accuracyM, int activity,
+                                           double tMs)
+{
+  if (!MileageOn())
+    return {};
+  auto const at = mercator::FromLatLon(lat, lon);
+  if (m_countryInfo && (!m_regionAt || mercator::DistanceOnEarth(*m_regionAt, at) > 2000))
+  {
+    m_regionAt = at;
+    m_region = m_countryInfo().GetRegionCountryId(at);
+  }
+  backseat::DriveSample s;
+  s.t = tMs;
+  s.at = {lat, lon};
+  s.speedMps = speedMps;
+  s.accuracyM = accuracyM;
+  s.activity = static_cast<backseat::Activity>(std::clamp(activity, 0, 5));
+  s.region = m_region;
+  if (auto const ended = m_drives.Feed(s))
+    return OnDriveEnded(*ended);
+
+  bool const talk = SettingOn(kMileageTalkKey, true);
+  if (m_drives.TakeStarted())
+  {
+    m_saidOutOfState = false;
+    // While navigating, the trip already has plenty to say.
+    if (talk && !m_navigator.InTrip())
+      return m_navigator.Reply("mileage.started");
+  }
+  if (talk && m_drives.Driving() && !m_saidOutOfState && !m_region.empty())
+  {
+    auto const home = MileageSettingsNow().homeState;
+    auto const state = backseat::StateOf(m_region);
+    if (!home.empty() && state != home)
+    {
+      m_saidOutOfState = true;
+      return m_navigator.Reply("mileage.outOfState", {{"state", backseat::RegionName(state)}});
+    }
+  }
+  return {};
+}
+
+std::string BackseatAdapter::MileageFinish()
+{
+  if (auto const ended = m_drives.Finish())
+    return OnDriveEnded(*ended);
+  return {};
+}
+
+std::string BackseatAdapter::OnDriveEnded(backseat::Drive const & drive)
+{
+  m_saidOutOfState = false;
+  auto logged = backseat::Classify(drive, MileagePlaces(), m_driveLog, MileageSettingsNow(), &LocalTm);
+  // Unnamed ends get the name from previous trips ("Starbucks").
+  auto const past = PastRoutes(50);
+  auto const nameNear = [&past](backseat::LatLon const & at)
+  {
+    for (auto const & r : past)
+      if (mercator::DistanceOnEarth(mercator::FromLatLon(r.lat, r.lon), mercator::FromLatLon(at.lat, at.lon)) < 250)
+        return r.label;
+    return std::string();
+  };
+  if (logged.fromName.empty())
+    logged.fromName = nameNear(drive.from);
+  if (logged.toName.empty())
+    logged.toName = nameNear(drive.to);
+  m_driveLog.push_back(logged);
+  std::ofstream(GetPlatform().SettingsPathForFile(kDrivesFile), std::ios::app) << backseat::SerializeDrive(logged) << '\n';
+
+  if (!SettingOn(kMileageTalkKey, true))
+    return {};
+  // One comment at most.
+  if (logged.flags & backseat::kFarFromHome)
+    return m_navigator.Reply("mileage.farAway");
+  if (logged.flags & backseat::kNewPlace)
+    return m_navigator.Reply("mileage.newPlace");
+  char const * const kCommuteSaidKey = "BackseatMileageCommuteSaid";
+  if (logged.why == backseat::Why::Commute && !SettingOn(kCommuteSaidKey, false))
+  {
+    settings::Set(kCommuteSaidKey, true);
+    return m_navigator.Reply("mileage.commute");
+  }
+  return {};
+}
+
+void BackseatAdapter::SaveDriveLog() const
+{
+  std::ofstream out(GetPlatform().SettingsPathForFile(kDrivesFile));
+  for (auto const & d : m_driveLog)
+    out << backseat::SerializeDrive(d) << '\n';
+}
+
+backseat::MileageYear BackseatAdapter::MileageSummary(int year) const
+{
+  return backseat::SummarizeYear(m_driveLog, year, &LocalTm);
+}
+
+std::string BackseatAdapter::MileageCsv(int year) const
+{
+  return backseat::MileageCsv(m_driveLog, year, &LocalTm);
+}
+
+size_t BackseatAdapter::SimilarDrives(size_t index) const
+{
+  if (index >= m_driveLog.size())
+    return 0;
+  auto copy = m_driveLog;
+  // Reassign counts the drive itself too.
+  return backseat::Reassign(copy, index, backseat::Bucket::Business, true) - 1;
+}
+
+std::string BackseatAdapter::ReassignDrive(size_t index, backseat::Bucket bucket, bool similarToo,
+                                           std::string const & purpose)
+{
+  if (index >= m_driveLog.size())
+    return {};
+  size_t const changed = backseat::Reassign(m_driveLog, index, bucket, similarToo, purpose);
+  SaveDriveLog();
+  if (changed > 1)
+    return m_navigator.Reply("mileage.sorted.similar", {{"count", std::to_string(changed - 1)}});
+  return m_navigator.Reply(bucket == backseat::Bucket::Business ? "mileage.sorted.business" : "mileage.sorted.personal");
+}
+
+void BackseatAdapter::TagPlace(std::string const & name, double lat, double lon, backseat::PlaceRole role)
+{
+  // Retagging the same spot replaces it.
+  backseat::LatLon const at{lat, lon};
+  m_taggedPlaces.erase(std::remove_if(m_taggedPlaces.begin(), m_taggedPlaces.end(), [&at](auto const & p)
+  { return mercator::DistanceOnEarth(mercator::FromLatLon(p.at.lat, p.at.lon), mercator::FromLatLon(at.lat, at.lon)) < 100; }),
+                       m_taggedPlaces.end());
+  m_taggedPlaces.push_back({name, at, role});
+  std::ofstream out(GetPlatform().SettingsPathForFile(kMileagePlacesFile));
+  for (auto const & p : m_taggedPlaces)
+    out << p.name << '\t' << std::setprecision(9) << p.at.lat << '\t' << p.at.lon << '\t' << static_cast<int>(p.role) << '\n';
+}
+
+std::string BackseatAdapter::MileageYearEnd()
+{
+  auto const tm = LocalTm(NowMs());
+  // December looks back at this year; January at last year.
+  int const year = tm.tm_year + 1900 - (tm.tm_mon == 0 ? 1 : 0);
+  if (tm.tm_mon != 11 && tm.tm_mon != 0)
+    return {};
+  char const * const kYearEndKey = "BackseatMileageYearEndSaid";
+  int said = 0;
+  settings::TryGet(kYearEndKey, said);
+  if (said >= year)
+    return {};
+  auto const y = MileageSummary(year);
+  if (y.businessDrives + y.personalDrives + y.unknownDrives == 0)
+    return {};
+  settings::Set(kYearEndKey, year);
+  auto const miles = [](double m) { return std::to_string(static_cast<long long>(std::lround(m))); };
+  return m_navigator.Reply("mileage.yearEnd", {{"business", miles(y.businessMiles)},
+                                                {"personal", miles(y.personalMiles)},
+                                                {"unknown", miles(y.unknownMiles)}});
 }
 
 std::string BackseatAdapter::FileAnswer(std::string const & spoken)

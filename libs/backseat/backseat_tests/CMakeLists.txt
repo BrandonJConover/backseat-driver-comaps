@@ -6,6 +6,7 @@ add_executable(${PROJECT_NAME}
   check.hpp
   engine_test.cpp
   main.cpp
+  mileage_test.cpp
   navigator_test.cpp
   parity_test.cpp
   plate_game_test.cpp

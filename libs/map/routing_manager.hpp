@@ -285,6 +285,26 @@ public:
   std::string BackseatNicenessSlidBack() { return m_backseat.NicenessSlidBack(); }
   std::string BackseatArrivalSurvey() { return m_backseat.ArrivalSurvey(); }
   std::string BackseatSurveyAnswer(std::string const & spoken) { return m_backseat.SurveyAnswer(spoken); }
+  std::string BackseatDriveSample(double lat, double lon, double speedMps, double accuracyM, int activity, double tMs)
+  {
+    return m_backseat.OnDriveSample(lat, lon, speedMps, accuracyM, activity, tMs);
+  }
+  std::string BackseatMileageFinish() { return m_backseat.MileageFinish(); }
+  bool BackseatMileageOn() const { return m_backseat.MileageOn(); }
+  std::vector<backseat::LoggedDrive> BackseatMileageLog() const { return m_backseat.MileageLog(); }
+  backseat::MileageYear BackseatMileageSummary(int year) const { return m_backseat.MileageSummary(year); }
+  std::string BackseatMileageCsv(int year) const { return m_backseat.MileageCsv(year); }
+  size_t BackseatSimilarDrives(size_t index) const { return m_backseat.SimilarDrives(index); }
+  std::string BackseatReassignDrive(size_t index, backseat::Bucket bucket, bool similarToo, std::string const & purpose)
+  {
+    return m_backseat.ReassignDrive(index, bucket, similarToo, purpose);
+  }
+  void BackseatTagPlace(std::string const & name, double lat, double lon, backseat::PlaceRole role)
+  {
+    m_backseat.TagPlace(name, lat, lon, role);
+  }
+  std::vector<backseat::MileagePlace> BackseatTaggedPlaces() const { return m_backseat.TaggedPlaces(); }
+  std::string BackseatMileageYearEnd() { return m_backseat.MileageYearEnd(); }
   std::vector<std::pair<std::string, std::string>> BackseatLearnedFacts() const { return m_backseat.LearnedFacts(); }
   /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.
   BackseatAdapter const & GetBackseat() const { return m_backseat; }

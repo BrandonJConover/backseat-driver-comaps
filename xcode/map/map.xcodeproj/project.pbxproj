@@ -10,6 +10,7 @@
 		163DCF5BB1EE109297A13D5A /* backseat_adapter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2C3A071C6981D6B998C023AD /* backseat_adapter.cpp */; };
 		F11BF20A5A3BB95017624EE3 /* engine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 05C1E20C2C5E4448BAEF6EBA /* engine.cpp */; };
 		04F00EF4C224802967A012B9 /* history.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E9032D35E8B7064CB7132AD /* history.cpp */; };
+		BD5EA7000000000000000021 /* mileage.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000020 /* mileage.cpp */; };
 		D11B0EA0545E2DA5C39B6197 /* lines.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7AA0F37DC5A858FEA309EA24 /* lines.cpp */; };
 		72027DDB55B38E72CFD39F30 /* lines_data.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AED2163B829158668F83E65D /* lines_data.cpp */; };
 		A536FAD0269DF941156830D4 /* navigator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5306268E5455315BD345F2F4 /* navigator.cpp */; };
@@ -166,6 +167,8 @@
 		2C3A071C6981D6B998C023AD /* backseat_adapter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = backseat_adapter.cpp; sourceTree = "<group>"; };
 		05C1E20C2C5E4448BAEF6EBA /* engine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = engine.cpp; path = ../backseat/engine.cpp; sourceTree = "<group>"; };
 		2E9032D35E8B7064CB7132AD /* history.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = history.cpp; path = ../backseat/history.cpp; sourceTree = "<group>"; };
+		BD5EA7000000000000000020 /* mileage.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = mileage.cpp; path = ../backseat/mileage.cpp; sourceTree = "<group>"; };
+		BD5EA7000000000000000022 /* mileage.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = mileage.hpp; path = ../backseat/mileage.hpp; sourceTree = "<group>"; };
 		7AA0F37DC5A858FEA309EA24 /* lines.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = lines.cpp; path = ../backseat/lines.cpp; sourceTree = "<group>"; };
 		AED2163B829158668F83E65D /* lines_data.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = lines_data.cpp; path = ../backseat/lines_data.cpp; sourceTree = "<group>"; };
 		5306268E5455315BD345F2F4 /* navigator.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = navigator.cpp; path = ../backseat/navigator.cpp; sourceTree = "<group>"; };
@@ -465,6 +468,8 @@
 				2C3A071C6981D6B998C023AD /* backseat_adapter.cpp */,
 				05C1E20C2C5E4448BAEF6EBA /* engine.cpp */,
 				2E9032D35E8B7064CB7132AD /* history.cpp */,
+				BD5EA7000000000000000020 /* mileage.cpp */,
+				BD5EA7000000000000000022 /* mileage.hpp */,
 				7AA0F37DC5A858FEA309EA24 /* lines.cpp */,
 				AED2163B829158668F83E65D /* lines_data.cpp */,
 				5306268E5455315BD345F2F4 /* navigator.cpp */,
@@ -744,6 +749,7 @@
 				163DCF5BB1EE109297A13D5A /* backseat_adapter.cpp in Sources */,
 				F11BF20A5A3BB95017624EE3 /* engine.cpp in Sources */,
 				04F00EF4C224802967A012B9 /* history.cpp in Sources */,
+				BD5EA7000000000000000021 /* mileage.cpp in Sources */,
 				D11B0EA0545E2DA5C39B6197 /* lines.cpp in Sources */,
 				72027DDB55B38E72CFD39F30 /* lines_data.cpp in Sources */,
 				A536FAD0269DF941156830D4 /* navigator.cpp in Sources */,
