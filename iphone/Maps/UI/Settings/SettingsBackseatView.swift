@@ -48,13 +48,40 @@ struct SettingsBackseatView: View {
     @State var voiceName: String = KokoroVoice.selectedVoiceName
 
 
-    /// What the GPS has worked out about the driver, as label / value pairs
-    @State var learnedFacts: [[String]] = []
+    /// How many things are in the driver's file
+    @State var fileCount: Int = 0
+
+
+    /// Where the Niceness slider is: 0 is mean, 1 is nice. It always ends up back at 0.
+    @State var niceness: Double = 0
+
+
+    /// The GPS is laughing at the driver for touching the slider
+    @State var isMockingNiceness: Bool = false
 
 
     /// The actual view
     var body: some View {
         List {
+            Section {
+                NavigationLink {
+                    SettingsBackseatFileView()
+                } label: {
+                    HStack {
+                        Image(systemName: "folder")
+
+                        Text(verbatim: "Your file")
+
+                        Spacer()
+
+                        Text(verbatim: fileCount == 0 ? "Empty" : "\(fileCount) \(fileCount == 1 ? "thing" : "things")")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } footer: {
+                Text(verbatim: "Everything I know about you. I never forget. Unless you swipe.")
+            }
+
             Section {
                 NavigationLink {
                     SettingsBackseatVoiceView()
@@ -163,31 +190,30 @@ struct SettingsBackseatView: View {
             }
 
             Section {
-                if learnedFacts.isEmpty {
-                    Text(verbatim: "Nothing yet. Drive somewhere.")
-                        .foregroundStyle(.secondary)
-                }
+                VStack(spacing: 6) {
+                    Slider(value: $niceness, in: 0...1) { editing in
+                        if !editing && niceness > 0 { mockNiceness() }
+                    }
+                    .tint(.red)
+                    .disabled(isMockingNiceness)
 
-                ForEach(learnedFacts, id: \.self) { fact in
                     HStack {
-                        Text(verbatim: fact.first ?? "")
+                        Text(verbatim: "Mean")
 
                         Spacer()
 
-                        Text(verbatim: fact.last ?? "")
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.trailing)
+                        Text(verbatim: "Nice")
                     }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 }
             } header: {
                 HStack(spacing: 4) {
-                    Image(systemName: "brain")
+                    Image(systemName: "dial.low")
                         .imageScale(.small)
 
-                    Text(verbatim: "What I've learned about you")
+                    Text(verbatim: "Niceness")
                 }
-            } footer: {
-                Text(verbatim: "Picked up from your trips and what you say, and used to call you out when you break your routine.")
             }
         }
         .accentColor(.accent)
@@ -250,6 +276,37 @@ struct SettingsBackseatView: View {
     }
 
 
+    /// The slider does nothing but this: the GPS laughs, takes it back to mean, and says so.
+    private func mockNiceness() {
+        isMockingNiceness = true
+        let laugh = MWMBackseatRewriter.nicenessMoved()
+        KokoroVoice.shared.sayReply(laugh, voiceID: nil) { MWMTextToSpeech.tts().play(laugh) }
+        afterSpeaking {
+            withAnimation(.easeInOut(duration: 1.4)) { niceness = 0 }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                let warning = MWMBackseatRewriter.nicenessSlidBack()
+                KokoroVoice.shared.sayReply(warning, voiceID: nil) { MWMTextToSpeech.tts().play(warning) }
+                afterSpeaking {
+                    isMockingNiceness = false
+                    fileCount = MWMBackseatRewriter.memories.count
+                }
+            }
+        }
+    }
+
+
+    /// Runs `then` once the GPS has finished talking (it may not have started yet)
+    private func afterSpeaking(_ then: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            if KokoroVoice.shared.anyVoiceSpeaking {
+                afterSpeaking(then)
+            } else {
+                then()
+            }
+        }
+    }
+
+
     /// Reads every setting again, e.g. after coming back from the voice list
     private func reload() {
         shouldProvideVoiceRouting = Settings.shouldProvideVoiceRouting
@@ -262,7 +319,7 @@ struct SettingsBackseatView: View {
         carHasAutopilot = MWMBackseatRewriter.carHasAutopilot
         voiceName = KokoroVoice.selectedVoiceName
         voiceStatus = KokoroVoice.shared.status
-        learnedFacts = MWMBackseatRewriter.learnedFacts
+        fileCount = MWMBackseatRewriter.memories.count
     }
 }
 
@@ -386,5 +443,97 @@ struct BackseatCommandsView: View {
         let sheet = UIHostingController(rootView: BackseatCommandsView { host?.dismiss(animated: true) })
         host = sheet
         top.present(sheet, animated: true)
+    }
+}
+
+
+/// Everything the GPS has learned about the driver, by topic, notes newest first. Swipe to forget.
+struct SettingsBackseatFileView: View {
+    // MARK: Properties
+
+    /// A topic and what's known about it
+    struct Entry: Identifiable, Hashable {
+        let id: String
+        let topic: String
+        let fact: String
+        let learnedAt: Date
+    }
+
+
+    /// Facts with a topic (name, favorite color, lies told...)
+    @State var topics: [Entry] = []
+
+
+    /// Things picked up in conversation, newest first
+    @State var notes: [Entry] = []
+
+
+    /// The actual view
+    var body: some View {
+        List {
+            if topics.isEmpty && notes.isEmpty {
+                Section {
+                    Text(verbatim: "Empty. For now. Keep driving.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !topics.isEmpty {
+                Section {
+                    ForEach(topics) { entry in
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(verbatim: entry.topic.capitalized)
+
+                            Spacer()
+
+                            Text(verbatim: entry.fact)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                    .onDelete { offsets in
+                        offsets.map { topics[$0].topic }.forEach { _ = MWMBackseatRewriter.forget($0) }
+                        reload()
+                    }
+                } header: {
+                    Text(verbatim: "On file")
+                }
+            }
+
+            if !notes.isEmpty {
+                Section {
+                    ForEach(notes) { entry in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: entry.fact)
+
+                            Text(entry.learnedAt, style: .date)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .onDelete { _ in
+                        _ = MWMBackseatRewriter.forget("note")
+                        reload()
+                    }
+                } header: {
+                    Text(verbatim: "Notes")
+                } footer: {
+                    Text(verbatim: "Swiping one note forgets all of them. I don't do half measures.")
+                }
+            }
+        }
+        .navigationTitle(Text(verbatim: "Your file"))
+        .onAppear(perform: reload)
+    }
+
+
+    /// Reads the file again
+    private func reload() {
+        let all = MWMBackseatRewriter.memories.enumerated().compactMap { index, memory -> Entry? in
+            guard let topic = memory["topic"] as? String, let fact = memory["fact"] as? String else { return nil }
+            return Entry(id: "\(index)", topic: topic, fact: fact, learnedAt: memory["learnedAt"] as? Date ?? Date())
+        }
+        topics = all.filter { $0.topic != "note" }
+        notes = all.filter { $0.topic == "note" }.sorted { $0.learnedAt > $1.learnedAt }
     }
 }

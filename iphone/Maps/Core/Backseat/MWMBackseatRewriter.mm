@@ -17,7 +17,10 @@
 
 #include "geometry/mercator.hpp"
 
+#include "platform/distance.hpp"
 #include "platform/settings.hpp"
+
+#include "routing/following_info.hpp"
 
 #include <atomic>
 #include <memory>
@@ -172,10 +175,18 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   // With the on-device model, it picks the app action; what it can't place goes to the keywords.
   if (gToolHandler && gToolsAvailable)
   {
-    gToolHandler(text, ^(BOOL used) {
+    gToolHandler(text, ^(BOOL used, NSString * chat) {
       dispatch_async(dispatch_get_main_queue(), ^{
-        if (!used)
-          Perform(GetFramework().GetRoutingManager().BackseatDriverSaid(text.UTF8String ?: ""));
+        if (used)
+          return;
+        auto const heard = GetFramework().GetRoutingManager().BackseatDriverSaid(text.UTF8String ?: "");
+        // Nothing the GPS listens for (no command, answer or place): the model's chat answers instead.
+        bool const nothing = heard.kind == BackseatAdapter::HeardCommand::Kind::None && heard.actions.empty() &&
+                             heard.reply.empty() && heard.voiceLines.empty();
+        if (nothing)
+          SayReply(chat.UTF8String ?: "", {});
+        else
+          Perform(heard);
       });
     });
     return;
@@ -263,6 +274,17 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
 {
   Perform(GetFramework().GetRoutingManager().BackseatRunTool(name.UTF8String ?: "", argument.UTF8String ?: "",
                                                              spoken.UTF8String ?: ""));
+}
+
++ (double)metersToNextTurn
+{
+  if (![MWMRouter isOnRoute])
+    return -1;
+  routing::FollowingInfo info;
+  GetFramework().GetRoutingManager().GetRouteFollowingInfo(info);
+  if (!info.IsValid())
+    return -1;
+  return info.m_distToTurn.To(platform::Distance::Units::Meters).GetDistance();
 }
 
 + (void)shareVoices

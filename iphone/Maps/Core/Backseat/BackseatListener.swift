@@ -107,6 +107,11 @@ import Speech
     }
   }
 
+  /// Stops waiting for an answer; what's said next goes to the navigator again.
+  func stopWaitingForAnswer() {
+    answerHandler = nil
+  }
+
   /// "Stop listening": hands-free stays off for the rest of this route, as if the mic was tapped.
   @objc func pauseForRoute() {
     mutedForRoute = true
@@ -425,6 +430,7 @@ import Speech
         } else {
           MWMBackseatRewriter.driverSaid(answer)
         }
+        BackseatFileQuestions.askIfStillParked(after: 20)
       }
     }
   }
@@ -514,5 +520,62 @@ import Speech
   private func finish() {
     finished = true
     Search.remove(self)
+  }
+}
+
+/// "For your file" questions, one at a time at a quiet moment: a minute into a route with no turn
+/// for a mile and nobody talking, or right after "where to?" when no route started. The navigator
+/// decides whether there's anything to ask (at most one every six hours).
+@objc final class BackseatFileQuestions: NSObject {
+  private static let checkEvery: TimeInterval = 15
+  private static let settleTime: TimeInterval = 60
+  private static let quietMeters: Double = 1500
+  private static var timer: Timer?
+  private static var routeStartedAt: Date?
+  private static var asking = false
+
+  @objc static func install() {
+    timer = Timer.scheduledTimer(withTimeInterval: checkEvery, repeats: true) { _ in checkWhileDriving() }
+  }
+
+  private static func checkWhileDriving() {
+    guard MWMRouter.isOnRoute() else {
+      routeStartedAt = nil
+      return
+    }
+    let started = routeStartedAt ?? Date()
+    routeStartedAt = started
+    guard Date().timeIntervalSince(started) > settleTime, MWMBackseatRewriter.metersToNextTurn > quietMeters else { return }
+    ask()
+  }
+
+  /// After the "where to?" exchange: if no route started, it's a quiet moment.
+  static func askIfStillParked(after delay: TimeInterval) {
+    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+      if !MWMRouter.isRoutingActive() { ask() }
+    }
+  }
+
+  private static func ask() {
+    guard !asking, !KokoroVoice.shared.anyVoiceSpeaking, !BackseatListener.shared.isListening,
+          MWMTextToSpeech.isTTSEnabled() else { return }
+    let question = MWMBackseatRewriter.fileQuestion
+    guard !question.isEmpty else { return }
+    asking = true
+    KokoroVoice.shared.sayReply(question, voiceID: nil) { MWMTextToSpeech.tts().play(question) }
+    // Hands-free never sends silence, so give up on an answer after a while.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 40) {
+      guard asking else { return }
+      asking = false
+      BackseatListener.shared.stopWaitingForAnswer()
+    }
+    BackseatSetup.listen(waiting: 15) { answer in
+      guard asking else { return }
+      asking = false
+      let reply = MWMBackseatRewriter.fileAnswer(answer)
+      if !reply.isEmpty {
+        KokoroVoice.shared.sayReply(reply, voiceID: nil) { MWMTextToSpeech.tts().play(reply) }
+      }
+    }
   }
 }

@@ -6,9 +6,10 @@ NS_ASSUME_NONNULL_BEGIN
 typedef void (^MWMBackseatRewriteCompletion)(NSString * text);
 typedef void (^MWMBackseatRewriteHandler)(NSString * instructions, NSString * prompt,
                                           MWMBackseatRewriteCompletion completion);
-/// Lets the on-device model turn what the driver said into an app action (it calls +runTool:...).
-/// `done` says whether it picked one; if not, the keyword parser gets the words. Any thread.
-typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used));
+/// Lets the on-device model turn what the driver said into an app action (it calls +runTool:...),
+/// or just answer. `done` says whether it ran an action; if not, the keyword parser gets the words,
+/// and `chat` (the model's answer) is said when the keywords meant nothing either. Any thread.
+typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used, NSString * chat));
 
 /// Hands Backseat Driver's roasts to an on-device language model for rewording. The handler
 /// runs off the main thread and may answer late or never; the canned line covers for it.
@@ -32,6 +33,8 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 + (void)runTool:(NSString *)name argument:(NSString *)argument spoken:(NSString *)spoken;
 /// Tells the navigator which voices there are, for "what voice options do you have?".
 + (void)shareVoices;
+/// How far the next turn is while following a route, in meters; -1 without a route.
+@property(class, nonatomic, readonly) double metersToNextTurn;
 
 /// Who's in the car, for the roasts. Pronouns are "they", "he" or "she". Setting any of these
 /// reloads the navigator's personality at once.
