@@ -11,6 +11,8 @@
 
 #include "geometry/mercator.hpp"
 
+#include "platform/settings.hpp"
+
 #include <atomic>
 #include <memory>
 
@@ -89,6 +91,65 @@ std::shared_ptr<BlockRewriter> & Installed()
   {
     [[MapsAppDelegate theApp] searchText:@(heard.query.c_str())];
   }
+}
+
+#pragma mark - Who's in the car
+
++ (NSString *)personalityString:(char const *)key fallback:(NSString *)fallback
+{
+  std::string value;
+  if (!settings::Get(key, value) || value.empty())
+    return fallback;
+  return @(value.c_str());
+}
+
++ (void)setPersonalityString:(NSString *)value forKey:(char const *)key
+{
+  settings::Set(key, std::string(value.UTF8String ?: ""));
+  GetFramework().GetRoutingManager().ReloadBackseatPersonality();
+}
+
++ (NSString *)partner
+{
+  return [self personalityString:BackseatAdapter::kPartnerKey fallback:@""];
+}
+
++ (void)setPartner:(NSString *)partner
+{
+  [self setPersonalityString:[partner stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet]
+                      forKey:BackseatAdapter::kPartnerKey];
+}
+
++ (NSString *)partnerPronouns
+{
+  return [self personalityString:BackseatAdapter::kPartnerPronounsKey fallback:@"they"];
+}
+
++ (void)setPartnerPronouns:(NSString *)pronouns
+{
+  [self setPersonalityString:pronouns forKey:BackseatAdapter::kPartnerPronounsKey];
+}
+
++ (NSString *)driverPronouns
+{
+  return [self personalityString:BackseatAdapter::kDriverPronounsKey fallback:@"they"];
+}
+
++ (void)setDriverPronouns:(NSString *)pronouns
+{
+  [self setPersonalityString:pronouns forKey:BackseatAdapter::kDriverPronounsKey];
+}
+
++ (BOOL)carHasAutopilot
+{
+  bool autopilot = false;
+  return settings::Get(BackseatAdapter::kAutopilotKey, autopilot) && autopilot;
+}
+
++ (void)setCarHasAutopilot:(BOOL)carHasAutopilot
+{
+  settings::Set(BackseatAdapter::kAutopilotKey, static_cast<bool>(carHasAutopilot));
+  GetFramework().GetRoutingManager().ReloadBackseatPersonality();
 }
 
 @end

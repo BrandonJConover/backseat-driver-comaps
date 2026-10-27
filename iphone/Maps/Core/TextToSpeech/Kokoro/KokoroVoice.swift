@@ -140,6 +140,12 @@ final class KokoroVoice: NSObject {
     speak(text, nav: false, speed: 1, fallback: fallback)
   }
 
+  /// True while Kokoro or the system voice has a line queued or playing, so the hands-free
+  /// listener can ignore the GPS's own voice. Main queue only.
+  @objc var anyVoiceSpeaking: Bool {
+    isBusy || (systemIsSpeaking?() ?? false)
+  }
+
   /// True while Kokoro has a line queued or playing, so the audio session must stay active.
   /// Main queue only.
   @objc var isBusy: Bool {

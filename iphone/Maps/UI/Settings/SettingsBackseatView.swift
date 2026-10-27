@@ -1,34 +1,65 @@
 import SwiftUI
 
-/// View for picking the Kokoro voice that gives directions and roasts the driver
+/// View for the Backseat Driver: its voice, listening, and who's in the car
 struct SettingsBackseatView: View {
     // MARK: Properties
+
+    /// The scene phase of the environment
+    @Environment(\.scenePhase) private var scenePhase
+
 
     /// If voice guidance should be provided during routing
     @State var shouldProvideVoiceRouting: Bool = true
 
 
-    /// The Kokoro voice
-    @State var selectedBackseatVoice: String = KokoroVoice.selectedVoiceID
+    /// If the mic stays on while following a route
+    @State var isHandsFree: Bool = true
 
 
-    /// When the system voice fills in, shown under the test button
-    @State var backseatVoiceStatus: String = ""
+    /// Who rides along, e.g. "my wife" or "Sam"; empty when it's just the driver
+    @State var partner: String = ""
 
 
-    /// A line to try a voice with
-    private let testLine = "Oh good, you found the gas pedal. Now try the turn signal."
+    /// The passenger's pronouns: "they", "he" or "she"
+    @State var partnerPronouns: String = "they"
+
+
+    /// The driver's pronouns: "they", "he" or "she"
+    @State var driverPronouns: String = "they"
+
+
+    /// If the car can drive itself
+    @State var carHasAutopilot: Bool = false
+
+
+    /// When the system voice fills in, shown under the voice
+    @State var voiceStatus: String = ""
+
+
+    /// The picked voice's name
+    @State var voiceName: String = KokoroVoice.selectedVoiceName
 
 
     /// The actual view
     var body: some View {
         List {
             Section {
-                Button {
-                    KokoroVoice.shared.test(testLine) {
-                        MWMTextToSpeech.tts().play(testLine)
+                NavigationLink {
+                    SettingsBackseatVoiceView()
+                } label: {
+                    HStack {
+                        Text("voice")
+
+                        Spacer()
+
+                        Text(verbatim: voiceName)
+                            .foregroundStyle(.secondary)
                     }
-                    backseatVoiceStatus = KokoroVoice.shared.status
+                }
+
+                Button {
+                    SettingsBackseatVoiceView.playTest()
+                    voiceStatus = KokoroVoice.shared.status
                 } label: {
                     HStack {
                         Image(systemName: "play.circle")
@@ -49,8 +80,163 @@ struct SettingsBackseatView: View {
                     }
                     .tint(.accent)
                 }
+            } header: {
+                HStack(spacing: 4) {
+                    Image(systemName: "speaker.wave.2")
+                        .imageScale(.small)
+
+                    Text(verbatim: "How it sounds")
+                }
             } footer: {
-                Text(verbatim: backseatVoiceStatus)
+                Text(verbatim: voiceStatus)
+            }
+
+            Section {
+                Toggle(isOn: $isHandsFree) {
+                    Text(verbatim: "Hands-free listening")
+                }
+                .tint(.accent)
+            } header: {
+                HStack(spacing: 4) {
+                    Image(systemName: "mic")
+                        .imageScale(.small)
+
+                    Text(verbatim: "Talking back")
+                }
+            } footer: {
+                if isHandsFree {
+                    Text(verbatim: "While you follow a route, the mic stays on so you can just talk: call out a license plate, answer back, or say \"take me to work.\" Tap the mic button to pause it for the rest of the trip.")
+                } else {
+                    Text(verbatim: "Tap the mic button and speak when you want to talk back.")
+                }
+            }
+
+            Section {
+                TextField(text: $partner) {
+                    Text(verbatim: "Passenger, e.g. \"my wife\" or \"Sam\"")
+                }
+                .textInputAutocapitalization(.never)
+                .submitLabel(.done)
+
+                if !partner.trimmingCharacters(in: .whitespaces).isEmpty {
+                    pronounPicker(title: "Their pronouns", selection: $partnerPronouns)
+                }
+
+                pronounPicker(title: "Your pronouns", selection: $driverPronouns)
+
+                Toggle(isOn: $carHasAutopilot) {
+                    Text(verbatim: "My car has autopilot")
+                }
+                .tint(.accent)
+            } header: {
+                HStack(spacing: 4) {
+                    Image(systemName: "person.2")
+                        .imageScale(.small)
+
+                    Text(verbatim: "Who's in the car")
+                }
+            } footer: {
+                Text(verbatim: "The Backseat Driver works these into the jokes. Leave the passenger empty if it's usually just you. With autopilot on, it may suggest letting the car drive after you miss a few turns.")
+            }
+        }
+        .accentColor(.accent)
+        .navigationTitle(Text(verbatim: "Backseat Driver"))
+        .onAppear {
+            reload()
+        }
+        .onChange(of: scenePhase) { _ in
+            voiceStatus = KokoroVoice.shared.status
+        }
+        .onChange(of: shouldProvideVoiceRouting) { changedShouldProvideVoiceRouting in
+            Settings.shouldProvideVoiceRouting = changedShouldProvideVoiceRouting
+        }
+        .onChange(of: isHandsFree) { changedIsHandsFree in
+            if changedIsHandsFree != BackseatListener.handsFree {
+                BackseatListener.handsFree = changedIsHandsFree
+            }
+        }
+        .onChange(of: partner) { changedPartner in
+            MWMBackseatRewriter.partner = changedPartner
+        }
+        .onChange(of: partnerPronouns) { changedPartnerPronouns in
+            MWMBackseatRewriter.partnerPronouns = changedPartnerPronouns
+        }
+        .onChange(of: driverPronouns) { changedDriverPronouns in
+            MWMBackseatRewriter.driverPronouns = changedDriverPronouns
+        }
+        .onChange(of: carHasAutopilot) { changedCarHasAutopilot in
+            MWMBackseatRewriter.carHasAutopilot = changedCarHasAutopilot
+        }
+    }
+
+
+    /// A they / he / she choice
+    private func pronounPicker(title: String, selection: Binding<String>) -> some View {
+        Picker(selection: selection) {
+            Text(verbatim: "they").tag("they")
+            Text(verbatim: "he").tag("he")
+            Text(verbatim: "she").tag("she")
+        } label: {
+            Text(verbatim: title)
+        }
+        .pickerStyle(.segmented)
+    }
+
+
+    /// Reads every setting again, e.g. after coming back from the voice list
+    private func reload() {
+        shouldProvideVoiceRouting = Settings.shouldProvideVoiceRouting
+        isHandsFree = BackseatListener.handsFree
+        partner = MWMBackseatRewriter.partner
+        partnerPronouns = MWMBackseatRewriter.partnerPronouns
+        driverPronouns = MWMBackseatRewriter.driverPronouns
+        carHasAutopilot = MWMBackseatRewriter.carHasAutopilot
+        voiceName = KokoroVoice.selectedVoiceName
+        voiceStatus = KokoroVoice.shared.status
+    }
+}
+
+
+/// View for picking the Kokoro voice that gives directions and roasts the driver
+struct SettingsBackseatVoiceView: View {
+    // MARK: Properties
+
+    /// The Kokoro voice
+    @State var selectedBackseatVoice: String = KokoroVoice.selectedVoiceID
+
+
+    /// When the system voice fills in, shown under the test button
+    @State var voiceStatus: String = ""
+
+
+    /// A line to try a voice with
+    private static let testLine = "Oh good, you found the gas pedal. Now try the turn signal."
+
+
+    /// Says the test line in the picked voice, or the system voice when Kokoro can't
+    static func playTest() {
+        KokoroVoice.shared.test(testLine) {
+            MWMTextToSpeech.tts().play(testLine)
+        }
+    }
+
+
+    /// The actual view
+    var body: some View {
+        List {
+            Section {
+                Button {
+                    Self.playTest()
+                    voiceStatus = KokoroVoice.shared.status
+                } label: {
+                    HStack {
+                        Image(systemName: "play.circle")
+
+                        Text("pref_tts_test_voice_title")
+                    }
+                }
+            } footer: {
+                Text(verbatim: voiceStatus)
             }
 
             Section {
@@ -69,18 +255,14 @@ struct SettingsBackseatView: View {
         .accentColor(.accent)
         .navigationTitle(Text("voice"))
         .onAppear {
-            shouldProvideVoiceRouting = Settings.shouldProvideVoiceRouting
             selectedBackseatVoice = KokoroVoice.selectedVoiceID
-            backseatVoiceStatus = KokoroVoice.shared.status
-        }
-        .onChange(of: shouldProvideVoiceRouting) { changedShouldProvideVoiceRouting in
-            Settings.shouldProvideVoiceRouting = changedShouldProvideVoiceRouting
+            voiceStatus = KokoroVoice.shared.status
         }
         .onChange(of: selectedBackseatVoice) { changedSelectedBackseatVoice in
             if changedSelectedBackseatVoice != KokoroVoice.selectedVoiceID {
                 KokoroVoice.shared.selectVoice(changedSelectedBackseatVoice)
             }
-            backseatVoiceStatus = KokoroVoice.shared.status
+            voiceStatus = KokoroVoice.shared.status
         }
     }
 }

@@ -342,7 +342,7 @@ using Observers = NSHashTable<Observer>;
 
 - (void)playRouteNotifications:(NSArray<NSString *> *)routeNotifications {
   auto stopSession = ^{
-    if (self.speechSynthesizer.isSpeaking || BackseatKokoroVoice.shared.isBusy)
+    if (self.speechSynthesizer.isSpeaking || BackseatKokoroVoice.shared.isBusy || BackseatListener.shared.isListening)
       return;
     [[AVAudioSession sharedInstance]
           setActive:NO

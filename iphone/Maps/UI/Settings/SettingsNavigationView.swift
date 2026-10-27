@@ -86,7 +86,7 @@ struct SettingsNavigationView: View {
                     }
                     
                     NavigationLink {
-                        SettingsBackseatView()
+                        SettingsBackseatVoiceView()
                     } label: {
                         HStack {
                             Text("voice")

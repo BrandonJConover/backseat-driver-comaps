@@ -85,6 +85,25 @@ struct SettingsView: View {
             List {
                 Section {
                     NavigationLink {
+                        SettingsBackseatView()
+                    } label: {
+                        HStack {
+                            Image(systemName: "car.side")
+
+                            Text(verbatim: "Backseat Driver")
+                                .lineLimit(1)
+
+                            Spacer(minLength: 0)
+
+                            Text(verbatim: KokoroVoice.selectedVoiceName)
+                                .lineLimit(1)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section {
+                    NavigationLink {
                         ProfileView()
                     } label: {
                         HStack {
@@ -101,25 +120,6 @@ struct SettingsView: View {
                                 .lineLimit(1)
                                 .foregroundStyle(.secondary)
                                 .layoutPriority(1)
-                        }
-                    }
-                }
-
-                Section {
-                    NavigationLink {
-                        SettingsBackseatView()
-                    } label: {
-                        HStack {
-                            Image(systemName: "car.side")
-
-                            Text(verbatim: "Backseat Driver")
-                                .lineLimit(1)
-
-                            Spacer(minLength: 0)
-
-                            Text(verbatim: KokoroVoice.selectedVoiceName)
-                                .lineLimit(1)
-                                .foregroundStyle(.secondary)
                         }
                     }
                 }

@@ -17,6 +17,13 @@ typedef void (^MWMBackseatRewriteHandler)(NSString * instructions, NSString * pr
 /// Lets the GPS see whether other audio (music, podcasts) is playing.
 + (void)installMusicCheck;
 
+/// Who's in the car, for the roasts. Pronouns are "they", "he" or "she". Setting any of these
+/// reloads the navigator's personality at once.
+@property(class, nonatomic, copy) NSString * partner;
+@property(class, nonatomic, copy) NSString * partnerPronouns;
+@property(class, nonatomic, copy) NSString * driverPronouns;
+@property(class, nonatomic) BOOL carHasAutopilot;
+
 @end
 
 NS_ASSUME_NONNULL_END
