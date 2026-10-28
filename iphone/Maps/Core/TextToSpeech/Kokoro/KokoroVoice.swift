@@ -299,6 +299,7 @@ final class KokoroVoice: NSObject {
         defer { CoreMLCrashGuard.endLoad() }
         let cpu = KokoroAneManager(computeUnits: .cpuOnly)
         try await cpu.initialize(preloadVoices: [voice])
+        await KokoroPronunciation.install(on: cpu)
         UserDefaults.standard.set(true, forKey: Self.installedKey)
         _ = try await render("Hello.", speed: 1, voice: voice, nav: false, with: cpu)
         CoreMLCrashGuard.loadSucceeded()
@@ -316,6 +317,7 @@ final class KokoroVoice: NSObject {
         defer { CoreMLCrashGuard.endLoad() }
         let engine = KokoroAneManager(computeUnits: .aneTailCpu)
         try await engine.initialize(preloadVoices: [voice])
+        await KokoroPronunciation.install(on: engine)
         UserDefaults.standard.set(true, forKey: Self.installedKey)
         CoreMLCrashGuard.loadSucceeded()
         lock.lock(); let onCPU = primary != nil; lock.unlock()
@@ -705,9 +707,12 @@ final class KokoroVoice: NSObject {
     var sampleRate = KokoroAneConstants.sampleRate
     var samples: [Float] = []
     var first = true
+    var phonemes: [String] = []
     // A speed run keeps its commas tight: "right, left, right" with pauses isn't fast.
-    for (piece, pause) in Self.pieces(of: Self.speakable(text), commas: !fast) {
-      let result = try await engine.synthesizeDetailed(text: piece, voice: voice, speed: pace)
+    for (piece, pause) in Self.pieces(of: KokoroPronunciation.prepare(Self.speakable(text)), commas: !fast) {
+      let result = try await engine.synthesizeDetailed(text: KokoroPronunciation.deliver(piece), voice: voice,
+                                                       speed: pace)
+      phonemes.append(result.phonemes)
       sampleRate = result.sampleRate
       // A Bluetooth car stereo wakes up on the first sound and swallows it: lead in with silence.
       if first { samples += [Float](repeating: 0, count: Int(Double(sampleRate) * Self.leadIn)) }
@@ -716,6 +721,11 @@ final class KokoroVoice: NSObject {
       samples += [Float](repeating: 0, count: Int(Double(sampleRate) * pause))
     }
     Self.level(&samples)
+    // What Kokoro was told to say, for a direction that sounded wrong on a drive (street names
+    // are where Misaki guesses). Only fresh renders get here; repeats come from the cache.
+    if nav {
+      BackseatLog.event("voice.phonemes", ["text": String(text.prefix(80)), "ph": phonemes.joined(separator: " | ")])
+    }
     return try AudioWAV.data(from: samples, sampleRate: Double(sampleRate), normalize: false)
   }
 
@@ -765,9 +775,10 @@ final class KokoroVoice: NSObject {
     // Compass points next to a street name: "N Main", "Main St NW".
     s = replace(s, "(?<![^\\s])(\(compass))\\.?(?= [A-Z0-9])") { compassWords[$0[1]] ?? $0[0] }
     s = replace(s, "(?<=[A-Za-z0-9] )(\(compass))(?=$|[\\s,;:!?.])") { compassWords[$0[1]] ?? $0[0] }
-    // Highways: "I-25" is "I twenty-five", "US-36" is "U.S. thirty-six".
+    // Highways: "I-25" is "I twenty-five", "US-36" is "US thirty-six".
     s = replace(s, "\\b(I|US|SR|CR)[- ](\\d+)\\b") { m in
-      let name = ["I": "I", "US": "U.S.", "SR": "State Route", "CR": "County Road"][m[1]] ?? m[1]
+      // "US" stays: the lexicon says it as letters (the frontend reads it as the pronoun).
+      let name = ["I": "I", "US": "US", "SR": "State Route", "CR": "County Road"][m[1]] ?? m[1]
       return "\(name) \(m[2])"
     }
     // Units after a number.
@@ -877,6 +888,7 @@ final class KokoroVoice: NSObject {
     if let fallbackEngine { return fallbackEngine }
     let engine = KokoroAneManager(computeUnits: .cpuOnly)
     try await engine.initialize(preloadVoices: [voice])
+    await KokoroPronunciation.install(on: engine)
     fallbackEngine = engine
     return engine
   }
@@ -1338,5 +1350,194 @@ enum CoreMLCrashGuard {
     defaults.set(0, forKey: streakKey)
     mode = .normal
     BackseatLog.event("voice.crashGuard", ["reason": "driver chose Kokoro now"])
+  }
+}
+
+/// How Kokoro is told to say things, ported from Brandon's EpubToM4B (PronunciationLibrary.swift,
+/// where each rule came from a listening test on his phone):
+/// - "…" is a pause, never a sound of its own, and a dash is a comma;
+/// - a one-word sentence ending in a hard consonant ("Great." "Left." "Stop.") gets "!", since with
+///   a full stop Kokoro trails off into a breathy "eh";
+/// - words the frontend gets wrong go in `words`, as a respelling or as Misaki IPA, and reach
+///   FluidAudio as its English custom lexicon (checked before Misaki's lexicon and the BART guess).
+enum KokoroPronunciation {
+  /// Words FluidAudio's English frontend says wrong. The value is a respelling, with hyphens
+  /// between syllables and the stressed one in capitals ("WINE-sap", "suh-WATCH"), or Misaki IPA
+  /// between slashes ("/jˌuˈɛs/"). A key matches its exact spelling first, then lowercase. When a
+  /// street sounds wrong on a drive, the drive log's voice.phonemes event shows what Kokoro was
+  /// given; add the word here.
+  static let words: [String: String] = [
+    // The highway ("US 36"), not the pronoun.
+    "US": "/jˌuˈɛs/",
+  ]
+
+  /// `words` as Misaki phonemes; entries that don't convert are left out (and logged once).
+  static let lexicon: [String: String] = {
+    var out: [String: String] = [:]
+    for (word, said) in words {
+      let value = said.trimmingCharacters(in: .whitespaces)
+      if value.hasPrefix("/"), value.hasSuffix("/"), value.count > 2 {
+        out[word] = String(value.dropFirst().dropLast())
+      } else if let phonemes = Respelling.phonemes(for: value) {
+        out[word] = phonemes
+      } else {
+        BackseatLog.event("voice.error", ["error": "unreadable respelling", "word": word, "said": said])
+      }
+    }
+    return out
+  }()
+
+  static func install(on engine: KokoroAneManager) async {
+    await engine.setEnglishCustomLexicon(lexicon)
+  }
+
+  /// The whole line: punctuation Kokoro would voice becomes the pause it stands for.
+  static func prepare(_ text: String) -> String {
+    var s = text
+      .replacingOccurrences(of: "\u{00A0}", with: " ")
+      .replacingOccurrences(of: "—", with: ", ")
+      .replacingOccurrences(of: "–", with: ", ")
+      .replacingOccurrences(of: #"\.(?:\s?\.){2,}"#, with: "…", options: .regularExpression)
+    guard s.contains("…") else { return s }
+    // At the start it's dropped, before other punctuation it's dropped, at the end it's a full
+    // stop, anywhere else a comma (the same pause, measured on his phone).
+    let rules: [(String, String)] = [
+      (#"^\s*…\s*"#, ""),
+      (#"(?<=[\s(“"‘'])…\s*"#, ""),
+      (#"…+(?=\s*[?!.,;:])"#, ""),
+      (#"…+(?=\s*[”"’')\]]*\s*$)"#, "."),
+      (#"…+(?=\s*[”"’')\]])"#, ","),
+      (#"…+"#, ","),
+    ]
+    for (pattern, template) in rules {
+      s = s.replacingOccurrences(of: pattern, with: template, options: .regularExpression)
+    }
+    return s
+  }
+
+  /// One sentence as it's rendered: "Great." becomes "Great!" (see above).
+  static func deliver(_ sentence: String) -> String {
+    let trimmed = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.count <= 24,
+          let match = trimmed.range(of: #"^([“"‘']?)([\p{L}’']+)\.([”"’']?)$"#, options: .regularExpression),
+          match == trimmed.startIndex..<trimmed.endIndex,
+          endsInStop(trimmed.filter(\.isLetter).lowercased()),
+          let dot = trimmed.lastIndex(of: ".") else { return sentence }
+    var result = trimmed
+    result.replaceSubrange(dot...dot, with: "!")
+    return result
+  }
+
+  /// Ends in a stop consonant sound: d t k p b g, or one before a silent e ("made", "quite"); not "ng".
+  static func endsInStop(_ word: String) -> Bool {
+    guard word.count >= 2, !word.hasSuffix("ng") else { return false }
+    let stops: Set<Character> = ["d", "t", "k", "p", "b", "g"]
+    if let last = word.last, stops.contains(last) { return true }
+    return word.hasSuffix("e") && word.count >= 3 && stops.contains(word[word.index(word.endIndex, offsetBy: -2)])
+  }
+
+  /// A reader-style respelling ("Ab-DEE-rus", "EE-fa") as Misaki phonemes. Given to Kokoro as
+  /// text, a respelling came out wrong: each hyphen was a pause and a capitalised syllable was
+  /// spelled letter by letter. Syllables split on hyphens; the capitalised one (or the one marked
+  /// ' ´ ˈ) is stressed. Nil when the text isn't a respelling. EpubToM4B's RespellingPhonemizer.
+  enum Respelling {
+    static func phonemes(for respelling: String) -> String? {
+      let raw = respelling.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !raw.isEmpty, !raw.contains(" "), raw.allSatisfy({ $0.isLetter || "-'´ˈ".contains($0) }),
+            raw.unicodeScalars.allSatisfy({ $0.isASCII || "'´ˈ".unicodeScalars.contains($0) }) else { return nil }
+      let marks = CharacterSet(charactersIn: "'´ˈ")
+      let parts = raw.split(separator: "-").map(String.init).filter { !$0.isEmpty }
+      let hasCapsSyllable = parts.count > 1
+        && parts.contains { $0 == $0.uppercased() && $0.contains(where: \.isLetter) }
+      guard parts.count > 1 || raw.unicodeScalars.contains(where: { marks.contains($0) }) else { return nil }
+      var stressIndex = parts.firstIndex { $0.unicodeScalars.contains(where: { marks.contains($0) }) }
+      if stressIndex == nil, hasCapsSyllable {
+        stressIndex = parts.firstIndex { p in
+          let letters = p.filter(\.isLetter)
+          return !letters.isEmpty && letters == letters.uppercased() && (letters.count > 1 || parts.count > 1)
+            && !(parts.first == p && letters.count == 1 && parts.count > 2)
+        }
+      }
+      let stress = stressIndex ?? 0
+      var out = ""
+      for (i, part) in parts.enumerated() {
+        let sounds = part.lowercased().filter(\.isLetter)
+        guard let ph = syllable(sounds, stressed: i == stress, last: i == parts.count - 1) else { return nil }
+        out += ph
+      }
+      // "A-KIL-leez": a doubled consonant across syllables is one sound.
+      var collapsed = ""
+      for ch in out {
+        if ch == collapsed.last, "bdfhklmnpstvwzɡɹʃʒθŋʧʤj".contains(ch) { continue }
+        collapsed.append(ch)
+      }
+      return collapsed.isEmpty ? nil : collapsed
+    }
+
+    private static let digraphVowels: [(String, String)] = [
+      ("eye", "I"), ("igh", "I"), ("air", "ɛɹ"), ("are", "ɛɹ"), ("eer", "ɪɹ"), ("ear", "ɪɹ"),
+      ("ee", "i"), ("ea", "i"), ("ie", "i"), ("oo", "u"), ("ou", "W"), ("ow", "W"),
+      ("oy", "Y"), ("oi", "Y"), ("ay", "A"), ("ai", "A"), ("ey", "A"), ("aw", "ɔ"), ("au", "ɔ"),
+      ("ah", "ɑ"), ("ih", "ɪ"), ("eh", "ɛ"), ("oh", "O"), ("oa", "O"), ("oe", "O"), ("uh", "ʌ"), ("ew", "ju"),
+      ("ar", "ɑɹ"), ("or", "ɔɹ"), ("er", "ɜɹ"), ("ir", "ɜɹ"), ("ur", "ɜɹ"),
+    ]
+    private static let consonants: [(String, String)] = [
+      ("tch", "ʧ"), ("ch", "ʧ"), ("sh", "ʃ"), ("th", "θ"), ("zh", "ʒ"), ("ng", "ŋ"), ("ph", "f"),
+      ("ck", "k"), ("qu", "kw"), ("kh", "k"), ("j", "ʤ"), ("c", "k"), ("x", "ks"), ("q", "k"),
+      ("g", "ɡ"), ("r", "ɹ"), ("y", "j"),
+      ("b", "b"), ("d", "d"), ("f", "f"), ("h", "h"), ("k", "k"), ("l", "l"), ("m", "m"),
+      ("n", "n"), ("p", "p"), ("s", "s"), ("t", "t"), ("v", "v"), ("w", "w"), ("z", "z"),
+    ]
+
+    /// One syllable: onset consonants, the vowel (stress mark before it), coda consonants.
+    private static func syllable(_ s: String, stressed: Bool, last: Bool) -> String? {
+      var rest = Substring(s), out = "", vowelDone = false
+      while !rest.isEmpty {
+        if !vowelDone {
+          if let (from, to) = digraphVowels.first(where: { rest.hasPrefix($0.0) }) {
+            let reduced = to.hasPrefix("ɜ") ? "əɹ" : (to == "ʌ" ? "ə" : to)   // "ROOZ-uh"
+            out += (stressed ? "ˈ" : "") + (stressed ? to : reduced)
+            rest = rest.dropFirst(from.count); vowelDone = true; continue
+          }
+          if let v = rest.first, "aeiou".contains(v) {
+            let open = rest.dropFirst().allSatisfy { !$0.isLetter }
+            out += (stressed ? "ˈ" : "") + singleVowel(v, stressed: stressed, open: open, last: last)
+            rest = rest.dropFirst(); vowelDone = true; continue
+          }
+          if rest.first == "y", rest.count == 1, !out.isEmpty {   // "-ly", "-ty"
+            out += stressed ? "ˈI" : "i"; rest = rest.dropFirst(); vowelDone = true; continue
+          }
+        }
+        guard let (from, to) = consonants.first(where: { rest.hasPrefix($0.0) }) else {
+          if let v = rest.first, "aeiouy".contains(v) { rest = rest.dropFirst(); continue }
+          return nil
+        }
+        out += to
+        rest = rest.dropFirst(from.count)
+      }
+      return vowelDone ? out : (out.isEmpty ? nil : out)
+    }
+
+    private static func singleVowel(_ v: Character, stressed: Bool, open: Bool, last: Bool) -> String {
+      switch (v, stressed, open) {
+      case ("a", true, false): return "æ"
+      case ("a", true, true): return "ɑ"
+      case ("a", false, _): return "ə"
+      case ("e", true, false): return "ɛ"
+      case ("e", true, true): return "i"
+      case ("e", false, true): return last ? "i" : "ə"
+      case ("e", false, false): return "ə"
+      case ("i", true, false): return "ɪ"
+      case ("i", true, true): return "I"
+      case ("i", false, _): return "ɪ"
+      case ("o", true, false): return "ɑ"
+      case ("o", _, true): return "O"
+      case ("o", false, false): return "ə"
+      case ("u", true, false): return "ʌ"
+      case ("u", true, true): return "u"
+      case ("u", false, _): return "ə"
+      default: return "ə"
+      }
+    }
   }
 }
