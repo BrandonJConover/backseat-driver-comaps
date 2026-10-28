@@ -393,13 +393,24 @@ using Observers = NSHashTable<Observer>;
 
     // Backseat Driver: Kokoro says the lines when it's ready. Navigation lines never wait on it:
     // if Kokoro can't start one quickly, the system voice says it.
-    auto const & voices = GetFramework().GetRoutingManager().GetBackseat().LastLineVoices();
+    auto & backseat = GetFramework().GetRoutingManager().GetBackseat();
+    auto const & voices = backseat.LastLineVoices();
     BOOL const hinted = self.allowsTurnInstructions && voices.size() == routeNotifications.count;
     BackseatKokoroVoice * kokoro = BackseatKokoroVoice.shared;
+    // A fake phone call that will put someone on just started: get their voice ready.
+    auto const callerVoice = backseat.TakeCallerVoiceToWarm();
+    if (!callerVoice.empty())
+      [kokoro prepareVoice:@(callerVoice.c_str())];
     for (NSUInteger i = 0; i < routeNotifications.count; ++i)
     {
       // While Kokoro loads, roasts wait for it and turn instructions go to the system voice.
       NSString * notification = routeNotifications[i];
+      // Someone else talking (the caller on the phone): only ever Kokoro, never the system voice.
+      if (hinted && !voices[i].voice.empty())
+      {
+        [kokoro speak:notification voice:@(voices[i].voice.c_str()) speed:static_cast<float>(voices[i].speed)];
+        continue;
+      }
       BOOL const nav = hinted ? voices[i].nav : YES;
       float const speed = hinted ? static_cast<float>(voices[i].speed) : 1.0f;
       double const maxWaitMs = hinted ? voices[i].maxWaitMs : 0;

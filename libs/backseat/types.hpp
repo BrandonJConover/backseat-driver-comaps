@@ -265,6 +265,10 @@ enum class Category
   Achievement,
   /// Filling a long silence on an easy stretch (navigator only).
   Idle,
+  /// The GPS on a pretend phone call during a quiet stretch (quiet_bits.hpp; navigator only).
+  PhoneCall,
+  /// I spy and useless facts on a quiet stretch (navigator only).
+  Quiet,
   Count
 };
 
@@ -291,6 +295,10 @@ struct Commentary
   /// too late to be useful and has to go out in the system voice. 0 means as soon as possible.
   /// Set by Navigator::TakeLines() from the distance and speed to the next maneuver.
   double maxWaitMs = 0;
+  /// Who says it: empty for the GPS's own voice, else a Kokoro voice id ("am_adam") for someone
+  /// else on the line, e.g. the caller the GPS put on. If that's the GPS's own voice (or missing),
+  /// the host uses another Kokoro voice; it never speaks these with the system voice.
+  std::string voice;
 };
 
 struct TripStats

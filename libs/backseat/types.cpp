@@ -161,6 +161,8 @@ char const * ToString(Category c)
   case Category::UTurn: return "uTurn";
   case Category::Achievement: return "achievement";
   case Category::Idle: return "idle";
+  case Category::PhoneCall: return "phoneCall";
+  case Category::Quiet: return "quiet";
   case Category::Count: break;
   }
   return "?";

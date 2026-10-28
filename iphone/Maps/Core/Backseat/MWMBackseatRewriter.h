@@ -137,6 +137,8 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 /// Right after the mileage log is turned on the first time: "Whose business are we tracking?"
 /// Empty after that.
 + (NSString *)mileageTurnedOn;
+/// The GPS's own name, the voice the driver picked ("Echo"), for the fake phone calls.
++ (void)setGpsName:(NSString *)name;
 /// How wound up the GPS is this trip, 0-100 (0 with no trip).
 @property(class, nonatomic, readonly) NSInteger frustration;
 /// The last mileage line asked a question; listen once and pass the answer to +mileageAnswer:.

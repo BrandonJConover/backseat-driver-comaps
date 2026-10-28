@@ -13,6 +13,7 @@ import FoundationModels
     MWMBackseatRewriter.shareVoices()
     // Load Kokoro now, not when the first route starts: its first lines would get the system voice.
     KokoroVoice.shared.start()
+    KokoroVoice.tellNavigatorItsName()
     BackseatWhereTo.install()
     BackseatFileQuestions.install()
     BackseatDriveWatcher.startIfEnabled()

@@ -2304,9 +2304,17 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
                             {"speed", backseat::LogNum(c.voiceSpeed, 2)},
                             {"text", c.text}});
     out.push_back(c.text);
-    m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed, c.maxWaitMs});
+    m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed, c.maxWaitMs, c.voice});
     if (c.priority == backseat::Priority::Nav)
       m_lastDirection = c.text;
+  }
+  // A call that will put someone on just started: the platform warms their voice up.
+  auto const & caller = m_navigator.PhoneCallerVoice();
+  if (caller != m_lastCallerVoice)
+  {
+    m_lastCallerVoice = caller;
+    if (!caller.empty())
+      m_callerVoiceToWarm = caller;
   }
   return out;
 }

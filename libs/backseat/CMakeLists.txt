@@ -27,6 +27,8 @@ set(
   navigator.hpp
   plate_game.cpp
   plate_game.hpp
+  quiet_bits.cpp
+  quiet_bits.hpp
   report.cpp
   report.hpp
   rewriter.cpp

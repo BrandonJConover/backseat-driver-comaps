@@ -17,6 +17,7 @@
 		BD5EA7000000000000000071 /* achievements.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000070 /* achievements.cpp */; };
 		BD5EA7000000000000000081 /* route_order.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000080 /* route_order.cpp */; };
 		BD5EA7000000000000000091 /* indoors.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000090 /* indoors.cpp */; };
+		BD5EA70000000000000000A9 /* quiet_bits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000A8 /* quiet_bits.cpp */; };
 		D11B0EA0545E2DA5C39B6197 /* lines.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7AA0F37DC5A858FEA309EA24 /* lines.cpp */; };
 		72027DDB55B38E72CFD39F30 /* lines_data.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AED2163B829158668F83E65D /* lines_data.cpp */; };
 		A536FAD0269DF941156830D4 /* navigator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5306268E5455315BD345F2F4 /* navigator.cpp */; };
@@ -187,6 +188,8 @@
 		BD5EA7000000000000000082 /* route_order.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = route_order.hpp; path = ../backseat/route_order.hpp; sourceTree = "<group>"; };
 		BD5EA7000000000000000090 /* indoors.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = indoors.cpp; path = ../backseat/indoors.cpp; sourceTree = "<group>"; };
 		BD5EA7000000000000000092 /* indoors.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = indoors.hpp; path = ../backseat/indoors.hpp; sourceTree = "<group>"; };
+		BD5EA70000000000000000A8 /* quiet_bits.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = quiet_bits.cpp; path = ../backseat/quiet_bits.cpp; sourceTree = "<group>"; };
+		BD5EA70000000000000000AA /* quiet_bits.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = quiet_bits.hpp; path = ../backseat/quiet_bits.hpp; sourceTree = "<group>"; };
 		7AA0F37DC5A858FEA309EA24 /* lines.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = lines.cpp; path = ../backseat/lines.cpp; sourceTree = "<group>"; };
 		AED2163B829158668F83E65D /* lines_data.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = lines_data.cpp; path = ../backseat/lines_data.cpp; sourceTree = "<group>"; };
 		5306268E5455315BD345F2F4 /* navigator.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = navigator.cpp; path = ../backseat/navigator.cpp; sourceTree = "<group>"; };
@@ -500,6 +503,8 @@
 				BD5EA7000000000000000082 /* route_order.hpp */,
 				BD5EA7000000000000000090 /* indoors.cpp */,
 				BD5EA7000000000000000092 /* indoors.hpp */,
+				BD5EA70000000000000000A8 /* quiet_bits.cpp */,
+				BD5EA70000000000000000AA /* quiet_bits.hpp */,
 				7AA0F37DC5A858FEA309EA24 /* lines.cpp */,
 				AED2163B829158668F83E65D /* lines_data.cpp */,
 				5306268E5455315BD345F2F4 /* navigator.cpp */,
@@ -786,6 +791,7 @@
 				BD5EA7000000000000000071 /* achievements.cpp in Sources */,
 				BD5EA7000000000000000081 /* route_order.cpp in Sources */,
 				BD5EA7000000000000000091 /* indoors.cpp in Sources */,
+				BD5EA70000000000000000A9 /* quiet_bits.cpp in Sources */,
 				D11B0EA0545E2DA5C39B6197 /* lines.cpp in Sources */,
 				72027DDB55B38E72CFD39F30 /* lines_data.cpp in Sources */,
 				A536FAD0269DF941156830D4 /* navigator.cpp in Sources */,

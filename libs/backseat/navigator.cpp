@@ -155,6 +155,68 @@ double constexpr kIndoorOutChance = 0.5;
 double constexpr kIndoorOutWithinMs = 5 * 60000;
 /// Silence between a setup and its punchline.
 double constexpr kAwkwardPauseMs = 2500;
+// Quiet-stretch bits (quiet_bits.hpp): a phone call, I spy or a useless fact when there's
+// nothing to say for a while. Not before the trip settles in, at most a couple a trip, spaced out.
+double constexpr kQuietBitAfterStartMs = 3 * 60000;
+int constexpr kQuietBitsPerTrip = 2;
+double constexpr kQuietBitEveryMs = 8 * 60000;
+/// Nothing said for this long, and the next maneuver at least this many seconds off.
+double constexpr kQuietSilenceMs = 25000;
+double constexpr kQuietMinToTurnS = 45;
+/// A call runs about a minute, so it wants a longer stretch. One a trip.
+double constexpr kCallMinToTurnS = 75;
+double constexpr kCallMinToTurnM = 1000;
+/// Once each bit has had its first time, a quiet stretch gets one this often; the call, I spy
+/// and the fact are picked by these weights.
+double constexpr kQuietBitChance = 0.5;
+double constexpr kCallWeight = 0.4;
+double constexpr kISpyWeight = 0.3;
+/// Speeds below this count as this for "how long until the turn" (a crawl isn't forever).
+double constexpr kQuietMinSpeedMps = 3;
+/// The GPS "listens" to the caller this long between its own lines (plus up to kCallListenSpreadMs).
+double constexpr kCallListenMs = 1800;
+double constexpr kCallListenSpreadMs = 1700;
+/// Directions interrupt: "I have to give them an update" goes first if the turn is this far off,
+/// otherwise the direction just cuts in. Back to the call this long after whatever cut in, once the
+/// next turn is at least kCallResumeMinToTurnS away; the caller hangs up after kCallMaxHoldMs.
+double constexpr kCallHoldFirstS = 20;
+double constexpr kCallResumeAfterCutInMs = 5000;
+double constexpr kCallResumeMinToTurnS = 25;
+double constexpr kCallMaxHoldMs = 120000;
+/// From the last line of the call to "Sorry about that, where were we?".
+double constexpr kCallAfterMs = 1500;
+/// Below this the sun is down (its top edge, with refraction).
+double constexpr kSunsetElevationDeg = -0.833;
+
+/// Only while driving along; a stop has its own lines.
+double constexpr kQuietMinMovingMps = 5;
+
+double SecondsToTurn(double distM, double speedMps) { return distM / std::max(speedMps, kQuietMinSpeedMps); }
+
+/// Lines that still get through while the GPS is on the phone (and put the call on hold): the
+/// driver talking to it, and things that actually happened. The running commentary waits.
+bool CutsIntoCall(Commentary const & c)
+{
+  if (c.priority == Priority::Nav)
+    return true;
+  switch (c.category)
+  {
+  case Category::PlateGame:
+  case Category::Thanked:
+  case Category::Title:
+  case Category::Bossy:
+  case Category::UnplannedStop:
+  case Category::Abandoned:
+  case Category::MissedTurn:
+  case Category::WrongTurn:
+  case Category::Rerouted:
+  case Category::StopRequest:
+  case Category::Battery:
+  case Category::Hazard:
+  case Category::Arrived: return true;
+  default: return false;
+  }
+}
 
 /// Roughly how long a line takes to say: ~2.7 words a second at normal speed.
 double SpeakingMs(std::string const & text, double speed)
@@ -418,6 +480,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackCurveAhead(fix, route);
   TrackMusic(fix.tMs, route);
   TrackLeftBuilding(fix);
+  TrackQuietBits(fix, route);
   // Fed up for the first time this trip: from now on it's "wise, omnipotent overseer GPS".
   if (!m_titleDemanded && Tier() == 2)
   {
@@ -569,9 +632,12 @@ std::vector<Commentary> Navigator::TakeLines()
     m_gate.Push(std::move(m_punchlines.front()), false);
     m_punchlines.erase(m_punchlines.begin());
   }
-  auto lines = m_gate.Take();
+  auto lines = FilterForCall(m_gate.Take());
   if (!lines.empty())
     m_lastSpokeT = m_lastT;
+  for (auto const & l : lines)
+    if (l.category != Category::PhoneCall && CutsIntoCall(l))
+      m_lastCutInT = m_lastT;
   for (auto & line : lines)
   {
     line.text = SpeakableText(line.text);
@@ -1267,6 +1333,14 @@ void Navigator::ResetTrip()
   m_lastTitleScoldT = -1e18;
   m_gate.Clear();
   m_punchlines.clear();
+  m_call.End();
+  m_callTaken = false;
+  m_quietBits = 0;
+  m_lastQuietBitT = -1e18;
+  m_quietRolledFor.reset();
+  m_quietTurnId.reset();
+  m_quietTurnSince = -1e18;
+  m_lastCutInT = -1e18;
 }
 
 void Navigator::SetSaidLog(SaidLog log, std::function<void(SaidLog const &)> onChange)
@@ -1670,5 +1744,224 @@ void Navigator::SayNav(double t, std::string const & text, double voiceSpeed)
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = Priority::Nav;
   m_gate.Push(std::move(c));
+}
+
+Vars Navigator::DriverVars() const
+{
+  Vars v = {{"name", m_driverName.empty() ? "the driver" : m_driverName}, {"gps", m_gpsName}};
+  switch (m_pronouns)
+  {
+  case Pronouns::He:
+    v.insert({{"theycap", "He"}, {"theyre", "he's"}, {"theyrecap", "He's"}, {"theyve", "he's"}, {"them", "him"}, {"their", "his"}});
+    break;
+  case Pronouns::She:
+    v.insert({{"theycap", "She"}, {"theyre", "she's"}, {"theyrecap", "She's"}, {"theyve", "she's"}, {"them", "her"}, {"their", "her"}});
+    break;
+  case Pronouns::They:
+    v.insert({{"theycap", "They"}, {"theyre", "they're"}, {"theyrecap", "They're"}, {"theyve", "they've"}, {"them", "them"}, {"their", "their"}});
+    break;
+  }
+  return v;
+}
+
+Commentary Navigator::CallLine(double tMs, std::string const & key)
+{
+  double const r = m_config.rng ? m_config.rng() : 0;
+  Commentary c;
+  c.t = tMs;
+  c.category = Category::PhoneCall;
+  // Nothing the call already said (Brandon's call has its own "Anyway, as I was saying.").
+  Vars const vars = DriverVars();
+  std::vector<std::string> options;
+  for (auto const & l : LinesFor(key, Tier()))
+    if (std::find(m_callSaid.begin(), m_callSaid.end(), Fill(l, vars)) == m_callSaid.end())
+      options.push_back(l);
+  if (options.empty())
+    options = LinesFor(key, Tier());
+  c.text = Fill(m_said.Pick(key, options, r), vars);
+  c.frustration = m_engine ? m_engine->Frustration() : 0;
+  c.priority = Priority::Roast;
+  c.voiceSpeed = 1 + c.frustration / 250.0;
+  m_callSaid.push_back(c.text);
+  return c;
+}
+
+void Navigator::StartCall(double t)
+{
+  // Callers who are the GPS's own voice can't ring it.
+  std::vector<std::string> ids;
+  for (auto const & s : CallScripts())
+    if (s.callerName != m_gpsName)
+      ids.push_back(s.id);
+  double const r = m_config.rng ? m_config.rng() : 0;
+  std::string const id = m_said.Pick("call.script", ids, r);
+  auto const & scripts = CallScripts();
+  auto const & script = *std::find_if(scripts.begin(), scripts.end(), [&](CallScript const & s) { return s.id == id; });
+  std::vector<CallBeat> beats;
+  // "It looks like I'm getting a phone call, just a sec." Then a beat to pick up.
+  beats.push_back({Speaker::Gps, true, false, CallLine(t, "call.ring").text});
+  beats.insert(beats.end(), script.beats.begin(), script.beats.end());
+  m_callSaid.clear();
+  m_call.Start(t, std::move(beats), script.callerVoice);
+  m_callTaken = true;
+  Trace("call.start", {{"script", id}});
+}
+
+void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
+{
+  double const t = fix.tMs;
+  bool const steady = route.state == RouteState::OnRoute && !m_rerouting && route.turnId;
+  double const toTurnS = steady ? SecondsToTurn(route.distToTurnM, fix.speedMps) : 0;
+  if (m_call.Active())
+  {
+    if (m_call.Held())
+    {
+      if (t - m_call.HeldSince() >= kCallMaxHoldMs)
+      {
+        m_call.End();
+        Trace("call.end", {{"why", "dropped"}});
+        m_gate.Push(CallLine(t, "call.dropped"), false);
+      }
+      else if (steady && t - m_lastCutInT >= kCallResumeAfterCutInMs && toTurnS >= kCallResumeMinToTurnS)
+      {
+        Trace("call.resume");
+        if (!m_call.Begun())
+        {
+          // Cut off before it even rang: just ring now.
+          m_call.Resume(t, 0);
+          return;
+        }
+        // "Anyway, as I was saying."
+        Commentary c = CallLine(t, "call.resume");
+        m_call.Resume(t, SpeakingMs(c.text, c.voiceSpeed) + 600);
+        m_gate.Push(std::move(c), false);
+      }
+      return;
+    }
+    if (auto const beat = m_call.Due(t))
+    {
+      Commentary c;
+      c.t = t;
+      c.category = Category::PhoneCall;
+      c.text = Fill(beat->text, DriverVars());
+      m_callSaid.push_back(c.text);
+      c.frustration = m_engine->Frustration();
+      c.priority = Priority::Roast;
+      c.voiceSpeed = 1 + c.frustration / 250.0;
+      if (beat->who == Speaker::Caller)
+        c.voice = m_call.CallerVoice();
+      double const end = t + SpeakingMs(c.text, c.voiceSpeed);
+      double const r = m_config.rng ? m_config.rng() : 0;
+      m_call.Advance(end, kCallListenMs + r * kCallListenSpreadMs);
+      m_gate.Push(std::move(c), false);
+      if (m_call.Done())
+      {
+        m_call.End();
+        Trace("call.end", {{"why", "done"}});
+        m_punchlines.push_back(CallLine(end + kCallAfterMs, "call.after"));
+      }
+    }
+    return;
+  }
+
+  // A new maneuver means a direction was just queued, even if it hasn't gone out yet.
+  if (route.turnId != m_quietTurnId)
+  {
+    m_quietTurnId = route.turnId;
+    m_quietTurnSince = t;
+  }
+  if (!steady || fix.speedMps < kQuietMinMovingMps || m_quietBits >= kQuietBitsPerTrip || !m_punchlines.empty() ||
+      QuietBitBusy())
+    return;
+  if (t - m_tripStartT < kQuietBitAfterStartMs || t - m_lastQuietBitT < kQuietBitEveryMs ||
+      t - std::max(m_lastSpokeT, m_quietTurnSince) < kQuietSilenceMs || toTurnS < kQuietMinToTurnS)
+    return;
+  bool const roomForCall = !m_callTaken && toTurnS >= kCallMinToTurnS && route.distToTurnM >= kCallMinToTurnM;
+  bool const night = KnowsTheDate(t) && SunElevationDeg(fix.lat, fix.lon, t) < kSunsetElevationDeg;
+  enum class Bit { None, Call, ISpy, Fact } bit = Bit::None;
+  // Each bit's first time comes as soon as there's room for it, the call first.
+  if (roomForCall && !m_said.Said("call.script"))
+    bit = Bit::Call;
+  else if (!m_said.Said("ispy.night") && !m_said.Said("ispy.day"))
+    bit = Bit::ISpy;
+  else if (!m_said.Said("fact.frame"))
+    bit = Bit::Fact;
+  else
+  {
+    // After that, one roll of the dice per stretch.
+    if (m_quietRolledFor == route.turnId)
+      return;
+    m_quietRolledFor = route.turnId;
+    double const r = m_config.rng ? m_config.rng() : 0;
+    if (r >= kQuietBitChance)
+      return;
+    double pick = r / kQuietBitChance;
+    if (!roomForCall)
+      pick = kCallWeight + pick * (1 - kCallWeight);
+    bit = pick < kCallWeight ? Bit::Call : pick < kCallWeight + kISpyWeight ? Bit::ISpy : Bit::Fact;
+  }
+  ++m_quietBits;
+  m_lastQuietBitT = t;
+  switch (bit)
+  {
+  case Bit::Call: StartCall(t); break;
+  case Bit::ISpy:
+    // "I spy something black. Oh wait, you can't see because it's dark outside." Only after dark.
+    Trace("quiet", {{"bit", "ispy"}, {"night", night ? "yes" : "no"}});
+    SayLine(t, Category::Quiet, night ? "ispy.night" : "ispy.day");
+    break;
+  case Bit::Fact:
+  {
+    Trace("quiet", {{"bit", "fact"}});
+    double const r = m_config.rng ? m_config.rng() : 0;
+    SayLine(t, Category::Quiet, "fact.frame", {{"fact", m_said.Pick("fact", LinesFor("fact", 0), r)}});
+    break;
+  }
+  case Bit::None: break;
+  }
+}
+
+std::vector<Commentary> Navigator::FilterForCall(std::vector<Commentary> lines)
+{
+  if (!m_call.Active())
+    return lines;
+  std::vector<Commentary> out;
+  // Lost or there: the call's over, and everything else goes out as usual.
+  if (m_arrived || m_lastState == RouteState::OffRoute)
+  {
+    bool const arrived = m_arrived;
+    m_call.End();
+    Trace("call.end", {{"why", arrived ? "arrived" : "lost"}});
+    out.push_back(CallLine(m_lastT, arrived ? "call.arrived" : "call.lost"));
+    for (auto & l : lines)
+      if (l.category != Category::PhoneCall)
+        out.push_back(std::move(l));
+    return out;
+  }
+  auto const cutIn = [](Commentary const & l) { return l.category != Category::PhoneCall && CutsIntoCall(l); };
+  bool const direction = std::any_of(lines.begin(), lines.end(), [&](Commentary const & l) {
+    return cutIn(l) && l.priority == Priority::Nav;
+  });
+  if (std::any_of(lines.begin(), lines.end(), cutIn) && !m_call.Held())
+  {
+    m_call.Hold(m_lastT);
+    double const toTurnS = SecondsToTurn(m_lastDistToTurnM, m_lastFix ? m_lastFix->speedMps : 0);
+    Trace("call.hold", {{"to_turn_s", LogNum(toTurnS, 0)}, {"direction", direction ? "yes" : "no"}});
+    // "Oh, it looks like I have to give them an update. Just a second." Unless the turn is close.
+    // The script just announced its own made-up update? Then the real one is right on cue.
+    if (direction && m_call.Begun() && toTurnS >= kCallHoldFirstS && !m_call.AnnouncedUpdate())
+      out.push_back(CallLine(m_lastT, "call.hold"));
+  }
+  for (auto & l : lines)
+  {
+    // On hold, call lines still queued are taken back (Hold() rewound them).
+    if (l.category == Category::PhoneCall ? !m_call.Held() : CutsIntoCall(l))
+      out.push_back(std::move(l));
+    else if (l.category != Category::PhoneCall)
+      // The GPS is busy on the phone; the roast can wait for another day.
+      Trace("call.skip", {{"category", ToString(l.category)}});
+  }
+  m_call.Delivered();
+  return out;
 }
 }  // namespace backseat

@@ -200,11 +200,51 @@ final class KokoroVoice: NSObject {
   /// Switches voices and forgets queued and cached lines, so the old voice doesn't come back.
   func selectVoice(_ id: String) {
     UserDefaults.standard.set(id, forKey: Self.voiceKey)
+    Self.tellNavigatorItsName()
     stop()
     lock.lock()
     cache.removeAll()
     cacheOrder.removeAll()
     lock.unlock()
+  }
+
+  /// The GPS answers its fake phone calls with its own name: the voice the driver picked ("Echo").
+  @objc static func tellNavigatorItsName() {
+    let name = voiceOptions.first { $0.id == selectedVoiceID }?.spokenName ?? "Echo"
+    MWMBackseatRewriter.setGpsName(name)
+  }
+
+  /// A line in someone else's voice (the caller the GPS put on the phone). Never the system voice:
+  /// if Kokoro can't say it, it's skipped.
+  @objc func speak(_ text: String, voice hint: String, speed: Float) {
+    enqueue(text, nav: false, speed: speed, voice: Self.otherVoice(hint), keep: false, fallback: {})
+  }
+
+  /// Renders a short line in the caller's voice as a chore, so their first line isn't late (a
+  /// voice's first render loads it) or dropped as stale.
+  @objc func prepareVoice(_ hint: String) {
+    let voice = Self.otherVoice(hint)
+    addChore { [self] in
+      lock.lock(); let engine = primary; lock.unlock()
+      guard let engine else { return }
+      let start = Date()
+      do {
+        _ = try await render("Hello.", speed: 1, voice: voice, nav: false, with: engine)
+        BackseatLog.event("voice.warm", ["reason": "caller \(voice)", "ms": String(Int(Date().timeIntervalSince(start) * 1000))])
+      } catch {
+        BackseatLog.event("voice.error", ["error": error.localizedDescription, "where": "caller warm-up"])
+      }
+    }
+  }
+
+  /// `hint` if it's one of the voices and isn't the GPS's own; otherwise the first voice of the
+  /// other gender (ids are af/am/bf/bm: the second letter is f or m).
+  static func otherVoice(_ hint: String) -> String {
+    let own = voice ?? selectedVoiceID
+    if hint != own, voiceOptions.contains(where: { $0.id == hint }) { return hint }
+    let ownGender = own.dropFirst().first
+    return voiceOptions.first { $0.id.dropFirst().first != ownGender && $0.id != own }?.id
+      ?? voiceOptions.first { $0.id != own }?.id ?? own
   }
 
   /// Says `text` in the picked voice for the test button in Settings; `fallback` says it with the

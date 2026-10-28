@@ -10,6 +10,7 @@
 #include "backseat/history.hpp"
 #include "backseat/indoors.hpp"
 #include "backseat/plate_game.hpp"
+#include "backseat/quiet_bits.hpp"
 #include "backseat/report.hpp"
 #include "backseat/rewriter.hpp"
 #include "backseat/stop_go.hpp"
@@ -213,6 +214,8 @@ public:
   void SetDriverPronouns(Pronouns p) { m_pronouns = p; }
   /// What to call the driver, from first-run setup. Empty when they never said.
   void SetDriverName(std::string name) { m_driverName = std::move(name); }
+  /// The GPS's own name, i.e. the voice the driver picked ("Echo"), for "This is Echo".
+  void SetGpsName(std::string name) { m_gpsName = std::move(name); }
   /// The driver's partner ("wife", "husband", "partner") and their pronouns, from settings.
   /// Empty turns off the "I wish your wife was driving" line.
   void SetPartner(std::string word, Pronouns pronouns)
@@ -265,6 +268,11 @@ public:
   /// "work" or "home" when `at` is there, otherwise `name` (or "the usual place").
   std::string PlaceName(std::optional<LatLon> const & at, std::string const & name) const;
 
+  /// The Kokoro voice of whoever is on the phone with the GPS right now, if they'll be put on the
+  /// line; empty otherwise. The host warms that voice up when this changes, so the caller's first
+  /// line isn't late.
+  std::string const & PhoneCallerVoice() const { return m_call.CallerVoice(); }
+
   bool InTrip() const { return m_engine != nullptr; }
   CritiqueEngine const * Engine() const { return m_engine.get(); }
 
@@ -315,6 +323,17 @@ private:
   /// The trip started indoors: say so, and maybe remark on it once the car gets out.
   void SayIndoorStart(double tMs, RouteSnapshot const & route);
   void TrackLeftBuilding(Fix const & fix);
+  /// Dead stretch with nothing to say about directions: a phone call, I spy, or a useless fact.
+  void TrackQuietBits(Fix const & fix, RouteSnapshot const & route);
+  void StartCall(double tMs);
+  /// A quiet-stretch bit is still going (a call), so nothing else should start one.
+  bool QuietBitBusy() const { return m_call.Active(); }
+  /// A "call.*" line, filled in, to say right away.
+  Commentary CallLine(double tMs, std::string const & key);
+  /// Puts the call on hold for directions, takes it back up, or ends it, as lines go out.
+  std::vector<Commentary> FilterForCall(std::vector<Commentary> lines);
+  /// {name}, {gps} and the driver's pronouns, for lines about the driver.
+  Vars DriverVars() const;
   int Tier() const;
   bool Parked() const;
 
@@ -470,6 +489,22 @@ private:
   double m_lastRegionCheckT = -1e18;
   /// Game lines held back while a maneuver is close; directions come first.
   std::vector<Commentary> m_heldPlateLines;
+
+  // Quiet-stretch bits.
+  std::string m_gpsName = "Echo";
+  PhoneCall m_call;
+  /// Everything said on this call, so the hold and resume lines don't echo the script.
+  std::vector<std::string> m_callSaid;
+  bool m_callTaken = false;
+  int m_quietBits = 0;
+  double m_lastQuietBitT = -1e18;
+  /// The maneuver whose quiet stretch already had its roll of the dice.
+  std::optional<uint32_t> m_quietRolledFor;
+  /// The maneuver being driven toward and since when, as the quiet-stretch bits see it.
+  std::optional<uint32_t> m_quietTurnId;
+  double m_quietTurnSince = -1e18;
+  /// When something last cut into a call (m_lastSpokeT is when anything was last handed out).
+  double m_lastCutInT = -1e18;
 
   std::optional<int> m_batteryPercent;
   std::optional<bool> m_charging;

@@ -307,10 +307,17 @@ public:
     /// Navigation lines: how long the line may wait for the neural voice before it's too late
     /// (from the distance and speed to the next maneuver). Wait at least the usual 1.2 s.
     double maxWaitMs = 0;
+    /// Someone else talking (the caller in a fake phone call): a Kokoro voice id. Empty means the
+    /// GPS's own voice.
+    std::string voice;
   };
 
   /// One entry per line of the last TakeNotifications() batch, in the same order.
   std::vector<LineVoice> const & LastLineVoices() const { return m_lastVoices; }
+  /// The GPS's own name, the voice the driver picked ("Echo"): the fake phone calls answer with it.
+  void SetGpsName(std::string const & name) { m_navigator.SetGpsName(name); }
+  /// A caller's voice to warm up, once, when a call that will put them on starts. Empty otherwise.
+  std::string TakeCallerVoiceToWarm() { return std::exchange(m_callerVoiceToWarm, std::string()); }
 
 private:
   backseat::RouteSnapshot Snapshot(routing::RoutingSession const & session, std::string const & destinationName) const;
@@ -436,4 +443,6 @@ private:
   std::vector<SearchResult> m_results;
   std::vector<backseat::VoiceOption> m_voices;
   mutable int m_secondsLeft = -1;
+  std::string m_lastCallerVoice;
+  std::string m_callerVoiceToWarm;
 };

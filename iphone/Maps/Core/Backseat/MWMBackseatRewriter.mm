@@ -648,6 +648,11 @@ static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == M
   return @(GetFramework().GetRoutingManager().BackseatMileageYearEnd().c_str());
 }
 
++ (void)setGpsName:(NSString *)name
+{
+  GetFramework().GetRoutingManager().GetBackseat().SetGpsName(name.UTF8String ?: "Echo");
+}
+
 + (NSInteger)frustration
 {
   return GetFramework().GetRoutingManager().BackseatFrustration();
