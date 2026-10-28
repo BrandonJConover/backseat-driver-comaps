@@ -327,6 +327,8 @@ public:
 private:
   std::optional<backseat::Sight> SightAt(backseat::LatLon const & at, double bearingDeg) const;
   backseat::Bridge BridgeAt(backseat::LatLon const & at, double bearingDeg) const;
+  /// Meters to the nearest mapped car road, up to kRoadSearchM; that far if none, -1 with no map.
+  double RoadDistanceAt(backseat::LatLon const & at) const;
   void CheckBattery(double tMs);
   /// Carries out one command, adding to `heard`; returns the reply to say for it.
   std::string Run(backseat::AppCommand const & command, bool polite, HeardCommand & heard);

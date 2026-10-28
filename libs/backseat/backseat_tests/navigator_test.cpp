@@ -1485,3 +1485,34 @@ TEST(TheNextDirectionWaitsUntilTheTurnIsDone)
   auto const close = nav.TakeLines();
   CHECK(std::any_of(close.begin(), close.end(), [](Commentary const & c) { return c.text.find("turn right") != std::string::npos; }));
 }
+
+TEST(DrivingWhereTheMapHasNoRoad)
+{
+  Navigator nav(Config());
+  double roadM = 5;
+  nav.SetRoadDistanceLookup([&](LatLon const &) { return roadM; });
+  auto const offRoadLines = [&](int from, int to, double mps)
+  {
+    for (int i = from; i < to; ++i)
+      nav.OnFix(Heading(i * 1000.0, mps, 90), Far());
+    int n = 0;
+    for (auto const & l : nav.TakeLines())
+      n += SaidLineOf(l.text, "offRoad");
+    return n;
+  };
+  CHECK_EQUAL(offRoadLines(0, 20, 15), 0);
+  // Off every road, but only for a moment (GPS wobble).
+  roadM = 90;
+  CHECK_EQUAL(offRoadLines(20, 26, 15), 0);
+  roadM = 5;
+  CHECK_EQUAL(offRoadLines(26, 30, 15), 0);
+  // Crawling through a big parking lot doesn't count.
+  roadM = 90;
+  CHECK_EQUAL(offRoadLines(30, 60, 3), 0);
+  // Really out there: once, then not again for a while.
+  CHECK_EQUAL(offRoadLines(60, 90, 15), 1);
+  CHECK_EQUAL(offRoadLines(90, 200, 15), 0);
+  // No map for this area: no opinion.
+  roadM = -1;
+  CHECK_EQUAL(offRoadLines(600, 700, 15), 0);
+}

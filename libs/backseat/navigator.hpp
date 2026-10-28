@@ -113,6 +113,8 @@ enum class Bridge
 };
 /// Whether the car is on a bridge, given where it is and which way it's heading.
 using BridgeLookup = std::function<Bridge(LatLon const &, double bearingDeg)>;
+/// Distance in meters from a spot to the nearest mapped car road; negative if the map can't tell.
+using RoadDistanceLookup = std::function<double(LatLon const &)>;
 
 /// What kind of notable place is at a point (a coffee shop, a theme park). Empty when nothing is.
 using VenueLookup = std::function<std::optional<Venue>(LatLon const &)>;
@@ -213,6 +215,7 @@ public:
   void SetCarHasAutopilot(bool has) { m_carHasAutopilot = has; }
   /// Lets the GPS panic on bridges.
   void SetBridgeLookup(BridgeLookup lookup) { m_bridgeLookup = std::move(lookup); }
+  void SetRoadDistanceLookup(RoadDistanceLookup lookup) { m_roadDistanceLookup = std::move(lookup); }
   /// Lets the GPS ask for music on a quiet drive, and keep it to itself when music is on.
   void SetMusicLookup(MusicLookup lookup) { m_musicLookup = std::move(lookup); }
   /// Local calendar time for a timestamp (ms since the epoch), for holidays. Defaults to the
@@ -275,6 +278,8 @@ private:
   void SayLine(double tMs, Category category, std::string const & key, Vars vars = {},
                Priority priority = Priority::Roast);
   void TrackFear(Fix const & fix, RouteSnapshot const & route);
+  /// "Either there is a new road here or we are completely off course."
+  void TrackOffRoad(Fix const & fix);
   void SayPolice(double tMs);
   void SayLemon(double tMs);
   void SayVenue(double tMs, RouteSnapshot const & route);
@@ -401,6 +406,10 @@ private:
   // Fear: bridges and sharp curves.
   BridgeLookup m_bridgeLookup;
   double m_lastBridgeCheckT = -1e18;
+  RoadDistanceLookup m_roadDistanceLookup;
+  double m_lastRoadCheckT = -1e18;
+  std::optional<double> m_offRoadSince;
+  double m_lastOffRoadT = -1e18;
   bool m_onBridge = false;
   double m_lastBridgeYelpT = -1e18;
   double m_lastCurveYelpT = -1e18;

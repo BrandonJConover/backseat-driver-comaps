@@ -1095,6 +1095,7 @@ void BackseatAdapter::SetDataSource(std::function<DataSource &()> getter)
   m_navigator.SetSightLookup([this](backseat::LatLon const & at, double bearing) { return SightAt(at, bearing); });
   m_navigator.SetVenueLookup([this](backseat::LatLon const & at) { return VenueAt(at); });
   m_navigator.SetBridgeLookup([this](backseat::LatLon const & at, double bearing) { return BridgeAt(at, bearing); });
+  m_navigator.SetRoadDistanceLookup([this](backseat::LatLon const & at) { return RoadDistanceAt(at); });
   // A stop within a light's queue is a red light, not pulling over.
   m_navigator.SetTrafficLightLookup([this](backseat::LatLon const & at)
   {
@@ -1184,6 +1185,52 @@ backseat::Control BackseatAdapter::GuessControl(routing::Route const & route, ui
   if (from >= RoadRank(ftypes::HighwayClass::Tertiary) && to >= 0 && to < from)
     return backseat::Control::StopSign;
   return backseat::Control::None;
+}
+
+double BackseatAdapter::RoadDistanceAt(backseat::LatLon const & at) const
+{
+  if (!m_dataSource)
+    return -1;
+  double constexpr kRoadSearchM = 120;
+  auto const & c = classif();
+  static uint32_t const kHighway = c.GetTypeByPath({"highway"});
+  static std::vector<std::string> const kCarRoads = {
+      "motorway",      "trunk",          "primary",      "secondary",      "tertiary",
+      "unclassified",  "residential",    "living_street", "service",       "motorway_link",
+      "trunk_link",    "primary_link",   "secondary_link", "tertiary_link", "road",
+      "track"};
+  m2::PointD const center = mercator::FromLatLon(at.lat, at.lon);
+  double best = kRoadSearchM;
+  bool sawAnything = false;
+  m_dataSource().ForEachInRect([&](FeatureType & ft)
+  {
+    sawAnything = true;
+    if (ft.GetGeomType() != feature::GeomType::Line)
+      return;
+    bool isRoad = false;
+    for (uint32_t type : feature::TypesHolder(ft))
+    {
+      if (ftype::GetLevel(type) < 2)
+        continue;
+      uint32_t top = type;
+      ftype::TruncValue(top, 1);
+      if (top != kHighway)
+        continue;
+      ClassifObject const * road = c.GetRoot()->GetObject(ftype::GetValue(type, 0))->GetObject(ftype::GetValue(type, 1));
+      if (std::find(kCarRoads.begin(), kCarRoads.end(), road->GetName()) != kCarRoads.end())
+        isRoad = true;
+    }
+    if (!isRoad)
+      return;
+    ft.ParseGeometry(scales::GetUpperScale());
+    for (size_t i = 1; i < ft.GetPointsCount(); ++i)
+    {
+      m2::ParametrizedSegment<m2::PointD> const segment(ft.GetPoint(i - 1), ft.GetPoint(i));
+      best = std::min(best, mercator::DistanceOnEarth(center, segment.ClosestPointTo(center)));
+    }
+  }, mercator::RectByCenterXYAndSizeInMeters(center, 2 * kRoadSearchM), scales::GetUpperScale());
+  // No features at all: the map for this area isn't downloaded, so it can't say there's no road.
+  return sawAnything ? best : -1;
 }
 
 backseat::Bridge BackseatAdapter::BridgeAt(backseat::LatLon const & at, double bearingDeg) const

@@ -66,6 +66,15 @@ double constexpr kCurveGasEveryMs = 5 * 60000;
 /// Regular bridges are everywhere in a city (every overpass); water is always worth a scream.
 double constexpr kLandBridgeYelpEveryMs = 600000;
 double constexpr kWaterBridgeYelpEveryMs = 60000;
+/// Off every mapped road: this far from the nearest one...
+double constexpr kOffRoadM = 60;
+/// ...and back on one within this...
+double constexpr kBackOnRoadM = 30;
+/// ...for this long, at a real driving speed (not crawling through a parking lot)...
+double constexpr kOffRoadForMs = 12000;
+double constexpr kOffRoadMinMps = 6;
+/// ...and said at most this often.
+double constexpr kOffRoadEveryMs = 300000;
 /// Lost this many times in one trip, the GPS suggests a car that drives itself.
 int constexpr kAutopilotAfterReroutes = 3;
 /// The second time lost on a trip, the GPS wishes the driver's partner were driving.
@@ -383,6 +392,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackStop(fix, route);
   TrackTraffic(fix, route);
   TrackFear(fix, route);
+  TrackOffRoad(fix);
   TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
   TrackLongDrive(fix.tMs, route);
   TrackSights(fix, route);
@@ -1435,6 +1445,33 @@ static std::string CarWeight(Units units)
 {
   // A typical car or small SUV.
   return units == Units::Mph ? "4,000 pounds" : "1,800 kilograms";
+}
+
+void Navigator::TrackOffRoad(Fix const & fix)
+{
+  if (!m_roadDistanceLookup || fix.tMs - m_lastRoadCheckT < 2000)
+    return;
+  if (fix.speedMps < kOffRoadMinMps)
+  {
+    m_offRoadSince.reset();
+    return;
+  }
+  m_lastRoadCheckT = fix.tMs;
+  double const dist = m_roadDistanceLookup({fix.lat, fix.lon});
+  if (dist < 0 || dist <= kBackOnRoadM)
+  {
+    m_offRoadSince.reset();
+    return;
+  }
+  if (dist < kOffRoadM)
+    return;
+  if (!m_offRoadSince)
+    m_offRoadSince = fix.tMs;
+  if (fix.tMs - *m_offRoadSince < kOffRoadForMs || fix.tMs - m_lastOffRoadT < kOffRoadEveryMs)
+    return;
+  m_lastOffRoadT = fix.tMs;
+  Trace("nav.offroad", {{"road_m", LogNum(dist, 0)}});
+  SayLine(fix.tMs, Category::Rerouted, "offRoad");
 }
 
 void Navigator::TrackFear(Fix const & fix, RouteSnapshot const & route)
