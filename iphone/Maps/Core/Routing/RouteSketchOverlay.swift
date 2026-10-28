@@ -22,8 +22,33 @@ final class RouteSketchOverlay: UIView {
   /// Erase also takes away the route drawn earlier; it happens on Go, so Cancel leaves it be.
   private var eraseRoute = false
   /// Undo steps: the drawing as it was, or a change already made to the route (a drag).
+  /// Erase and reconnect: a rubbed-out stretch of the route line (vertex indexes into `line`), and
+  /// the drawn way across it once there is one.
+  private struct Cut {
+    var from: Int
+    var to: Int
+    var fill: [CLLocation]?
+  }
+  /// The route's line when editing began; frozen while there are cuts, so their indexes hold.
+  private var line: [CLLocation] = []
+  private var cuts: [Cut] = []
+  private enum Tool { case pen, eraser }
+  private var tool = Tool.pen
+  /// The eraser's path while rubbing, and the stretch it has rubbed out so far.
+  private var rubbing: [CLLocation] = []
+  private let cutsLayer = CAShapeLayer()
+  private let cutEndsLayer = CAShapeLayer()
+  private let penButton = RouteSketchOverlay.toolButton("pencil.tip")
+  private let eraserButton = RouteSketchOverlay.toolButton("eraser")
+  private let hint = UILabel()
+  private let defaultHint = "Drag the blue line to change roads, or draw with one finger. Two fingers move and zoom. Hold to drop a stop."
+  /// Pressing on the route: drawing unless the finger stays still, then it drags the route.
+  private var holdTimer: Timer?
+  private var pressStart = CGPoint.zero
+  private var pressOnHandle = false
+
   private enum Step {
-    case drawing(items: [[CLLocation]], eraseRoute: Bool)
+    case drawing(items: [[CLLocation]], eraseRoute: Bool, cuts: [Cut])
     case route
   }
   private var history: [Step] = []
@@ -76,8 +101,7 @@ final class RouteSketchOverlay: UIView {
     handlesLayer.lineWidth = 3
     layer.addSublayer(handlesLayer)
 
-    let hint = UILabel()
-    hint.text = "Drag the blue line to change roads, or draw with one finger. Two fingers move and zoom. Hold to drop a stop."
+    hint.text = defaultHint
     hint.font = .preferredFont(forTextStyle: .subheadline)
     hint.textColor = .white
     hint.numberOfLines = 0
@@ -95,6 +119,34 @@ final class RouteSketchOverlay: UIView {
     cancelButton.addAction(UIAction { [weak self] _ in self?.cancel() }, for: .touchUpInside)
     saveButton.addAction(UIAction { [weak self] _ in self?.askToSave() }, for: .touchUpInside)
     goButton.addAction(UIAction { [weak self] _ in self?.go() }, for: .touchUpInside)
+    // Pen and eraser, on the right edge.
+    for layer in [cutsLayer, cutEndsLayer] {
+      self.layer.insertSublayer(layer, below: drawingLayer)
+    }
+    cutsLayer.strokeColor = UIColor.white.cgColor
+    cutsLayer.fillColor = nil
+    cutsLayer.lineWidth = 9
+    cutsLayer.lineCap = .round
+    cutsLayer.lineDashPattern = [8, 8]
+    cutEndsLayer.lineWidth = 3
+    cutEndsLayer.strokeColor = UIColor.white.cgColor
+    penButton.addAction(UIAction { [weak self] _ in self?.select(.pen) }, for: .touchUpInside)
+    eraserButton.addAction(UIAction { [weak self] _ in self?.select(.eraser) }, for: .touchUpInside)
+    let tools = UIStackView(arrangedSubviews: [penButton, eraserButton])
+    tools.axis = .vertical
+    tools.spacing = 8
+    tools.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(tools)
+    NSLayoutConstraint.activate([
+      tools.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -12),
+      tools.centerYAnchor.constraint(equalTo: centerYAnchor),
+      penButton.widthAnchor.constraint(equalToConstant: 48),
+      penButton.heightAnchor.constraint(equalToConstant: 48),
+      eraserButton.widthAnchor.constraint(equalToConstant: 48),
+      eraserButton.heightAnchor.constraint(equalToConstant: 48),
+    ])
+    line = MWMRouter.routeLine()
+
     let buttons = UIStackView(arrangedSubviews: [cancelButton, undoButton, eraseButton, saveButton, goButton])
     buttons.axis = .horizontal
     buttons.spacing = 8
@@ -116,8 +168,11 @@ final class RouteSketchOverlay: UIView {
     addSubview(host.view)
     plannerHost = host
     plannerTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-      self?.planner.refresh()
-      self?.redraw()
+      guard let self else { return }
+      self.planner.refresh()
+      // The route can re-plan (drags, stops); its line is followed until something is cut out of it.
+      if self.cuts.isEmpty { self.line = MWMRouter.routeLine() }
+      self.redraw()
     }
 
     NSLayoutConstraint.activate([
@@ -167,21 +222,48 @@ final class RouteSketchOverlay: UIView {
     return button
   }
 
-  private var hasChanges: Bool { !items.isEmpty || eraseRoute || routeChanged }
+  private var hasChanges: Bool { !items.isEmpty || eraseRoute || routeChanged || !cuts.isEmpty }
+  private var gapOpen: Bool { cuts.contains { $0.fill == nil } }
+
+  private static func toolButton(_ symbol: String) -> UIButton {
+    var config = UIButton.Configuration.filled()
+    config.image = UIImage(systemName: symbol)
+    config.baseBackgroundColor = .systemBackground
+    config.baseForegroundColor = .label
+    config.cornerStyle = .medium
+    let button = UIButton(configuration: config)
+    button.layer.shadowOpacity = 0.2
+    button.layer.shadowRadius = 3
+    button.layer.shadowOffset = .zero
+    return button
+  }
+
+  private func select(_ tool: Tool) {
+    self.tool = tool
+    updateButtons()
+  }
 
   private func updateButtons() {
+    penButton.configuration?.baseBackgroundColor = tool == .pen ? .systemOrange : .systemBackground
+    penButton.configuration?.baseForegroundColor = tool == .pen ? .white : .label
+    eraserButton.configuration?.baseBackgroundColor = tool == .eraser ? .systemOrange : .systemBackground
+    eraserButton.configuration?.baseForegroundColor = tool == .eraser ? .white : .label
     undoButton.isHidden = history.isEmpty
     eraseButton.isHidden = items.isEmpty && (eraseRoute || !MWMRouter.hasSketch())
-    saveButton.isHidden = items.isEmpty
-    goButton.isEnabled = hasChanges
-    goButton.alpha = hasChanges ? 1 : 0.5
+    saveButton.isHidden = items.isEmpty && cuts.isEmpty
+    // An erased stretch has to be drawn across before the route can be planned.
+    let ready = hasChanges && !gapOpen
+    goButton.isEnabled = ready
+    goButton.alpha = ready ? 1 : 0.5
+    hint.text = gapOpen ? "Connect the gap: draw from one end of the dashed stretch to the other."
+      : tool == .eraser ? "Rub out the part of the blue route you don't want." : defaultHint
     confirmingCancel = false
     cancelButton.configuration?.title = "Cancel"
     cancelButton.configuration?.baseForegroundColor = .label
   }
 
   private func change(_ apply: () -> Void) {
-    history.append(.drawing(items: items, eraseRoute: eraseRoute))
+    history.append(.drawing(items: items, eraseRoute: eraseRoute, cuts: cuts))
     apply()
     redraw()
     updateButtons()
@@ -192,9 +274,10 @@ final class RouteSketchOverlay: UIView {
   private func undo() {
     guard let last = history.popLast() else { return }
     switch last {
-    case .drawing(let previousItems, let previousErase):
+    case .drawing(let previousItems, let previousErase, let previousCuts):
       items = previousItems
       eraseRoute = previousErase
+      cuts = previousCuts
     case .route:
       MWMRouter.undoSketch()
       follow(for: 1.5)
@@ -215,13 +298,19 @@ final class RouteSketchOverlay: UIView {
     current.removeAll()
     change {
       items.removeAll()
+      cuts.removeAll()
       if MWMRouter.hasSketch() { eraseRoute = true }
     }
   }
 
   /// Nothing touches the route until here.
   private func go() {
-    guard let mapView, hasChanges else { return }
+    guard let mapView, hasChanges, !gapOpen else { return }
+    // Reconnected stretches first, then anything drawn freehand.
+    let fills = cuts.compactMap { cut in cut.fill.map { ["from": cut.from, "to": cut.to, "stroke": $0] as [String: Any] } }
+    if !fills.isEmpty {
+      onStroke?(MWMRouter.applyRouteFills(fills, line: line, in: mapView))
+    }
     if items.isEmpty {
       if eraseRoute, MWMRouter.clearSketch() { onErase?() }
     } else {
@@ -248,7 +337,8 @@ final class RouteSketchOverlay: UIView {
 
   /// "Save route": asks for a name ("To Melissa Drive" suggested) and keeps the drawing.
   private func askToSave() {
-    guard !items.isEmpty, let presenter = window?.rootViewController?.topmostPresented else { return }
+    guard !items.isEmpty || !cuts.isEmpty, !gapOpen,
+          let presenter = window?.rootViewController?.topmostPresented else { return }
     let alert = UIAlertController(title: "Save route", message: "Find it on the \u{201C}Where to?\u{201D} card next time.",
                                   preferredStyle: .alert)
     alert.addTextField { field in
@@ -260,10 +350,26 @@ final class RouteSketchOverlay: UIView {
     alert.addAction(UIAlertAction(title: "Save", style: .default) { [weak self, weak alert] _ in
       guard let self else { return }
       let name = alert?.textFields?.first?.text?.trimmingCharacters(in: .whitespaces) ?? ""
-      BackseatSavedRoutes.save(name: name.isEmpty ? BackseatSavedRoutes.suggestedName() : name, items: self.items)
+      BackseatSavedRoutes.save(name: name.isEmpty ? BackseatSavedRoutes.suggestedName() : name,
+                               items: self.editedLine.map { [$0] + self.items } ?? self.items)
       UINotificationFeedbackGenerator().notificationOccurred(.success)
     })
     presenter.present(alert, animated: true)
+  }
+
+  /// The route as edited (the kept line with each cut drawn across), for Save: a saved route is the
+  /// result, not the edits. Nil without cuts.
+  private var editedLine: [CLLocation]? {
+    guard !cuts.isEmpty, !gapOpen, !line.isEmpty else { return nil }
+    var out: [CLLocation] = []
+    var next = 0
+    for cut in cuts.sorted(by: { $0.from < $1.from }) {
+      if cut.from > next { out += line[next..<cut.from] }
+      out += cut.fill ?? []
+      next = cut.to + 1
+    }
+    if next < line.count { out += line[next...] }
+    return out
   }
 
   /// "+ Add stop": keeps what's been done, closes Draw mode and opens search; a place picked there
@@ -277,6 +383,7 @@ final class RouteSketchOverlay: UIView {
   }
 
   private func close() {
+    holdTimer?.invalidate()
     plannerTimer?.invalidate()
     plannerTimer = nil
     MWMRouter.setDrawModeOpen(false)
@@ -289,7 +396,8 @@ final class RouteSketchOverlay: UIView {
   @objc private func longPressed(_ press: UILongPressGestureRecognizer) {
     guard press.state == .began, let mapView else { return }
     let at = press.location(in: self)
-    // Held still on a via handle (or on the line, which just made one): remove it.
+    // Held still on a via handle: remove it. (Held on the line itself is the start of a drag.)
+    if dragging && !dragMoved && !pressOnHandle { return }
     if dragging && !dragMoved {
       dragging = false
       MWMRouter.endRouteDrag()
@@ -354,6 +462,24 @@ final class RouteSketchOverlay: UIView {
       }
     }
     handlesLayer.path = handles.cgPath
+    // Erased stretches: dashed over the route, with their ends marked (red until drawn across).
+    let dashed = UIBezierPath()
+    let ends = UIBezierPath()
+    var anyOpen = false
+    for cut in cuts where cut.to < line.count {
+      dashed.append(path(for: Array(line[cut.from...cut.to])))
+      if let fill = cut.fill { all.append(path(for: fill)) } else { anyOpen = true }
+      for end in [line[cut.from], line[cut.to]] {
+        let p = screenPoint(end)
+        ends.append(UIBezierPath(ovalIn: CGRect(x: p.x - 9, y: p.y - 9, width: 18, height: 18)))
+      }
+    }
+    if !rubbing.isEmpty, let span = rubSpan(), span.to < line.count {
+      dashed.append(path(for: Array(line[span.from...span.to])))
+    }
+    cutsLayer.path = dashed.cgPath
+    cutEndsLayer.path = ends.cgPath
+    cutEndsLayer.fillColor = (anyOpen ? UIColor.systemRed : UIColor.systemGreen).cgColor
     drawingLayer.path = all.cgPath
     currentLayer.path = path(for: current).cgPath
   }
@@ -406,18 +532,59 @@ final class RouteSketchOverlay: UIView {
     }
     guard let touch = touches.first, let mapView else { return }
     let at = touch.location(in: self)
-    // On the route line or a via handle: drag the route instead of drawing.
-    if MWMRouter.beginRouteDrag(at: convert(at, to: mapView), in: mapView) {
-      dragging = true
-      dragMoved = false
-      dragStart = at
-      UISelectionFeedbackGenerator().selectionChanged()
-      follow(for: 0)
+    if tool == .eraser {
+      rubbing = coordinate(at: at).map { [$0] } ?? []
+      redraw()
+      return
+    }
+    pressStart = at
+    // On a via handle: drag it straight away.
+    let onHandle = MWMRouter.viaHandles(in: mapView).contains {
+      let p = convert($0.cgPointValue, from: mapView)
+      return hypot(p.x - at.x, p.y - at.y) <= 28
+    }
+    if onHandle, cuts.isEmpty, MWMRouter.beginRouteDrag(at: convert(at, to: mapView), in: mapView) {
+      startDrag(at: at, onHandle: true)
       return
     }
     guard let start = coordinate(at: at) else { return }
     current = [start]
     redraw()
+    // On the route line: a stroke, unless the finger holds still a moment, which drags the route.
+    holdTimer?.invalidate()
+    if cuts.isEmpty {
+      holdTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
+        guard let self, let mapView = self.mapView, self.current.count <= 2 else { return }
+        if MWMRouter.beginRouteDrag(at: self.convert(self.pressStart, to: mapView), in: mapView) {
+          self.current.removeAll()
+          self.startDrag(at: self.pressStart, onHandle: false)
+        }
+      }
+    }
+  }
+
+  private func startDrag(at point: CGPoint, onHandle: Bool) {
+    dragging = true
+    dragMoved = false
+    dragStart = point
+    pressOnHandle = onHandle
+    UISelectionFeedbackGenerator().selectionChanged()
+    follow(for: 0)
+    redraw()
+  }
+
+  /// Meters a finger can be off and still mean a spot on the route.
+  private var reachM: Double {
+    guard let mapView else { return 30 }
+    return 30 * MWMRouter.metersPerPoint(in: mapView)
+  }
+
+  /// The stretch of the route line rubbed out so far.
+  private func rubSpan() -> (from: Int, to: Int)? {
+    guard let mapView, !line.isEmpty, !rubbing.isEmpty,
+          let span = MWMRouter.eraseSpan(on: line, eraser: rubbing, radiusM: 22 * MWMRouter.metersPerPoint(in: mapView)),
+          span.count == 2 else { return nil }
+    return (span[0].intValue, span[1].intValue)
   }
 
   override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -432,7 +599,17 @@ final class RouteSketchOverlay: UIView {
       MWMRouter.moveRouteDrag(to: convert(at, to: mapView), in: mapView)
       return
     }
+    if tool == .eraser, let touch = touches.first {
+      for coalesced in event?.coalescedTouches(for: touch) ?? [touch] {
+        if let c = coordinate(at: coalesced.location(in: self)) { rubbing.append(c) }
+      }
+      redraw()
+      return
+    }
     guard !current.isEmpty, let touch = touches.first else { return }
+    if hypot(touch.location(in: self).x - pressStart.x, touch.location(in: self).y - pressStart.y) > 8 {
+      holdTimer?.invalidate()
+    }
     for coalesced in event?.coalescedTouches(for: touch) ?? [touch] {
       if let c = coordinate(at: coalesced.location(in: self)) { current.append(c) }
     }
@@ -461,15 +638,62 @@ final class RouteSketchOverlay: UIView {
       }
       return
     }
+    holdTimer?.invalidate()
+    if tool == .eraser {
+      let span = rubSpan()
+      rubbing.removeAll()
+      if let span {
+        // A new cut swallows any it overlaps, and their drawn ways across go with them.
+        change {
+          var merged = Cut(from: span.from, to: span.to, fill: nil)
+          cuts.removeAll { cut in
+            let overlaps = cut.from <= merged.to && cut.to >= merged.from
+            if overlaps {
+              merged.from = min(merged.from, cut.from)
+              merged.to = max(merged.to, cut.to)
+            }
+            return overlaps
+          }
+          cuts.append(merged)
+          cuts.sort { $0.from < $1.from }
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+      } else {
+        redraw()
+      }
+      return
+    }
     // Lifting the finger only finishes the highlight; nothing is routed until Go. The highlight
     // moves onto the roads traced, and those snapped points are what Go routes through.
     let stroke = current.count >= 2 ? MWMRouter.snapStroke(toRoads: current) : current
     current.removeAll()
-    if stroke.count >= 2 {
-      change { items.append(stroke) }
-    } else {
+    guard stroke.count >= 2 else {
       redraw()
+      return
     }
+    // From one end of an erased stretch to the other: that's the way across.
+    if !line.isEmpty {
+      for (i, cut) in cuts.enumerated() where cut.fill == nil {
+        if let way = MWMRouter.matchGap(on: line, from: cut.from, to: cut.to, stroke: stroke, reachM: reachM) {
+          change { cuts[i].fill = way }
+          return
+        }
+      }
+      // From the route back onto the route, nothing erased: it replaces the stretch between.
+      if !gapOpen, let span = MWMRouter.strokeAcrossRoute(line, stroke: stroke, reachM: reachM), span.count == 2 {
+        let cut = Cut(from: span[0].intValue, to: span[1].intValue, fill: nil)
+        let way = MWMRouter.matchGap(on: line, from: cut.from, to: cut.to, stroke: stroke, reachM: reachM * 3) ?? stroke
+        let overlaps = cuts.contains { $0.from <= cut.to && $0.to >= cut.from }
+        if !overlaps {
+          change {
+            cuts.append(Cut(from: cut.from, to: cut.to, fill: way))
+            cuts.sort { $0.from < $1.from }
+          }
+          return
+        }
+      }
+    }
+    change { items.append(stroke) }
   }
 
   override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -487,7 +711,9 @@ final class RouteSketchOverlay: UIView {
       return
     }
     // The long press took over (a stop), or the system interrupted: drop the stroke.
+    holdTimer?.invalidate()
     current.removeAll()
+    rubbing.removeAll()
     redraw()
   }
 }

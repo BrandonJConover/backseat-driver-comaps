@@ -8,6 +8,8 @@
 #include <cstddef>
 #include <string>
 #include <cstdint>
+#include <optional>
+#include <utility>
 #include <vector>
 
 namespace backseat
@@ -113,4 +115,36 @@ std::vector<LatLon> ResampleStroke(std::vector<LatLon> const & stroke, double ev
 /// nearby are dropped.
 std::vector<SnappedPoint> SnapStroke(std::vector<LatLon> const & stroke, std::vector<RoadSegment> const & roads,
                                      SnapOptions const & options = {});
+
+// Erase and reconnect: editing a planned route by rubbing part of it out and drawing the way across.
+
+/// A rubbed-out stretch of a route line: the vertices from `from` to `to` (inclusive) are gone.
+struct RouteCut
+{
+  std::size_t from = 0;
+  std::size_t to = 0;
+};
+
+/// The stretch of `line` the eraser went over (within `radiusM` of its path), or nothing if it
+/// didn't touch the line.
+std::optional<RouteCut> EraseSpan(std::vector<LatLon> const & line, std::vector<LatLon> const & eraser, double radiusM);
+
+/// Overlapping or touching cuts made one, in order along the line.
+std::vector<RouteCut> MergeCuts(std::vector<RouteCut> cuts);
+
+/// Points `distanceM` along the line outside each end of the cut, where the kept route is pinned
+/// so the router doesn't change it. Nothing for an end that runs off the line (the cut reaches
+/// the start or the end).
+std::pair<std::optional<LatLon>, std::optional<LatLon>> CutAnchors(std::vector<LatLon> const & line, RouteCut const & cut,
+                                                                  double distanceM);
+
+/// The stroke as the way across the gap, oriented from the cut's start to its end, if it starts
+/// near one end and finishes near the other (within `reachM`), in either direction.
+std::optional<std::vector<LatLon>> MatchGap(std::vector<LatLon> const & line, RouteCut const & cut,
+                                            std::vector<LatLon> const & stroke, double reachM);
+
+/// A stroke that starts and ends on the route (within `reachM`) replaces the stretch between: that
+/// stretch, as a cut. Nothing if either end is off the route or both are at the same place on it.
+std::optional<RouteCut> StrokeAcrossRoute(std::vector<LatLon> const & line, std::vector<LatLon> const & stroke,
+                                          double reachM);
 }  // namespace backseat

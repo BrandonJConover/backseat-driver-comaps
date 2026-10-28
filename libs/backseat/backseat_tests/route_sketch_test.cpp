@@ -153,3 +153,73 @@ TEST(SketchStaysOnTheRoadThroughAnIntersection)
   for (auto const & p : SnapStroke(stroke, Crossroads()))
     CHECK_EQUAL(p.road, 1u);
 }
+
+namespace
+{
+// A route 1 km due north, a vertex every 10 m.
+std::vector<LatLon> NorthKm() { return Line({40.0, -105.0}, {40.009, -105.0}, 100); }
+}  // namespace
+
+TEST(EraseSpanCoversWhatWasRubbed)
+{
+  auto const line = NorthKm();
+  // Rubbed back and forth across the line from ~400 m to ~600 m north.
+  auto const cut = EraseSpan(line, Line({40.0036, -105.0001}, {40.0054, -104.9999}, 20), 15);
+  CHECK(cut.has_value());
+  CHECK(cut->from >= 35 && cut->from <= 41);
+  CHECK(cut->to >= 59 && cut->to <= 65);
+  // Nowhere near the line: nothing erased.
+  CHECK(!EraseSpan(line, Line({40.004, -104.99}, {40.005, -104.99}, 5), 15).has_value());
+}
+
+TEST(EraseCutsMerge)
+{
+  auto const merged = MergeCuts({{50, 60}, {10, 20}, {18, 30}});
+  CHECK_EQUAL(merged.size(), 2u);
+  CHECK_EQUAL(merged[0].from, 10u);
+  CHECK_EQUAL(merged[0].to, 30u);
+  CHECK_EQUAL(merged[1].from, 50u);
+}
+
+TEST(CutAnchorsPinTheKeptRoute)
+{
+  auto const line = NorthKm();
+  auto const [before, after] = CutAnchors(line, {40, 60}, 100);
+  CHECK(before.has_value() && after.has_value());
+  CHECK(std::fabs(SketchDistanceM(*before, line[40]) - 100) < 2);
+  CHECK(std::fabs(SketchDistanceM(*after, line[60]) - 100) < 2);
+  // A cut from the very start has nothing before it.
+  CHECK(!CutAnchors(line, {0, 20}, 100).first.has_value());
+}
+
+TEST(GapMatchesEitherWay)
+{
+  auto const line = NorthKm();
+  RouteCut const cut{40, 60};
+  // A detour east of the gap, drawn from its south end to its north end...
+  std::vector<LatLon> detour = {line[40], {40.0040, -104.999}, {40.0056, -104.999}, line[60]};
+  auto const forward = MatchGap(line, cut, detour, 30);
+  CHECK(forward.has_value());
+  CHECK(SketchDistanceM(forward->front(), line[40]) < 1);
+  // ...or drawn the other way: it comes back turned around.
+  std::vector<LatLon> backwards(detour.rbegin(), detour.rend());
+  auto const turned = MatchGap(line, cut, backwards, 30);
+  CHECK(turned.has_value());
+  CHECK(SketchDistanceM(turned->front(), line[40]) < 1);
+  // Ends nowhere near the gap.
+  CHECK(!MatchGap(line, cut, Line({40.002, -104.99}, {40.003, -104.99}, 3), 30).has_value());
+}
+
+TEST(StrokeAcrossRouteReplacesTheStretch)
+{
+  auto const line = NorthKm();
+  // From the route at ~300 m, out east, back onto the route at ~700 m.
+  std::vector<LatLon> stroke = {{40.0027, -105.00005}, {40.0030, -104.998}, {40.0060, -104.998}, {40.0063, -105.00005}};
+  auto const cut = StrokeAcrossRoute(line, stroke, 20);
+  CHECK(cut.has_value());
+  CHECK(cut->from >= 28 && cut->from <= 32);
+  CHECK(cut->to >= 68 && cut->to <= 72);
+  // A stroke that ends off the route doesn't count.
+  stroke.back() = {40.0063, -104.995};
+  CHECK(!StrokeAcrossRoute(line, stroke, 20).has_value());
+}

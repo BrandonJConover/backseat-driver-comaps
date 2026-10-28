@@ -579,6 +579,179 @@ double constexpr kRoundTripM = 50;
   [self rebuildWithBestRouter:NO];
 }
 
+namespace
+{
+std::vector<backseat::LatLon> ToLatLons(NSArray<CLLocation *> * locations)
+{
+  std::vector<backseat::LatLon> out;
+  out.reserve(locations.count);
+  for (CLLocation * c in locations)
+    out.push_back({c.coordinate.latitude, c.coordinate.longitude});
+  return out;
+}
+
+NSArray<CLLocation *> * ToLocations(std::vector<backseat::LatLon> const & points)
+{
+  NSMutableArray<CLLocation *> * out = [NSMutableArray arrayWithCapacity:points.size()];
+  for (auto const & p : points)
+    [out addObject:[[CLLocation alloc] initWithLatitude:p.lat longitude:p.lon]];
+  return out;
+}
+
+/// Where the kept route is pinned outside a cut.
+double constexpr kAnchorM = 80;
+}  // namespace
+
++ (NSArray<CLLocation *> *)routeLine
+{
+  auto const route = GetFramework().GetRoutingManager().RoutingSession().GetRouteForTests();
+  if (!route || !route->IsValid())
+    return @[];
+  std::vector<backseat::LatLon> line;
+  for (auto const & g : route->GetFollowedPolyline().GetPolyline().GetPoints())
+  {
+    auto const ll = mercator::ToLatLon(g);
+    line.push_back({ll.m_lat, ll.m_lon});
+  }
+  return ToLocations(backseat::ResampleStroke(line, 10));
+}
+
++ (double)metersPerPointInView:(UIView *)mapView
+{
+  auto & f = GetFramework();
+  CGFloat const scale = mapView.contentScaleFactor;
+  CGPoint const mid = CGPointMake(CGRectGetMidX(mapView.bounds), CGRectGetMidY(mapView.bounds));
+  return mercator::DistanceOnEarth(f.PtoG(m2::PointD(mid.x * scale, mid.y * scale)),
+                                   f.PtoG(m2::PointD((mid.x + 1) * scale, mid.y * scale)));
+}
+
++ (nullable NSArray<NSNumber *> *)eraseSpanOn:(NSArray<CLLocation *> *)line
+                                       eraser:(NSArray<CLLocation *> *)eraser
+                                      radiusM:(double)radiusM
+{
+  auto const cut = backseat::EraseSpan(ToLatLons(line), ToLatLons(eraser), radiusM);
+  if (!cut)
+    return nil;
+  return @[@(cut->from), @(cut->to)];
+}
+
++ (nullable NSArray<CLLocation *> *)matchGapOn:(NSArray<CLLocation *> *)line
+                                          from:(NSInteger)from
+                                            to:(NSInteger)to
+                                        stroke:(NSArray<CLLocation *> *)stroke
+                                        reachM:(double)reachM
+{
+  auto const way = backseat::MatchGap(ToLatLons(line), {size_t(from), size_t(to)}, ToLatLons(stroke), reachM);
+  return way ? ToLocations(*way) : nil;
+}
+
++ (nullable NSArray<NSNumber *> *)strokeAcrossRoute:(NSArray<CLLocation *> *)line
+                                             stroke:(NSArray<CLLocation *> *)stroke
+                                             reachM:(double)reachM
+{
+  auto const cut = backseat::StrokeAcrossRoute(ToLatLons(line), ToLatLons(stroke), reachM);
+  if (!cut)
+    return nil;
+  return @[@(cut->from), @(cut->to)];
+}
+
++ (MWMRouteSketchResult)applyRouteFills:(NSArray<NSDictionary<NSString *, id> *> *)fills
+                                   line:(NSArray<CLLocation *> *)lineLocations
+                                 inView:(UIView *)mapView
+{
+  auto & manager = GetFramework().GetRoutingManager();
+  auto const line = ToLatLons(lineLocations);
+  auto points = manager.GetRoutePoints();
+  if (fills.count == 0 || line.size() < 2 || points.size() < 2)
+    return MWMRouteSketchResultNone;
+
+  // Each route point's place along the line, so new via points can go in between in order.
+  auto placeOf = [&](backseat::LatLon const & p)
+  {
+    size_t best = 0;
+    double bestD = std::numeric_limits<double>::max();
+    for (size_t i = 0; i < line.size(); ++i)
+    {
+      double const d = backseat::SketchDistanceM(p, line[i]);
+      if (d < bestD)
+      {
+        bestD = d;
+        best = i;
+      }
+    }
+    return double(best);
+  };
+
+  std::vector<backseat::RouteCut> cuts;
+  for (NSDictionary * fill in fills)
+    cuts.push_back({[fill[@"from"] unsignedLongValue], [fill[@"to"] unsignedLongValue]});
+
+  struct Placed
+  {
+    double at;
+    RouteMarkData point;
+  };
+  std::vector<Placed> middle;
+  for (size_t i = 1; i + 1 < points.size(); ++i)
+  {
+    double const at = placeOf(LatLonOf(points[i]));
+    // Via points inside an erased stretch went with it.
+    bool const erased = points[i].m_isShaping &&
+        std::any_of(cuts.begin(), cuts.end(), [&](auto const & c) { return at >= c.from && at <= c.to; });
+    if (!erased)
+      middle.push_back({at, points[i]});
+  }
+
+  backseat::SketchOptions options;
+  options.toleranceM = std::max(25.0, 10 * [self metersPerPointInView:mapView]);
+  bool trimmed = false;
+  auto shaping = [](backseat::LatLon const & ll)
+  {
+    RouteMarkData p;
+    p.m_isShaping = true;
+    p.m_position = mercator::FromLatLon(ll.lat, ll.lon);
+    return p;
+  };
+  for (size_t f = 0; f < cuts.size(); ++f)
+  {
+    auto const & cut = cuts[f];
+    auto const way = ToLatLons(fills[f][@"stroke"]);
+    auto const [before, after] = backseat::CutAnchors(line, cut, kAnchorM);
+    // The way across sits between the cut's ends, in drawing order.
+    double const span = std::max(1.0, double(cut.to) - double(cut.from));
+    if (before)
+      middle.push_back({double(cut.from) - 0.5, shaping(*before)});
+    auto const across = backseat::ShapingPoints(way, options);
+    if (across.size() < backseat::ShapingPoints(way, backseat::SketchOptions{}).size())
+      trimmed = true;
+    for (size_t i = 0; i < across.size(); ++i)
+      middle.push_back({double(cut.from) + span * (i + 1) / (across.size() + 1), shaping(across[i])});
+    if (after)
+      middle.push_back({double(cut.to) + 0.5, shaping(*after)});
+  }
+  std::stable_sort(middle.begin(), middle.end(), [](auto const & a, auto const & b) { return a.at < b.at; });
+
+  std::vector<RouteMarkData> all;
+  all.push_back(points.front());
+  for (auto & m : middle)
+    all.push_back(std::move(m.point));
+  all.push_back(points.back());
+  size_t const maxPoints = RoutePointsLayout::kMaxIntermediatePointsCount + 2;
+  if (all.size() > maxPoints)
+  {
+    trimmed = true;
+    auto const finish = all.back();
+    all.resize(maxPoints - 1);
+    all.push_back(finish);
+  }
+
+  Remember();
+  SetPoints(std::move(all));
+  manager.BackseatSketchApplied(false, trimmed);
+  [self rebuildWithBestRouter:NO];
+  return trimmed ? (MWMRouteSketchResultApplied | MWMRouteSketchResultTrimmed) : MWMRouteSketchResultApplied;
+}
+
 + (NSArray<CLLocation *> *)snapStrokeToRoads:(NSArray<CLLocation *> *)stroke
 {
   std::vector<backseat::LatLon> in;

@@ -67,6 +67,32 @@ typedef NS_OPTIONS(NSUInteger, MWMRouteSketchResult) {
 /// The destination is back where the trip starts.
 @property(class, nonatomic, getter=isRoundTrip) BOOL roundTrip;
 
+// Erase and reconnect. Cuts are pairs of vertex indexes into a snapshot of the route line.
+
+/// The built route's line, a point about every 10 m; empty while it builds.
++ (NSArray<CLLocation *> *)routeLine;
+/// Meters per screen point at the middle of the map view now.
++ (double)metersPerPointInView:(UIView *)mapView;
+/// The stretch of `line` the eraser went over: @[from, to], or nil.
++ (nullable NSArray<NSNumber *> *)eraseSpanOn:(NSArray<CLLocation *> *)line
+                                       eraser:(NSArray<CLLocation *> *)eraser
+                                      radiusM:(double)radiusM;
+/// The stroke as the way across cut [from, to], oriented start to end; nil if it doesn't connect it.
++ (nullable NSArray<CLLocation *> *)matchGapOn:(NSArray<CLLocation *> *)line
+                                          from:(NSInteger)from
+                                            to:(NSInteger)to
+                                        stroke:(NSArray<CLLocation *> *)stroke
+                                        reachM:(double)reachM;
+/// A stroke from the route back to the route: the stretch it replaces as @[from, to], or nil.
++ (nullable NSArray<NSNumber *> *)strokeAcrossRoute:(NSArray<CLLocation *> *)line
+                                             stroke:(NSArray<CLLocation *> *)stroke
+                                             reachM:(double)reachM;
+/// Re-plans the route with each filled cut going the drawn way: via points pinned just outside each
+/// cut keep the rest of the route as it was. `fills` are @{"from", "to", "stroke"} on `line`.
++ (MWMRouteSketchResult)applyRouteFills:(NSArray<NSDictionary<NSString *, id> *> *)fills
+                                   line:(NSArray<CLLocation *> *)line
+                                 inView:(UIView *)mapView;
+
 /// A finger stroke moved onto the car roads it traced, or the stroke itself when there's no road
 /// data to snap to.
 + (NSArray<CLLocation *> *)snapStrokeToRoads:(NSArray<CLLocation *> *)stroke;

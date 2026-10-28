@@ -294,4 +294,123 @@ std::vector<SnappedPoint> SnapStroke(std::vector<LatLon> const & stroke, std::ve
   }
   return out;
 }
+namespace
+{
+double DistanceToSegmentM(LatLon const & p, LatLon const & a, LatLon const & b)
+{
+  return SegmentDistance(Xy{}, ToXy(a, p), ToXy(b, p));
+}
+
+/// The line segment nearest `p` (its first vertex) and how far off it is.
+std::pair<std::size_t, double> NearestSegment(std::vector<LatLon> const & line, LatLon const & p)
+{
+  std::size_t best = 0;
+  double bestD = std::numeric_limits<double>::max();
+  for (std::size_t i = 0; i + 1 < line.size(); ++i)
+  {
+    double const d = DistanceToSegmentM(p, line[i], line[i + 1]);
+    if (d < bestD)
+    {
+      bestD = d;
+      best = i;
+    }
+  }
+  return {best, bestD};
+}
+}  // namespace
+
+std::optional<RouteCut> EraseSpan(std::vector<LatLon> const & line, std::vector<LatLon> const & eraser, double radiusM)
+{
+  if (line.size() < 2 || eraser.empty())
+    return {};
+  std::optional<RouteCut> cut;
+  // Close enough samples that a quick rub doesn't skip over the line.
+  auto const samples = eraser.size() == 1 ? eraser : ResampleStroke(eraser, std::max(1.0, radiusM / 2));
+  for (auto const & p : samples)
+  {
+    for (std::size_t i = 0; i + 1 < line.size(); ++i)
+    {
+      if (DistanceToSegmentM(p, line[i], line[i + 1]) > radiusM)
+        continue;
+      if (!cut)
+        cut = RouteCut{i, i + 1};
+      cut->from = std::min(cut->from, i);
+      cut->to = std::max(cut->to, i + 1);
+    }
+  }
+  return cut;
+}
+
+std::vector<RouteCut> MergeCuts(std::vector<RouteCut> cuts)
+{
+  std::sort(cuts.begin(), cuts.end(), [](auto const & a, auto const & b) { return a.from < b.from; });
+  std::vector<RouteCut> merged;
+  for (auto const & c : cuts)
+  {
+    if (!merged.empty() && c.from <= merged.back().to)
+      merged.back().to = std::max(merged.back().to, c.to);
+    else
+      merged.push_back(c);
+  }
+  return merged;
+}
+
+std::pair<std::optional<LatLon>, std::optional<LatLon>> CutAnchors(std::vector<LatLon> const & line, RouteCut const & cut,
+                                                                  double distanceM)
+{
+  std::pair<std::optional<LatLon>, std::optional<LatLon>> anchors;
+  if (line.size() < 2 || cut.to >= line.size())
+    return anchors;
+  // Walk back from the cut's start...
+  double walked = 0;
+  for (std::size_t i = cut.from; i > 0; --i)
+  {
+    double const len = SketchDistanceM(line[i - 1], line[i]);
+    if (walked + len >= distanceM)
+    {
+      anchors.first = Lerp(line[i], line[i - 1], (distanceM - walked) / len);
+      break;
+    }
+    walked += len;
+  }
+  // ...and forward from its end.
+  walked = 0;
+  for (std::size_t i = cut.to; i + 1 < line.size(); ++i)
+  {
+    double const len = SketchDistanceM(line[i], line[i + 1]);
+    if (walked + len >= distanceM)
+    {
+      anchors.second = Lerp(line[i], line[i + 1], (distanceM - walked) / len);
+      break;
+    }
+    walked += len;
+  }
+  return anchors;
+}
+
+std::optional<std::vector<LatLon>> MatchGap(std::vector<LatLon> const & line, RouteCut const & cut,
+                                            std::vector<LatLon> const & stroke, double reachM)
+{
+  if (stroke.size() < 2 || cut.to >= line.size())
+    return {};
+  LatLon const & a = line[cut.from];
+  LatLon const & b = line[cut.to];
+  if (SketchDistanceM(stroke.front(), a) <= reachM && SketchDistanceM(stroke.back(), b) <= reachM)
+    return stroke;
+  if (SketchDistanceM(stroke.front(), b) <= reachM && SketchDistanceM(stroke.back(), a) <= reachM)
+    return std::vector<LatLon>(stroke.rbegin(), stroke.rend());
+  return {};
+}
+
+std::optional<RouteCut> StrokeAcrossRoute(std::vector<LatLon> const & line, std::vector<LatLon> const & stroke,
+                                          double reachM)
+{
+  if (line.size() < 2 || stroke.size() < 2)
+    return {};
+  auto const [start, startD] = NearestSegment(line, stroke.front());
+  auto const [end, endD] = NearestSegment(line, stroke.back());
+  if (startD > reachM || endD > reachM || start == end)
+    return {};
+  return RouteCut{std::min(start, end) + 1, std::max(start, end)};
+}
 }  // namespace backseat
