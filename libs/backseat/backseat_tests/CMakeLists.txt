@@ -12,6 +12,7 @@ add_executable(${PROJECT_NAME}
   plate_game_test.cpp
   voice_command_test.cpp
   rewriter_test.cpp
+  route_order_test.cpp
   route_sketch_test.cpp
   debug_log_test.cpp
   lines_test.cpp

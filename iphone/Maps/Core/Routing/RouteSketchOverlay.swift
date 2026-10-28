@@ -1,4 +1,5 @@
 import CoreLocation
+import SwiftUI
 import UIKit
 
 /// Draw-your-own route: a see-through layer over the map where the driver sketches the way they
@@ -33,6 +34,9 @@ final class RouteSketchOverlay: UIView {
   private var dragMoved = false
   private var dragStart = CGPoint.zero
   private let handlesLayer = CAShapeLayer()
+  private let planner = RoutePlannerModel()
+  private var plannerHost: UIHostingController<RoutePlannerPanel>?
+  private var plannerTimer: Timer?
   /// Cancel was tapped once with a drawing: the next tap discards it.
   private var confirmingCancel = false
   private weak var mapView: UIView?
@@ -102,8 +106,25 @@ final class RouteSketchOverlay: UIView {
     press.allowableMovement = 10
     addGestureRecognizer(press)
 
+    // The planner: total, stops and options, on top.
+    planner.routeChanged = { [weak self] in self?.routeWasChanged() }
+    planner.addStop = { [weak self] in self?.addStopBySearch() }
+    let host = UIHostingController(rootView: RoutePlannerPanel(model: planner))
+    host.view.backgroundColor = .clear
+    host.view.translatesAutoresizingMaskIntoConstraints = false
+    if #available(iOS 16.0, *) { host.sizingOptions = .intrinsicContentSize }
+    addSubview(host.view)
+    plannerHost = host
+    plannerTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+      self?.planner.refresh()
+      self?.redraw()
+    }
+
     NSLayoutConstraint.activate([
-      hintBox.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 12),
+      host.view.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 8),
+      host.view.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+      host.view.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+      hintBox.topAnchor.constraint(equalTo: host.view.bottomAnchor, constant: 8),
       hintBox.centerXAnchor.constraint(equalTo: centerXAnchor),
       hintBox.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 16),
       hint.topAnchor.constraint(equalTo: hintBox.topAnchor, constant: 8),
@@ -120,7 +141,10 @@ final class RouteSketchOverlay: UIView {
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-  deinit { displayLink?.invalidate() }
+  deinit {
+    displayLink?.invalidate()
+    plannerTimer?.invalidate()
+  }
 
   private static func pill(_ title: String, symbol: String?, prominent: Bool = false) -> UIButton {
     var config = UIButton.Configuration.filled()
@@ -242,7 +266,19 @@ final class RouteSketchOverlay: UIView {
     presenter.present(alert, animated: true)
   }
 
+  /// "+ Add stop": keeps what's been done, closes Draw mode and opens search; a place picked there
+  /// is added with the place card's "Add stop".
+  private func addStopBySearch() {
+    if !items.isEmpty, let mapView {
+      onStroke?(MWMRouter.buildSketch(items, in: mapView))
+    }
+    close()
+    MapViewController.shared()?.searchManager.startSearching(isRouting: true)
+  }
+
   private func close() {
+    plannerTimer?.invalidate()
+    plannerTimer = nil
     MWMRouter.setDrawModeOpen(false)
     displayLink?.invalidate()
     displayLink = nil
@@ -597,5 +633,229 @@ private extension UIViewController {
   /// The view controller on top of whatever this one presents.
   var topmostPresented: UIViewController {
     presentedViewController?.topmostPresented ?? self
+  }
+}
+
+/// What the Draw mode planner panel shows, read from the route once a second (it re-plans in the
+/// background after every edit).
+final class RoutePlannerModel: ObservableObject {
+  struct Stop: Identifiable, Equatable {
+    let id: Int
+    let title: String
+    let kind: String
+    let leg: String?
+  }
+
+  @Published var stops: [Stop] = []
+  @Published var summary: String = "Planning…"
+  @Published var roundTrip = false
+  @Published var avoidHighways = false
+  @Published var avoidTolls = false
+  @Published var avoidFerries = false
+  @Published var expanded = true
+
+  /// Called after the panel changed the route itself, for Undo.
+  var routeChanged: () -> Void = {}
+  /// "+ Add stop": search for a place.
+  var addStop: () -> Void = {}
+
+  init() {
+    let options = RoutingOptions()
+    avoidHighways = options.avoidMotorway
+    avoidTolls = options.avoidToll
+    avoidFerries = options.avoidFerry
+    refresh()
+  }
+
+  func refresh() {
+    let rows = MWMRouter.plannerStops()
+    let next = rows.enumerated().map { index, row -> Stop in
+      let seconds = (row["legSeconds"] as? NSNumber)?.doubleValue
+      let meters = (row["legMeters"] as? NSNumber)?.doubleValue
+      let leg = seconds.map { s in [Self.time(s), meters.map(Self.distance)].compactMap { $0 }.joined(separator: " · ") }
+      return Stop(id: index, title: row["title"] as? String ?? "", kind: row["kind"] as? String ?? "stop", leg: leg)
+    }
+    if next != stops { stops = next }
+    if let total = MWMRouter.plannerSummary(), let s = total["seconds"]?.doubleValue, let m = total["meters"]?.doubleValue {
+      let text = "\(Self.time(s)) · \(Self.distance(m))"
+      if text != summary { summary = text }
+    } else if summary != "Planning…" {
+      summary = "Planning…"
+    }
+    let round = MWMRouter.isRoundTrip
+    if round != roundTrip { roundTrip = round }
+  }
+
+  /// "1 h 5 min", "12 min".
+  static func time(_ seconds: Double) -> String {
+    let minutes = max(1, Int((seconds / 60).rounded()))
+    return minutes < 60 ? "\(minutes) min" : "\(minutes / 60) h \(minutes % 60) min"
+  }
+
+  /// Miles or kilometers, as the phone's region uses.
+  static func distance(_ meters: Double) -> String {
+    let formatter = MeasurementFormatter()
+    formatter.unitOptions = .providedUnit
+    formatter.numberFormatter.maximumFractionDigits = 1
+    let metric = Locale.current.measurementSystem == .metric
+    let measurement = Measurement(value: meters, unit: UnitLength.meters)
+      .converted(to: metric ? .kilometers : .miles)
+    return formatter.string(from: measurement)
+  }
+
+  // MARK: Actions
+
+  func move(from source: IndexSet, to destination: Int) {
+    guard let from = source.first else { return }
+    // List's destination counts the row's old place; the router wants where it ends up.
+    let to = destination > from ? destination - 1 : destination
+    guard from > 0, to > 0 else { return }
+    MWMRouter.movePlannerStop(from: from, to: to)
+    routeChanged()
+    refresh()
+  }
+
+  func delete(_ offsets: IndexSet) {
+    for index in offsets.sorted(by: >) where index > 0 {
+      MWMRouter.removePlannerStop(at: index)
+      routeChanged()
+    }
+    refresh()
+  }
+
+  func optimize() {
+    MWMRouter.optimizePlannerStops()
+    routeChanged()
+    refresh()
+  }
+
+  func setRoundTrip(_ on: Bool) {
+    MWMRouter.isRoundTrip = on
+    routeChanged()
+    refresh()
+  }
+
+  func applyOptions() {
+    let options = RoutingOptions()
+    options.avoidMotorway = avoidHighways
+    options.avoidToll = avoidTolls
+    options.avoidFerry = avoidFerries
+    options.save()
+    MWMRouter.rebuild(withBestRouter: false)
+  }
+
+  var canOptimize: Bool { stops.filter { $0.kind == "stop" }.count >= 2 }
+}
+
+/// Draw mode's planner, MapQuest style: the trip's total, its stops in order (drag to reorder,
+/// swipe to delete, time for each leg), and the trip options.
+struct RoutePlannerPanel: View {
+  @ObservedObject var model: RoutePlannerModel
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Button {
+        withAnimation { model.expanded.toggle() }
+      } label: {
+        HStack {
+          Image(systemName: "car.fill")
+            .foregroundStyle(.orange)
+
+          Text(verbatim: model.summary)
+            .font(.headline)
+            .monospacedDigit()
+
+          Spacer()
+
+          Image(systemName: model.expanded ? "chevron.up" : "chevron.down")
+            .foregroundStyle(.secondary)
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+
+      if model.expanded {
+        List {
+          ForEach(model.stops) { stop in
+            HStack(spacing: 10) {
+              Text(verbatim: Self.letter(for: stop.id))
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(stop.kind == "start" ? Color.green : stop.kind == "finish" ? Color.red : Color.orange))
+
+              Text(verbatim: stop.title)
+                .lineLimit(1)
+
+              Spacer(minLength: 4)
+
+              if let leg = stop.leg {
+                Text(verbatim: leg)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+                  .monospacedDigit()
+              }
+            }
+            .moveDisabled(stop.kind == "start")
+            .deleteDisabled(stop.kind == "start" || model.stops.count <= 2)
+          }
+          .onMove(perform: model.move)
+          .onDelete(perform: model.delete)
+        }
+        .listStyle(.plain)
+        .environment(\.editMode, .constant(.active))
+        .frame(height: min(CGFloat(model.stops.count) * 44, 176))
+
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 8) {
+            chip("Add stop", symbol: "plus", on: false) { model.addStop() }
+            chip("Optimize order", symbol: "wand.and.stars", on: false) { model.optimize() }
+              .disabled(!model.canOptimize)
+              .opacity(model.canOptimize ? 1 : 0.4)
+            chip("Round trip", symbol: "arrow.triangle.2.circlepath", on: model.roundTrip) {
+              model.setRoundTrip(!model.roundTrip)
+            }
+            chip("No highways", symbol: "road.lanes", on: model.avoidHighways) {
+              model.avoidHighways.toggle()
+              model.applyOptions()
+            }
+            chip("No tolls", symbol: "dollarsign.circle", on: model.avoidTolls) {
+              model.avoidTolls.toggle()
+              model.applyOptions()
+            }
+            chip("No ferries", symbol: "ferry", on: model.avoidFerries) {
+              model.avoidFerries.toggle()
+              model.applyOptions()
+            }
+          }
+        }
+      }
+    }
+    .padding(12)
+    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(uiColor: .systemBackground)))
+    .shadow(radius: 3)
+  }
+
+  /// A, B, C… down the list.
+  private static func letter(for index: Int) -> String {
+    let scalar = UnicodeScalar(UInt8(65 + min(index, 25)))
+    return String(Character(scalar))
+  }
+
+  private func chip(_ title: String, symbol: String, on: Bool, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      HStack(spacing: 4) {
+        Image(systemName: symbol)
+          .imageScale(.small)
+
+        Text(verbatim: title)
+      }
+      .font(.subheadline.weight(.medium))
+      .foregroundStyle(on ? Color.white : Color.primary)
+      .padding(.horizontal, 12)
+      .frame(minHeight: 36)
+      .background(Capsule().fill(on ? Color.orange : Color(uiColor: .secondarySystemBackground)))
+    }
+    .buttonStyle(.plain)
   }
 }

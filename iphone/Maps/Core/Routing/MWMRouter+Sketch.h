@@ -52,6 +52,21 @@ typedef NS_OPTIONS(NSUInteger, MWMRouteSketchResult) {
 /// Removes the via point nearest `point` (within a finger's reach) and re-plans. NO if none.
 + (BOOL)removeViaAt:(CGPoint)point inView:(UIView *)mapView;
 
+/// The planner panel: the route's real points (start, stops, destination; not drawn or dragged via
+/// points), each a dictionary with "title" (NSString), "kind" ("start", "stop", "finish") and,
+/// once the route is built, "legSeconds" and "legMeters" (NSNumber) from the point before.
++ (NSArray<NSDictionary<NSString *, id> *> *)plannerStops;
+/// "seconds" and "meters" for the whole built route; nil while it builds.
++ (nullable NSDictionary<NSString *, NSNumber *> *)plannerSummary;
+/// Moves a planner row (not the start, row 0) to another position, and re-plans. Via points are
+/// dropped, since they belonged to the old order.
++ (void)movePlannerStopFrom:(NSInteger)from to:(NSInteger)to;
++ (void)removePlannerStopAt:(NSInteger)index;
+/// Keeps the start and the destination and visits the stops between in the shortest order.
++ (void)optimizePlannerStops;
+/// The destination is back where the trip starts.
+@property(class, nonatomic, getter=isRoundTrip) BOOL roundTrip;
+
 /// A finger stroke moved onto the car roads it traced, or the stroke itself when there's no road
 /// data to snap to.
 + (NSArray<CLLocation *> *)snapStrokeToRoads:(NSArray<CLLocation *> *)stroke;

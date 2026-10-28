@@ -2,6 +2,7 @@
 
 #include <CoreApi/Framework.h>
 
+#include "backseat/route_order.hpp"
 #include "backseat/route_sketch.hpp"
 #include "geometry/mercator.hpp"
 
@@ -429,6 +430,153 @@ double constexpr kPlanEvery = 0.3;
     }
   }
   return NO;
+}
+
+namespace
+{
+backseat::LatLon LatLonOf(RouteMarkData const & p)
+{
+  auto const ll = mercator::ToLatLon(p.m_position);
+  return {ll.m_lat, ll.m_lon};
+}
+
+/// The route's real points, in order, without via points.
+std::vector<RouteMarkData> RealPoints()
+{
+  std::vector<RouteMarkData> real;
+  for (auto const & p : GetFramework().GetRoutingManager().GetRoutePoints())
+    if (!p.m_isShaping)
+      real.push_back(p);
+  return real;
+}
+
+/// A round trip ends within this of where it starts.
+double constexpr kRoundTripM = 50;
+}  // namespace
+
++ (NSArray<NSDictionary<NSString *, id> *> *)plannerStops
+{
+  auto & manager = GetFramework().GetRoutingManager();
+  auto const all = manager.GetRoutePoints();
+  // Time and distance from the start to each route point, from the route's subroutes (one per pair
+  // of consecutive route points, via points included).
+  std::vector<double> seconds(all.size(), -1), meters(all.size(), -1);
+  auto const route = manager.RoutingSession().GetRouteForTests();
+  if (route && route->IsValid() && route->GetSubrouteCount() + 1 == all.size())
+  {
+    auto const & segments = route->GetRouteSegments();
+    seconds[0] = meters[0] = 0;
+    for (size_t i = 0; i < route->GetSubrouteCount(); ++i)
+    {
+      size_t const end = std::min(route->GetSubrouteAttrs(i).GetEndSegmentIdx(), segments.size());
+      if (end == 0)
+        continue;
+      seconds[i + 1] = segments[end - 1].GetTimeFromBeginningSec();
+      meters[i + 1] = segments[end - 1].GetDistFromBeginningMeters();
+    }
+  }
+  NSMutableArray * rows = [NSMutableArray array];
+  std::optional<size_t> previous;
+  int stopNumber = 0;
+  for (size_t i = 0; i < all.size(); ++i)
+  {
+    auto const & p = all[i];
+    if (p.m_isShaping)
+      continue;
+    NSString * kind = p.m_pointType == RouteMarkType::Start ? @"start" : p.m_pointType == RouteMarkType::Finish ? @"finish" : @"stop";
+    NSString * title = @(p.m_title.c_str());
+    if (title.length == 0)
+      title = p.m_isMyPosition ? @"My position" : [kind isEqualToString:@"finish"] ? @"Destination" : [NSString stringWithFormat:@"Stop %d", stopNumber + 1];
+    if ([kind isEqualToString:@"stop"])
+      ++stopNumber;
+    NSMutableDictionary * row = [@{@"title": title, @"kind": kind} mutableCopy];
+    if (previous && seconds[i] >= 0 && seconds[*previous] >= 0)
+    {
+      row[@"legSeconds"] = @(seconds[i] - seconds[*previous]);
+      row[@"legMeters"] = @(meters[i] - meters[*previous]);
+    }
+    previous = i;
+    [rows addObject:row];
+  }
+  return rows;
+}
+
++ (nullable NSDictionary<NSString *, NSNumber *> *)plannerSummary
+{
+  auto const route = GetFramework().GetRoutingManager().RoutingSession().GetRouteForTests();
+  if (!route || !route->IsValid())
+    return nil;
+  return @{@"seconds": @(route->GetTotalTimeSec()), @"meters": @(route->GetTotalDistanceMeters())};
+}
+
++ (void)movePlannerStopFrom:(NSInteger)from to:(NSInteger)to
+{
+  auto real = RealPoints();
+  if (from <= 0 || to <= 0 || from >= NSInteger(real.size()) || to >= NSInteger(real.size()) || from == to)
+    return;
+  Remember();
+  auto moved = std::move(real[from]);
+  real.erase(real.begin() + from);
+  real.insert(real.begin() + to, std::move(moved));
+  SetPoints(std::move(real));
+  [self rebuildWithBestRouter:NO];
+}
+
++ (void)removePlannerStopAt:(NSInteger)index
+{
+  auto real = RealPoints();
+  if (index <= 0 || index >= NSInteger(real.size()) || real.size() <= 2)
+    return;
+  Remember();
+  real.erase(real.begin() + index);
+  SetPoints(std::move(real));
+  [self rebuildWithBestRouter:NO];
+}
+
++ (void)optimizePlannerStops
+{
+  auto real = RealPoints();
+  if (real.size() < 4)
+    return;
+  std::vector<backseat::LatLon> points;
+  for (auto const & p : real)
+    points.push_back(LatLonOf(p));
+  auto const order = backseat::OptimizeStopOrder(points);
+  Remember();
+  std::vector<RouteMarkData> ordered;
+  for (size_t i : order)
+    ordered.push_back(real[i]);
+  SetPoints(std::move(ordered));
+  [self rebuildWithBestRouter:NO];
+}
+
++ (BOOL)isRoundTrip
+{
+  auto const real = RealPoints();
+  return real.size() >= 3 && backseat::SketchDistanceM(LatLonOf(real.front()), LatLonOf(real.back())) <= kRoundTripM;
+}
+
++ (void)setRoundTrip:(BOOL)roundTrip
+{
+  if (roundTrip == [self isRoundTrip])
+    return;
+  auto all = GetFramework().GetRoutingManager().GetRoutePoints();
+  if (all.size() < 2)
+    return;
+  Remember();
+  if (roundTrip)
+  {
+    RouteMarkData back;
+    back.m_position = all.front().m_position;
+    back.m_title = "Back to start";
+    all.push_back(std::move(back));
+  }
+  else
+  {
+    all.pop_back();
+  }
+  SetPoints(std::move(all));
+  [self rebuildWithBestRouter:NO];
 }
 
 + (NSArray<CLLocation *> *)snapStrokeToRoads:(NSArray<CLLocation *> *)stroke

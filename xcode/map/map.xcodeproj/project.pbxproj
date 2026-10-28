@@ -15,6 +15,7 @@
 		BD5EA7000000000000000051 /* stop_go.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000050 /* stop_go.cpp */; };
 		BD5EA7000000000000000061 /* debug_log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000060 /* debug_log.cpp */; };
 		BD5EA7000000000000000071 /* achievements.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000070 /* achievements.cpp */; };
+		BD5EA7000000000000000081 /* route_order.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000080 /* route_order.cpp */; };
 		D11B0EA0545E2DA5C39B6197 /* lines.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7AA0F37DC5A858FEA309EA24 /* lines.cpp */; };
 		72027DDB55B38E72CFD39F30 /* lines_data.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AED2163B829158668F83E65D /* lines_data.cpp */; };
 		A536FAD0269DF941156830D4 /* navigator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5306268E5455315BD345F2F4 /* navigator.cpp */; };
@@ -181,6 +182,8 @@
 		BD5EA7000000000000000062 /* debug_log.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = debug_log.hpp; path = ../backseat/debug_log.hpp; sourceTree = "<group>"; };
 		BD5EA7000000000000000070 /* achievements.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = achievements.cpp; path = ../backseat/achievements.cpp; sourceTree = "<group>"; };
 		BD5EA7000000000000000072 /* achievements.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = achievements.hpp; path = ../backseat/achievements.hpp; sourceTree = "<group>"; };
+		BD5EA7000000000000000080 /* route_order.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = route_order.cpp; path = ../backseat/route_order.cpp; sourceTree = "<group>"; };
+		BD5EA7000000000000000082 /* route_order.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = route_order.hpp; path = ../backseat/route_order.hpp; sourceTree = "<group>"; };
 		7AA0F37DC5A858FEA309EA24 /* lines.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = lines.cpp; path = ../backseat/lines.cpp; sourceTree = "<group>"; };
 		AED2163B829158668F83E65D /* lines_data.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = lines_data.cpp; path = ../backseat/lines_data.cpp; sourceTree = "<group>"; };
 		5306268E5455315BD345F2F4 /* navigator.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = navigator.cpp; path = ../backseat/navigator.cpp; sourceTree = "<group>"; };
@@ -490,6 +493,8 @@
 				BD5EA7000000000000000062 /* debug_log.hpp */,
 				BD5EA7000000000000000070 /* achievements.cpp */,
 				BD5EA7000000000000000072 /* achievements.hpp */,
+				BD5EA7000000000000000080 /* route_order.cpp */,
+				BD5EA7000000000000000082 /* route_order.hpp */,
 				7AA0F37DC5A858FEA309EA24 /* lines.cpp */,
 				AED2163B829158668F83E65D /* lines_data.cpp */,
 				5306268E5455315BD345F2F4 /* navigator.cpp */,
@@ -774,6 +779,7 @@
 				BD5EA7000000000000000051 /* stop_go.cpp in Sources */,
 				BD5EA7000000000000000061 /* debug_log.cpp in Sources */,
 				BD5EA7000000000000000071 /* achievements.cpp in Sources */,
+				BD5EA7000000000000000081 /* route_order.cpp in Sources */,
 				D11B0EA0545E2DA5C39B6197 /* lines.cpp in Sources */,
 				72027DDB55B38E72CFD39F30 /* lines_data.cpp in Sources */,
 				A536FAD0269DF941156830D4 /* navigator.cpp in Sources */,
