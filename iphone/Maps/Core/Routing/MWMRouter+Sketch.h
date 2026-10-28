@@ -25,6 +25,12 @@ typedef NS_OPTIONS(NSUInteger, MWMRouteSketchResult) {
 + (MWMRouteSketchResult)applySketchCoordinates:(NSArray<CLLocation *> *)coordinates
                                       previous:(NSArray<CLLocation *> *)previous
                                         inView:(UIView *)mapView;
+/// Draw mode's "Go": builds the route from everything drawn, in the order it was drawn. Each item
+/// is either a stroke (two or more coordinates: roads to take) or a stop (one coordinate, from a
+/// long press). The route starts here (or keeps its start) and ends at the route's destination if
+/// there is one, otherwise at the last stop, otherwise where the last stroke ends. Replaces any
+/// earlier drawing and stops in between.
++ (MWMRouteSketchResult)buildSketch:(NSArray<NSArray<CLLocation *> *> *)items inView:(UIView *)mapView;
 /// Where a point of the map view is on the map, and back.
 + (CLLocationCoordinate2D)coordinateAtPoint:(CGPoint)point inView:(UIView *)mapView;
 + (CGPoint)pointForCoordinate:(CLLocationCoordinate2D)coordinate inView:(UIView *)mapView;

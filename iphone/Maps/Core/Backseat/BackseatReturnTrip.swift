@@ -8,6 +8,9 @@ import CoreLocation
   private static let lonKey = "BackseatReturnLon"
   private static let nameKey = "BackseatReturnName"
   private static let atKey = "BackseatReturnAt"
+  private static let savedRouteKey = "BackseatReturnSavedRoute"
+  /// Set when a saved route is started; the trip that follows remembers it for the way back.
+  static var usingSavedRoute: UUID?
   /// Offered this long after the trip started.
   private static let keepFor: TimeInterval = 12 * 3600
   /// Closer than this to where it started, there's nothing to head back to.
@@ -16,6 +19,8 @@ import CoreLocation
   struct Origin {
     let coordinate: CLLocationCoordinate2D
     let name: String
+    /// The saved route the trip took, to offer it back the other way.
+    let savedRoute: BackseatSavedRoutes.Route?
   }
 
   static func install() {
@@ -33,6 +38,8 @@ import CoreLocation
     defaults.set(here.coordinate.longitude, forKey: lonKey)
     defaults.set(name(for: here.coordinate), forKey: nameKey)
     defaults.set(Date().timeIntervalSince1970, forKey: atKey)
+    defaults.set(usingSavedRoute?.uuidString, forKey: savedRouteKey)
+    usingSavedRoute = nil
   }
 
   /// "Home" or "Work" when the start is a place driven to before, else where you started.
@@ -57,12 +64,20 @@ import CoreLocation
        here.distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)) < awayMeters {
       return nil
     }
-    return Origin(coordinate: coordinate, name: name)
+    let savedID = defaults.string(forKey: savedRouteKey).flatMap(UUID.init(uuidString:))
+    let saved = savedID.flatMap { id in BackseatSavedRoutes.all.first { $0.id == id } }
+    return Origin(coordinate: coordinate, name: name, savedRoute: saved)
   }
 
-  /// Drives back the way you came, straight into navigation.
+  /// Drives back to where the trip started, straight into navigation.
   static func headBack() {
     guard let origin else { return }
     MWMBackseatRewriter.route(to: origin.coordinate, title: origin.name)
+  }
+
+  /// Drives the saved route the trip took, the other way, back to where it started.
+  static func headBackSameWay() {
+    guard let origin, let saved = origin.savedRoute else { return }
+    BackseatSavedRoutes.drive(saved.reversed(to: origin.coordinate))
   }
 }

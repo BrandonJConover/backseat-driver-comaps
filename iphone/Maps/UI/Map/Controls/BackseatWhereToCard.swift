@@ -32,6 +32,15 @@ struct BackseatWhereToCard: View {
     @State private var returnTrip: BackseatReturnTrip.Origin?
 
 
+    /// Routes drawn and saved in Draw mode
+    @State private var savedRoutes: [BackseatSavedRoutes.Route] = []
+
+
+    /// The saved route being renamed, and its new name
+    @State private var renaming: BackseatSavedRoutes.Route?
+    @State private var newName: String = ""
+
+
     /// If the GPS is listening
     @State private var isListening: Bool = false
 
@@ -102,6 +111,46 @@ struct BackseatWhereToCard: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text(verbatim: "Head back to \(returnTrip.name)"))
+
+                    // Came on a saved route: the same roads the other way.
+                    if let saved = returnTrip.savedRoute {
+                        Button {
+                            BackseatReturnTrip.headBackSameWay()
+                        } label: {
+                            capsule(symbol: "arrow.triangle.swap", text: "Same way back (\(saved.name))")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                // Drawn routes saved for next time. Long press to rename or delete.
+                if !savedRoutes.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(savedRoutes) { route in
+                                Button {
+                                    BackseatSavedRoutes.start(route)
+                                } label: {
+                                    capsule(symbol: "scribble", text: route.name)
+                                }
+                                .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button {
+                                        newName = route.name
+                                        renaming = route
+                                    } label: {
+                                        Label(title: { Text(verbatim: "Rename") }, icon: { Image(systemName: "pencil") })
+                                    }
+
+                                    Button(role: .destructive) {
+                                        BackseatSavedRoutes.delete(route)
+                                    } label: {
+                                        Label(title: { Text(verbatim: "Delete") }, icon: { Image(systemName: "trash") })
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 if places.isEmpty {
@@ -134,11 +183,49 @@ struct BackseatWhereToCard: View {
                 .fill(Color(uiColor: .systemBackground).opacity(colorScheme == .dark ? 0.92 : 0.97))
                 .shadow(radius: 3)
         }
+        .alert(Text(verbatim: "Rename route"), isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField(text: $newName) {
+                Text(verbatim: "Name")
+            }
+
+            Button(role: .cancel) {
+                renaming = nil
+            } label: {
+                Text(verbatim: "Cancel")
+            }
+
+            Button {
+                if let route = renaming, !newName.trimmingCharacters(in: .whitespaces).isEmpty {
+                    BackseatSavedRoutes.rename(route, to: newName.trimmingCharacters(in: .whitespaces))
+                }
+                renaming = nil
+            } label: {
+                Text(verbatim: "Save")
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: BackseatSavedRoutes.changed)) { _ in reload() }
         .onAppear(perform: reload)
         .onChange(of: scenePhase) { _ in reload() }
         .onReceive(NotificationCenter.default.publisher(for: BackseatListener.listeningChanged)) { _ in
             isListening = BackseatListener.shared.isListening
         }
+    }
+
+
+    /// A saved route or the way back: an icon and a name on a quiet capsule
+    private func capsule(symbol: String, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol)
+                .imageScale(.small)
+
+            Text(verbatim: text)
+                .lineLimit(1)
+        }
+        .font(.subheadline.weight(.medium))
+        .padding(.horizontal, 14)
+        .frame(minHeight: 44)
+        .background(Capsule().fill(Color(uiColor: .secondarySystemBackground)))
+        .contentShape(Capsule())
     }
 
 
@@ -170,5 +257,6 @@ struct BackseatWhereToCard: View {
         }
         isListening = BackseatListener.shared.isListening
         returnTrip = BackseatReturnTrip.origin
+        savedRoutes = BackseatSavedRoutes.all
     }
 }
