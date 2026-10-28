@@ -90,11 +90,12 @@ TEST(NavigatorOpensWithGreetingRundownAndInstruction)
 TEST(NavigatorTurnsStepChangesIntoCompletedTurns)
 {
   Navigator nav(Config());
-  nav.OnFix(At(0, 10), OnRoute(1, TurnKind::Left, 400));
+  nav.OnFix(At(0, 10), OnRoute(1, TurnKind::Left, 900));
   nav.TakeLines();
-  nav.OnFix(At(10000, 10), OnRoute(1, TurnKind::Left, 140));
+  // Once the opening lines are over.
+  nav.OnFix(At(60000, 10), OnRoute(1, TurnKind::Left, 140));
   CHECK(Has(nav.TakeLines(), Category::Instruction));  // the 500 ft nag
-  nav.OnFix(At(30000, 10), OnRoute(2, TurnKind::Right, 300, "Oak Avenue"));
+  nav.OnFix(At(80000, 10), OnRoute(2, TurnKind::Right, 300, "Oak Avenue"));
   auto const lines = nav.TakeLines();
   CHECK(Has(lines, Category::TurnCompleted));
   CHECK_EQUAL(nav.Engine()->Stats().turnsCompleted, 1);
@@ -861,18 +862,26 @@ TEST(NavigatorPointsAtTheVolumeKnobAtRoundabouts)
   bool music = true;
   Navigator nav(Config());
   nav.SetMusicLookup([&] { return music; });
-  nav.OnFix(At(0, 10), OnRoute(1, TurnKind::Roundabout, 300));
+  // Mid-trip, once the opening lines are long done; the roundabout is half a minute out.
+  nav.OnFix(At(0, 10), OnRoute(1, TurnKind::Left, 3000));
+  nav.TakeLines();
+  nav.OnFix(At(60000, 10), OnRoute(1, TurnKind::Left, 2400));
+  nav.TakeLines();
+  nav.OnFix(At(90000, 10), OnRoute(2, TurnKind::Roundabout, 300));
+  nav.TakeLines();
+  // With the direction, a few seconds after the last turn.
+  nav.OnFix(At(94000, 10), OnRoute(2, TurnKind::Roundabout, 260));
   auto said = LinesOf(nav.TakeLines(), Category::Music);
   CHECK_EQUAL(said.size(), size_t(1));
   CHECK_EQUAL(said[0].text, std::string("Oh look, a roundabout! Do you know what else in this car is round?"));
   // ...awkward pause...
-  nav.OnFix(At(4000, 10), OnRoute(1, TurnKind::Roundabout, 260));
+  nav.OnFix(At(98000, 10), OnRoute(2, TurnKind::Roundabout, 220));
   CHECK(LinesOf(nav.TakeLines(), Category::Music).empty());
-  nav.OnFix(At(8000, 10), OnRoute(1, TurnKind::Roundabout, 220));
+  nav.OnFix(At(102000, 10), OnRoute(2, TurnKind::Roundabout, 180));
   said = LinesOf(nav.TakeLines(), Category::Music);
   CHECK_EQUAL(said.size(), size_t(1));
   CHECK_EQUAL(said[0].text, std::string("The volume knob."));
-  nav.OnFix(At(30000, 10), OnRoute(2, TurnKind::Roundabout, 300));
+  nav.OnFix(At(130000, 10), OnRoute(3, TurnKind::Roundabout, 300));
   CHECK(LinesOf(nav.TakeLines(), Category::Music).empty());  // once a trip
 
   music = false;
@@ -1569,4 +1578,84 @@ TEST(DrivingWhereTheMapHasNoRoad)
   // No map for this area: no opinion.
   roadM = -1;
   CHECK_EQUAL(offRoadLines(600, 700, 15), 0);
+}
+
+TEST(SpeedingNagsBackOffOnALongStretch)
+{
+  Navigator nav(Config());
+  double const limit = FromDisplay(65, Units::Mph);
+  double const speed = FromDisplay(69, Units::Mph);
+  int nags = 0;
+  // Half an hour at 4 over, one dip under the limit for a few seconds in the middle.
+  for (double t = 0; t <= 1800000; t += 1000)
+  {
+    bool const dip = t >= 900000 && t < 905000;
+    nav.OnFix(At(t, dip ? limit - 1 : speed, limit), OnRoute(1, TurnKind::Right, 60000 - t / 1000 * 30));
+    nav.Poll(OnRoute(1, TurnKind::Right, 60000 - t / 1000 * 30));
+    for (auto const & l : nav.TakeLines())
+      if (l.category == Category::Speeding)
+        ++nags;
+  }
+  // 40 s, 80 s, 160 s, then every 5 minutes; the dip isn't a fresh offense. It was 45.
+  CHECK(nags >= 5);
+  CHECK(nags <= 10);
+}
+
+TEST(RoastsWaitUntilTheTurnIsDone)
+{
+  Navigator nav(Config());
+  double const limit = FromDisplay(30, Units::Mph);
+  double const legal = FromDisplay(29, Units::Mph);
+  double const speeding = FromDisplay(36, Units::Mph);
+  nav.OnFix(At(0, legal, limit), OnRoute(1, TurnKind::Left, 3000));
+  nav.TakeLines();
+  // Long after the opening lines, the car speeds up just before the turn: the roast for that
+  // would still be playing when "Now, turn left" is due.
+  double dist = 1500;
+  std::vector<std::pair<double, Commentary>> said;
+  double turnAt = 0;
+  for (double t = 120000; t <= 300000; t += 1000)
+  {
+    double const speed = dist < 130 ? speeding : legal;
+    dist -= speed;
+    RouteSnapshot r = dist > 0 ? OnRoute(1, TurnKind::Left, dist) : OnRoute(2, TurnKind::Right, 2000 + dist, "Oak Avenue");
+    if (dist <= 0 && turnAt == 0)
+      turnAt = t;
+    nav.OnFix(At(t, speed, limit), r);
+    for (auto const & l : nav.TakeLines())
+      said.push_back({t, l});
+  }
+  auto const finalCall = std::find_if(said.begin(), said.end(),
+                                      [](auto const & s) { return s.second.text.rfind("Now, ", 0) == 0; });
+  CHECK(finalCall != said.end());
+  bool roasted = false;
+  for (auto const & [t, l] : said)
+  {
+    if (l.category == Category::Speeding)
+      roasted = true;
+    // Nothing but directions from a few seconds before the final call until the turn is done.
+    if (l.priority != Priority::Nav && l.category != Category::TurnCompleted)
+      CHECK(t < finalCall->first - 7000 || t >= turnAt);
+  }
+  // Said after the turn instead.
+  CHECK(roasted);
+}
+
+TEST(AFirstTurnRightThereIsSaidBeforeTheGreeting)
+{
+  Navigator nav(Config());
+  // A first trip, so the next one isn't the first ever.
+  nav.OnFix(At(0, 10), OnRoute(1, TurnKind::Left, 900));
+  RouteSnapshot done = OnRoute(1, TurnKind::Left, 900);
+  done.state = RouteState::Finished;
+  nav.OnFix(At(60000, 0), done);
+  nav.OnFix(At(70000, 0), RouteSnapshot{});
+  nav.TakeLines();
+
+  nav.OnFix(At(86400000, 0), OnRoute(5, TurnKind::Right, 120, "Oak Avenue"));
+  auto const lines = nav.TakeLines();
+  CHECK(!lines.empty());
+  CHECK(lines[0].text.find("turn right onto Oak Avenue") != std::string::npos);
+  // No rundown on top of it: the greeting and the direction, nothing else that's a direction.
+  CHECK(std::count_if(lines.begin(), lines.end(), [](Commentary const & l) { return l.priority == Priority::Nav; }) <= 2);
 }

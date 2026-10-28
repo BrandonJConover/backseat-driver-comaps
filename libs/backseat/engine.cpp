@@ -10,6 +10,7 @@
 #include <limits>
 #include <random>
 #include <regex>
+#include <string_view>
 
 namespace backseat
 {
@@ -32,6 +33,20 @@ double constexpr kFinalCallS = 4;
 double constexpr kFinalAfterInstructionMs = 4000;
 /// Legs at least this long get a plain "In 1 mile, turn right onto ..." reminder, which ends the straight nags.
 double constexpr kReminderLegM = 2500;
+/// speechAware: the final call is over at least this long before the turn...
+double constexpr kFinalClearMs = 1500;
+/// ...but never comes more than this many seconds out, however much talking is ahead of it.
+double constexpr kFinalCallMaxS = 10;
+/// speechAware: anything else has to be over at least this long before the final call is due.
+double constexpr kBeforeFinalClearMs = 1000;
+/// How long a roast takes to say, before it's picked (most are 10-15 words).
+double constexpr kRoastSpeakMs = 5000;
+/// The pause the phone leaves after each line.
+double constexpr kLinePauseMs = 350;
+/// speechAware: no remark after a direction for a turn that's closer than this many seconds.
+double constexpr kSuffixMinS = 15;
+/// Moving slower than this, the car isn't heading for the turn yet (a red light, a jam).
+double constexpr kRollingMps = 3;
 
 /// How much each offense winds the GPS up. Negative values calm it down.
 double FrustrationDelta(Category c)
@@ -192,6 +207,12 @@ std::string FirstManeuver(std::string const & text)
   static std::regex const then(", then ", std::regex::icase);
   std::smatch m;
   return std::regex_search(text, m, then) ? text.substr(0, m.position(0)) : text;
+}
+
+double SpeakingMs(std::string const & text, double speed)
+{
+  int const words = static_cast<int>(std::count(text.begin(), text.end(), ' ')) + 1;
+  return words / 2.7 * 1000 / std::max(0.5, speed);
 }
 
 std::string DirectionText(std::string const & text, double distanceM, Units units, Control control)
@@ -370,7 +391,9 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     int const tier = Tier();
     // The direction comes first, always: a remark goes after it, on one direction in three.
     int const n = m_instructionCount++ % 3;
-    std::string const suffix = n == 2 ? Pick("instruction.suffix", tier) : std::string();
+    double const mps = m_lastSample ? m_lastSample->speedMps : 0;
+    bool const turnIsClose = m_config.speechAware && mps >= kRollingMps && e.distanceM / mps < kSuffixMinS;
+    std::string const suffix = n == 2 && !turnIsClose ? Pick("instruction.suffix", tier) : std::string();
     std::string const text =
         DirectionText(e.text, e.distanceM, units, dir == Maneuver::Other ? Control::None : e.control) + suffix;
     out.push_back(Make(e.t, Category::Instruction, text, Priority::Nav));
@@ -642,7 +665,7 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
     return;
   auto & p = *m_pendingTurn;
   double const far = FarM();
-  double const finalM = FinalM();
+  double const finalM = m_config.speechAware ? FinalDueM(t, p) : FinalM();
   double const mention = m_config.countdownMentionM;
   double const reminderM = m_config.units == Units::Mph ? 1609.344 : 1000;
   if (!p.reminded && p.stage == 0 && p.legM >= kReminderLegM && distanceM <= reminderM && distanceM > 1.5 * far)
@@ -688,10 +711,19 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   }
   else if (p.stage <= 1 && distanceM <= finalM && distanceM > 5)
   {
-    // The call that matters most, so it's plain and it always comes, mention or not.
-    p.stage = 2;
-    if (t - p.since < kFinalAfterInstructionMs)
+    // The call that matters most, so it's plain and it always comes, mention or not. Right after
+    // the instruction it would only say it again: skipped at the usual spot, and when it's only
+    // due early (a long call, the phone still talking) it waits for that spot.
+    // speechAware: "just said" lasts until the instruction is over, with a breath.
+    double const justSaidMs = m_config.speechAware ? std::max(kFinalAfterInstructionMs, SpeakingMs(p.text) + 2500)
+                                                   : kFinalAfterInstructionMs;
+    if (t - p.since < justSaidMs)
+    {
+      if (distanceM <= FinalM())
+        p.stage = 2;
       return;
+    }
+    p.stage = 2;
     out.push_back(Make(t, Category::Instruction, "Now, " + LowerFirst(p.text) + ".", Priority::Nav));
     return;
   }
@@ -712,6 +744,15 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
     return;
   std::string const key = CountdownKey(p.shape, stage);
   std::string const distance = FormatDistance(sayM, m_config.units);
+  // "In 500 feet..." and "Did I mention..." repeat the instruction: they only go out if they're over
+  // before the final call.
+  if (m_config.speechAware && (std::string_view(stage) == "mention" || std::string_view(stage) == "far" ||
+                               std::string_view(stage) == "nascar") &&
+      std::max(0.0, m_talkingUntil - t) + kRoastSpeakMs + kBeforeFinalClearMs > MsUntilFinal(t, p))
+  {
+    TraceThrottled("roast.held", key + "/turn", {{"key", key}, {"why", "turn"}});
+    return;
+  }
   std::string const text = Fill(Pick(key, Tier()), {{"dir", DirName(p.dir)}, {"distance", distance}});
   out.push_back(Make(t, Category::Instruction, Capitalize(text), Priority::Nav));
 }
@@ -721,6 +762,36 @@ double CritiqueEngine::FinalM() const
 {
   double const mps = m_lastSample ? m_lastSample->speedMps : 0;
   return std::max(m_config.countdownNearM, mps * kFinalCallS);
+}
+
+double CritiqueEngine::FinalDueM(double t, PendingTurn const & p) const
+{
+  double const base = FinalM();
+  double const mps = m_lastSample ? m_lastSample->speedMps : 0;
+  if (mps < kRollingMps)
+    return base;
+  std::string const call = "Now, " + LowerFirst(p.text) + ".";
+  double const needMs = std::max(0.0, m_talkingUntil - t) + SpeakingMs(call) + kLinePauseMs + kFinalClearMs;
+  return std::max(base, mps * std::min(needMs / 1000, kFinalCallMaxS));
+}
+
+double CritiqueEngine::MsUntilFinal(double t, PendingTurn const & p) const
+{
+  double const mps = m_lastSample ? m_lastSample->speedMps : 0;
+  if (mps < kRollingMps)
+    return 1e12;
+  return (p.distM - FinalDueM(t, p)) / mps * 1000;
+}
+
+bool CritiqueEngine::TurnNeedsQuiet(double t, double speakMs) const
+{
+  if (!m_config.speechAware || !m_pendingTurn)
+    return false;
+  auto const & p = *m_pendingTurn;
+  // The final call is out: quiet until the turn is done, or until the car gives up on it.
+  if (p.stage >= 2)
+    return !p.atTurnSince || t - *p.atTurnSince < 10000;
+  return std::max(0.0, m_talkingUntil - t) + speakMs + kBeforeFinalClearMs > MsUntilFinal(t, p);
 }
 
 /// Where the "In 500 feet" call goes: 500 ft in town, farther out at speed so there are still
@@ -815,22 +886,26 @@ void CritiqueEngine::WrongTurn(std::vector<Commentary> & out, double t, TurnDire
 void CritiqueEngine::CheckSpeeding(TelemetrySample const & s, TelemetrySample const * prev, std::vector<Commentary> & out)
 {
   Units const units = m_config.units;
-  if (!s.speedLimitMps)
+  bool const backoff = m_config.speedingRenagMaxMs > 0;
+  int const over = s.speedLimitMps ? static_cast<int>(JsRound(ToDisplay(s.speedMps, units))) -
+                                         static_cast<int>(JsRound(ToDisplay(*s.speedLimitMps, units)))
+                                   : 0;
+  if (!s.speedLimitMps || over <= m_config.speedingTolerance)
   {
     m_speedingSince.reset();
-    m_speedingBand.reset();
+    if (!m_underLimitSince)
+      m_underLimitSince = s.t;
+    // Under the limit for a while: the next time over is a new offense, and the nags start over.
+    if (!backoff || s.t - *m_underLimitSince >= m_config.speedingResetMs)
+    {
+      m_speedingBand.reset();
+      m_speedingRenags = 0;
+    }
     return;
   }
+  m_underLimitSince.reset();
   int const speed = static_cast<int>(JsRound(ToDisplay(s.speedMps, units)));
   int const limit = static_cast<int>(JsRound(ToDisplay(*s.speedLimitMps, units)));
-  int const over = speed - limit;
-
-  if (over <= m_config.speedingTolerance)
-  {
-    m_speedingSince.reset();
-    m_speedingBand.reset();
-    return;
-  }
 
   if (prev && m_speedingSince)
     m_stats.speedingSeconds += (s.t - prev->t) / 1000;
@@ -859,10 +934,16 @@ void CritiqueEngine::CheckSpeeding(TelemetrySample const & s, TelemetrySample co
       m_lastSpeedingLineAt = s.t;
     }
   }
-  else if (s.t - m_lastSpeedingLineAt >= m_config.speedingRenagMs)
+  else
   {
-    if (Roast(out, s.t, Category::Speeding, "speeding.still", vars))
+    double const renagMs = backoff ? std::min(m_config.speedingRenagMaxMs,
+                                              m_config.speedingRenagMs * std::pow(2.0, std::min(m_speedingRenags, 10)))
+                                   : m_config.speedingRenagMs;
+    if (s.t - m_lastSpeedingLineAt >= renagMs && Roast(out, s.t, Category::Speeding, "speeding.still", vars))
+    {
       m_lastSpeedingLineAt = s.t;
+      ++m_speedingRenags;
+    }
   }
 }
 
@@ -951,6 +1032,11 @@ bool CritiqueEngine::Roast(std::vector<Commentary> & out, double t, Category cat
     TraceThrottled("roast.held", key + "/breath", {{"key", key}, {"why", "breath"}});
     return false;
   }
+  if (!urgent && TurnNeedsQuiet(t, kRoastSpeakMs))
+  {
+    TraceThrottled("roast.held", key + "/turn", {{"key", key}, {"why", "turn"}});
+    return false;
+  }
 
   if (category != Category::TurnCompleted)
     Bump(category);
@@ -1024,6 +1110,8 @@ Commentary CritiqueEngine::Make(double t, Category category, std::string const &
     m_lastNavAt = t;
   // Fed up talks a touch faster, never rushed: at most 10% faster at full frustration.
   c.voiceSpeed = RoundTo(1 + m_frustration / 1000, 2);
+  if (m_config.speechAware)
+    m_talkingUntil = std::max(m_talkingUntil, t) + SpeakingMs(c.text, c.voiceSpeed) + kLinePauseMs;
   return c;
 }
 }  // namespace backseat

@@ -17,6 +17,8 @@ add_executable(${PROJECT_NAME}
   rewriter_test.cpp
   route_order_test.cpp
   route_sketch_test.cpp
+  sim_drive.hpp
+  soak_test.cpp
   debug_log_test.cpp
   lines_test.cpp
   stop_go_test.cpp

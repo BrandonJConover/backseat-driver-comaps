@@ -7,6 +7,7 @@
 #include "backseat/report.hpp"
 #include "backseat/types.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -51,6 +52,12 @@ struct EngineConfig
   double navBreathMs = 5000;
   /// Re-nag interval while the driver stays over the limit.
   double speedingRenagMs = 40000;
+  /// With this set, each "still speeding" nag waits twice as long as the one before, up to this
+  /// long, so an hour at 4 over doesn't run through every line twice; and a dip under the limit
+  /// doesn't count as a fresh offense. Both start over after speedingResetMs under the limit.
+  /// 0 keeps the plain speedingRenagMs (the TS engine's behavior).
+  double speedingRenagMaxMs = 0;
+  double speedingResetMs = 30000;
   /// Distances for the "you are turning left in 500 feet / 50 feet" nags.
   double countdownFarM = 152;  // 500 ft
   double countdownNearM = 15;  // 50 ft
@@ -68,6 +75,12 @@ struct EngineConfig
   double speedingLogEveryMs = 5000;
   /// Frustration points lost per minute of good behavior.
   double frustrationDecayPerMin = 6;
+  /// Keep the turn calls clear of everything else, from a rough idea of how long the phone is still
+  /// talking (SetTalkingUntil): no roast or "did I mention" that would still be playing when the
+  /// final "Now, ..." call is due, that call early enough to be over before the turn, and no remark
+  /// tacked onto a direction for a turn that's seconds away. The Navigator turns it on; off by
+  /// default so the TS engine's parity trace still holds.
+  bool speechAware = false;
   Rng rng;
   LineSource * lineSource = nullptr;
   /// Lines said on earlier trips, so picks avoid them too. Not owned; null keeps it per trip.
@@ -96,6 +109,9 @@ std::string FirstManeuver(std::string const & text);
 /// turn right onto Oak Lane.", "Your destination, Sundance Lane, is 400 feet ahead."
 std::string DirectionText(std::string const & text, double distanceM, Units units, Control control = Control::None);
 
+/// Roughly how long a line takes to say: ~2.7 words a second at normal speed.
+double SpeakingMs(std::string const & text, double speed = 1);
+
 class CritiqueEngine
 {
 public:
@@ -111,6 +127,13 @@ public:
   /// Grade + heat map. Valid mid-trip too.
   TripReport Report() const;
   EngineConfig const & Config() const { return m_config; }
+
+  /// The phone is busy saying what it was handed until about `t` (speechAware only).
+  void SetTalkingUntil(double t) { m_talkingUntil = std::max(m_talkingUntil, t); }
+  /// A line that takes `speakMs` to say would get in the way of the next turn: it would still be
+  /// playing when the final call is due, or the final call is out and the turn isn't done yet.
+  /// Always false unless speechAware.
+  bool TurnNeedsQuiet(double t, double speakMs) const;
 
 private:
   enum class SpeedBand
@@ -185,6 +208,12 @@ private:
   std::optional<TelemetrySample> m_lastSample;
   double FarM() const;
   double FinalM() const;
+  /// Where the final call goes with speechAware: FinalM(), or farther out when the call is long or
+  /// the phone is still talking, so it's over before the car gets to the turn.
+  double FinalDueM(double t, PendingTurn const & p) const;
+  /// Milliseconds until the final call for `p` is due; huge when the car isn't rolling.
+  double MsUntilFinal(double t, PendingTurn const & p) const;
+  mutable double m_talkingUntil = 0;
   double m_lastRoastAt;
   /// Set by Make() for every navigation line.
   mutable double m_lastNavAt = -1e18;
@@ -195,6 +224,9 @@ private:
   std::optional<double> m_speedingSince;
   std::optional<SpeedBand> m_speedingBand;
   double m_lastSpeedingLineAt;
+  /// "Still speeding" nags since the driver was last under the limit for a while.
+  int m_speedingRenags = 0;
+  std::optional<double> m_underLimitSince;
   std::optional<double> m_slowSince;
   std::optional<double> m_stoppedSince;
   int m_stopCount = 0;

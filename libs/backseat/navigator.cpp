@@ -119,6 +119,16 @@ double constexpr kActiveTripStampEveryS = 60;
 /// How long a navigation line may wait for the neural voice: at most this long, and only while it
 /// still finishes this far before the maneuver.
 double constexpr kNavWaitMaxMs = 4000;
+/// The pause the phone leaves after each line.
+double constexpr kLinePauseMs = 350;
+/// A first turn closer than this when the trip starts is said before the greeting.
+double constexpr kFirstTurnFirstWithinM = 350;
+/// "Still speeding" nags back off to one every 5 minutes on a long stretch over the limit.
+double constexpr kSpeedingRenagMaxMs = 300000;
+/// A remark held back for a turn is dropped after this long...
+double constexpr kTurnHeldMaxMs = 45000;
+/// ...or after this long, or once the turn is done, if it was about that moment ("Nice turn").
+double constexpr kTurnHeldStaleMs = 15000;
 double constexpr kNavDoneBeforeTurnM = 40;
 // Facing the wrong way: the GPS course is at least this far off the route's direction...
 double constexpr kWrongWayDeg = 135;
@@ -229,12 +239,6 @@ bool CutsIntoCall(Commentary const & c)
   }
 }
 
-/// Roughly how long a line takes to say: ~2.7 words a second at normal speed.
-double SpeakingMs(std::string const & text, double speed)
-{
-  int const words = static_cast<int>(std::count(text.begin(), text.end(), ' ')) + 1;
-  return words / 2.7 * 1000 / std::max(0.5, speed);
-}
 /// After turning down the driver's game, the GPS pitches it as its own idea this much later.
 double constexpr kGamePitchAfterMs = 180000;
 
@@ -657,9 +661,14 @@ std::vector<Commentary> Navigator::TakeLines()
     m_gate.Push(std::move(m_punchlines.front()), false);
     m_punchlines.erase(m_punchlines.begin());
   }
-  auto lines = FilterForCall(m_gate.Take());
+  auto lines = KeepTurnsClear(FilterForCall(m_gate.Take()));
   if (!lines.empty())
     m_lastSpokeT = m_lastT;
+  // What the phone will be busy saying, so the next turn call and the roasts can plan around it.
+  for (auto const & l : lines)
+    m_talkingUntil = std::max(m_talkingUntil, m_lastT) + SpeakingMs(l.text, l.voiceSpeed) + kLinePauseMs;
+  if (m_engine)
+    m_engine->SetTalkingUntil(m_talkingUntil);
   // Directions cut into 20 Questions: back to the game once they're done.
   if (m_twenty.GetState() == TwentyQuestions::State::Playing &&
       std::any_of(lines.begin(), lines.end(), [](Commentary const & l) { return l.priority == Priority::Nav; }))
@@ -674,6 +683,94 @@ std::vector<Commentary> Navigator::TakeLines()
       line.maxWaitMs = NavWaitMs(line);
   }
   return lines;
+}
+
+namespace
+{
+/// Lines that are about this very moment, or part of a bit that keeps its own timing: never held
+/// back for a turn.
+bool HoldsForTurns(Category c)
+{
+  switch (c)
+  {
+  case Category::MissedTurn:
+  case Category::WrongTurn:
+  case Category::Rerouted:
+  case Category::Arrived:
+  case Category::Instruction:
+  case Category::Payback:
+  case Category::Hazard:
+  case Category::Fear:
+  case Category::PlateGame:
+  case Category::PhoneCall:
+  case Category::Quiet:
+  case Category::TwentyQuestions:
+  case Category::Bossy:
+  case Category::Thanked:
+  case Category::Title: return false;
+  default: return true;
+  }
+}
+
+/// Remarks about a moment that's gone once the car has made another turn ("Nice turn", "Slow down").
+bool GoesStaleAfterATurn(Category c)
+{
+  switch (c)
+  {
+  case Category::TurnCompleted:
+  case Category::Speeding:
+  case Category::TooSlow:
+  case Category::HardBraking:
+  case Category::HardAccel:
+  case Category::Tour:
+  case Category::Idle:
+  case Category::Music:
+  case Category::UTurn: return true;
+  default: return false;
+  }
+}
+}  // namespace
+
+std::vector<Commentary> Navigator::KeepTurnsClear(std::vector<Commentary> lines)
+{
+  if (!m_engine)
+  {
+    m_turnHeld.clear();
+    return lines;
+  }
+  int const turnsDone = m_engine->Stats().turnsCompleted;
+  std::vector<Commentary> out;
+  // Held lines first, oldest first, when the turn is out of the way; stale ones are dropped.
+  std::vector<TurnHeld> still;
+  for (auto & h : m_turnHeld)
+  {
+    bool const stale = m_lastT - h.heldAt > kTurnHeldMaxMs ||
+                       (GoesStaleAfterATurn(h.line.category) && (turnsDone > h.turnsDone || m_lastT - h.heldAt > kTurnHeldStaleMs));
+    if (stale)
+    {
+      Trace("say.dropped", {{"why", "turn"}, {"text", h.line.text}});
+      continue;
+    }
+    if (m_engine->TurnNeedsQuiet(m_lastT, SpeakingMs(h.line.text, h.line.voiceSpeed)))
+      still.push_back(std::move(h));
+    else
+      out.push_back(std::move(h.line));
+  }
+  m_turnHeld = std::move(still);
+  for (auto & l : lines)
+  {
+    bool const holdable = l.priority == Priority::Nav ? (!m_predictionText.empty() && l.text == m_predictionText)
+                                                      : HoldsForTurns(l.category);
+    // Anything already waiting goes first, so a newer line waits behind it.
+    if (holdable && (!m_turnHeld.empty() || m_engine->TurnNeedsQuiet(m_lastT, SpeakingMs(l.text, l.voiceSpeed))))
+    {
+      Trace("say.held", {{"why", "turn"}, {"text", l.text}});
+      m_turnHeld.push_back({std::move(l), m_lastT, turnsDone});
+    }
+    else
+      out.push_back(std::move(l));
+  }
+  return out;
 }
 
 double Navigator::NavWaitMs(Commentary const & line) const
@@ -845,7 +942,11 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
 {
   EngineConfig config = m_config;
   config.saidLog = &m_said;
+  config.speechAware = true;
+  if (config.speedingRenagMaxMs == 0)
+    config.speedingRenagMaxMs = kSpeedingRenagMaxMs;
   m_engine = std::make_unique<CritiqueEngine>(config, t);
+  m_engine->SetTalkingUntil(m_talkingUntil);
   m_plan = {};
   m_plan.origin = route.origin;
   m_plan.destination = route.destinationPoint;
@@ -889,6 +990,15 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
       std::max(m_history.size(), static_cast<size_t>(std::max(0, m_said.Counter(kTripsStartedKey))));
   m_said.SetCounter(kTripsStartedKey, static_cast<int>(tripsBefore + 1));
   Trace("trip.number", {{"before", std::to_string(tripsBefore)}});
+  // The first turn is right there: the direction goes first, then the greeting, and the rundown
+  // (after the first trip ever) is left out so the final call isn't stuck behind it.
+  bool const turnFirst = route.turnId && route.distToTurnM < kFirstTurnFirstWithinM;
+  if (turnFirst)
+  {
+    m_turnId = route.turnId;
+    m_turnKind = route.turn;
+    SayInstruction(t, route);
+  }
   SayNav(t, TripGreeting(m_history, m_config.rng, tripsBefore));
   SayIndoorStart(t, route);
   // Before 5 am: "Are we off to make the donuts?"
@@ -912,11 +1022,14 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   // After that, a drawn route gets "We're doing your route" instead of the rundown.
   if (m_sketched && tripsBefore > 0)
     SayLine(t, Category::Instruction, "sketch.start");
-  else
+  else if (!turnFirst || tripsBefore == 0)
     SayNav(t, RouteRundown(steps, m_history, m_config.rng, tripsBefore), tripsBefore == 0 ? kRattleSpeed : 1.0);
   // The time prediction waits until the car is rolling, so the start isn't five lines in a row.
   if (m_plan.expectedMinutes > 0)
-    SayNavLater(t + kPredictionDelayMs, PredictTrip(m_history, m_plan, m_config.rng).text);
+  {
+    m_predictionText = PredictTrip(m_history, m_plan, m_config.rng).text;
+    SayNavLater(t + kPredictionDelayMs, m_predictionText);
+  }
   Say(m_engine->OnNav(NavEvent::DestinationSet(t, route.destination)));
   SayVenue(t, route);
   SayRoutine(t, route);
@@ -1322,6 +1435,8 @@ void Navigator::SayVenue(double t, RouteSnapshot const & route)
 
 void Navigator::ResetTrip()
 {
+  m_turnHeld.clear();
+  m_predictionText.clear();
   m_turnId.reset();
   m_turnKind = TurnKind::None;
   m_leftsInARow = 0;

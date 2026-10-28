@@ -357,6 +357,9 @@ private:
   bool Night(double tMs, LatLon const & here) const;
   /// A "call.*" line, filled in, to say right away.
   Commentary CallLine(double tMs, std::string const & key);
+  /// Holds back remarks that would still be playing when the next turn's final call is due (or
+  /// while the car is making the turn) and lets them out once it's done; stale ones are dropped.
+  std::vector<Commentary> KeepTurnsClear(std::vector<Commentary> lines);
   /// Puts the call on hold for directions, takes it back up, or ends it, as lines go out.
   std::vector<Commentary> FilterForCall(std::vector<Commentary> lines);
   /// Rest areas, highways, farmland, the dark, the weather, signal and drive-thrus (road_bits.hpp).
@@ -373,6 +376,18 @@ private:
   RewriteGate m_gate;
 
   double m_lastT = 0;
+  /// About when the phone is done saying everything handed to it so far.
+  double m_talkingUntil = 0;
+  /// The trip-time prediction, said a little after the start like a direction but held for turns.
+  std::string m_predictionText;
+  struct TurnHeld
+  {
+    Commentary line;
+    double heldAt = 0;
+    /// Turns completed when it was held.
+    int turnsDone = 0;
+  };
+  std::vector<TurnHeld> m_turnHeld;
   RouteState m_lastState = RouteState::Inactive;
   std::optional<uint32_t> m_turnId;
   double m_lastDistToTurnM = 0;
