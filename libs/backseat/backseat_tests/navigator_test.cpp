@@ -1288,6 +1288,60 @@ TEST(TourGuideWaitsUntilTheSightIsInView)
   CHECK(SaidLineOf(said[0].first.text, "tour.coffee"));
 }
 
+TEST(TourGuidePointsOutTheMiddleOfNowhere)
+{
+  Navigator nav(Config());
+  // Nothing on either side but a field on the left (the map side reports it as a sight).
+  LatLon const field = NorthOfStart(2300, -50);
+  nav.SetSightLookup(
+      [field](LatLon const & at, double)
+      {
+        if (std::fabs(at.lat - field.lat) * kMPerDegLat > 400)
+          return std::optional<Sight>{};
+        return std::optional<Sight>{Sight{"the field", false, field, "nowhere"}};
+      });
+  auto const said = DriveNorth(nav, 0, 400, 15, Far());
+  // Once a trip, however many fields go by.
+  CHECK_EQUAL(said.size(), size_t(1));
+  CHECK(SaidLineOf(said[0].first.text, "tour.nowhere"));
+  CHECK(said[0].first.text.find("left") != std::string::npos);
+}
+
+TEST(PassingTheLastExitForAWhile)
+{
+  Navigator nav(Config());
+  auto const exitLines = [&](double tMs, std::optional<double> nextM)
+  {
+    RouteSnapshot r = Far();
+    r.passedExitNextM = nextM;
+    nav.OnFix(Heading(tMs, 30, 0), r);
+    int longs = 0, shorts = 0;
+    // Give the line a few seconds to get said.
+    for (int i = 1; i <= 10; ++i)
+    {
+      nav.OnFix(Heading(tMs + i * 1000.0, 30, 0), Far());
+      for (auto const & l : nav.TakeLines())
+      {
+        longs += SaidLineOf(l.text, "lastExit.long");
+        shorts += SaidLineOf(l.text, "lastExit");
+      }
+    }
+    return std::make_pair(longs, shorts);
+  };
+  for (int i = 0; i < 200; ++i)
+    nav.OnFix(Heading(i * 1000.0, 30, 0), Far());
+  nav.TakeLines();
+  // The next exit is 62 miles on: Brandon's pool.
+  CHECK(exitLines(300000, 100000) == std::make_pair(1, 0));
+  // Another long gap ten minutes later: not again so soon.
+  CHECK(exitLines(900000, 100000) == std::make_pair(0, 0));
+  // Half an hour on, a 25 mile gap gets the shorter pool, with the distance.
+  CHECK(exitLines(2200000, 40000) == std::make_pair(0, 1));
+  // Exits every few miles, or the route ends first: nothing to say.
+  CHECK(exitLines(4200000, 10000) == std::make_pair(0, 0));
+  CHECK(exitLines(6200000, -1) == std::make_pair(0, 0));
+}
+
 TEST(TourGuideSkipsSightsBehindOrOffTheRoad)
 {
   Navigator nav(Config());

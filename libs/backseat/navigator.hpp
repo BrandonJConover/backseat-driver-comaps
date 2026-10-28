@@ -95,6 +95,9 @@ struct RouteSnapshot
   /// How far ahead the route bends sharply where there's no maneuver (CurveAheadM()); negative if
   /// not within reach.
   double curveAheadM = -1;
+  /// Set on the one update right after the car drives past a highway exit: how far along the route
+  /// the next exit is. Negative if the trip ends before another exit.
+  std::optional<double> passedExitNextM;
 };
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
@@ -286,6 +289,8 @@ private:
   void TrackFear(Fix const & fix, RouteSnapshot const & route);
   /// "Either there is a new road here or we are completely off course."
   void TrackOffRoad(Fix const & fix);
+  /// "I probably should have told you the exit you just passed is the last one for a hundred miles."
+  void TrackLastExit(double tMs, RouteSnapshot const & route);
   void SayPolice(double tMs);
   void SayLemon(double tMs);
   void SayVenue(double tMs, RouteSnapshot const & route);
@@ -419,6 +424,7 @@ private:
   double m_lastRoadCheckT = -1e18;
   std::optional<double> m_offRoadSince;
   double m_lastOffRoadT = -1e18;
+  double m_lastExitLineT = -1e18;
   bool m_onBridge = false;
   double m_lastBridgeYelpT = -1e18;
   double m_lastCurveYelpT = -1e18;

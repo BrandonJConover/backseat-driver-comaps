@@ -338,6 +338,9 @@ private:
   backseat::Bridge BridgeAt(backseat::LatLon const & at, double bearingDeg) const;
   /// Meters to the nearest mapped car road, up to kRoadSearchM; that far if none, -1 with no map.
   double RoadDistanceAt(backseat::LatLon const & at) const;
+  /// Right after the car drives past a highway exit (staying on the highway): how far along the
+  /// route the next exit is, -1 if the trip ends first. Nothing on every other update.
+  std::optional<double> PassedExitNextM(routing::RoutingSession const & session, double speedMps);
   void CheckBattery(double tMs);
   /// Carries out one command, adding to `heard`; returns the reply to say for it.
   std::string Run(backseat::AppCommand const & command, bool polite, HeardCommand & heard);
@@ -358,6 +361,10 @@ private:
   /// For "Starbucks in Colorado or Starbucks in Alaska?": where the phone is, the first search
   /// after setup asks, then every few searches.
   std::optional<m2::PointD> m_here;
+  /// The highway exit the car is passing, and the last one already counted as passed.
+  std::optional<m2::PointD> m_exitAt;
+  std::optional<m2::PointD> m_exitPassed;
+  double m_exitCheckAt = 0;
   bool m_askStateNext = false;
   int m_searches = 0;
   /// The usual trip AskWhereTo() guessed, waiting for a "yes".

@@ -27,6 +27,7 @@
 #include "geometry/parametrized_segment.hpp"
 
 #include "base/logging.hpp"
+#include "base/timer.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1054,7 +1055,9 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
                                        std::string const & destinationName)
 {
   m_here = mercator::FromLatLon(info.m_latitude, info.m_longitude);
-  auto const route = Snapshot(session, destinationName);
+  auto route = Snapshot(session, destinationName);
+  if (route.state == backseat::RouteState::OnRoute)
+    route.passedExitNextM = PassedExitNextM(session, info.m_speed);
   if (route.state == backseat::RouteState::Inactive && !m_navigator.InTrip())
     return;
   backseat::Fix fix;
@@ -1235,6 +1238,118 @@ std::optional<backseat::Building> BackseatAdapter::BuildingAt(backseat::LatLon c
   if (normalPlaceToStart)
     return std::nullopt;
   return best;
+}
+
+std::optional<double> BackseatAdapter::PassedExitNextM(routing::RoutingSession const & session, double speedMps)
+{
+  // Highway speed only, checked every couple of seconds.
+  double constexpr kHighwayMps = 20;
+  double constexpr kAtExitM = 40;
+  double constexpr kPastExitM = 200;
+  double constexpr kSearchM = 161000;  // 100 miles
+  double constexpr kChunkM = 2000;
+  if (!m_dataSource || !m_here || speedMps < kHighwayMps)
+    return std::nullopt;
+  auto const route = session.GetRouteForTests();
+  if (!route || !route->IsValid() || !route->GetFollowedPolyline().IsValid())
+    return std::nullopt;
+  auto const & followed = route->GetFollowedPolyline();
+  auto const & poly = followed.GetPolyline();
+  auto const iter = followed.GetCurrentIter();
+  // Still on a motorway or trunk (an exit taken puts the route onto the ramp).
+  auto const & segments = route->GetRouteSegments();
+  if (iter.m_ind >= segments.size())
+    return std::nullopt;
+  auto const roadClass = segments[iter.m_ind].GetRoadNameInfo().m_highwayClass;
+  if (roadClass != ftypes::HighwayClass::Motorway && roadClass != ftypes::HighwayClass::Trunk)
+  {
+    m_exitAt.reset();
+    return std::nullopt;
+  }
+
+  static uint32_t const kJunction = classif().GetTypeByPath({"highway", "motorway_junction"});
+  auto const junctionsIn = [&](m2::RectD const & rect, auto && fn)
+  {
+    m_dataSource().ForEachInRect([&](FeatureType & ft)
+    {
+      if (ft.GetGeomType() != feature::GeomType::Point)
+        return;
+      for (uint32_t type : feature::TypesHolder(ft))
+      {
+        ftype::TruncValue(type, 2);
+        if (type == kJunction)
+        {
+          fn(ft.GetCenter());
+          return;
+        }
+      }
+    }, rect, scales::GetUpperScale());
+  };
+
+  // Driving past one: remember it; once it's well behind, it's passed.
+  if (m_exitAt)
+  {
+    if (mercator::DistanceOnEarth(*m_here, *m_exitAt) < kPastExitM)
+      return std::nullopt;
+    m_exitPassed = m_exitAt;
+    m_exitAt.reset();
+  }
+  else
+  {
+    double const now = base::Timer::LocalTime();
+    if (now - m_exitCheckAt < 2)
+      return std::nullopt;
+    m_exitCheckAt = now;
+    junctionsIn(mercator::RectByCenterXYAndSizeInMeters(*m_here, 2 * kAtExitM), [&](m2::PointD const & p)
+    {
+      if (mercator::DistanceOnEarth(*m_here, p) <= kAtExitM &&
+          (!m_exitPassed || mercator::DistanceOnEarth(*m_exitPassed, p) > kPastExitM))
+        m_exitAt = p;
+    });
+    return std::nullopt;
+  }
+
+  // The next exit along the route, a couple of kilometers of route at a time.
+  double along = 0;
+  size_t i = iter.m_ind + 1;
+  while (i < poly.GetSize() && along < kSearchM)
+  {
+    size_t const first = i - 1;
+    m2::RectD rect;
+    rect.Add(poly.GetPoint(first));
+    double chunk = 0;
+    for (; i < poly.GetSize() && chunk < kChunkM; ++i)
+    {
+      chunk += mercator::DistanceOnEarth(poly.GetPoint(i - 1), poly.GetPoint(i));
+      rect.Add(poly.GetPoint(i));
+    }
+    rect.Inflate(mercator::MetersToMercator(kAtExitM), mercator::MetersToMercator(kAtExitM));
+    std::optional<double> found;
+    junctionsIn(rect, [&](m2::PointD const & p)
+    {
+      if (mercator::DistanceOnEarth(*m_exitPassed, p) <= kPastExitM)
+        return;
+      double segAlong = along;
+      for (size_t j = first + 1; j < i; ++j)
+      {
+        m2::ParametrizedSegment<m2::PointD> const seg(poly.GetPoint(j - 1), poly.GetPoint(j));
+        m2::PointD const closest = seg.ClosestPointTo(p);
+        if (mercator::DistanceOnEarth(closest, p) <= kAtExitM)
+        {
+          double const at = segAlong + mercator::DistanceOnEarth(poly.GetPoint(j - 1), closest);
+          if (at > kPastExitM && (!found || at < *found))
+            found = at;
+          break;
+        }
+        segAlong += mercator::DistanceOnEarth(poly.GetPoint(j - 1), poly.GetPoint(j));
+      }
+    });
+    if (found)
+      return found;
+    along += chunk;
+  }
+  // Ran out of route first: the trip ends before another exit, so there's nothing to miss.
+  return along >= kSearchM ? along : -1.0;
 }
 
 double BackseatAdapter::RoadDistanceAt(backseat::LatLon const & at) const
@@ -2006,12 +2121,50 @@ std::optional<backseat::Sight> BackseatAdapter::SightAt(backseat::LatLon const &
   m2::PointD const mid = mercator::GetSmPoint(here, midM * std::sin(headingRad), midM * std::cos(headingRad));
   std::optional<backseat::Sight> best;
   double bestAlong = 0;
+  // Nothing to point at? Then maybe the nothing is the sight: a field beside the road with no
+  // building or business anywhere near on that side gets Brandon's "empty field".
+  static uint32_t const kFarmland = c.GetTypeByPath({"landuse", "farmland"});
+  static uint32_t const kMeadow = c.GetTypeByPath({"landuse", "meadow"});
+  static uint32_t const kGrassland = c.GetTypeByPath({"natural", "grassland"});
+  auto const & isBuilding = ftypes::IsBuildingChecker::Instance();
+  double constexpr kFieldAheadM = 120;
+  double constexpr kFieldSideM = 50;
+  double constexpr kEmptySideM = 200;
+  auto const sideProbe = [&](bool left)
+  {
+    double const sideRad = headingRad + (left ? -M_PI / 2 : M_PI / 2);
+    m2::PointD const ahead =
+        mercator::GetSmPoint(here, kFieldAheadM * std::sin(headingRad), kFieldAheadM * std::cos(headingRad));
+    return mercator::GetSmPoint(ahead, kFieldSideM * std::sin(sideRad), kFieldSideM * std::cos(sideRad));
+  };
+  m2::PointD const probe[2] = {sideProbe(true), sideProbe(false)};
+  bool field[2] = {false, false};
+  bool busy[2] = {false, false};
   m_dataSource().ForEachInRect([&](FeatureType & ft)
   {
     if (ft.GetGeomType() == feature::GeomType::Line)
       return;
+    feature::TypesHolder const types(ft);
+    if (ft.GetGeomType() == feature::GeomType::Area &&
+        (types.Has(kFarmland) || types.Has(kMeadow) || types.Has(kGrassland)))
+    {
+      m2::RectD const r = ft.GetLimitRect(scales::GetUpperScale());
+      for (int i = 0; i < 2; ++i)
+        field[i] = field[i] || r.IsPointInside(probe[i]);
+      return;
+    }
+    {
+      m2::PointD const where = feature::GetCenter(ft);
+      double const distance = mercator::DistanceOnEarth(here, where);
+      double const toIt = std::atan2(where.x - here.x, where.y - here.y) * 180 / M_PI;
+      double const off = std::fmod(toIt - bearingDeg + 540.0, 360.0) - 180;
+      double const along = distance * std::cos(off * M_PI / 180);
+      double const beside = std::fabs(distance * std::sin(off * M_PI / 180));
+      if (along > -50 && along < kAheadMaxM && beside < kEmptySideM && (isBuilding(types) || ft.HasName()))
+        busy[off < 0 ? 0 : 1] = true;
+    }
     std::optional<std::string> kind;
-    for (uint32_t type : feature::TypesHolder(ft))
+    for (uint32_t type : types)
     {
       uint32_t two = type;
       ftype::TruncValue(two, 2);
@@ -2046,7 +2199,18 @@ std::optional<backseat::Sight> BackseatAdapter::SightAt(backseat::LatLon const &
     auto const ll = mercator::ToLatLon(where);
     best = backseat::Sight{chain ? "a " + name : name, off < 0, backseat::LatLon{ll.m_lat, ll.m_lon}, *kind};
     bestAlong = along;
-  }, mercator::RectByCenterXYAndSizeInMeters(mid, midM + kBesideM), scales::GetUpperScale());
+  }, mercator::RectByCenterXYAndSizeInMeters(mid, midM + kEmptySideM), scales::GetUpperScale());
+  if (!best)
+  {
+    for (int i = 0; i < 2; ++i)
+    {
+      if (!field[i] || busy[i])
+        continue;
+      // Said once a trip (the navigator never repeats a sight's name), as the car passes the spot.
+      auto const ll = mercator::ToLatLon(probe[i]);
+      return backseat::Sight{"the field", i == 0, backseat::LatLon{ll.m_lat, ll.m_lon}, "nowhere"};
+    }
+  }
   return best;
 }
 

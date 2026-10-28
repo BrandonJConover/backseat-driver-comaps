@@ -75,6 +75,11 @@ double constexpr kOffRoadForMs = 12000;
 double constexpr kOffRoadMinMps = 6;
 /// ...and said at most this often.
 double constexpr kOffRoadEveryMs = 300000;
+/// The next highway exit this far out makes the one just passed worth a remark...
+double constexpr kLastExitM = 32187;  // 20 miles
+/// ...and this far out gets Brandon's "last one for a hundred miles".
+double constexpr kLastExitLongM = 80467;  // 50 miles
+double constexpr kLastExitEveryMs = 1800000;
 /// Lost this many times in one trip, the GPS suggests a car that drives itself.
 int constexpr kAutopilotAfterReroutes = 3;
 /// The second time lost on a trip, the GPS wishes the driver's partner were driving.
@@ -402,6 +407,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackTraffic(fix, route);
   TrackFear(fix, route);
   TrackOffRoad(fix);
+  TrackLastExit(fix.tMs, route);
   TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
   TrackLongDrive(fix.tMs, route);
   TrackSights(fix, route);
@@ -1500,6 +1506,21 @@ static std::string CarWeight(Units units)
 {
   // A typical car or small SUV.
   return units == Units::Mph ? "4,000 pounds" : "1,800 kilograms";
+}
+
+void Navigator::TrackLastExit(double tMs, RouteSnapshot const & route)
+{
+  if (!route.passedExitNextM)
+    return;
+  double const gap = *route.passedExitNextM;
+  Trace("nav.exitPassed", {{"next_m", LogNum(gap, 0)}});
+  if (gap < kLastExitM || tMs - m_lastExitLineT < kLastExitEveryMs)
+    return;
+  m_lastExitLineT = tMs;
+  // Whole miles or kilometers; "the next 100 miles" when the search ran out before finding one.
+  double const unitM = m_config.units == Units::Mph ? 1609.344 : 1000;
+  std::string const distance = FormatDistance(JsRound(gap / unitM) * unitM, m_config.units);
+  SayLine(tMs, Category::LongDrive, gap >= kLastExitLongM ? "lastExit.long" : "lastExit", {{"distance", distance}});
 }
 
 void Navigator::TrackOffRoad(Fix const & fix)
