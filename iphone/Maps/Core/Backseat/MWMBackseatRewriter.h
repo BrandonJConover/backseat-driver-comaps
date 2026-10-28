@@ -139,6 +139,11 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 + (NSString *)mileageTurnedOn;
 /// The GPS's own name, the voice the driver picked ("Echo"), for the fake phone calls.
 + (void)setGpsName:(NSString *)name;
+/// The last trip's report card, for the arrival card; nil until a trip reaches its destination in
+/// this app run. Keys: at (epoch seconds), letter, quip, destination, instructionsScore,
+/// drivingScore, onTime, late, missed, wrongWay, reroutes, speedingSeconds, maxOverLimit,
+/// hardBrakes, hardAccels, expectedMin, actualMin, and previousLetter when there was a trip before.
+@property(class, nonatomic, readonly, nullable) NSDictionary<NSString *, id> * lastTripReport;
 /// How wound up the GPS is this trip, 0-100 (0 with no trip).
 @property(class, nonatomic, readonly) NSInteger frustration;
 /// The last mileage line asked a question; listen once and pass the answer to +mileageAnswer:.

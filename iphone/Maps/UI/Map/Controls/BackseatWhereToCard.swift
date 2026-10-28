@@ -6,10 +6,6 @@ import SwiftUI
 struct BackseatWhereToCard: View {
     // MARK: Properties
 
-    /// The color scheme of the environment
-    @Environment(\.colorScheme) private var colorScheme
-
-
     /// The scene phase of the environment
     @Environment(\.scenePhase) private var scenePhase
 
@@ -49,140 +45,195 @@ struct BackseatWhereToCard: View {
     private let micSize: CGFloat = 60
 
 
+    /// Under the title: a different jab each time the card comes back
+    @State private var tagline: String = Self.taglines[0]
+
+
+    private static let taglines = [
+        "I'll decide how badly you get there.",
+        "Somewhere close. I don't have all day.",
+        "Pick a place. I'll pick apart how you get there.",
+        "Go on. Surprise me.",
+    ]
+
+
+    /// The night-drive palette, as SwiftUI colors
+    private enum Palette {
+        static let card = Color(uiColor: BackseatTheme.card)
+        static let raised = Color(uiColor: BackseatTheme.raised)
+        static let line = Color(uiColor: BackseatTheme.line)
+        static let text = Color(uiColor: BackseatTheme.text)
+        static let muted = Color(uiColor: BackseatTheme.muted)
+        static let accent = Color(uiColor: BackseatTheme.accent)
+        static let hot = Color(uiColor: BackseatTheme.hot)
+        static let ink = Color(uiColor: BackseatTheme.ink)
+    }
+
+
     /// The actual view
     var body: some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: isListening ? "Listening…" : "Where to?")
+                        .font(Font(BackseatTheme.number(30)))
+                        .foregroundStyle(Palette.text)
+
+                    Text(verbatim: tagline)
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+
+                Spacer(minLength: 0)
+
+                // Draw a route from here with a finger
+                Button {
+                    BackseatSketch.open()
+                } label: {
+                    Image(systemName: "scribble")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Palette.text)
+                        .frame(width: 44, height: 44)
+                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.raised))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(verbatim: "Draw route"))
+            }
+
+            // The big yellow mic: tap and say where
             Button {
                 BackseatListener.shared.toggle()
             } label: {
-                Image(systemName: isListening ? "waveform" : "mic.fill")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: micSize, height: micSize)
-                    .background(Circle().fill(isListening ? Color.red : Color.accentColor))
-                    .shadow(radius: 2)
+                HStack(spacing: 12) {
+                    Image(systemName: isListening ? "waveform" : "mic.fill")
+                        .font(.body.weight(.bold))
+                        .foregroundStyle(isListening ? Palette.hot : Palette.accent)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(Palette.ink))
+
+                    Text(verbatim: isListening ? "Listening. Go ahead." : "Tap and tell me")
+                        .font(.headline)
+
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(Palette.ink)
+                .padding(.horizontal, 12)
+                .frame(height: micSize)
+                .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(isListening ? Palette.hot : Palette.accent))
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(verbatim: isListening ? "Stop listening" : "Say where to"))
 
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(verbatim: isListening ? "Listening…" : "Where to?")
-                        .font(.headline)
+            // After a trip: one tap back the way you came.
+            if let returnTrip {
+                Button {
+                    BackseatReturnTrip.headBack()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(.body.weight(.bold))
+                            .foregroundStyle(Palette.accent)
 
-                    Spacer(minLength: 0)
-
-                    // Draw a route from here with a finger
-                    Button {
-                        BackseatSketch.open()
-                    } label: {
-                        Label {
-                            Text(verbatim: "Draw route")
-                        } icon: {
-                            Image(systemName: "scribble")
-                        }
-                        .font(.subheadline.weight(.medium))
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 36)
-                        .background(Capsule().fill(Color(uiColor: .secondarySystemBackground)))
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                // After a trip: one tap back the way you came.
-                if let returnTrip {
-                    Button {
-                        BackseatReturnTrip.headBack()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.uturn.backward")
-                                .imageScale(.small)
-
+                        VStack(alignment: .leading, spacing: 1) {
                             Text(verbatim: returnTrip.name == "Where you started" ? "Head back" : "Head back to \(returnTrip.name)")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(Palette.text)
+                                .lineLimit(1)
+
+                            Text(verbatim: "One tap. Even you can manage that.")
+                                .font(.caption)
+                                .foregroundStyle(Palette.muted)
                                 .lineLimit(1)
                         }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 44)
-                        .background(Capsule().fill(Color.accentColor))
-                        .contentShape(Capsule())
+
+                        Spacer(minLength: 0)
+
+                        Text(verbatim: "Go")
+                            .font(.subheadline.weight(.heavy))
+                            .foregroundStyle(Palette.accent)
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 52)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Palette.accent, lineWidth: 1.5))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(verbatim: "Head back to \(returnTrip.name)"))
+
+                // Came on a saved route: the same roads the other way.
+                if let saved = returnTrip.savedRoute {
+                    Button {
+                        BackseatReturnTrip.headBackSameWay()
+                    } label: {
+                        capsule(symbol: "arrow.triangle.swap", text: "Same way back (\(saved.name))")
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(Text(verbatim: "Head back to \(returnTrip.name)"))
-
-                    // Came on a saved route: the same roads the other way.
-                    if let saved = returnTrip.savedRoute {
-                        Button {
-                            BackseatReturnTrip.headBackSameWay()
-                        } label: {
-                            capsule(symbol: "arrow.triangle.swap", text: "Same way back (\(saved.name))")
-                        }
-                        .buttonStyle(.plain)
-                    }
                 }
+            }
 
-                // Drawn routes saved for next time. Long press to rename or delete.
-                if !savedRoutes.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(savedRoutes) { route in
-                                Button {
-                                    BackseatSavedRoutes.start(route)
-                                } label: {
-                                    capsule(symbol: "scribble", text: route.name)
-                                }
-                                .buttonStyle(.plain)
-                                .contextMenu {
-                                    Button {
-                                        newName = route.name
-                                        renaming = route
-                                    } label: {
-                                        Label(title: { Text(verbatim: "Rename") }, icon: { Image(systemName: "pencil") })
-                                    }
-
-                                    Button(role: .destructive) {
-                                        BackseatSavedRoutes.delete(route)
-                                    } label: {
-                                        Label(title: { Text(verbatim: "Delete") }, icon: { Image(systemName: "trash") })
-                                    }
-                                }
+            // Drawn routes saved for next time. Long press to rename or delete.
+            if !savedRoutes.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(savedRoutes) { route in
+                            Button {
+                                BackseatSavedRoutes.start(route)
+                            } label: {
+                                capsule(symbol: "scribble", text: route.name)
                             }
-                        }
-                    }
-                }
-
-                if places.isEmpty {
-                    Text(verbatim: "No trips yet. I'm sure you'll get lost somewhere memorable.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(places) { place in
+                            .buttonStyle(.plain)
+                            .contextMenu {
                                 Button {
-                                    MWMBackseatRewriter.route(
-                                        to: CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude),
-                                        title: place.label)
+                                    newName = route.name
+                                    renaming = route
                                 } label: {
-                                    chip(for: place)
+                                    Label(title: { Text(verbatim: "Rename") }, icon: { Image(systemName: "pencil") })
                                 }
-                                .buttonStyle(.plain)
+
+                                Button(role: .destructive) {
+                                    BackseatSavedRoutes.delete(route)
+                                } label: {
+                                    Label(title: { Text(verbatim: "Delete") }, icon: { Image(systemName: "trash") })
+                                }
                             }
                         }
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if places.isEmpty {
+                Text(verbatim: "No trips yet. I'm sure you'll get lost somewhere memorable.")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(places) { place in
+                            Button {
+                                MWMBackseatRewriter.route(
+                                    to: CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude),
+                                    title: place.label)
+                            } label: {
+                                tile(for: place)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
         }
-        .padding(12)
+        .padding(16)
         .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color(uiColor: .systemBackground).opacity(colorScheme == .dark ? 0.92 : 0.97))
-                .shadow(radius: 3)
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .fill(Palette.card)
+                .shadow(color: .black.opacity(0.45), radius: 14, y: 8)
         }
+        .environment(\.colorScheme, .dark)
         .alert(Text(verbatim: "Rename route"), isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField(text: $newName) {
                 Text(verbatim: "Name")
@@ -212,37 +263,48 @@ struct BackseatWhereToCard: View {
     }
 
 
-    /// A saved route or the way back: an icon and a name on a quiet capsule
+    /// A saved route or the way back: an icon and a name on a dark capsule
     private func capsule(symbol: String, text: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: symbol)
                 .imageScale(.small)
+                .foregroundStyle(Palette.accent)
 
             Text(verbatim: text)
                 .lineLimit(1)
+                .foregroundStyle(Palette.text)
         }
         .font(.subheadline.weight(.medium))
         .padding(.horizontal, 14)
         .frame(minHeight: 44)
-        .background(Capsule().fill(Color(uiColor: .secondarySystemBackground)))
+        .background(Capsule().fill(Palette.raised))
         .contentShape(Capsule())
     }
 
 
-    /// One place: its icon, name and usual drive time
-    private func chip(for place: Place) -> some View {
-        HStack(spacing: 6) {
+    /// One place: a yellow icon over its name and usual drive time
+    private func tile(for place: Place) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             Image(systemName: place.label == "Home" ? "house.fill" : place.label == "Work" ? "briefcase.fill" : "mappin")
-                .imageScale(.small)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Palette.accent)
 
-            Text(verbatim: place.minutes > 0 ? "\(place.label) · \(place.minutes) min" : place.label)
+            Text(verbatim: place.label)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(Palette.text)
                 .lineLimit(1)
+
+            if place.minutes > 0 {
+                Text(verbatim: "\(place.minutes) min")
+                    .font(.caption)
+                    .foregroundStyle(Palette.muted)
+            }
         }
-        .font(.subheadline.weight(.medium))
-        .padding(.horizontal, 14)
-        .frame(minHeight: 44)
-        .background(Capsule().fill(Color(uiColor: .secondarySystemBackground)))
-        .contentShape(Capsule())
+        .padding(12)
+        .frame(minWidth: 96, minHeight: 76, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(uiColor: BackseatTheme.asphalt)))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Palette.line, lineWidth: 1))
+        .contentShape(Rectangle())
     }
 
 
@@ -256,6 +318,7 @@ struct BackseatWhereToCard: View {
                          minutes: (route["minutes"] as? NSNumber)?.intValue ?? 0)
         }
         isListening = BackseatListener.shared.isListening
+        tagline = Self.taglines.randomElement() ?? tagline
         returnTrip = BackseatReturnTrip.origin
         savedRoutes = BackseatSavedRoutes.all
     }

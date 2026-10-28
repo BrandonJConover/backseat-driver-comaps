@@ -51,6 +51,7 @@ NSString *titleForButton(MWMActionBarButtonType type, BOOL isSelected) {
 @property(weak, nonatomic) IBOutlet UILabel *label;
 @property(weak, nonatomic) IBOutlet UIView *extraBackground;
 @property(weak, nonatomic) id<MWMActionBarButtonDelegate> delegate;
+@property(nonatomic) UIView *startPill;
 
 @end
 
@@ -125,9 +126,7 @@ NSString *titleForButton(MWMActionBarButtonType type, BOOL isSelected) {
       [self.button setImage:[UIImage imageNamed:@"ic_route_from"] forState:UIControlStateNormal];
       break;
     case MWMActionBarButtonTypeRouteTo:
-      [self.button setImage:[UIImage imageNamed:@"ic_route_to"] forState:UIControlStateNormal];
-      if ([self needsToHighlightRouteToButton])
-        self.button.coloring = MWMButtonColoringBlue;
+      [self setupStartButton];
       break;
     case MWMActionBarButtonTypeMore:
       [self.button setImage:[UIImage systemImageNamed:@"ellipsis"] forState:UIControlStateNormal];
@@ -211,6 +210,44 @@ NSString *titleForButton(MWMActionBarButtonType type, BOOL isSelected) {
   UIImageView *animationIV = btn.imageView;
   animationIV.animationImages = animationImages;
   animationIV.animationRepeatCount = 1;
+}
+
+// Backseat: Start is a road-sign yellow pill with a dark arrow and label, so it's the obvious tap.
+- (void)setupStartButton {
+  UIImageSymbolConfiguration * config =
+      [UIImageSymbolConfiguration configurationWithPointSize:20 weight:UIImageSymbolWeightBold];
+  UIImage * arrow = [[UIImage systemImageNamed:@"location.north.fill" withConfiguration:config]
+      imageWithTintColor:MWMBackseatTheme.ink renderingMode:UIImageRenderingModeAlwaysOriginal];
+  [self.button setImage:arrow forState:UIControlStateNormal];
+  if (!self.startPill) {
+    UIView * pill = [[UIView alloc] init];
+    pill.translatesAutoresizingMaskIntoConstraints = NO;
+    pill.userInteractionEnabled = NO;
+    pill.backgroundColor = MWMBackseatTheme.accent;
+    pill.layer.cornerRadius = 14;
+    pill.layer.cornerCurve = kCACornerCurveContinuous;
+    [self insertSubview:pill atIndex:0];
+    [NSLayoutConstraint activateConstraints:@[
+      [pill.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:6],
+      [pill.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-6],
+      [pill.topAnchor constraintEqualToAnchor:self.topAnchor constant:4],
+      [pill.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-4],
+    ]];
+    self.startPill = pill;
+  }
+  [self styleStartLabel];
+}
+
+- (void)styleStartLabel {
+  self.label.textColor = MWMBackseatTheme.ink;
+  self.label.font = [MWMBackseatTheme bodyFont:13 weight:UIFontWeightHeavy];
+}
+
+// The label's style sheet runs first; Start keeps its dark label on yellow after a theme change.
+- (void)applyTheme {
+  [super applyTheme];
+  if (self.type == MWMActionBarButtonTypeRouteTo)
+    [self styleStartLabel];
 }
 
 - (BOOL)needsToHighlightRouteToButton {

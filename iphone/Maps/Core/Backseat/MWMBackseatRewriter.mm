@@ -653,6 +653,36 @@ static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == M
   GetFramework().GetRoutingManager().GetBackseat().SetGpsName(name.UTF8String ?: "Echo");
 }
 
++ (nullable NSDictionary<NSString *, id> *)lastTripReport
+{
+  auto const last = GetFramework().GetRoutingManager().GetBackseat().LastTripReport();
+  if (!last)
+    return nil;
+  auto const & r = last->report;
+  NSMutableDictionary * out = [@{
+    @"at": @(last->at),
+    @"letter": @(r.overall.letter.c_str()),
+    @"quip": @(r.quip.c_str()),
+    @"destination": @(last->record.destination.c_str()),
+    @"instructionsScore": @(r.instructions.score),
+    @"drivingScore": @(r.driving.score),
+    @"onTime": @(r.onTime),
+    @"late": @(r.late),
+    @"missed": @(r.missed),
+    @"wrongWay": @(r.wrongWay),
+    @"reroutes": @(r.reroutes),
+    @"speedingSeconds": @(r.speedingSeconds),
+    @"maxOverLimit": @(r.maxOverLimit),
+    @"hardBrakes": @(r.hardBrakes),
+    @"hardAccels": @(r.hardAccels),
+    @"expectedMin": @(last->record.expectedMinutes),
+    @"actualMin": @(last->record.actualMinutes),
+  } mutableCopy];
+  if (last->previousGrade)
+    out[@"previousLetter"] = @(last->previousGrade->c_str());
+  return out;
+}
+
 + (NSInteger)frustration
 {
   return GetFramework().GetRoutingManager().BackseatFrustration();

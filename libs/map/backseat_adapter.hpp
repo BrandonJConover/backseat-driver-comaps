@@ -317,6 +317,22 @@ public:
 
   /// One entry per line of the last TakeNotifications() batch, in the same order.
   std::vector<LineVoice> const & LastLineVoices() const { return m_lastVoices; }
+
+  /// The report card of the last trip that reached its destination in this app run.
+  struct LastTrip
+  {
+    /// Seconds since the epoch, when the report was made.
+    double at = 0;
+    backseat::TripRecord record;
+    backseat::TripReport report;
+    /// The grade of the trip before it (to the same place if there was one).
+    std::optional<std::string> previousGrade;
+  };
+  std::optional<LastTrip> LastTripReport() const
+  {
+    std::lock_guard<std::mutex> lock(m_lastTripMutex);
+    return m_lastTrip;
+  }
   /// The GPS's own name, the voice the driver picked ("Echo"): the fake phone calls answer with it.
   void SetGpsName(std::string const & name) { m_navigator.SetGpsName(name); }
   /// A caller's voice to warm up, once, when a call that will put them on starts. Empty otherwise.
@@ -450,4 +466,6 @@ private:
   mutable int m_secondsLeft = -1;
   std::string m_lastCallerVoice;
   std::string m_callerVoiceToWarm;
+  mutable std::mutex m_lastTripMutex;
+  std::optional<LastTrip> m_lastTrip;
 };

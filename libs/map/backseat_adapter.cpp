@@ -479,9 +479,22 @@ void BackseatAdapter::ReloadPersonality()
 
 BackseatAdapter::BackseatAdapter()
   : m_debugLog({.dir = GetPlatform().SettingsDir()})
-  , m_navigator({}, LoadTrips(), [](backseat::TripRecord const & r, backseat::TripReport const & report)
+  , m_navigator({}, LoadTrips(), [this](backseat::TripRecord const & r, backseat::TripReport const & report)
 {
   LOG(LINFO, ("Backseat Driver trip to", r.destination, "graded", report.overall.letter));
+  // The grade before this one: the last trip to the same place, else the last trip at all.
+  std::optional<std::string> previous;
+  for (auto const & past : m_navigator.History())
+  {
+    if (past.endedAt >= r.endedAt || past.grade.empty())
+      continue;
+    if (past.routeKey == r.routeKey || !previous)
+      previous = past.grade;
+  }
+  {
+    std::lock_guard<std::mutex> lock(m_lastTripMutex);
+    m_lastTrip = LastTrip{NowMs() / 1000, r, report, previous};
+  }
   AppendTrip(r);
 })
 {
