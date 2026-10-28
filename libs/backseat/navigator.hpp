@@ -8,6 +8,7 @@
 #include "backseat/achievements.hpp"
 #include "backseat/engine.hpp"
 #include "backseat/history.hpp"
+#include "backseat/indoors.hpp"
 #include "backseat/plate_game.hpp"
 #include "backseat/report.hpp"
 #include "backseat/rewriter.hpp"
@@ -164,6 +165,8 @@ struct Fix
   double bearingDeg = -1;
   /// Posted limit for the road, if known.
   std::optional<double> speedLimitMps;
+  /// Horizontal accuracy in meters. Negative when unknown.
+  double accuracyM = -1;
 };
 
 /// Distance along `ahead` (the route from the car onward) to the first sharp bend: where the heading
@@ -197,6 +200,9 @@ public:
   void SetRegionLookup(RegionLookup lookup) { m_regionLookup = std::move(lookup); }
   /// Plates called out in a parking lot don't count ("Hey that's cheating").
   void SetParkingLookup(ParkingLookup lookup) { m_parkingLookup = std::move(lookup); }
+  /// Starting a trip inside a building gets "You drove into a building and then decided it was time
+  /// for directions." (indoors.hpp).
+  void SetBuildingLookup(BuildingLookup lookup) { m_buildingLookup = std::move(lookup); }
   /// Stops next to a traffic light are red lights, not pulling over.
   void SetTrafficLightLookup(TrafficLightLookup lookup) { m_lightLookup = std::move(lookup); }
   /// Names the road to blame a jam on ("I told you to take I-25").
@@ -301,6 +307,9 @@ private:
   /// "Hey did you know there is a curve ahead? I did."
   void TrackCurveAhead(Fix const & fix, RouteSnapshot const & route);
   void TrackMusic(double tMs, RouteSnapshot const & route);
+  /// The trip started indoors: say so, and maybe remark on it once the car gets out.
+  void SayIndoorStart(double tMs, RouteSnapshot const & route);
+  void TrackLeftBuilding(Fix const & fix);
   int Tier() const;
   bool Parked() const;
 
@@ -437,6 +446,11 @@ private:
   ParkingLookup m_parkingLookup;
   /// The last real fix, for judging whether the driver is parked when they talk.
   std::optional<Fix> m_lastFix;
+  /// The last fix, trip or not: where the car is when a trip starts.
+  std::optional<Fix> m_hereFix;
+  BuildingLookup m_buildingLookup;
+  /// This trip started indoors; the "made it out" line is still to come (key, empty if not).
+  std::string m_indoorOutKey;
   std::function<void(PlateLog const &)> m_onPlateLog;
   SaidLog m_said;
   std::function<void(SaidLog const &)> m_onSaid;

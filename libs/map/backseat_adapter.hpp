@@ -317,6 +317,9 @@ private:
   backseat::Control GuessControl(routing::Route const & route, uint32_t turnIndex) const;
   std::optional<backseat::Place> PlaceAt(backseat::LatLon const & at) const;
   bool InParkingLot(backseat::LatLon const & at) const;
+  /// The building whose footprint covers `at`, deepest first. Nothing in a parking garage, carport,
+  /// canopy, gas station or parking lot: starting a trip there is normal.
+  std::optional<backseat::Building> BuildingAt(backseat::LatLon const & at) const;
   std::optional<backseat::Venue> VenueAt(backseat::LatLon const & at) const;
 
 public:

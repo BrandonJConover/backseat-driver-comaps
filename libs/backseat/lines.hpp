@@ -31,6 +31,12 @@ class SaidLog
 public:
   /// A line from `options` not said recently for `key`, chosen by `r` in [0, 1), and remembered.
   std::string const & Pick(std::string const & key, std::vector<std::string> const & options, double r);
+  /// Whether anything for `key` was said before (as far as the log remembers).
+  bool Said(std::string const & key) const
+  {
+    auto const it = m_recent.find(key);
+    return it != m_recent.end() && !it->second.empty();
+  }
 
   /// A value kept with the log, like how many trips have started ("" or 0 when never set).
   std::string Value(std::string const & key) const;

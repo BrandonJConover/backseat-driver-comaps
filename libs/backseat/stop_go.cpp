@@ -4,10 +4,10 @@ namespace backseat
 {
 namespace
 {
-/// Faster than this is rolling (~6 mph), slower than kStoppedMps is stopped; in between keeps
+/// Faster than this is rolling (~6 mph), slower than kStopGoStoppedMps is stopped; in between keeps
 /// the last state so creeping forward a car length doesn't count as a go.
-double constexpr kRollingMps = 2.5;
-double constexpr kStoppedMps = 0.5;
+double constexpr kStopGoRollingMps = 2.5;
+double constexpr kStopGoStoppedMps = 0.5;
 /// The first stop is just the jam; it's the second one onwards that's indecisive.
 int constexpr kRestopsBeforeQuip = 2;
 double constexpr kStandstillMs = 30000;
@@ -20,13 +20,13 @@ void StopGo::Reset() { *this = StopGo(); }
 StopGo::Quip StopGo::Update(double tMs, double mps)
 {
   bool const gapOk = tMs - m_lastQuipT >= kQuipGapMs;
-  if (mps > kRollingMps)
+  if (mps > kStopGoRollingMps)
   {
     m_state = State::Rolling;
     m_standstillSaid = false;
     return Quip::None;
   }
-  if (mps >= kStoppedMps)
+  if (mps >= kStopGoStoppedMps)
   {
     // Inching forward: not a go, but not sitting still either.
     m_stoppedSince = tMs;

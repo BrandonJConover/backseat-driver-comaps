@@ -1,5 +1,6 @@
 #include "map/backseat_adapter.hpp"
 
+#include "backseat/indoors.hpp"
 #include "backseat/route_sketch.hpp"
 #include "backseat/units.hpp"
 #include "backseat/voice_command.hpp"
@@ -1062,6 +1063,7 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
   fix.lon = info.m_longitude;
   fix.speedMps = info.m_speed;
   fix.bearingDeg = info.m_bearing;
+  fix.accuracyM = info.m_horizontalAccuracy > 0 ? info.m_horizontalAccuracy : -1;
   if (route.state != backseat::RouteState::Inactive)
   {
     double const limit = session.GetCurrentSpeedLimit();
@@ -1092,6 +1094,7 @@ void BackseatAdapter::SetDataSource(std::function<DataSource &()> getter)
   m_dataSource = std::move(getter);
   m_navigator.SetPlaceLookup([this](backseat::LatLon const & at) { return PlaceAt(at); });
   m_navigator.SetParkingLookup([this](backseat::LatLon const & at) { return InParkingLot(at); });
+  m_navigator.SetBuildingLookup([this](backseat::LatLon const & at) { return BuildingAt(at); });
   m_navigator.SetSightLookup([this](backseat::LatLon const & at, double bearing) { return SightAt(at, bearing); });
   m_navigator.SetVenueLookup([this](backseat::LatLon const & at) { return VenueAt(at); });
   m_navigator.SetBridgeLookup([this](backseat::LatLon const & at, double bearing) { return BridgeAt(at, bearing); });
@@ -1185,6 +1188,53 @@ backseat::Control BackseatAdapter::GuessControl(routing::Route const & route, ui
   if (from >= RoadRank(ftypes::HighwayClass::Tertiary) && to >= 0 && to < from)
     return backseat::Control::StopSign;
   return backseat::Control::None;
+}
+
+std::optional<backseat::Building> BackseatAdapter::BuildingAt(backseat::LatLon const & p) const
+{
+  if (!m_dataSource)
+    return std::nullopt;
+  m2::PointD const pt = mercator::FromLatLon(p.lat, p.lon);
+  m2::RectD const rect = mercator::RectByCenterXYAndSizeInMeters(pt, 30);
+  auto const & isBuilding = ftypes::IsBuildingChecker::Instance();
+  auto const & c = classif();
+  std::optional<backseat::Building> best;
+  bool normalPlaceToStart = false;
+  m_dataSource().ForEachInRect(
+      [&](FeatureType & ft)
+      {
+        if (ft.GetGeomType() != feature::GeomType::Area)
+          return;
+        feature::TypesHolder const types(ft);
+        bool garage = false;
+        bool parkingLike = false;
+        for (uint32_t const t : types)
+        {
+          std::string const name = c.GetReadableObjectName(t);
+          if (name.starts_with("amenity-parking") || name.starts_with("amenity-fuel") || name == "building-parking" ||
+              name == "building-roof" || name == "building-carport")
+            parkingLike = true;
+          if (name == "building-garage" || name == "building-garages")
+            garage = true;
+        }
+        if (!parkingLike && !isBuilding(types))
+          return;
+        std::vector<backseat::FootprintTriangle> triangles;
+        ft.ForEachTriangle([&](m2::PointD const & a, m2::PointD const & b, m2::PointD const & d)
+                           { triangles.push_back({ToBackseatLatLon(a), ToBackseatLatLon(b), ToBackseatLatLon(d)}); },
+                           FeatureType::BEST_GEOMETRY);
+        auto const depth = backseat::DepthInsideM(triangles, p);
+        if (!depth)
+          return;
+        if (parkingLike)
+          normalPlaceToStart = true;
+        else if (!best || *depth > best->depthM)
+          best = backseat::Building{*depth, garage};
+      },
+      rect, scales::GetUpperScale());
+  if (normalPlaceToStart)
+    return std::nullopt;
+  return best;
 }
 
 double BackseatAdapter::RoadDistanceAt(backseat::LatLon const & at) const

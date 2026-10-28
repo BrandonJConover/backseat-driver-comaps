@@ -15,6 +15,8 @@ set(
   engine.hpp
   history.cpp
   history.hpp
+  indoors.cpp
+  indoors.hpp
   lines.cpp
   lines.hpp
   lines_data.cpp

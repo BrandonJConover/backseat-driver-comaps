@@ -140,6 +140,14 @@ double constexpr kMusicAfterMs = 15 * 60000;
 double constexpr kMusicCheckEveryMs = 15000;
 /// "You call this music?" once it has been playing this long.
 double constexpr kMusicJudgeAfterMs = 45000;
+// Starting indoors: a fix this old still says where the car is. "Home" is within this of the
+// learned home. After the first time, the line comes back on this share of indoor starts.
+double constexpr kIndoorFixFreshMs = 60000;
+double constexpr kIndoorHomeM = 100;
+double constexpr kIndoorRepeatChance = 1.0 / 3;
+// Some indoor starts get a second line once the car is out and rolling, if that's soon.
+double constexpr kIndoorOutChance = 0.5;
+double constexpr kIndoorOutWithinMs = 5 * 60000;
 /// Silence between a setup and its punchline.
 double constexpr kAwkwardPauseMs = 2500;
 
@@ -369,6 +377,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
 {
   // Clocks can step backwards (GPS vs. system time); the engine ignores those samples.
   m_lastT = std::max(m_lastT, fix.tMs);
+  m_hereFix = fix;
   Update(m_lastT, route);
   if (!m_engine || m_arrived)
     return;
@@ -402,6 +411,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackSlowStart(fix);
   TrackCurveAhead(fix, route);
   TrackMusic(fix.tMs, route);
+  TrackLeftBuilding(fix);
   // Fed up for the first time this trip: from now on it's "wise, omnipotent overseer GPS".
   if (!m_titleDemanded && Tier() == 2)
   {
@@ -772,6 +782,7 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   m_said.SetCounter(kTripsStartedKey, static_cast<int>(tripsBefore + 1));
   Trace("trip.number", {{"before", std::to_string(tripsBefore)}});
   SayNav(t, TripGreeting(m_history, m_config.rng, tripsBefore));
+  SayIndoorStart(t, route);
   // Before 5 am: "Are we off to make the donuts?"
   if (KnowsTheDate(t) && LocalTime(t).tm_hour < 5)
     SayLine(t, Category::Holiday, "early.opener");
@@ -815,6 +826,50 @@ void Navigator::TrackLongDrive(double tMs, RouteSnapshot const & route)
   ++m_longDriveSaid;
   int const hours = static_cast<int>(std::lround(m_plan.expectedMinutes / 60));
   SayLine(tMs, Category::LongDrive, next.key, {{"hours", std::to_string(hours) + " hour"}});
+}
+
+void Navigator::SayIndoorStart(double t, RouteSnapshot const & route)
+{
+  m_indoorOutKey.clear();
+  if (!m_buildingLookup)
+    return;
+  // Where the car is now; the route's origin if there's been no fix lately.
+  bool const fresh = m_hereFix && t - m_hereFix->tMs <= kIndoorFixFreshMs;
+  LatLon const here = fresh ? LatLon{m_hereFix->lat, m_hereFix->lon} : route.origin;
+  if (!here.lat && !here.lon)
+    return;
+  auto const home = GuessPlace(m_history, KnownPlace::Home);
+  bool const atHome = home && DistanceM(*home, here) < kIndoorHomeM;
+  auto const verdict = JudgeIndoorStart(m_buildingLookup(here), fresh ? m_hereFix->accuracyM : -1,
+                                        fresh ? m_hereFix->speedMps : -1, atHome);
+  if (verdict == IndoorStart::No)
+    return;
+  std::string const key = verdict == IndoorStart::Garage ? "indoors.garage" : "indoors.building";
+  // The first time always; after that, now and then, so leaving home stays a surprise.
+  double const r = m_config.rng ? m_config.rng() : 0;
+  bool const say = !m_said.Said(key) || r < kIndoorRepeatChance;
+  Trace("indoors", {{"kind", key}, {"home", atHome ? "yes" : "no"}, {"said", say ? "yes" : "no"}});
+  if (!say)
+    return;
+  SayLine(t, Category::LongStop, key);
+  double const r2 = m_config.rng ? m_config.rng() : 0;
+  if (r2 < kIndoorOutChance)
+    m_indoorOutKey = key + ".out";
+}
+
+void Navigator::TrackLeftBuilding(Fix const & fix)
+{
+  if (m_indoorOutKey.empty())
+    return;
+  if (fix.tMs - m_tripStartT > kIndoorOutWithinMs)
+  {
+    m_indoorOutKey.clear();
+    return;
+  }
+  if (fix.speedMps < kResumedMps)
+    return;
+  SayLine(fix.tMs, Category::LongStop, m_indoorOutKey);
+  m_indoorOutKey.clear();
 }
 
 void Navigator::QueueOpener(double tMs, std::string key, Vars vars)
