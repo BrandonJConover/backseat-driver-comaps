@@ -1,7 +1,11 @@
+import CoreLocation
 import UIKit
 
 /// Draw-your-own route: a see-through layer over the map. One finger draws along the roads you
-/// want; two fingers still move the map. Each stroke reshapes the route (MWMRouter+Sketch).
+/// want; two fingers pan and zoom the map without ending the drawing. A stroke that starts where
+/// the last one ended carries that line on, so a route can run past the screen edge: draw, pan,
+/// keep going. Undo takes strokes back one at a time. Each stroke reshapes the route
+/// (MWMRouter+Sketch).
 @objc(MWMRouteSketchOverlay)
 final class RouteSketchOverlay: UIView {
   @objc var onStroke: ((MWMRouteSketchResult) -> Void)?
@@ -11,7 +15,16 @@ final class RouteSketchOverlay: UIView {
   private weak var mapView: UIView?
   private let strokeLayer = CAShapeLayer()
   private var points: [CGPoint] = []
+  /// The stroke being drawn, on the map, so it survives panning.
+  private var coordinates: [CLLocation] = []
+  /// The line so far (all strokes that continued one another), for the next stroke to carry on.
+  private var line: [CLLocation] = []
+  /// This stroke started where the line ended.
+  private var continuing = false
+  /// Two fingers are down: the map gets the touches until they all lift.
+  private var panning = false
   private let path = UIBezierPath()
+  private let undoButton = RouteSketchOverlay.pill("Undo")
   private let eraseButton = RouteSketchOverlay.pill("Erase drawing")
   private let doneButton = RouteSketchOverlay.pill("Done")
 
@@ -29,7 +42,7 @@ final class RouteSketchOverlay: UIView {
     layer.addSublayer(strokeLayer)
 
     let hint = UILabel()
-    hint.text = "Drag along the roads you want. End on empty map to add a stop."
+    hint.text = "Drag along the roads you want. Two fingers move the map; start where you left off to keep going. End on empty map to add a stop."
     hint.font = .preferredFont(forTextStyle: .subheadline)
     hint.textColor = .white
     hint.numberOfLines = 0
@@ -42,19 +55,30 @@ final class RouteSketchOverlay: UIView {
     hintBox.addSubview(hint)
     addSubview(hintBox)
 
+    undoButton.configuration?.image = UIImage(systemName: "arrow.uturn.backward")
+    undoButton.configuration?.imagePadding = 6
+    undoButton.addAction(UIAction { [weak self] _ in
+      guard let self else { return }
+      MWMRouter.undoSketch()
+      // The line before the undone stroke isn't known any more; the next stroke starts fresh.
+      self.line = []
+      self.updateErase()
+    }, for: .touchUpInside)
     eraseButton.addAction(UIAction { [weak self] _ in
       guard let self else { return }
       if MWMRouter.clearSketch() {
         self.onErase?()
       }
+      self.line = []
       self.updateErase()
     }, for: .touchUpInside)
     doneButton.addAction(UIAction { [weak self] _ in
       guard let self else { return }
+      MWMRouter.forgetSketchHistory()
       self.removeFromSuperview()
       self.onDone?()
     }, for: .touchUpInside)
-    let buttons = UIStackView(arrangedSubviews: [eraseButton, doneButton])
+    let buttons = UIStackView(arrangedSubviews: [undoButton, eraseButton, doneButton])
     buttons.axis = .horizontal
     buttons.spacing = 12
     buttons.translatesAutoresizingMaskIntoConstraints = false
@@ -70,6 +94,7 @@ final class RouteSketchOverlay: UIView {
       hint.trailingAnchor.constraint(equalTo: hintBox.trailingAnchor, constant: -12),
       buttons.centerXAnchor.constraint(equalTo: centerXAnchor),
       buttons.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -16),
+      undoButton.heightAnchor.constraint(equalToConstant: 44),
       eraseButton.heightAnchor.constraint(equalToConstant: 44),
       doneButton.heightAnchor.constraint(equalToConstant: 44),
     ])
@@ -100,51 +125,96 @@ final class RouteSketchOverlay: UIView {
 
   private func updateErase() {
     eraseButton.isHidden = !MWMRouter.hasSketch()
+    undoButton.isHidden = !MWMRouter.canUndoSketch()
   }
 
-  // Two fingers move the map underneath; only the buttons and one-finger drawing stay here.
-  override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-    if let event, (event.allTouches?.count ?? 0) > 1 {
-      return false
-    }
-    return super.point(inside: point, with: event)
+  /// How close to the end of the line a new stroke must start to carry it on.
+  private static let continueWithin: CGFloat = 44
+
+  private func coordinate(at point: CGPoint) -> CLLocation? {
+    guard let mapView else { return nil }
+    let c = MWMRouter.coordinate(at: convert(point, to: mapView), in: mapView)
+    return CLLocation(latitude: c.latitude, longitude: c.longitude)
   }
+
+  // Two fingers go to the map (pan, pinch) for as long as they're down; the stroke in progress, if
+  // any, is dropped rather than drawn.
 
   override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-    guard touches.count == 1, let touch = touches.first else { return }
+    if panning || (event?.allTouches?.count ?? touches.count) > 1 {
+      if !panning {
+        panning = true
+        points = []
+        coordinates = []
+        fadeStroke()
+      }
+      next?.touchesBegan(touches, with: event)
+      return
+    }
+    guard let touch = touches.first else { return }
+    let start = touch.location(in: self)
     strokeLayer.removeAllAnimations()
     strokeLayer.opacity = 1
-    points = [touch.location(in: self)]
+    points = [start]
+    coordinates = coordinate(at: start).map { [$0] } ?? []
+    continuing = false
+    if let end = line.last, let mapView {
+      let endOnScreen = convert(MWMRouter.point(for: end.coordinate, in: mapView), from: mapView)
+      continuing = hypot(endOnScreen.x - start.x, endOnScreen.y - start.y) <= Self.continueWithin
+    }
     path.removeAllPoints()
-    path.move(to: points[0])
+    path.move(to: start)
     strokeLayer.path = path.cgPath
   }
 
   override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+    if panning {
+      next?.touchesMoved(touches, with: event)
+      return
+    }
     guard !points.isEmpty, let touch = touches.first else { return }
     for coalesced in event?.coalescedTouches(for: touch) ?? [touch] {
       let p = coalesced.location(in: self)
       points.append(p)
+      if let c = coordinate(at: p) { coordinates.append(c) }
       path.addLine(to: p)
     }
     strokeLayer.path = path.cgPath
   }
 
   override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-    defer { points = [] }
-    guard points.count >= 2, let mapView else {
+    if panning {
+      next?.touchesEnded(touches, with: event)
+      let stillDown = (event?.allTouches ?? []).filter { $0.phase != .ended && $0.phase != .cancelled }
+      if stillDown.isEmpty { panning = false }
+      return
+    }
+    defer {
+      points = []
+      coordinates = []
+    }
+    guard coordinates.count >= 2, let mapView else {
       fadeStroke()
       return
     }
-    let inMap = points.map { NSValue(cgPoint: convert($0, to: mapView)) }
-    let result = MWMRouter.applySketch(inMap, in: mapView)
+    let previous = continuing ? line : []
+    let result = MWMRouter.applySketchCoordinates(coordinates, previous: previous, in: mapView)
+    if result.contains(.applied) {
+      line = previous + coordinates
+    }
     fadeStroke()
     updateErase()
     onStroke?(result)
   }
 
   override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+    if panning {
+      next?.touchesCancelled(touches, with: event)
+      panning = false
+      return
+    }
     points = []
+    coordinates = []
     fadeStroke()
   }
 
@@ -171,6 +241,7 @@ final class RouteSketchOverlay: UIView {
     overlay.frame = controller.view.bounds
     overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     overlay.onErase = { say(MWMBackseatRewriter.sketchCleared()) }
+    MWMRouter.forgetSketchHistory()
     controller.view.addSubview(overlay)
   }
 
