@@ -49,6 +49,7 @@
 #import "MWMRouteManagerPointType.h"
 #import "MWMRouter.h"
 #import "MWMRouter+Sketch.h"
+#import "MWMRouter+Plan.h"
 #import "MWMRouterResultCode.h"
 #import "MWMRouterTransitStepInfo.h"
 #import "MWMRoutingManager.h"

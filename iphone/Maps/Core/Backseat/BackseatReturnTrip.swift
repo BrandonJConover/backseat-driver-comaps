@@ -78,6 +78,6 @@ import CoreLocation
   /// Drives the saved route the trip took, the other way, back to where it started.
   static func headBackSameWay() {
     guard let origin, let saved = origin.savedRoute else { return }
-    BackseatSavedRoutes.drive(saved.reversed(to: origin.coordinate))
+    BackseatSavedRoutes.drive(saved, backwards: true, endingAt: origin.coordinate)
   }
 }

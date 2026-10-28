@@ -92,7 +92,7 @@ struct BackseatWhereToCard: View {
                 Button {
                     BackseatSketch.open()
                 } label: {
-                    Image(systemName: "scribble")
+                    Image(systemName: "hand.tap")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(Palette.text)
                         .frame(width: 44, height: 44)
@@ -100,7 +100,7 @@ struct BackseatWhereToCard: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(BackseatPressStyle())
-                .accessibilityLabel(Text(verbatim: "Draw route"))
+                .accessibilityLabel(Text(verbatim: "Plan route"))
             }
 
             // The big yellow mic: tap and say where
@@ -187,6 +187,14 @@ struct BackseatWhereToCard: View {
                             }
                             .buttonStyle(BackseatPressStyle())
                             .contextMenu {
+                                    Button { BackseatSavedRoutes.drive(route, backwards: false) } label: {
+                                        Label(title: { Text(verbatim: "Drive it forwards") }, icon: { Image(systemName: "arrow.right") })
+                                    }
+
+                                    Button { BackseatSavedRoutes.drive(route, backwards: true) } label: {
+                                        Label(title: { Text(verbatim: "Drive it backwards") }, icon: { Image(systemName: "arrow.left") })
+                                    }
+
                                 Button {
                                     newName = route.name
                                     renaming = route
