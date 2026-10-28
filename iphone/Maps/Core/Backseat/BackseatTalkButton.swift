@@ -8,32 +8,24 @@ import UIKit
 
   static let navigationVisibilityChanged = Notification.Name("BackseatNavigationVisibilityChanged")
 
-  /// A round mic button styled like the other map buttons.
+  /// The round yellow mic.
   static func make() -> UIButton {
-    var config = UIButton.Configuration.filled()
-    config.image = UIImage(systemName: "mic.fill")
-    config.cornerStyle = .capsule
-    config.baseBackgroundColor = .systemBackground
-    config.baseForegroundColor = .label
-    let button = UIButton(configuration: config)
+    let button = UIButton(configuration: .filled())
+    BackseatTheme.styleTalkButton(button)
     button.accessibilityLabel = "Talk to Backseat Driver"
-    button.layer.shadowColor = UIColor.black.cgColor
-    button.layer.shadowOpacity = 0.25
-    button.layer.shadowRadius = 3
-    button.layer.shadowOffset = CGSize(width: 0, height: 1)
     button.addAction(UIAction { _ in BackseatListener.shared.toggle() }, for: .touchUpInside)
     followListening(button)
     return button
   }
 
-  /// Turns `button` red while the GPS is listening.
+  /// Turns `button` hot orange while the GPS is listening, yellow otherwise.
   static func followListening(_ button: UIButton) {
     NotificationCenter.default.addObserver(forName: BackseatListener.listeningChanged, object: nil, queue: .main) {
       [weak button] _ in
       guard let button else { return }
       let listening = BackseatListener.shared.isListening
-      button.configuration?.baseBackgroundColor = listening ? .systemRed : .systemBackground
-      button.configuration?.baseForegroundColor = listening ? .white : .label
+      button.configuration?.baseBackgroundColor = listening ? BackseatTheme.hot : BackseatTheme.accent
+      button.configuration?.baseForegroundColor = BackseatTheme.ink
     }
   }
 
@@ -43,6 +35,7 @@ import UIKit
     BackseatHooks.install()
     BackseatReturnTrip.install()
     BackseatDriveOverlay.install(in: view)
+    BackseatCaption.install(in: view)
     BackseatSketch.installPreviewButton(in: view)
     // The "Where to?" card has the mic now.
     if !showsMapButton { return }
@@ -62,41 +55,61 @@ import UIKit
   }
 }
 
-/// While a route is followed: a big speed-against-the-limit pill that turns red when over, and a
-/// one-tap Report button, on the leading edge of the map. Added on top of CoMaps' own navigation
-/// views, which it leaves alone; remove the install call to take it out.
+/// While a route is followed: a speed card (a real SPEED LIMIT sign next to your speed, which goes
+/// orange when over), and square Report and Draw buttons, on the leading edge of the map. Added on
+/// top of CoMaps' own navigation views; remove the install call to take it out.
 final class BackseatDriveOverlay: NSObject {
   private static var stack: UIStackView?
-  private static var pill: UILabel?
+  private static var sign: BackseatSpeedLimitSign?
+  private static var speedLabel: UILabel?
+  private static var unitLabel: UILabel?
+  private static var speedCard: UIView?
   private static var draw: UIButton?
   private static var timer: Timer?
 
   static func install(in view: UIView) {
-    let pill = UILabel()
-    pill.font = .monospacedDigitSystemFont(ofSize: 22, weight: .bold)
-    pill.textAlignment = .center
-    pill.layer.cornerRadius = 22
-    pill.layer.masksToBounds = true
-    pill.layer.borderWidth = 3
-    pill.accessibilityLabel = "Speed and speed limit"
+    let sign = BackseatSpeedLimitSign()
+    let speedLabel = UILabel()
+    speedLabel.font = BackseatTheme.number(40)
+    speedLabel.textColor = BackseatTheme.text
+    speedLabel.textAlignment = .center
+    let unitLabel = UILabel()
+    unitLabel.font = BackseatTheme.body(12, weight: .semibold)
+    unitLabel.textColor = BackseatTheme.muted
+    unitLabel.textAlignment = .center
+    let speedColumn = UIStackView(arrangedSubviews: [speedLabel, unitLabel])
+    speedColumn.axis = .vertical
+    speedColumn.alignment = .center
+    speedColumn.spacing = -4
+    let speedRow = UIStackView(arrangedSubviews: [sign, speedColumn])
+    speedRow.axis = .horizontal
+    speedRow.alignment = .center
+    speedRow.spacing = 10
+    speedRow.translatesAutoresizingMaskIntoConstraints = false
+    let speedCard = UIView()
+    BackseatTheme.styleCard(speedCard, radius: BackseatTheme.buttonRadius)
+    speedCard.layer.borderWidth = 2
+    speedCard.layer.borderColor = UIColor.clear.cgColor
+    speedCard.addSubview(speedRow)
+    speedCard.isAccessibilityElement = true
+    NSLayoutConstraint.activate([
+      speedRow.topAnchor.constraint(equalTo: speedCard.topAnchor, constant: 8),
+      speedRow.bottomAnchor.constraint(equalTo: speedCard.bottomAnchor, constant: -8),
+      speedRow.leadingAnchor.constraint(equalTo: speedCard.leadingAnchor, constant: 8),
+      speedRow.trailingAnchor.constraint(equalTo: speedCard.trailingAnchor, constant: -12),
+      speedColumn.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
+    ])
 
-    var config = UIButton.Configuration.filled()
-    config.image = UIImage(systemName: "exclamationmark.triangle.fill")
-    config.title = "Report"
-    config.imagePadding = 6
-    config.cornerStyle = .capsule
-    config.baseBackgroundColor = .systemBackground
-    config.baseForegroundColor = .label
-    let report = UIButton(configuration: config)
-    report.accessibilityLabel = "Report police ahead"
+    let report = BackseatTheme.iconButton(symbol: "exclamationmark.triangle.fill", label: "Report police ahead")
     report.addAction(UIAction { _ in
       MWMBackseatRewriter.runTool("report_police", argument: "", spoken: "report police")
     }, for: .touchUpInside)
 
     // Drawing a route: the driver only while (nearly) stopped; otherwise it says it's for passengers.
-    let draw = BackseatSketch.button()
+    let draw = BackseatTheme.iconButton(symbol: "scribble", label: "Draw route")
+    draw.addAction(UIAction { _ in BackseatSketch.open() }, for: .touchUpInside)
 
-    let stack = UIStackView(arrangedSubviews: [pill, report, draw])
+    let stack = UIStackView(arrangedSubviews: [speedCard, report, draw])
     stack.axis = .vertical
     stack.spacing = 10
     stack.alignment = .leading
@@ -104,15 +117,14 @@ final class BackseatDriveOverlay: NSObject {
     stack.isHidden = true
     view.addSubview(stack)
     NSLayoutConstraint.activate([
-      pill.heightAnchor.constraint(equalToConstant: 44),
-      pill.widthAnchor.constraint(greaterThanOrEqualToConstant: 110),
-      report.heightAnchor.constraint(equalToConstant: 44),
-      draw.heightAnchor.constraint(equalToConstant: 44),
       stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
       stack.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
     ])
     self.stack = stack
-    self.pill = pill
+    self.sign = sign
+    self.speedLabel = speedLabel
+    self.unitLabel = unitLabel
+    self.speedCard = speedCard
     self.draw = draw
 
     NotificationCenter.default.addObserver(forName: BackseatTalkButton.navigationVisibilityChanged, object: nil,
@@ -128,24 +140,26 @@ final class BackseatDriveOverlay: NSObject {
     }
   }
 
-  /// "34 / 35 mph": red with white text when over the limit.
+  /// The limit on the sign, your speed beside it: orange digits and an orange edge when over.
   private static func update() {
-    guard let pill else { return }
+    // The Patience meter under the GPS's face: 10 when calm, down to 0 when it's had enough.
+    BackseatCaption.setPatience(10 - (MWMBackseatRewriter.frustration + 5) / 10)
+    guard let speedLabel, let speedCard else { return }
     let speedMps = max(LocationManager.lastLocation()?.speed ?? 0, 0)
     let speed = Measure(asSpeed: speedMps)
     let limitMps = MWMBackseatRewriter.speedLimitMps
-    var text = speed.valueAsString
-    if limitMps > 0 {
-      text += " / " + Measure(asSpeed: limitMps).valueAsString
-    }
-    pill.text = "  \(text) \(speed.unit)  "
+    sign?.setLimit(limitMps > 0 ? Measure(asSpeed: limitMps).valueAsString : nil)
+    speedLabel.text = speed.valueAsString
+    unitLabel?.text = speed.unit
     let over = limitMps > 0 && speedMps > limitMps
-    pill.backgroundColor = over ? .systemRed : .systemBackground
-    pill.textColor = over ? .white : .label
-    pill.layer.borderColor = (over ? UIColor.white : UIColor.systemRed).cgColor
-    let drawTitle = speedMps < BackseatSketch.parkedMps ? "Draw route" : "Draw route (passenger)"
-    if draw?.configuration?.title != drawTitle {
-      draw?.configuration?.title = drawTitle
+    speedLabel.textColor = over ? BackseatTheme.hot : BackseatTheme.text
+    speedCard.layer.borderColor = (over ? BackseatTheme.hot : UIColor.clear).cgColor
+    speedCard.accessibilityLabel = limitMps > 0
+      ? "\(speed.valueAsString) \(speed.unit), limit \(Measure(asSpeed: limitMps).valueAsString)"
+      : "\(speed.valueAsString) \(speed.unit)"
+    let drawLabel = speedMps < BackseatSketch.parkedMps ? "Draw route" : "Draw route (passenger)"
+    if draw?.accessibilityLabel != drawLabel {
+      draw?.accessibilityLabel = drawLabel
     }
   }
 }

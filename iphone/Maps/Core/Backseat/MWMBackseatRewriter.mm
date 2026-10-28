@@ -648,6 +648,11 @@ static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == M
   return @(GetFramework().GetRoutingManager().BackseatMileageYearEnd().c_str());
 }
 
++ (NSInteger)frustration
+{
+  return GetFramework().GetRoutingManager().BackseatFrustration();
+}
+
 + (NSString *)mileageTurnedOn
 {
   return @(GetFramework().GetRoutingManager().BackseatMileageTurnedOn().c_str());

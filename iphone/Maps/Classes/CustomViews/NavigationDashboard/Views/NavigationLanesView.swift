@@ -25,10 +25,9 @@ final class NavigationLanesView: UIView {
   }
 
   private func setup() {
-    // Match the adjacent turn box (FirstTurnView style): green guidance background
-    // with rounded corners.
-    backgroundColor = UIColor.linkBlue()
-    layer.cornerRadius = 8
+    // Backseat Driver: a dark card beside the yellow turn box; the lanes to use are yellow.
+    backgroundColor = BackseatTheme.card
+    layer.cornerRadius = 14
     layer.cornerCurve = .continuous
     layer.masksToBounds = true
 
@@ -62,7 +61,7 @@ final class NavigationLanesView: UIView {
       : (lane.laneWays.compactMap { LaneWay(rawValue: $0) }.first ?? .through)
 
     let imageView = UIImageView(image: UIImage(named: way.turnImageName)?.withRenderingMode(.alwaysTemplate))
-    imageView.tintColor = UIColor.white()
+    imageView.tintColor = isActive ? BackseatTheme.accent : BackseatTheme.text
     imageView.contentMode = .scaleAspectFit
     imageView.alpha = isActive ? 1.0 : inactiveLaneAlpha
     imageView.setContentHuggingPriority(.defaultLow, for: .horizontal)

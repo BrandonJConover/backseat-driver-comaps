@@ -326,6 +326,12 @@ public:
   /// Draw mode: a finger stroke moved onto the car roads it traced (route_sketch.hpp SnapStroke).
   /// Empty if there's no map data there or the stroke covers too much ground to look up quickly.
   std::vector<backseat::LatLon> SnapToRoads(std::vector<backseat::LatLon> const & stroke) const;
+  /// How wound up the GPS is this trip, 0-100 (0 with no trip), for the driving screen's Patience meter.
+  int Frustration() const
+  {
+    auto const * engine = m_navigator.Engine();
+    return engine ? engine->Frustration() : 0;
+  }
 
 private:
   std::optional<backseat::Sight> SightAt(backseat::LatLon const & at, double bearingDeg) const;

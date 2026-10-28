@@ -314,6 +314,7 @@ public:
   std::string BackseatBusinessOwner() const { return m_backseat.BusinessOwner(); }
   void BackseatSetBusinessOwner(std::string const & owner) { m_backseat.SetBusinessOwner(owner); }
   void BackseatSketchApplied(bool addedStop, bool trimmed) { m_backseat.SketchApplied(addedStop, trimmed); }
+  int BackseatFrustration() const { return m_backseat.Frustration(); }
   std::vector<backseat::LatLon> BackseatSnapToRoads(std::vector<backseat::LatLon> const & stroke) const
   {
     return m_backseat.SnapToRoads(stroke);
