@@ -151,6 +151,8 @@ final class KokoroVoice: NSObject {
   private static let readyWait: TimeInterval = 20
   /// How long after launch the warm-up starts, so loading the models isn't part of opening the app.
   private static let warmUpDelay: TimeInterval = 2
+  /// The same, the launch after a crash during the load.
+  private static let lazyLoadDelay: TimeInterval = 8
   private let player = ClipPlayer()
   /// One worker renders everything; a second one would render concurrently and crash BNNS.
   private var workerStarted = false
@@ -287,8 +289,20 @@ final class KokoroVoice: NSObject {
       giveUp()
       return
     case .lazy:
-      // The last launch died loading Kokoro: wait for the first line rather than load at open.
+      // The last launch died while Kokoro loaded (often something else crashing in that window:
+      // on 10-28 it was a map style assert). Load a little later than usual, or at the first
+      // line if one comes sooner. Waiting for the first line meant the trip's opening lines and
+      // first turn were all on the system voice while it loaded.
       lock.lock(); loadOnFirstLine = true; lock.unlock()
+      DispatchQueue.main.asyncAfter(deadline: .now() + Self.lazyLoadDelay) { [self] in
+        lock.lock()
+        let due = loadOnFirstLine
+        loadOnFirstLine = false
+        lock.unlock()
+        guard due else { return }
+        BackseatLog.event("voice.reload", ["reason": "delayed load after a crash"])
+        load()
+      }
       return
     case .normal:
       break
@@ -549,6 +563,7 @@ final class KokoroVoice: NSObject {
   private func enqueue(_ text: String, nav: Bool, speed: Float, voice requested: String?, keep: Bool,
                        fallback: @escaping () -> Void, budget: TimeInterval = navDeadline,
                        noWait: Bool = false) {
+    let queuedAt = Date()
     lock.lock()
     if loadOnFirstLine {
       loadOnFirstLine = false
@@ -565,8 +580,29 @@ final class KokoroVoice: NSObject {
       lock.lock()
     }
     let known = requested.flatMap { id in Self.voiceOptions.contains { $0.id == id } ? id : nil }
-    // Still loading: everything but a turn instruction waits for Kokoro rather than switching voices.
-    if primary == nil, Self.voice != nil, !failed, !nav, !noWait {
+    // Still loading: everything waits for Kokoro rather than switching voices. A navigation line
+    // waits only while a load is actually running, and only for what's left of its budget (a
+    // load takes 1-3 s); then the system voice says it.
+    let waitForLoad = primary == nil && Self.voice != nil && !failed && !noWait && (!nav || loading)
+    if waitForLoad, nav {
+      var said = false
+      let say = { [self] in
+        guard !said else { return }
+        said = true
+        enqueue(text, nav: nav, speed: speed, voice: requested, keep: keep, fallback: fallback,
+                budget: max(budget - Date().timeIntervalSince(queuedAt), Self.headGrace), noWait: true)
+      }
+      waitingForReady.append(say)
+      lock.unlock()
+      DispatchQueue.main.asyncAfter(deadline: .now() + budget) { [self] in
+        lock.lock()
+        let stillWaiting = primary == nil
+        lock.unlock()
+        if stillWaiting { say() }
+      }
+      return
+    }
+    if waitForLoad {
       var said = false
       let say = { [self] in
         guard !said else { return }
@@ -1308,8 +1344,8 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
 /// that load. Crashes anywhere else (search, the listener, the map) never count, and nor do
 /// per-line renders: one in flight on another thread when something else crashes proves nothing.
 ///
-/// After a load crash, the next launch skips the eager warm-up and loads Kokoro on the first line
-/// instead. A load that succeeds clears the streak. Three load crashes in a row keep the system
+/// After a load crash, the next launch loads Kokoro a little later (or at the first line, if
+/// sooner). A load that succeeds clears the streak. Three load crashes in a row keep the system
 /// voice for that session only; the next launch tries again. Kokoro is never off for longer.
 enum CoreMLCrashGuard {
   /// Launches in a row that found the load marker.
@@ -1323,7 +1359,7 @@ enum CoreMLCrashGuard {
   /// This session: what the guard decided at launch.
   enum Mode: Equatable {
     case normal
-    /// Last launch died during the load: load on the first line, not at launch.
+    /// Last launch died during the load: load later than usual, or at the first line.
     case lazy
     /// Three load crashes in a row: the system voice this session.
     case paused
@@ -1380,7 +1416,7 @@ enum CoreMLCrashGuard {
     } else {
       defaults.set(streak, forKey: streakKey)
       mode = .lazy
-      BackseatLog.event("voice.crashGuard", ["reason": "Kokoro load crashed last launch (\(streak) in a row); loading on the first line"])
+      BackseatLog.event("voice.crashGuard", ["reason": "Kokoro load crashed last launch (\(streak) in a row); loading a little later"])
     }
     return mode
   }
