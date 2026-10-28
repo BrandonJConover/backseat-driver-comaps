@@ -41,6 +41,8 @@ set(
   rundown.hpp
   stop_go.cpp
   stop_go.hpp
+  twenty_questions.cpp
+  twenty_questions.hpp
   types.cpp
   types.hpp
   units.cpp

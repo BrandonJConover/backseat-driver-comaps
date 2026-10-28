@@ -269,6 +269,8 @@ enum class Category
   PhoneCall,
   /// I spy and useless facts on a quiet stretch (navigator only).
   Quiet,
+  /// 20 Questions (twenty_questions.hpp; navigator only). The host listens after these, like PlateGame.
+  TwentyQuestions,
   Count
 };
 

@@ -14,6 +14,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -310,6 +311,8 @@ public:
     /// Someone else talking (the caller in a fake phone call): a Kokoro voice id. Empty means the
     /// GPS's own voice.
     std::string voice;
+    /// A 20 Questions line: the driver answers out loud, so the platform listens after it.
+    bool listen = false;
   };
 
   /// One entry per line of the last TakeNotifications() batch, in the same order.
@@ -333,6 +336,8 @@ public:
   /// Draw mode: a finger stroke moved onto the car roads it traced (route_sketch.hpp SnapStroke).
   /// Empty if there's no map data there or the stroke covers too much ground to look up quickly.
   std::vector<backseat::LatLon> SnapToRoads(std::vector<backseat::LatLon> const & stroke) const;
+  /// 20 Questions: what's within about 2 km (TwentyThing tags: "water_tower", "bridge", "farm"...).
+  std::set<std::string> NearbyThings(backseat::LatLon const & at) const;
   /// How wound up the GPS is this trip, 0-100 (0 with no trip), for the driving screen's Patience meter.
   int Frustration() const
   {

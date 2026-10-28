@@ -5,6 +5,7 @@
 #include "backseat/lines_data.hpp"
 #include "backseat/route_sketch.hpp"
 #include "backseat/rundown.hpp"
+#include "backseat/twenty_questions.hpp"
 #include "backseat/units.hpp"
 #include "backseat/voice_command.hpp"
 
@@ -169,8 +170,10 @@ double constexpr kCallMinToTurnM = 1000;
 /// Once each bit has had its first time, a quiet stretch gets one this often; the call, I spy
 /// and the fact are picked by these weights.
 double constexpr kQuietBitChance = 0.5;
-double constexpr kCallWeight = 0.4;
-double constexpr kISpyWeight = 0.3;
+double constexpr kCallWeight = 0.3;
+double constexpr kISpyWeight = 0.2;
+/// 20 Questions (twenty_questions.hpp); the fact gets what's left.
+double constexpr kTwentyWeight = 0.3;
 /// Speeds below this count as this for "how long until the turn" (a crawl isn't forever).
 double constexpr kQuietMinSpeedMps = 3;
 /// The GPS "listens" to the caller this long between its own lines (plus up to kCallListenSpreadMs).
@@ -202,6 +205,7 @@ bool CutsIntoCall(Commentary const & c)
   switch (c.category)
   {
   case Category::PlateGame:
+  case Category::TwentyQuestions:
   case Category::Thanked:
   case Category::Title:
   case Category::Bossy:
@@ -438,6 +442,7 @@ Navigator::Navigator(EngineConfig config, std::vector<TripRecord> history, TripR
     m_config.rng = SeededRng(rd());
   }
   m_plates = PlateGame(m_config.rng);
+  m_twenty = TwentyQuestions(m_config.rng);
 }
 
 void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
@@ -480,6 +485,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackCurveAhead(fix, route);
   TrackMusic(fix.tMs, route);
   TrackLeftBuilding(fix);
+  TrackTwentyQuestions(fix, route);
   TrackQuietBits(fix, route);
   // Fed up for the first time this trip: from now on it's "wise, omnipotent overseer GPS".
   if (!m_titleDemanded && Tier() == 2)
@@ -635,6 +641,10 @@ std::vector<Commentary> Navigator::TakeLines()
   auto lines = FilterForCall(m_gate.Take());
   if (!lines.empty())
     m_lastSpokeT = m_lastT;
+  // Directions cut into 20 Questions: back to the game once they're done.
+  if (m_twenty.GetState() == TwentyQuestions::State::Playing &&
+      std::any_of(lines.begin(), lines.end(), [](Commentary const & l) { return l.priority == Priority::Nav; }))
+    m_twentyCutInT = m_lastT;
   for (auto const & l : lines)
     if (l.category != Category::PhoneCall && CutsIntoCall(l))
       m_lastCutInT = m_lastT;
@@ -701,6 +711,10 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     m_heldPlateLines.clear();
     if (auto const wrap = m_plates.WrapUp(Tier()))
       SayPlate(t, *wrap);
+    // Mid-game: "We're here, and you never got it. It was a cow."
+    m_heldTwentyLines.clear();
+    if (auto const wrap = Twenty().WrapUp(Tier()))
+      SayTwenty(t, *wrap);
     TripRecord const record = RecordTrip(*m_engine, m_plan);
     m_history.push_back(record);
     Trace("trip.arrived", {{"grade", m_engine->Report().overall.letter}});
@@ -828,6 +842,9 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   m_tripsOnRoute = static_cast<int>(
       std::count_if(m_history.begin(), m_history.end(), [&](TripRecord const & r) { return r.routeKey == routeKey; }));
   m_plates.NewTrip(routeKey);
+  m_twenty.NewTrip();
+  m_heldTwentyLines.clear();
+  m_twentyCutInT.reset();
 
   // The app was relaunched mid-trip: no second greeting, just a word about the interruption.
   double const activeAt = m_said.Counter(kActiveTripAtKey);
@@ -1296,6 +1313,9 @@ void Navigator::ResetTrip()
   m_speeds.clear();
   m_inTraffic = false;
   m_heldPlateLines.clear();
+  m_twenty.NewTrip();
+  m_heldTwentyLines.clear();
+  m_twentyCutInT.reset();
   m_lastFix.reset();
   m_pullOverSaid = false;
   m_policeSaid = false;
@@ -1379,6 +1399,12 @@ void Navigator::CountLefts(double t)
   }
 }
 
+void Navigator::SetTwentyLog(TwentyLog log, std::function<void(TwentyLog const &)> onChange)
+{
+  m_twenty.SetLog(std::move(log));
+  m_onTwentyLog = std::move(onChange);
+}
+
 void Navigator::SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange)
 {
   m_plates.SetLog(std::move(log));
@@ -1428,6 +1454,14 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
   if (!m_engine || m_arrived)
     return;
   m_lastT = std::max(m_lastT, tMs);
+  // Mid-game, it's a question: "is it a police car?" isn't the police, and the title can wait.
+  if (m_twenty.Active())
+    if (auto const reply = Twenty().OnDriverSaid(text, m_lastT, Tier()))
+    {
+      m_twentyCutInT.reset();
+      SayTwenty(m_lastT, *reply);
+      return;
+    }
   // "We're getting pulled over": the GPS knows exactly whose fault that is.
   std::string words = " ";
   for (unsigned char const ch : text)
@@ -1447,6 +1481,16 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
       return;
     }
     SayLine(m_lastT, Category::Title, "title.used");
+  }
+  // "Let's play 20 questions": asked by name, so no "not now" gag; straight to the first question.
+  if (!m_twenty.Active() && AsksForTwentyQuestions(text))
+  {
+    LatLon const here = m_lastFix ? LatLon{m_lastFix->lat, m_lastFix->lon} : m_plan.origin;
+    auto const nearby = m_nearbyThings ? m_nearbyThings(here) : std::set<std::string>{};
+    auto const reply = Twenty().Start(nearby, Night(m_lastT, here), m_lastT, Tier());
+    Trace("twenty", {{"event", "asked"}, {"thing", m_twenty.Thing()->name}, {"nearby", std::to_string(nearby.size())}});
+    SayTwenty(m_lastT, reply);
+    return;
   }
   for (char const * cue : {" police ", " cop ", " cops ", " officer ", " pulled over ", " pulling us over ",
                            " pulling me over ", " trooper "})
@@ -1822,7 +1866,8 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
         Trace("call.end", {{"why", "dropped"}});
         m_gate.Push(CallLine(t, "call.dropped"), false);
       }
-      else if (steady && t - m_lastCutInT >= kCallResumeAfterCutInMs && toTurnS >= kCallResumeMinToTurnS)
+      else if (steady && t - m_lastCutInT >= kCallResumeAfterCutInMs && toTurnS >= kCallResumeMinToTurnS &&
+               !m_twenty.Active())
       {
         Trace("call.resume");
         if (!m_call.Begun())
@@ -1877,8 +1922,11 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
       t - std::max(m_lastSpokeT, m_quietTurnSince) < kQuietSilenceMs || toTurnS < kQuietMinToTurnS)
     return;
   bool const roomForCall = !m_callTaken && toTurnS >= kCallMinToTurnS && route.distToTurnM >= kCallMinToTurnM;
-  bool const night = KnowsTheDate(t) && SunElevationDeg(fix.lat, fix.lon, t) < kSunsetElevationDeg;
-  enum class Bit { None, Call, ISpy, Fact } bit = Bit::None;
+  bool const night = Night(t, {fix.lat, fix.lon});
+  // 20 Questions once a trip, and not on top of the plate game.
+  bool const roomForTwenty = !m_twenty.OfferedThisTrip() && m_plates.GetState() != PlateGame::State::Offered &&
+                             m_plates.GetState() != PlateGame::State::Playing;
+  enum class Bit { None, Call, ISpy, Twenty, Fact } bit = Bit::None;
   // Each bit's first time comes as soon as there's room for it, the call first.
   if (roomForCall && !m_said.Said("call.script"))
     bit = Bit::Call;
@@ -1886,6 +1934,8 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
     bit = Bit::ISpy;
   else if (!m_said.Said("fact.frame"))
     bit = Bit::Fact;
+  else if (roomForTwenty && !m_said.Said("twenty.offer") && !m_said.Said("twenty.start"))
+    bit = Bit::Twenty;
   else
   {
     // After that, one roll of the dice per stretch.
@@ -1898,13 +1948,17 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
     double pick = r / kQuietBitChance;
     if (!roomForCall)
       pick = kCallWeight + pick * (1 - kCallWeight);
-    bit = pick < kCallWeight ? Bit::Call : pick < kCallWeight + kISpyWeight ? Bit::ISpy : Bit::Fact;
+    bit = pick < kCallWeight                                  ? Bit::Call
+          : pick < kCallWeight + kISpyWeight                  ? Bit::ISpy
+          : pick < kCallWeight + kISpyWeight + kTwentyWeight ? (roomForTwenty ? Bit::Twenty : Bit::Fact)
+                                                              : Bit::Fact;
   }
   ++m_quietBits;
   m_lastQuietBitT = t;
   switch (bit)
   {
   case Bit::Call: StartCall(t); break;
+  case Bit::Twenty: OfferTwentyQuestions(fix); break;
   case Bit::ISpy:
     // "I spy something black. Oh wait, you can't see because it's dark outside." Only after dark.
     Trace("quiet", {{"bit", "ispy"}, {"night", night ? "yes" : "no"}});
@@ -1963,5 +2017,84 @@ std::vector<Commentary> Navigator::FilterForCall(std::vector<Commentary> lines)
   }
   m_call.Delivered();
   return out;
+}
+bool Navigator::Night(double tMs, LatLon const & here) const
+{
+  return KnowsTheDate(tMs) && SunElevationDeg(here.lat, here.lon, tMs) < kSunsetElevationDeg;
+}
+
+TwentyQuestions & Navigator::Twenty()
+{
+  m_twenty.SetPicker([this](std::string const & key, int tier)
+                     { return m_said.Pick(key, LinesFor(key, tier), m_config.rng ? m_config.rng() : 0); });
+  return m_twenty;
+}
+
+bool Navigator::OfferTwentyQuestions(Fix const & fix)
+{
+  if (m_twenty.OfferedThisTrip() || m_plates.GetState() == PlateGame::State::Playing)
+    return false;
+  LatLon const here{fix.lat, fix.lon};
+  auto const nearby = m_nearbyThings ? m_nearbyThings(here) : std::set<std::string>{};
+  auto const reply = Twenty().Offer(nearby, Night(fix.tMs, here), fix.tMs, Tier());
+  Trace("twenty", {{"event", "offer"}, {"thing", m_twenty.Thing()->name}, {"nearby", std::to_string(nearby.size())}});
+  SayTwenty(fix.tMs, reply);
+  return true;
+}
+
+void Navigator::TrackTwentyQuestions(Fix const & fix, RouteSnapshot const & route)
+{
+  double const t = fix.tMs;
+  if (!m_twenty.Active() && m_heldTwentyLines.empty())
+  {
+    m_twentyCutInT.reset();
+    return;
+  }
+  // Directions first: nothing from the game this close to a maneuver.
+  if (route.turnId && route.distToTurnM < TwentyQuestions::kHoldNearManeuverM)
+    return;
+  if (!m_heldTwentyLines.empty())
+  {
+    // The held answer picks the game back up by itself.
+    for (auto & line : m_heldTwentyLines)
+      m_gate.Push(std::move(line), false);
+    m_heldTwentyLines.clear();
+    m_twentyCutInT.reset();
+    return;
+  }
+  double const toTurnS = route.turnId ? SecondsToTurn(route.distToTurnM, fix.speedMps) : 1e9;
+  if (m_twentyCutInT)
+  {
+    // "Anyway. Where were we. Oh right, you were losing." Once the direction has had its breath.
+    if (t - *m_twentyCutInT >= kCallResumeAfterCutInMs && toTurnS >= kCallResumeMinToTurnS)
+    {
+      m_twentyCutInT.reset();
+      if (m_twenty.GetState() == TwentyQuestions::State::Playing)
+        SayTwenty(t, Twenty().Resume(t, Tier()));
+    }
+    return;
+  }
+  if (auto const reply = Twenty().Tick(t, Tier()))
+    SayTwenty(t, *reply);
+}
+
+void Navigator::SayTwenty(double tMs, TwentyQuestions::Reply const & reply)
+{
+  Trace("twenty", {{"key", reply.key}, {"left", std::to_string(m_twenty.QuestionsLeft())},
+                   {"over", reply.over ? "yes" : "no"}});
+  Commentary c;
+  c.t = tMs;
+  c.category = Category::TwentyQuestions;
+  c.text = reply.text;
+  c.frustration = m_engine ? m_engine->Frustration() : 0;
+  c.priority = Priority::Roast;
+  c.voiceSpeed = 1 + c.frustration / 250.0;
+  if (m_turnId && m_lastDistToTurnM < TwentyQuestions::kHoldNearManeuverM && !m_arrived)
+    m_heldTwentyLines.push_back(std::move(c));
+  else
+    // The driver is waiting for an answer; don't hold it up for the rewording model.
+    m_gate.Push(std::move(c), false);
+  if (m_onTwentyLog)
+    m_onTwentyLog(m_twenty.Log());
 }
 }  // namespace backseat

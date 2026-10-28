@@ -419,6 +419,15 @@ using Observers = NSHashTable<Observer>;
         [weakSelf speakOneString:notification];
       }];
     }
+    // 20 Questions: the driver answers out loud, so listen once the GPS has said its piece.
+    for (NSUInteger i = 0; hinted && i < voices.size(); ++i)
+    {
+      if (voices[i].listen)
+      {
+        [BackseatListener.shared listenForGameAnswer];
+        break;
+      }
+    }
   }
 }
 

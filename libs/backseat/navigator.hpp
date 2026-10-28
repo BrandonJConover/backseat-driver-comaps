@@ -14,12 +14,14 @@
 #include "backseat/report.hpp"
 #include "backseat/rewriter.hpp"
 #include "backseat/stop_go.hpp"
+#include "backseat/twenty_questions.hpp"
 
 #include <ctime>
 #include <deque>
 #include <functional>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -245,6 +247,13 @@ public:
   void SetAchievements(Achievements achievements, std::function<void(Achievements const &)> onChange);
   Achievements const & GetAchievements() const { return m_achievements; }
   PlateLog const & GetPlateLog() const { return m_plates.Log(); }
+  /// 20 Questions games so far (record, recent answers), and where to save the log when it changes.
+  void SetTwentyLog(TwentyLog log, std::function<void(TwentyLog const &)> onChange);
+  TwentyLog const & GetTwentyLog() const { return m_twenty.Log(); }
+  /// Map tags of what's around the car, about 2 km out ("fuel", "water_tower", "farm"; see
+  /// TwentyThing::tag), so 20 Questions can pick something on the drive. Optional.
+  using NearbyThingsLookup = std::function<std::set<std::string>(LatLon const &)>;
+  void SetNearbyThingsLookup(NearbyThingsLookup lookup) { m_nearbyThings = std::move(lookup); }
   /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate".
   /// Same thread as OnFix.
   void OnDriverSaid(double tMs, std::string const & text);
@@ -326,8 +335,16 @@ private:
   /// Dead stretch with nothing to say about directions: a phone call, I spy, or a useless fact.
   void TrackQuietBits(Fix const & fix, RouteSnapshot const & route);
   void StartCall(double tMs);
-  /// A quiet-stretch bit is still going (a call), so nothing else should start one.
-  bool QuietBitBusy() const { return m_call.Active(); }
+  /// A quiet-stretch bit is still going (a call, a game of 20 Questions), so nothing else should start one.
+  bool QuietBitBusy() const { return m_call.Active() || m_twenty.Active(); }
+  /// The GPS asks to play 20 Questions (a quiet-stretch bit). False if it can't now.
+  bool OfferTwentyQuestions(Fix const & fix);
+  /// Lines held near a maneuver, "anyway, where were we" after directions, nudges, giving up.
+  void TrackTwentyQuestions(Fix const & fix, RouteSnapshot const & route);
+  void SayTwenty(double tMs, TwentyQuestions::Reply const & reply);
+  /// The game, picking its lines through m_said (bound here, so a moved Navigator stays right).
+  TwentyQuestions & Twenty();
+  bool Night(double tMs, LatLon const & here) const;
   /// A "call.*" line, filled in, to say right away.
   Commentary CallLine(double tMs, std::string const & key);
   /// Puts the call on hold for directions, takes it back up, or ends it, as lines go out.
@@ -489,6 +506,15 @@ private:
   double m_lastRegionCheckT = -1e18;
   /// Game lines held back while a maneuver is close; directions come first.
   std::vector<Commentary> m_heldPlateLines;
+
+  // 20 Questions.
+  TwentyQuestions m_twenty;
+  std::function<void(TwentyLog const &)> m_onTwentyLog;
+  NearbyThingsLookup m_nearbyThings;
+  /// Game lines held back while a maneuver is close; directions come first.
+  std::vector<Commentary> m_heldTwentyLines;
+  /// When directions cut into a game, until the GPS picks it back up (or the driver does).
+  std::optional<double> m_twentyCutInT;
 
   // Quiet-stretch bits.
   std::string m_gpsName = "Echo";

@@ -111,6 +111,17 @@ import Speech
     }
   }
 
+  /// 20 Questions: the driver answers out loud. Hands-free already hears it while a route is
+  /// followed; otherwise the mic opens once, after the GPS has finished talking, and what's heard
+  /// goes to the navigator like anything else the driver says.
+  @objc func listenForGameAnswer() {
+    if isListening && continuous { return }
+    BackseatSetup.listen(waiting: 10, for: "game") { answer in
+      guard !answer.isEmpty else { return }
+      MWMBackseatRewriter.driverSaid(answer)
+    }
+  }
+
   /// Stops waiting for an answer; what's said next goes to the navigator again.
   func stopWaitingForAnswer() {
     answerHandler = nil
@@ -250,7 +261,7 @@ import Speech
       request.requiresOnDeviceRecognition = true
     }
     // Most answers are one place name.
-    request.contextualStrings = ["plate", "autopilot", "take me to", "work", "home", "Hawaii", "Alaska", "Colorado", "New Mexico", "Texas", "yes", "no"]
+    request.contextualStrings = ["plate", "autopilot", "take me to", "work", "home", "Hawaii", "Alaska", "Colorado", "New Mexico", "Texas", "yes", "no", "is it", "twenty questions", "I give up", "a hint"]
     self.request = request
     heard = ""
     heardTheGPS = KokoroVoice.shared.anyVoiceSpeaking

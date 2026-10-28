@@ -43,6 +43,7 @@ namespace
 {
 std::string const kTripsFile = "backseat_trips.tsv";
 std::string const kPlatesFile = "backseat_plates.txt";
+std::string const kTwentyFile = "backseat_twenty.txt";
 std::string const kSaidFile = "backseat_said.tsv";
 std::string const kAchievementsFile = "backseat_achievements.tsv";
 std::string const kMemoryFile = "backseat_memory.tsv";
@@ -303,6 +304,56 @@ void SavePlates(backseat::PlateLog const & log)
   std::ofstream(GetPlatform().SettingsPathForFile(kPlatesFile)) << log.Serialize();
 }
 
+/// 20 Questions wins and losses, and the things it picked lately (so they don't come back).
+backseat::TwentyLog LoadTwenty()
+{
+  std::ifstream in(GetPlatform().SettingsPathForFile(kTwentyFile));
+  std::stringstream text;
+  text << in.rdbuf();
+  return backseat::TwentyLog::Parse(text.str());
+}
+
+void SaveTwenty(backseat::TwentyLog const & log)
+{
+  std::ofstream(GetPlatform().SettingsPathForFile(kTwentyFile)) << log.Serialize();
+}
+
+/// CoMaps type name prefix -> 20 Questions tag (TwentyThing::tag in twenty_questions.cpp). A type
+/// that doesn't exist in this map version just never matches.
+struct TwentyTagFor
+{
+  char const * typePrefix;
+  char const * tag;
+};
+TwentyTagFor const kTwentyTags[] = {
+    {"amenity-fuel", "fuel"},
+    {"amenity-fast_food", "fast_food"},
+    {"amenity-cafe", "cafe"},
+    {"amenity-place_of_worship", "church"},
+    {"amenity-school", "school"},
+    {"man_made-water_tower", "water_tower"},
+    {"railway-level_crossing", "railway"},
+    {"railway-rail", "railway"},
+    {"waterway-river", "river"},
+    {"waterway-stream", "river"},
+    {"natural-water", "lake"},
+    {"power-line", "power_line"},
+    {"power-tower", "power_line"},
+    {"power-generator-wind", "wind_turbine"},
+    {"power-plant-wind", "wind_turbine"},
+    {"amenity-parking", "parking"},
+    {"shop-supermarket", "supermarket"},
+    {"amenity-hospital", "hospital"},
+    {"amenity-fire_station", "fire_station"},
+    {"landuse-farmland", "farm"},
+    {"landuse-farmyard", "farm"},
+    {"landuse-meadow", "farm"},
+    {"landuse-forest", "forest"},
+    {"natural-wood", "forest"},
+    {"natural-peak", "mountain"},
+    {"highway-bus_stop", "bus_stop"},
+};
+
 backseat::Pronouns PronounsFrom(std::string const & s)
 {
   if (s == "he")
@@ -435,6 +486,7 @@ BackseatAdapter::BackseatAdapter()
 })
 {
   m_navigator.SetPlateLog(LoadPlates(), &SavePlates);
+  m_navigator.SetTwentyLog(LoadTwenty(), &SaveTwenty);
   m_navigator.SetSaidLog(LoadSaid(), &SaveSaid);
   m_navigator.SetAchievements(LoadAchievements(), &SaveAchievements);
   m_memory = LoadMemory();
@@ -1097,6 +1149,7 @@ void BackseatAdapter::SetDataSource(std::function<DataSource &()> getter)
   m_dataSource = std::move(getter);
   m_navigator.SetPlaceLookup([this](backseat::LatLon const & at) { return PlaceAt(at); });
   m_navigator.SetParkingLookup([this](backseat::LatLon const & at) { return InParkingLot(at); });
+  m_navigator.SetNearbyThingsLookup([this](backseat::LatLon const & at) { return NearbyThings(at); });
   m_navigator.SetBuildingLookup([this](backseat::LatLon const & at) { return BuildingAt(at); });
   m_navigator.SetSightLookup([this](backseat::LatLon const & at, double bearing) { return SightAt(at, bearing); });
   m_navigator.SetVenueLookup([this](backseat::LatLon const & at) { return VenueAt(at); });
@@ -1472,6 +1525,30 @@ backseat::Bridge BackseatAdapter::BridgeAt(backseat::LatLon const & at, double b
     }
   }, mercator::RectByCenterXYAndSizeInMeters(center, kWaterSearchM), scales::GetUpperScale());
   return water ? backseat::Bridge::Water : backseat::Bridge::Land;
+}
+
+std::set<std::string> BackseatAdapter::NearbyThings(backseat::LatLon const & at) const
+{
+  std::set<std::string> tags;
+  if (!m_dataSource)
+    return tags;
+  // Once per game of 20 Questions, so a 2 km look around is fine.
+  m2::RectD const rect = mercator::RectByCenterXYAndSizeInMeters(mercator::FromLatLon(at.lat, at.lon), 4000);
+  auto const & c = classif();
+  m_dataSource().ForEachInRect([&](FeatureType & ft)
+  {
+    for (uint32_t const type : feature::TypesHolder(ft))
+    {
+      std::string const name = c.GetReadableObjectName(type);
+      for (auto const & m : kTwentyTags)
+        if (name.starts_with(m.typePrefix))
+          tags.insert(m.tag);
+      // Bridges are road types: "highway-primary-bridge", "railway-rail-bridge".
+      if (name.ends_with("-bridge"))
+        tags.insert("bridge");
+    }
+  }, rect, scales::GetUpperScale());
+  return tags;
 }
 
 std::vector<backseat::LatLon> BackseatAdapter::SnapToRoads(std::vector<backseat::LatLon> const & stroke) const
@@ -2304,7 +2381,8 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
                             {"speed", backseat::LogNum(c.voiceSpeed, 2)},
                             {"text", c.text}});
     out.push_back(c.text);
-    m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed, c.maxWaitMs, c.voice});
+    m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed, c.maxWaitMs, c.voice,
+                            c.category == backseat::Category::TwentyQuestions});
     if (c.priority == backseat::Priority::Nav)
       m_lastDirection = c.text;
   }

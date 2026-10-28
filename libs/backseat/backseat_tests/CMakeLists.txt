@@ -19,6 +19,7 @@ add_executable(${PROJECT_NAME}
   debug_log_test.cpp
   lines_test.cpp
   stop_go_test.cpp
+  twenty_questions_test.cpp
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
 target_compile_definitions(${PROJECT_NAME} PRIVATE BACKSEAT_TRACE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/parity_trace.txt")
