@@ -1,9 +1,10 @@
 // Backseat Driver's Kokoro voice on iOS: Kokoro-82M on Core ML (Neural Engine + CPU) through
 // FluidAudio, the same engine EpubToM4B narrates with.
 //
-// Navigation lines never wait long on Kokoro: one that isn't ready to play within its budget (at
-// least `navDeadline`, longer when the engine says the maneuver is far enough off) goes to the
-// system voice and isn't rendered. Roasts queue, go stale after `roastMaxAge`, and are
+// Navigation lines never wait long on Kokoro: one that isn't ready within its budget (at least
+// `navDeadline`, longer when the engine says the maneuver is far enough off) goes to the system
+// voice and isn't rendered. The budget only runs out once the line is holding up the speaker: a
+// line queued behind others renders while they play, so a burst at trip start stays in Kokoro. Roasts queue, go stale after `roastMaxAge`, and are
 // cut off when a navigation line needs the speaker. Settings picks the voice, or the system voice.
 //
 // Apple's BNNS can crash inside Core ML on iOS 26.4 and later (FluidAudio #817/#844). That can't be
@@ -106,6 +107,8 @@ final class KokoroVoice: NSObject {
     let budget: TimeInterval
     let queuedAt = Date()
     var state = State.waiting  // guarded by KokoroVoice.lock
+    /// When nothing was ahead of it any more and the speaker was free (main queue only).
+    var headSince: Date?
 
     init(text: String, nav: Bool, speed: Float, voice: String, keep: Bool, fallback: @escaping () -> Void,
          generation: Int, budget: TimeInterval = KokoroVoice.navDeadline) {
@@ -149,6 +152,28 @@ final class KokoroVoice: NSObject {
   /// How long after launch the warm-up starts, so loading the models isn't part of opening the app.
   private static let warmUpDelay: TimeInterval = 2
   private let player = ClipPlayer()
+  /// One worker renders everything; a second one would render concurrently and crash BNNS.
+  private var workerStarted = false
+  /// The line being rendered right now, so the deadline knows it's ahead of the ones queued.
+  private var rendering: Job?
+  /// Model work for the worker (warm-ups, the Neural Engine switch), done between lines.
+  private var chores: [() async -> Void] = []
+  /// True while `primary` is the CPU engine.
+  private var primaryOnCPU = false
+  /// Lines in a row the Neural Engine failed on (the CPU said them); two moves Kokoro to the CPU.
+  private var aneFailures = 0
+  /// Lines in a row neither engine could say; three throws the engines away and loads again.
+  private var lineFailures = 0
+  private var lastRender = Date.distantPast
+  private var observers: [NSObjectProtocol] = []
+  /// How often a waiting navigation line checks whether it's holding up the speaker.
+  private static let deadlineTick: TimeInterval = 0.25
+  /// Once the speaker is free for a line, how much longer it waits for Kokoro.
+  private static let headGrace: TimeInterval = 1.0
+  /// Past its budget by this much, a navigation line goes to the system voice whatever is ahead.
+  private static let deadlineCap: TimeInterval = 20
+  /// A warm-up is skipped if Kokoro rendered something this recently: it's warm.
+  private static let warmAfterIdle: TimeInterval = 20
 
   /// The picked Kokoro voice, for the drive log; nil if Kokoro doesn't speak this language.
   var selectedVoiceID: String? { Self.voice }
@@ -210,6 +235,7 @@ final class KokoroVoice: NSObject {
     started = true
     lock.unlock()
     let mode = CoreMLCrashGuard.checkAtLaunch()
+    DispatchQueue.main.async { [self] in observeApp() }
     player.systemIsSpeaking = { [weak self] in self?.systemIsSpeaking?() ?? false }
     player.systemStoodIn = { [weak self] in
       guard let self else { return }
@@ -274,16 +300,17 @@ final class KokoroVoice: NSObject {
         let cpu = KokoroAneManager(computeUnits: .cpuOnly)
         try await cpu.initialize(preloadVoices: [voice])
         UserDefaults.standard.set(true, forKey: Self.installedKey)
-        _ = try await render("Hello.", speed: 1, voice: voice, with: cpu)
+        _ = try await render("Hello.", speed: 1, voice: voice, nav: false, with: cpu)
         CoreMLCrashGuard.loadSucceeded()
-        becomeReady(cpu, cpuFallback: true, after: began, on: "the CPU")
+        becomeReady(cpu, onCPU: true, after: began, on: "the CPU")
       } catch {
         Self.log.error("Kokoro on the CPU failed: \(error.localizedDescription, privacy: .public)")
       }
       // Then the Neural Engine, quicker per line; CPU + Neural Engine with the noise and tail
       // stages on the CPU, since iOS refuses GPU work from the background, where a navigation app
-      // spends most of its time. Its first line compiles the rest, so it isn't warmed with a render
-      // here: that would run alongside the CPU's renders, and concurrent renders crash BNNS.
+      // spends most of its time. Its first line compiles the rest, which took 1.6-1.8 s and pushed
+      // the lines after it to the system voice, so it's warmed with a render first. The render is a
+      // chore on the worker, between lines: alongside the CPU's renders it would crash BNNS.
       do {
         CoreMLCrashGuard.beginLoad()
         defer { CoreMLCrashGuard.endLoad() }
@@ -291,7 +318,13 @@ final class KokoroVoice: NSObject {
         try await engine.initialize(preloadVoices: [voice])
         UserDefaults.standard.set(true, forKey: Self.installedKey)
         CoreMLCrashGuard.loadSucceeded()
-        becomeReady(engine, cpuFallback: false, after: began, on: "the Neural Engine")
+        lock.lock(); let onCPU = primary != nil; lock.unlock()
+        if onCPU {
+          addChore { [self] in await switchToNeuralEngine(engine, voice: voice, began: began) }
+        } else {
+          becomeReady(engine, onCPU: false, after: began, on: "the Neural Engine")
+          warmUp("load")
+        }
       } catch {
         Self.log.error("Kokoro unavailable, the system voice stays on: \(error.localizedDescription, privacy: .public)")
         lock.lock(); let ready = primary != nil; lock.unlock()
@@ -304,16 +337,20 @@ final class KokoroVoice: NSObject {
   }
 
   /// Speaks with `engine` from now on, and says the lines that were waiting if it's the first.
-  private func becomeReady(_ engine: KokoroAneManager, cpuFallback: Bool, after began: Date, on name: String) {
+  private func becomeReady(_ engine: KokoroAneManager, onCPU: Bool, after began: Date, on name: String) {
     lock.lock()
     let first = primary == nil
     primary = engine
-    if cpuFallback { fallbackEngine = engine }
+    primaryOnCPU = onCPU
+    if onCPU { fallbackEngine = engine }
     failed = false
+    aneFailures = 0
+    lineFailures = 0
     let waiting = first ? waitingForReady : []
     if first { waitingForReady.removeAll() }
     lock.unlock()
     Self.log.info("Kokoro voice ready on \(name, privacy: .public) in \(Int(Date().timeIntervalSince(began) * 1000)) ms")
+    BackseatLog.event("voice.ready", ["on": onCPU ? "cpu" : "ane", "ms": String(Int(Date().timeIntervalSince(began) * 1000))])
     if first {
       startWorker()
       waiting.forEach { $0() }
@@ -333,6 +370,114 @@ final class KokoroVoice: NSObject {
   /// Lets the next start() try the download again.
   private func allowRetry() {
     lock.lock(); started = false; lock.unlock()
+  }
+
+  /// On the worker: warms the Neural Engine with a short render, then speaks with it and lets the
+  /// CPU copy go (two copies of the models in memory make iOS more likely to kill the app in the
+  /// background). If the warm-up fails, Kokoro stays on the CPU.
+  private func switchToNeuralEngine(_ engine: KokoroAneManager, voice: String, began: Date) async {
+    let start = Date()
+    do {
+      CoreMLCrashGuard.beginLoad()
+      defer { CoreMLCrashGuard.endLoad() }
+      _ = try await render("Okay.", speed: 1, voice: voice, nav: false, with: engine)
+    } catch {
+      Self.log.error("Kokoro's Neural Engine warm-up failed, staying on the CPU: \(error.localizedDescription, privacy: .public)")
+      BackseatLog.event("voice.error", ["error": error.localizedDescription, "where": "ane warm-up"])
+      return
+    }
+    lock.lock()
+    primary = engine
+    primaryOnCPU = false
+    fallbackEngine = nil
+    aneFailures = 0
+    lastRender = Date()
+    lock.unlock()
+    Self.log.info("Kokoro voice on the Neural Engine in \(Int(Date().timeIntervalSince(began) * 1000)) ms")
+    BackseatLog.event("voice.ready", ["on": "ane", "ms": String(Int(Date().timeIntervalSince(began) * 1000)),
+                                      "warm_ms": String(Int(Date().timeIntervalSince(start) * 1000))])
+  }
+
+  /// A short render nobody hears, so the next real line isn't the slow first one after loading, a
+  /// stretch in the background, or an audio interruption. Skipped when Kokoro is already warm.
+  func warmUp(_ reason: String) {
+    lock.lock()
+    let engine = primary
+    let idle = Date().timeIntervalSince(lastRender) > Self.warmAfterIdle
+    lock.unlock()
+    guard engine != nil, idle, let voice = Self.voice else { return }
+    addChore { [self] in
+      lock.lock()
+      let engine = primary
+      let stillIdle = Date().timeIntervalSince(lastRender) > Self.warmAfterIdle
+      lock.unlock()
+      guard let engine, stillIdle else { return }
+      let start = Date()
+      do {
+        _ = try await render("Okay.", speed: 1, voice: voice, nav: false, with: engine)
+        lock.lock(); lastRender = Date(); lock.unlock()
+        BackseatLog.event("voice.warm", ["reason": reason, "ms": String(Int(Date().timeIntervalSince(start) * 1000))])
+      } catch {
+        BackseatLog.event("voice.error", ["error": error.localizedDescription, "where": "warm-up (\(reason))"])
+      }
+    }
+  }
+
+  private func addChore(_ chore: @escaping () async -> Void) {
+    lock.lock()
+    chores.append(chore)
+    let worker = wake
+    lock.unlock()
+    worker?.yield()
+  }
+
+  /// Neither engine could say three lines in a row: start over with freshly loaded models.
+  private func reloadEngines(_ why: String) {
+    lock.lock()
+    primary = nil
+    fallbackEngine = nil
+    primaryOnCPU = false
+    lineFailures = 0
+    aneFailures = 0
+    lock.unlock()
+    BackseatLog.event("voice.reload", ["reason": why])
+    load()
+  }
+
+  /// The app moments Kokoro reacts to. Main queue.
+  private func observeApp() {
+    let center = NotificationCenter.default
+    observers.append(center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil,
+                                        queue: .main) { [weak self] _ in
+      guard let self else { return }
+      self.lock.lock()
+      let retry = self.primary == nil && self.failed && !self.loading && CoreMLCrashGuard.mode != .paused
+      self.lock.unlock()
+      if retry {
+        BackseatLog.event("voice.reload", ["reason": "back in the foreground after a failed load"])
+        self.load()
+      } else {
+        self.warmUp("foreground")
+      }
+    })
+    observers.append(center.addObserver(forName: BackseatTalkButton.navigationVisibilityChanged, object: nil,
+                                        queue: .main) { [weak self] note in
+      if (note.object as? Bool) ?? false { self?.warmUp("trip") }
+    })
+    observers.append(center.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil,
+                                        queue: .main) { [weak self] _ in
+      guard let self else { return }
+      // The clips go, and the spare CPU copy of the models when the Neural Engine is speaking.
+      self.lock.lock()
+      let clips = self.cache.count
+      self.cache.removeAll()
+      self.cacheOrder.removeAll()
+      let dropCPU = !self.primaryOnCPU && self.fallbackEngine != nil
+      if dropCPU { self.fallbackEngine = nil }
+      self.lock.unlock()
+      BackseatLog.event("voice.memory", ["clips": String(clips), "cpu": dropCPU ? "released" : "kept"])
+    })
+    player.interruptionEnded = { [weak self] in self?.warmUp("interruption") }
   }
 
   /// Says `text` with Kokoro, or calls `fallback` (on the main queue) to say it with the system voice.
@@ -434,17 +579,42 @@ final class KokoroVoice: NSObject {
     wake?.yield()
 
     guard nav else { return }
-    DispatchQueue.main.asyncAfter(deadline: .now() + job.budget) { [self] in
-      lock.lock()
-      let fallBack = job.state == .waiting && job.generation == generation
-      if fallBack { job.state = .fellBack }
-      lock.unlock()
-      guard fallBack else { return }
-      Self.log.debug("Kokoro too slow for a navigation line, using the system voice")
-      Self.trace(job.text, voice: "system", why: "deadline", waitMs: Date().timeIntervalSince(job.queuedAt) * 1000,
-                 budget: job.budget)
-      player.sayWithSystemVoice(nav: true, job.fallback)
+    DispatchQueue.main.async { [self] in watchDeadline(job) }
+  }
+
+  /// A navigation line goes to the system voice only when Kokoro is what's holding it up: it has
+  /// waited its budget, and the speaker has been free for it for `headGrace`. While another line
+  /// is rendering ahead of it or a navigation line is playing, the system voice couldn't say it any
+  /// sooner, so it keeps waiting (and renders meanwhile). Main queue.
+  private func watchDeadline(_ job: Job) {
+    lock.lock()
+    guard job.state == .waiting, job.generation == generation else { lock.unlock(); return }
+    let renderingAhead = rendering.map { $0 !== job && $0.nav } ?? false
+    let queuedAhead = navJobs.prefix(while: { $0 !== job }).contains { $0.state == .waiting }
+    lock.unlock()
+    let now = Date()
+    let waited = now.timeIntervalSince(job.queuedAt)
+    let blocked = renderingAhead || queuedAhead || player.navBusy || (systemIsSpeaking?() ?? false)
+    if blocked {
+      job.headSince = nil
+    } else if job.headSince == nil {
+      job.headSince = now
     }
+    let headWait = job.headSince.map { now.timeIntervalSince($0) } ?? 0
+    let late = (!blocked && waited >= job.budget && headWait >= Self.headGrace) || waited >= job.budget + Self.deadlineCap
+    guard late else {
+      DispatchQueue.main.asyncAfter(deadline: .now() + Self.deadlineTick) { [self] in watchDeadline(job) }
+      return
+    }
+    lock.lock()
+    let fallBack = job.state == .waiting && job.generation == generation
+    if fallBack { job.state = .fellBack }
+    lock.unlock()
+    guard fallBack else { return }
+    Self.log.debug("Kokoro too slow for a navigation line, using the system voice")
+    Self.trace(job.text, voice: "system", why: blocked ? "deadlineCap" : "deadline", waitMs: waited * 1000,
+               budget: job.budget)
+    player.sayWithSystemVoice(nav: true, job.fallback)
   }
 
   /// Stops playback and forgets queued lines.
@@ -460,30 +630,55 @@ final class KokoroVoice: NSObject {
   // MARK: - Synthesis
 
   private func startWorker() {
+    lock.lock()
+    if workerStarted {
+      let worker = wake
+      lock.unlock()
+      worker?.yield()
+      return
+    }
+    workerStarted = true
     let (stream, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
-    lock.lock(); wake = continuation; lock.unlock()
+    wake = continuation
+    lock.unlock()
     continuation.yield()
     // One line at a time: concurrent Core ML renders are what made BNNS crash in EpubToM4B.
     Task.detached(priority: .userInitiated) { [self] in
       for await _ in stream {
-        while let job = nextJob() {
-          await synthesize(job)
+        while let work = nextWork() {
+          switch work {
+          case .line(let job): await synthesize(job)
+          case .chore(let chore): await chore()
+          }
         }
       }
     }
   }
 
-  private func nextJob() -> Job? {
+  private enum Work {
+    case line(Job)
+    case chore(() async -> Void)
+  }
+
+  /// Navigation lines, then chores (a warm-up must not hold up a turn), then roasts.
+  private func nextWork() -> Work? {
     lock.lock(); defer { lock.unlock() }
     // A navigation line the system voice already said isn't rendered: with one worker, warming the
     // cache with it kept roasts waiting until they went stale.
     while !navJobs.isEmpty {
       let job = navJobs.removeFirst()
-      if job.state != .fellBack { return job }
+      if job.state != .fellBack {
+        rendering = job
+        return .line(job)
+      }
     }
+    if !chores.isEmpty { return .chore(chores.removeFirst()) }
     while !roastJobs.isEmpty {
       let job = roastJobs.removeFirst()
-      if job.keep || Date().timeIntervalSince(job.queuedAt) <= Self.roastMaxAge { return job }
+      if job.keep || Date().timeIntervalSince(job.queuedAt) <= Self.roastMaxAge {
+        rendering = job
+        return .line(job)
+      }
     }
     return nil
   }
@@ -501,19 +696,152 @@ final class KokoroVoice: NSObject {
   /// Faster than this (the first trip's speed run) is on purpose and keeps its speed.
   private static let deliberatelyFast: Float = 1.3
 
-  private func render(_ text: String, speed: Float, voice: String, with engine: KokoroAneManager) async throws -> Data {
+  private func render(_ text: String, speed: Float, voice: String, nav: Bool,
+                      with engine: KokoroAneManager) async throws -> Data {
     let fast = speed >= Self.deliberatelyFast
-    let pace = fast ? speed : min(Self.basePace + (speed - 1) * 0.5, Self.paceCap)
-    var samples: [Float] = []
+    var pace = fast ? speed : min(Self.basePace + (speed - 1) * 0.5, Self.paceCap)
+    // Directions are never hurried: frustration speeds up the roasts, not the turn you need.
+    if nav && !fast { pace = min(pace, Self.basePace) }
     var sampleRate = KokoroAneConstants.sampleRate
+    var samples: [Float] = []
+    var first = true
     // A speed run keeps its commas tight: "right, left, right" with pauses isn't fast.
-    for (piece, pause) in Self.pieces(of: text, commas: !fast) {
+    for (piece, pause) in Self.pieces(of: Self.speakable(text), commas: !fast) {
       let result = try await engine.synthesizeDetailed(text: piece, voice: voice, speed: pace)
       sampleRate = result.sampleRate
+      // A Bluetooth car stereo wakes up on the first sound and swallows it: lead in with silence.
+      if first { samples += [Float](repeating: 0, count: Int(Double(sampleRate) * Self.leadIn)) }
+      first = false
       samples += result.samples
       samples += [Float](repeating: 0, count: Int(Double(sampleRate) * pause))
     }
+    Self.level(&samples)
     return try AudioWAV.data(from: samples, sampleRate: Double(sampleRate), normalize: false)
+  }
+
+  private static let leadIn: TimeInterval = 0.12
+  /// Clips are brought up to this peak: raw Kokoro is quieter than the system voice, and over road
+  /// noise and music that read as "less clear".
+  private static let targetPeak: Float = 0.89
+  private static let maxGain: Float = 2.5
+
+  /// One gain for the whole clip (no compression, so the delivery keeps its shape).
+  private static func level(_ samples: inout [Float]) {
+    let peak = samples.reduce(Float(0)) { max($0, abs($1)) }
+    guard peak > 0.01 else { return }
+    let gain = min(targetPeak / peak, maxGain)
+    guard abs(gain - 1) > 0.05 else { return }
+    for i in samples.indices { samples[i] *= gain }
+  }
+
+  // MARK: - Reading text out loud
+
+  private static let streetWords = [
+    "St": "Street", "Ave": "Avenue", "Blvd": "Boulevard", "Rd": "Road", "Dr": "Drive", "Ln": "Lane",
+    "Ct": "Court", "Pkwy": "Parkway", "Hwy": "Highway", "Pl": "Place", "Cir": "Circle", "Ter": "Terrace",
+    "Trl": "Trail", "Expy": "Expressway", "Fwy": "Freeway", "Sq": "Square", "Mt": "Mount",
+  ]
+  private static let compassWords = [
+    "N": "North", "S": "South", "E": "East", "W": "West",
+    "NE": "Northeast", "NW": "Northwest", "SE": "Southeast", "SW": "Southwest",
+  ]
+  private static let unitWords = [
+    "ft": "feet", "mi": "miles", "mph": "miles an hour", "km": "kilometers", "m": "meters", "yd": "yards",
+  ]
+
+  /// `text` the way it should sound: street abbreviations, compass points, highway names, units and
+  /// numbers written out. Kokoro reads what's written; the system voice did this itself, which is
+  /// part of why its directions sounded clearer.
+  static func speakable(_ text: String) -> String {
+    var s = text.replacingOccurrences(of: " & ", with: " and ")
+    // "Main St", "Elm Dr." after a word, at the end or before punctuation, a lowercase word or a
+    // compass point ("Main St NW"). Not "Dr Smith" or "St Louis". A period after it stays: it was
+    // probably the end of the sentence too.
+    let compass = "(?:NE|NW|SE|SW|N|S|E|W)"
+    s = replace(s, "(?<=[A-Za-z] )(St|Ave|Blvd|Rd|Dr|Ln|Ct|Pkwy|Hwy|Pl|Cir|Ter|Trl|Expy|Fwy|Sq)(?=$|[,;:!?.)]|\\s+(?:[a-z]|\(compass)\\b))") {
+      streetWords[$0[1]] ?? $0[0]
+    }
+    s = replace(s, "\\bMt\\.? (?=[A-Z])") { _ in "Mount " }
+    // Compass points next to a street name: "N Main", "Main St NW".
+    s = replace(s, "(?<![^\\s])(\(compass))\\.?(?= [A-Z0-9])") { compassWords[$0[1]] ?? $0[0] }
+    s = replace(s, "(?<=[A-Za-z0-9] )(\(compass))(?=$|[\\s,;:!?.])") { compassWords[$0[1]] ?? $0[0] }
+    // Highways: "I-25" is "I twenty-five", "US-36" is "U.S. thirty-six".
+    s = replace(s, "\\b(I|US|SR|CR)[- ](\\d+)\\b") { m in
+      let name = ["I": "I", "US": "U.S.", "SR": "State Route", "CR": "County Road"][m[1]] ?? m[1]
+      return "\(name) \(m[2])"
+    }
+    // Units after a number.
+    s = replace(s, "(?<=\\d) ?(ft|mi|mph|km|m|yd)\\b\\.?") { " " + (unitWords[$0[1]] ?? $0[1]) }
+    s = replace(s, "(\\d+)/(\\d+)") { m in
+      switch (m[1], m[2]) {
+      case ("1", "2"): return "a half"
+      case ("1", "4"): return "a quarter"
+      case ("3", "4"): return "three quarters"
+      default: return "\(m[1]) over \(m[2])"
+      }
+    }
+    // Times: "2:30" is "two thirty".
+    s = replace(s, "\\b(\\d{1,2}):(\\d{2})\\b") { m in
+      let minutes = Int(m[2]) ?? 0
+      let hour = spell(Int(m[1]) ?? 0)
+      if minutes == 0 { return "\(hour) o'clock" }
+      return minutes < 10 ? "\(hour) oh \(spell(minutes))" : "\(hour) \(spell(minutes))"
+    }
+    // Ordinals: "8th Street" is "eighth street".
+    s = replace(s, "\\b(\\d+)(st|nd|rd|th)\\b") { m in ordinal(Int(m[1]) ?? 0) }
+    // Decimals and plain numbers ("1,200" too). Long ones (phone numbers, zip codes) digit by digit.
+    s = replace(s, "\\b(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d+))?\\b") { m in
+      let whole = m[1].replacingOccurrences(of: ",", with: "")
+      var said = whole.count > 6 ? whole.map { spell(Int(String($0)) ?? 0) }.joined(separator: " ")
+                                 : spell(Int(whole) ?? 0)
+      if !m[2].isEmpty { said += " point " + m[2].map { spell(Int(String($0)) ?? 0) }.joined(separator: " ") }
+      return said
+    }
+    return s
+  }
+
+  private static let spellOut: NumberFormatter = {
+    let f = NumberFormatter()
+    f.numberStyle = .spellOut
+    f.locale = Locale(identifier: "en_US")
+    return f
+  }()
+
+  private static func spell(_ n: Int) -> String {
+    spellOut.string(from: NSNumber(value: n)) ?? String(n)
+  }
+
+  /// "twenty-one" to "twenty-first".
+  private static func ordinal(_ n: Int) -> String {
+    let words = spell(n)
+    let irregular = ["one": "first", "two": "second", "three": "third", "five": "fifth", "eight": "eighth",
+                     "nine": "ninth", "twelve": "twelfth"]
+    let cut = words.lastIndex { $0 == " " || $0 == "-" }.map { words.index(after: $0) } ?? words.startIndex
+    let head = String(words[..<cut])
+    let last = String(words[cut...])
+    if let word = irregular[last] { return head + word }
+    if last.hasSuffix("y") { return head + String(last.dropLast()) + "ieth" }
+    return head + last + "th"
+  }
+
+  /// Every match of `pattern` in `text`, replaced by `with` (given the match and its groups; a
+  /// group that didn't take part is "").
+  private static func replace(_ text: String, _ pattern: String, with: ([String]) -> String) -> String {
+    guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+    let ns = text as NSString
+    var out = ""
+    var last = 0
+    for match in regex.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+      out += ns.substring(with: NSRange(location: last, length: match.range.location - last))
+      let groups = (0..<match.numberOfRanges).map { i -> String in
+        let r = match.range(at: i)
+        return r.location == NSNotFound ? "" : ns.substring(with: r)
+      }
+      out += with(groups)
+      last = match.range.location + match.range.length
+    }
+    out += ns.substring(from: last)
+    return out
   }
 
   /// `text` split into sentences (and clauses at commas), each with the silence that follows it.
@@ -557,7 +885,9 @@ final class KokoroVoice: NSObject {
     lock.lock()
     let current = job.generation == generation
     let engine = primary
+    let onCPU = primaryOnCPU
     lock.unlock()
+    defer { lock.lock(); if rendering === job { rendering = nil }; lock.unlock() }
     guard current, let engine else { return }
 
     let renderStart = Date()
@@ -567,10 +897,23 @@ final class KokoroVoice: NSObject {
     }
     do {
       do {
-        wav = try await render(job.text, speed: job.speed, voice: job.voice, with: engine)
-      } catch {
+        wav = try await render(job.text, speed: job.speed, voice: job.voice, nav: job.nav, with: engine)
+        lock.lock(); aneFailures = 0; lock.unlock()
+      } catch where !onCPU {
         Self.log.error("Kokoro (Neural Engine) failed, retrying on the CPU: \(error.localizedDescription, privacy: .public)")
-        wav = try await render(job.text, speed: job.speed, voice: job.voice, with: try await cpuEngine(voice: job.voice))
+        BackseatLog.event("voice.error", ["error": error.localizedDescription, "where": "ane"])
+        let cpu = try await cpuEngine(voice: job.voice)
+        wav = try await render(job.text, speed: job.speed, voice: job.voice, nav: job.nav, with: cpu)
+        // The Neural Engine keeps failing (it can, in the background): stay on the CPU, which works.
+        lock.lock()
+        aneFailures += 1
+        let move = aneFailures >= 2 && primary === engine
+        if move {
+          primary = cpu
+          primaryOnCPU = true
+        }
+        lock.unlock()
+        if move { BackseatLog.event("voice.engine", ["on": "cpu", "reason": "Neural Engine failed twice in a row"]) }
       }
     } catch {
       Self.log.error("Kokoro failed on a line: \(error.localizedDescription, privacy: .public)")
@@ -578,13 +921,18 @@ final class KokoroVoice: NSObject {
       lock.lock()
       let fallBack = job.state == .waiting
       if fallBack { job.state = .fellBack }
+      lineFailures += 1
+      let reload = lineFailures >= 3
       lock.unlock()
       if fallBack { Self.trace(job.text, voice: "system", why: "error", budget: job.nav ? job.budget : 0) }
       if fallBack { DispatchQueue.main.async { self.player.sayWithSystemVoice(nav: job.nav, job.fallback) } }
+      if reload { reloadEngines("three lines in a row failed") }
       return
     }
 
     lock.lock()
+    lineFailures = 0
+    lastRender = Date()
     let key = Self.key(job.text, job.speed, job.voice)
     cache[key] = wav
     touch(key)
@@ -625,6 +973,8 @@ final class KokoroVoice: NSObject {
 /// - a navigation line goes first, and if a roast is talking it fades the roast out and takes over;
 ///   a navigation line is never cut;
 /// - a roast that has waited more than `roastStale` is dropped (replies to the driver are kept).
+/// It also keeps itself from getting stuck: a call or Siri pauses the clip and it picks up after,
+/// a clip that never reports finishing is let go, and a dead audio session is retried, not skipped.
 private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   private struct Item {
     let wav: Data
@@ -636,7 +986,11 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   var systemIsSpeaking: () -> Bool = { false }
   /// Called whenever a line goes to the system voice.
   var systemStoodIn: () -> Void = {}
+  /// Called when a call or Siri is over and the speaker is ours again.
+  var interruptionEnded: () -> Void = {}
   var isPlaying: Bool { current != nil || !navQueue.isEmpty || !roastQueue.isEmpty || !pendingSystem.isEmpty }
+  /// A navigation clip is talking or waiting to: a navigation line behind it can't go sooner.
+  var navBusy: Bool { (current != nil && currentIsNav) || !navQueue.isEmpty || pendingSystem.contains { $0.nav } }
   private var navQueue: [Item] = []
   private var roastQueue: [Item] = []
   private var current: AVAudioPlayer?
@@ -654,6 +1008,30 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   private static let gap: TimeInterval = 0.45
   /// How long a roast takes to fade out when a navigation line cuts in.
   private static let fade: TimeInterval = 0.2
+  /// A navigation clip still waiting this long after a call or Siri is out of date.
+  private static let navStale: TimeInterval = 30
+  /// A clip that hasn't said it finished this long after it should have is let go.
+  private static let finishSlack: TimeInterval = 1.5
+  /// While the audio session won't activate: how often to try, and for how long before giving up
+  /// on the waiting roasts.
+  private static let activateRetry: TimeInterval = 0.5
+  private static let activateGiveUp: TimeInterval = 10
+  /// True between a call or Siri starting and ending.
+  private var interrupted = false
+  private var activateFailingSince: Date?
+  /// Bumped for each clip, so a watchdog for an earlier one does nothing.
+  private var serial = 0
+
+  override init() {
+    super.init()
+    let center = NotificationCenter.default
+    center.addObserver(self, selector: #selector(interruption(_:)), name: AVAudioSession.interruptionNotification,
+                       object: nil)
+    center.addObserver(self, selector: #selector(mediaServicesReset(_:)),
+                       name: AVAudioSession.mediaServicesWereResetNotification, object: nil)
+    center.addObserver(self, selector: #selector(routeChanged(_:)), name: AVAudioSession.routeChangeNotification,
+                       object: nil)
+  }
 
   func play(_ wav: Data, nav: Bool, keep: Bool) {
     if nav {
@@ -689,6 +1067,97 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
     current = nil
   }
 
+  // MARK: Staying unstuck
+
+  /// A call, Siri or another app's alarm: AVAudioPlayer pauses and never says it finished, which
+  /// left every later line queued behind it in silence. Pause on purpose, and pick up after.
+  @objc private func interruption(_ note: Notification) {
+    guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+          let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
+    DispatchQueue.main.async { [self] in
+      switch type {
+      case .began:
+        interrupted = true
+        current?.pause()
+      case .ended:
+        interrupted = false
+        resumeAfterInterruption()
+        interruptionEnded()
+      @unknown default:
+        break
+      }
+    }
+  }
+
+  private func resumeAfterInterruption() {
+    let now = Date()
+    navQueue.removeAll { now.timeIntervalSince($0.queuedAt) > Self.navStale }
+    roastQueue.removeAll { !$0.keep && now.timeIntervalSince($0.queuedAt) > Self.roastStale }
+    if let player = current {
+      if currentIsNav, (try? AVAudioSession.sharedInstance().setActive(true)) != nil {
+        // A direction cut off mid-word is no use: say it again from the top.
+        player.currentTime = 0
+        if player.play() {
+          BackseatLog.event("voice.resume", ["what": "navigation clip"])
+          watch(player)
+          return
+        }
+      }
+      // A roast that got cut off isn't worth finishing.
+      player.stop()
+      current = nil
+    }
+    BackseatLog.event("voice.resume", ["queued": String(navQueue.count + roastQueue.count)])
+    flushSystemLines()
+    playNext()
+  }
+
+  /// The audio daemon restarted: every player is dead, and the session needs setting up again.
+  @objc private func mediaServicesReset(_ note: Notification) {
+    DispatchQueue.main.async { [self] in
+      BackseatLog.event("audio.reset", [:])
+      current = nil
+      interrupted = false
+      try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .voicePrompt,
+                                                       options: [.interruptSpokenAudioAndMixWithOthers, .duckOthers])
+      MWMTextToSpeech.applicationDidBecomeActive()
+      flushSystemLines()
+      playNext()
+    }
+  }
+
+  /// The car's Bluetooth went away: the clip that was talking may have stopped without a word.
+  @objc private func routeChanged(_ note: Notification) {
+    guard let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+          AVAudioSession.RouteChangeReason(rawValue: raw) == .oldDeviceUnavailable else { return }
+    DispatchQueue.main.async { [self] in
+      guard let player = current, !player.isPlaying, !interrupted else { return }
+      if player.play() { watch(player) } else { finished(player, why: "route change") }
+    }
+  }
+
+  /// Lets go of a clip that should have finished by now, so the queue behind it moves.
+  private func watch(_ player: AVAudioPlayer) {
+    serial += 1
+    let mine = serial
+    let left = max(player.duration - player.currentTime, 0) + Self.finishSlack
+    DispatchQueue.main.asyncAfter(deadline: .now() + left) { [weak self, weak player] in
+      guard let self, let player, mine == self.serial, player === self.current else { return }
+      if self.interrupted || player.isPlaying {
+        // Paused for a call, or still going (a slow Bluetooth start): look again later.
+        self.watch(player)
+        return
+      }
+      self.finished(player, why: "never finished")
+    }
+  }
+
+  private func finished(_ player: AVAudioPlayer, why: String) {
+    BackseatLog.event("voice.stuck", ["why": why])
+    player.stop()
+    audioPlayerDidFinishPlaying(player, successfully: false)
+  }
+
   func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
     guard player === current else { return }
     current = nil
@@ -721,7 +1190,7 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   }
 
   private func playNext() {
-    guard current == nil else { return }
+    guard current == nil, !interrupted else { return }
     let now = Date()
     if now < quietUntil {
       DispatchQueue.main.asyncAfter(deadline: .now() + quietUntil.timeIntervalSince(now)) { [weak self] in
@@ -737,23 +1206,40 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
     }
     waitingSince = nil
     roastQueue.removeAll { !$0.keep && Date().timeIntervalSince($0.queuedAt) > Self.roastStale }
-    let item: Item
-    if !navQueue.isEmpty { item = navQueue.removeFirst() }
-    else if !roastQueue.isEmpty { item = roastQueue.removeFirst() }
-    else { return }
+    guard !navQueue.isEmpty || !roastQueue.isEmpty else { return }
+    // The session can refuse to activate for a moment (another app holds it, or the mic is
+    // switching categories). Wait for it rather than throw the lines away.
     do {
       try AVAudioSession.sharedInstance().setActive(true)
-      let player = try AVAudioPlayer(data: item.wav)
-      player.delegate = self
-      current = player
-      currentIsNav = item.nav
-      if !player.play() {
-        current = nil
-        playNext()
-      }
+      activateFailingSince = nil
     } catch {
-      current = nil
+      let since = activateFailingSince ?? now
+      if activateFailingSince == nil {
+        activateFailingSince = now
+        BackseatLog.event("audio.activateFailed", ["error": error.localizedDescription])
+      }
+      if now.timeIntervalSince(since) > Self.activateGiveUp { roastQueue.removeAll { !$0.keep } }
+      navQueue.removeAll { now.timeIntervalSince($0.queuedAt) > Self.navStale }
+      DispatchQueue.main.asyncAfter(deadline: .now() + Self.activateRetry) { [weak self] in self?.playNext() }
+      return
+    }
+    let item = !navQueue.isEmpty ? navQueue.removeFirst() : roastQueue.removeFirst()
+    guard let player = try? AVAudioPlayer(data: item.wav) else {
+      BackseatLog.event("voice.error", ["error": "unplayable clip"])
       playNext()
+      return
+    }
+    player.delegate = self
+    current = player
+    currentIsNav = item.nav
+    if player.play() {
+      watch(player)
+    } else {
+      // One retry: the first play after a route change can fail while the output settles.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+        guard let self, player === self.current else { return }
+        if player.play() { self.watch(player) } else { self.finished(player, why: "wouldn't play") }
+      }
     }
   }
 }
