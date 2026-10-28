@@ -124,7 +124,17 @@ void InitLocalizedStrings() {
   [HttpThreadImpl setDownloadIndicatorProtocol:self];
 
   InitLocalizedStrings();
+  // Backseat Driver's night-drive look for UIKit's own controls, before any screen is made.
+  [MWMBackseatAppearance applyProxies];
   [MWMThemeManager invalidate];
+  // Backseat Driver: the tilted 3D map with buildings while driving, on by default (once; the
+  // driver can still turn it off in Settings).
+  if (![NSUserDefaults.standardUserDefaults boolForKey:@"Backseat3dDefault"])
+  {
+    GetFramework().Save3dMode(true /* allow3d */, true /* allow3dBuildings */);
+    GetFramework().Allow3dMode(true, true);
+    [NSUserDefaults.standardUserDefaults setBool:YES forKey:@"Backseat3dDefault"];
+  }
 
   [self commonInit];
   [BackseatLLM install];

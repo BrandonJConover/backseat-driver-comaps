@@ -157,6 +157,7 @@
 		BD5EA70000000000000000E1 /* BackseatTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000E0 /* BackseatTheme.swift */; };
 		BD5EA70000000000000000E3 /* BackseatCaptionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000E2 /* BackseatCaptionView.swift */; };
 		BD5EA70000000000000000F1 /* BackseatArrivalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000F0 /* BackseatArrivalCard.swift */; };
+		BD5EA70000000000000000F7 /* BackseatAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000F6 /* BackseatAppearance.swift */; };
 		BD5EA70000000000000000C4 /* MWMBackseatLog.mm in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000C1 /* MWMBackseatLog.mm */; };
 		BD5EA70000000000000000F5 /* MWMBackseatRoadTrip.mm in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000F4 /* MWMBackseatRoadTrip.mm */; };
 		BD5EA70000000000000000C5 /* BackseatDriveLogSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */; };
@@ -1002,6 +1003,7 @@
 		BD5EA70000000000000000E0 /* BackseatTheme.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatTheme.swift; sourceTree = "<group>"; };
 		BD5EA70000000000000000E2 /* BackseatCaptionView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatCaptionView.swift; sourceTree = "<group>"; };
 		BD5EA70000000000000000F0 /* BackseatArrivalCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatArrivalCard.swift; sourceTree = "<group>"; };
+		BD5EA70000000000000000F6 /* BackseatAppearance.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatAppearance.swift; sourceTree = "<group>"; };
 		BD5EA70000000000000000C0 /* MWMBackseatLog.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MWMBackseatLog.h; sourceTree = "<group>"; };
 		BD5EA70000000000000000C1 /* MWMBackseatLog.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatLog.mm; sourceTree = "<group>"; };
 		BD5EA70000000000000000F3 /* MWMBackseatRoadTrip.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MWMBackseatRoadTrip.h; sourceTree = "<group>"; };
@@ -2612,6 +2614,7 @@
 				BD5EA70000000000000000E0 /* BackseatTheme.swift */,
 				BD5EA70000000000000000E2 /* BackseatCaptionView.swift */,
 				BD5EA70000000000000000F0 /* BackseatArrivalCard.swift */,
+				BD5EA70000000000000000F6 /* BackseatAppearance.swift */,
 				BD5EA70000000000000000C0 /* MWMBackseatLog.h */,
 				BD5EA70000000000000000C1 /* MWMBackseatLog.mm */,
 				BD5EA70000000000000000F3 /* MWMBackseatRoadTrip.h */,
@@ -4919,6 +4922,7 @@
 				BD5EA70000000000000000E1 /* BackseatTheme.swift in Sources */,
 				BD5EA70000000000000000E3 /* BackseatCaptionView.swift in Sources */,
 				BD5EA70000000000000000F1 /* BackseatArrivalCard.swift in Sources */,
+				BD5EA70000000000000000F7 /* BackseatAppearance.swift in Sources */,
 				BD5EA70000000000000000C4 /* MWMBackseatLog.mm in Sources */,
 				BD5EA70000000000000000F5 /* MWMBackseatRoadTrip.mm in Sources */,
 				BD5EA70000000000000000C5 /* BackseatDriveLogSection.swift in Sources */,
@@ -5489,7 +5493,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 347526FA1DC0B00F00918CF5 /* common-debug.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "Debug Icon";
+				ASSETCATALOG_COMPILER_APPICON_NAME = "Backseat Icon";
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				BUNDLE_IDENTIFIER = com.brandonjconover.backseatdriver.debug;
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
@@ -5532,7 +5536,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 347526FB1DC0B00F00918CF5 /* common-release.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = Icon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "Backseat Icon";
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				BUNDLE_IDENTIFIER = com.brandonjconover.backseatdriver;
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;

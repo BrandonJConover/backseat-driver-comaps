@@ -270,6 +270,9 @@ BOOL defaultOrientation(CGSize const &size) {
     [self setTurnsViewVisible:YES];
     [self setupLanesViewIfNeeded];
     [self.lanesView setLanes:info.lanes];
+    // Backseat: a new maneuver pops the yellow turn box so the change catches the eye.
+    if (self.nextTurnImageView.image != info.turnImage && self.nextTurnImageView.image != nil)
+      [self backseatPopTurn];
     self.nextTurnImageView.image = info.turnImage;
 
     if (info.roundExitNumber == 0) {
@@ -544,6 +547,11 @@ BOOL defaultOrientation(CGSize const &size) {
   self.streetNameLabel.textColor = MWMBackseatTheme.text;
   self.streetNameLabel.font = [MWMBackseatTheme bodyFont:IPAD ? 24 : 20 weight:UIFontWeightSemibold];
   [self backseatRestyleView:self];
+}
+
+- (void)backseatPopTurn {
+  UIView * box = self.nextTurnImageView.superview.superview ?: self.nextTurnImageView;
+  [MWMBackseatTheme pop:box];
 }
 
 - (void)backseatRestyleView:(UIView *)view {

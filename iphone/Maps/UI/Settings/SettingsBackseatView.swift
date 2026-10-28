@@ -63,6 +63,11 @@ struct SettingsBackseatView: View {
     /// The actual view
     var body: some View {
         List {
+            // Backseat Driver at the top: its face, its name and a jab.
+            Section {
+                BackseatSettingsHero()
+            }
+
             Section {
                 NavigationLink {
                     SettingsBackseatFileView()
@@ -255,6 +260,7 @@ struct SettingsBackseatView: View {
             }
         }
         .accentColor(.accent)
+        .backseatList()
         .navigationTitle(Text(verbatim: "Backseat Driver"))
         .onAppear {
             reload()
@@ -432,6 +438,7 @@ struct SettingsBackseatVoiceView: View {
             }
         }
         .accentColor(.accent)
+        .backseatList()
         .navigationTitle(Text("voice"))
         .onAppear {
             selectedBackseatVoice = KokoroVoice.selectedVoiceID
@@ -574,6 +581,7 @@ struct SettingsBackseatFileView: View {
                 }
             }
         }
+        .backseatList()
         .navigationTitle(Text(verbatim: "Your file"))
         .onAppear(perform: reload)
     }
@@ -817,6 +825,7 @@ struct SettingsBackseatMileageView: View {
                 }
             }
         }
+        .backseatList()
         .navigationTitle(Text(verbatim: "Mileage log"))
         .onAppear(perform: reload)
         .onChange(of: year) { _ in reload() }

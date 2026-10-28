@@ -219,6 +219,7 @@ struct SettingsNavigationView: View {
         }
         .accentColor(.accent)
         .navigationViewStyle(StackNavigationViewStyle())
+        .backseatList()
         .navigationTitle("prefs_group_route")
         .onAppear {
             hasPerspectiveViewWhileRouting = Settings.hasPerspectiveViewWhileRouting

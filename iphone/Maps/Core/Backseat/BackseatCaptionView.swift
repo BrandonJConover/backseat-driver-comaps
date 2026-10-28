@@ -62,6 +62,7 @@ final class BackseatCaptionView: UIView {
   private let bubble = UIView()
   private let label = UILabel()
   private var hideWork: DispatchWorkItem?
+  private var patience = 10
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -121,7 +122,17 @@ final class BackseatCaptionView: UIView {
   func show(_ text: String) {
     label.text = text
     bubble.accessibilityLabel = text
-    UIView.animate(withDuration: 0.2) { self.bubble.alpha = 1 }
+    // Springs out of the face: grows from its corner.
+    let wasHidden = bubble.alpha < 0.01
+    if wasHidden {
+      bubble.transform = CGAffineTransform(translationX: -16, y: 8).scaledBy(x: 0.6, y: 0.6)
+    }
+    UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.62, initialSpringVelocity: 0.4,
+                   options: [.allowUserInteraction, .beginFromCurrentState]) {
+      self.bubble.alpha = 1
+      self.bubble.transform = .identity
+    }
+    if !wasHidden { BackseatMotion.pop(bubble) }
     hideWork?.cancel()
     let words = text.split(separator: " ").count
     let seconds = min(max(Double(words) * 0.45, 5), 12)
@@ -133,15 +144,24 @@ final class BackseatCaptionView: UIView {
   func hideBubble(animated: Bool) {
     hideWork?.cancel()
     if animated {
-      UIView.animate(withDuration: 0.4) { self.bubble.alpha = 0 }
+      UIView.animate(withDuration: 0.35, delay: 0, options: [.curveEaseIn, .beginFromCurrentState]) {
+        self.bubble.alpha = 0
+        self.bubble.transform = CGAffineTransform(translationX: -8, y: 4).scaledBy(x: 0.9, y: 0.9)
+      }
     } else {
       bubble.alpha = 0
     }
   }
 
   func setPatience(_ left: Int) {
-    meter.setLevel(left)
+    let dropped = left < patience
+    patience = left
+    meter.setLevel(left, animated: true)
     face.setMood(left)
+    if dropped && !isHidden {
+      BackseatMotion.shake(face)
+      BackseatHaptics.sigh()
+    }
   }
 
   @objc private func faceTapped() {
@@ -242,10 +262,15 @@ final class BackseatPatienceMeter: UIView {
 
   required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
-  func setLevel(_ left: Int) {
+  func setLevel(_ left: Int, animated: Bool = false) {
     let color = Self.color(for: left)
     for (i, segment) in segments.enumerated() {
-      segment.backgroundColor = i < left ? color : BackseatTheme.line
+      let target = i < left ? color : BackseatTheme.line
+      // Segments drain one after another, right to left.
+      let delay = animated ? Double(segments.count - i) * 0.03 : 0
+      UIView.animate(withDuration: animated ? 0.25 : 0, delay: delay) {
+        segment.backgroundColor = target
+      }
     }
     accessibilityLabel = "Patience \(left) of 10"
   }

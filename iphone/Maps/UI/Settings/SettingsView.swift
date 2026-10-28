@@ -162,14 +162,7 @@ struct SettingsView: View {
                 }
                 
                 Section {
-                    Picker(selection: $selectedAppearance) {
-                        ForEach(Settings.Appearance.allCases) { appearance in
-                            Text(appearance.description)
-                        }
-                    } label: {
-                        Text("pref_appearance_title")
-                    }
-                    
+                    // Backseat Driver: always night, so no appearance choice.
                     Picker(selection: $selectedCustomButtonKind) {
                         ForEach(MapCustomButton.Kind.offered) { customButtonKind in
                             Text(customButtonKind.description)
@@ -190,14 +183,6 @@ struct SettingsView: View {
                 }
                 
                 Section {
-                    Picker(selection: $selectedMapAppearance) {
-                        ForEach(Settings.Appearance.allCases) { mapAppearance in
-                            Text(mapAppearance.description)
-                        }
-                    } label: {
-                        Text("pref_mapappearance_title")
-                    }
-
                     VStack(alignment: .leading) {
                         Text("pref_font_size")
                         Slider(
@@ -358,6 +343,7 @@ struct SettingsView: View {
                     Text("enable_logging_warning_message")
                 }
             }
+            .backseatList()
             .navigationTitle("settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

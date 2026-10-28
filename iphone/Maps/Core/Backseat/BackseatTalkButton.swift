@@ -102,12 +102,14 @@ final class BackseatDriveOverlay: NSObject {
     ])
 
     let report = BackseatTheme.iconButton(symbol: "exclamationmark.triangle.fill", label: "Report police ahead")
+    BackseatMotion.addPress(to: report)
     report.addAction(UIAction { _ in
       MWMBackseatRewriter.runTool("report_police", argument: "", spoken: "report police")
     }, for: .touchUpInside)
 
     // Drawing a route: the driver only while (nearly) stopped; otherwise it says it's for passengers.
     let draw = BackseatTheme.iconButton(symbol: "scribble", label: "Draw route")
+    BackseatMotion.addPress(to: draw)
     draw.addAction(UIAction { _ in BackseatSketch.open() }, for: .touchUpInside)
 
     let stack = UIStackView(arrangedSubviews: [speedCard, report, draw])
@@ -141,6 +143,18 @@ final class BackseatDriveOverlay: NSObject {
     }
   }
 
+  /// Under this far from the turn, it's "turn now".
+  private static let turnNowMeters = 40.0
+  private static var wasNearTurn = false
+
+  /// Two knocks you can feel as the turn arrives, once per turn.
+  private static func checkTurnNow() {
+    let meters = MWMBackseatRewriter.metersToNextTurn
+    let near = meters > 0 && meters < turnNowMeters
+    if near && !wasNearTurn { BackseatHaptics.turnNow() }
+    wasNearTurn = near
+  }
+
   /// The limit on the sign, your speed beside it: orange digits and an orange edge when over.
   private static func update() {
     // The Patience meter under the GPS's face: 10 when calm, down to 0 when it's had enough.
@@ -155,6 +169,8 @@ final class BackseatDriveOverlay: NSObject {
     let over = limitMps > 0 && speedMps > limitMps
     speedLabel.textColor = over ? BackseatTheme.hot : BackseatTheme.text
     speedCard.layer.borderColor = (over ? BackseatTheme.hot : UIColor.clear).cgColor
+    BackseatMotion.breathe(speedCard.layer, on: over)
+    checkTurnNow()
     speedCard.accessibilityLabel = limitMps > 0
       ? "\(speed.valueAsString) \(speed.unit), limit \(Measure(asSpeed: limitMps).valueAsString)"
       : "\(speed.valueAsString) \(speed.unit)"

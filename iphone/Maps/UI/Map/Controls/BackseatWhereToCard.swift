@@ -99,7 +99,7 @@ struct BackseatWhereToCard: View {
                         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.raised))
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(BackseatPressStyle())
                 .accessibilityLabel(Text(verbatim: "Draw route"))
             }
 
@@ -125,7 +125,7 @@ struct BackseatWhereToCard: View {
                 .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(isListening ? Palette.hot : Palette.accent))
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(BackseatPressStyle())
             .accessibilityLabel(Text(verbatim: isListening ? "Stop listening" : "Say where to"))
 
             // After a trip: one tap back the way you came.
@@ -161,7 +161,7 @@ struct BackseatWhereToCard: View {
                     .background(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Palette.accent, lineWidth: 1.5))
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(BackseatPressStyle())
                 .accessibilityLabel(Text(verbatim: "Head back to \(returnTrip.name)"))
 
                 // Came on a saved route: the same roads the other way.
@@ -171,7 +171,7 @@ struct BackseatWhereToCard: View {
                     } label: {
                         capsule(symbol: "arrow.triangle.swap", text: "Same way back (\(saved.name))")
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(BackseatPressStyle())
                 }
             }
 
@@ -185,7 +185,7 @@ struct BackseatWhereToCard: View {
                             } label: {
                                 capsule(symbol: "scribble", text: route.name)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(BackseatPressStyle())
                             .contextMenu {
                                 Button {
                                     newName = route.name
@@ -221,7 +221,7 @@ struct BackseatWhereToCard: View {
                             } label: {
                                 tile(for: place)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(BackseatPressStyle())
                         }
                     }
                 }

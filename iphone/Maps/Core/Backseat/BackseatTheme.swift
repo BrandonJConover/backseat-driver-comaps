@@ -1,3 +1,4 @@
+import SwiftUI
 import UIKit
 
 /// Backseat Driver's own look: night asphalt surfaces, a road-sign yellow, and an orange for when
@@ -89,6 +90,105 @@ enum BackseatTheme {
   }
 }
 
+/// Taps you can feel, kept rare so they mean something: the turn is now, a grade lands.
+enum BackseatHaptics {
+  /// A button press on a Backseat card.
+  static func tap() {
+    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+  }
+
+  /// "Turn now": two firm knocks, felt through a phone mount.
+  static func turnNow() {
+    let generator = UIImpactFeedbackGenerator(style: .heavy)
+    generator.prepare()
+    generator.impactOccurred()
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { generator.impactOccurred(intensity: 0.8) }
+  }
+
+  /// The grade stamp hits the card.
+  static func stamp(good: Bool) {
+    UINotificationFeedbackGenerator().notificationOccurred(good ? .success : .error)
+  }
+
+  /// Patience just dropped.
+  static func sigh() {
+    UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6)
+  }
+}
+
+/// SwiftUI buttons on Backseat cards: a quick squeeze and a light tap when pressed.
+struct BackseatPressStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .scaleEffect(configuration.isPressed ? 0.96 : 1)
+      .brightness(configuration.isPressed ? -0.06 : 0)
+      .animation(.spring(response: 0.25, dampingFraction: 0.6), value: configuration.isPressed)
+      .onChange(of: configuration.isPressed) { _, pressed in
+        if pressed { BackseatHaptics.tap() }
+      }
+  }
+}
+
+/// UIKit views: a springy squeeze on touch down, back on release.
+enum BackseatMotion {
+  static func addPress(to button: UIButton) {
+    button.addAction(UIAction { [weak button] _ in
+      UIView.animate(withDuration: 0.18, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0,
+                     options: [.allowUserInteraction, .beginFromCurrentState]) {
+        button?.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
+      }
+      BackseatHaptics.tap()
+    }, for: .touchDown)
+    let release = UIAction { [weak button] _ in
+      UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 0.8,
+                     options: [.allowUserInteraction, .beginFromCurrentState]) {
+        button?.transform = .identity
+      }
+    }
+    button.addAction(release, for: [.touchUpInside, .touchUpOutside, .touchCancel])
+  }
+
+  /// A new turn: the card dips and springs back, so the change catches the eye.
+  static func pop(_ view: UIView) {
+    view.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+    UIView.animate(withDuration: 0.55, delay: 0, usingSpringWithDamping: 0.55, initialSpringVelocity: 0.6,
+                   options: [.allowUserInteraction, .beginFromCurrentState]) {
+      view.transform = .identity
+    }
+  }
+
+  /// A short sideways shake, for an annoyed face.
+  static func shake(_ view: UIView) {
+    let animation = CAKeyframeAnimation(keyPath: "transform.translation.x")
+    animation.values = [0, -5, 5, -4, 4, -2, 0]
+    animation.duration = 0.45
+    view.layer.add(animation, forKey: "shake")
+  }
+
+  /// A soft glow that breathes in and out (the over-the-limit edge).
+  static func breathe(_ layer: CALayer, on: Bool) {
+    if on {
+      guard layer.animation(forKey: "breathe") == nil else { return }
+      let animation = CABasicAnimation(keyPath: "shadowOpacity")
+      animation.fromValue = 0.2
+      animation.toValue = 0.9
+      animation.duration = 0.8
+      animation.autoreverses = true
+      animation.repeatCount = .infinity
+      layer.shadowColor = BackseatTheme.hot.cgColor
+      layer.shadowRadius = 10
+      layer.shadowOffset = .zero
+      layer.add(animation, forKey: "breathe")
+    } else if layer.animation(forKey: "breathe") != nil {
+      layer.removeAnimation(forKey: "breathe")
+      layer.shadowColor = UIColor.black.cgColor
+      layer.shadowOpacity = 0.45
+      layer.shadowRadius = 14
+      layer.shadowOffset = CGSize(width: 0, height: 8)
+    }
+  }
+}
+
 /// A US-style SPEED LIMIT sign: white, black border, the limit in big condensed digits.
 /// Hidden when the limit is unknown.
 final class BackseatSpeedLimitSign: UIView {
@@ -151,4 +251,5 @@ final class BackseatSpeedLimitSign: UIView {
   @objc static func numberFont(_ size: CGFloat) -> UIFont { BackseatTheme.number(size) }
   @objc static func bodyFont(_ size: CGFloat, weight: UIFont.Weight) -> UIFont { BackseatTheme.body(size, weight: weight) }
   @objc static func styleCard(_ view: UIView, radius: CGFloat) { BackseatTheme.styleCard(view, radius: radius) }
+  @objc static func pop(_ view: UIView) { BackseatMotion.pop(view) }
 }

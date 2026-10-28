@@ -20,6 +20,7 @@
 
   self.window = [[UIWindow alloc] initWithWindowScene:(UIWindowScene *)scene];
   self.window.rootViewController = [MapsAppDelegate.theApp ensureMapNavigationController];
+  [MWMBackseatAppearance applyTo:self.window];
   [self.window makeKeyAndVisible];
 
   // Handle cold-start deep links and document imports delivered via URL contexts.

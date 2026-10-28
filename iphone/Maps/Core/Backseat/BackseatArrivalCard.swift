@@ -155,6 +155,8 @@ struct BackseatArrivalCardView: View {
   let dismiss: () -> Void
 
   @State private var sharing = false
+  /// The stamp slams down and the bars fill once the card is up.
+  @State private var landed = false
 
   private enum Palette {
     static let card = Color(uiColor: BackseatTheme.card)
@@ -189,6 +191,12 @@ struct BackseatArrivalCardView: View {
       .padding(.bottom, 24)
     }
     .background(Color(uiColor: BackseatTheme.asphalt).ignoresSafeArea())
+    .onAppear {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.55)) { landed = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { BackseatHaptics.stamp(good: report.isGood) }
+      }
+    }
     .sheet(isPresented: $sharing) { ShareSheet(text: report.shareText) }
   }
 
@@ -201,7 +209,9 @@ struct BackseatArrivalCardView: View {
         .foregroundStyle(stampColor)
         .frame(width: 104, height: 104)
         .overlay(Circle().strokeBorder(stampColor, lineWidth: 4))
-        .rotationEffect(.degrees(-8))
+        .rotationEffect(.degrees(landed ? -8 : -24))
+        .scaleEffect(landed ? 1 : 2.4)
+        .opacity(landed ? 1 : 0)
         .accessibilityLabel(Text(verbatim: "Grade \(report.letter)"))
 
       VStack(alignment: .leading, spacing: 4) {
@@ -244,7 +254,9 @@ struct BackseatArrivalCardView: View {
       GeometryReader { geo in
         ZStack(alignment: .leading) {
           Capsule().fill(Palette.line)
-          Capsule().fill(color).frame(width: geo.size.width * CGFloat(min(max(score, 0), 100)) / 100)
+          Capsule().fill(color)
+            .frame(width: landed ? geo.size.width * CGFloat(min(max(score, 0), 100)) / 100 : 0)
+            .animation(.easeOut(duration: 0.9).delay(0.5), value: landed)
         }
       }
       .frame(height: 8)
@@ -293,7 +305,7 @@ struct BackseatArrivalCardView: View {
           .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Palette.accent))
           .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BackseatPressStyle())
       }
       HStack(spacing: 10) {
         secondary(report.isGood ? "Brag about it" : "Share my shame") { sharing = true }
@@ -313,7 +325,7 @@ struct BackseatArrivalCardView: View {
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Palette.line, lineWidth: 1))
         .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
+    .buttonStyle(BackseatPressStyle())
   }
 }
 
