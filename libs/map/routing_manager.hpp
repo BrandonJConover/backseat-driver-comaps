@@ -352,6 +352,9 @@ public:
   /// Removes every drawn shaping point, keeping the stops. Returns false if there were none.
   bool ClearRouteSketch();
   bool HasRouteSketch() const;
+  /// Backseat Draw mode is open: rebuilt routes don't move the map (no fit-to-route), so panning
+  /// while drawing and re-planning stays where the driver put it.
+  void SetBackseatKeepViewport(bool keep) { m_backseatKeepViewport = keep; }
 
   void SetRouterImpl(routing::RouterType type);
   void RemoveRoute(bool deactivateFollowing);
@@ -523,4 +526,5 @@ private:
   TransitReadManager * m_transitReadManager = nullptr;
 
   DECLARE_THREAD_CHECKER(m_threadChecker);
+  bool m_backseatKeepViewport = false;
 };

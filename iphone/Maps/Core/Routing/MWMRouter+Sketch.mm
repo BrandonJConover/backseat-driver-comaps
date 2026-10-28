@@ -239,6 +239,29 @@ double constexpr kPlanEvery = 0.3;
   return out;
 }
 
++ (void)setDrawModeOpen:(BOOL)open
+{
+  static NSTimer * keepPut;
+  auto & f = GetFramework();
+  f.GetRoutingManager().SetBackseatKeepViewport(open);
+  [keepPut invalidate];
+  keepPut = nil;
+  if (open)
+  {
+    f.StopLocationFollow();
+    f.GetRoutingManager().DisableFollowMode();
+    // While a route is followed the map returns to the car after 20 s untouched; any redraw resets
+    // that clock, so nudge one while drawing.
+    keepPut = [NSTimer scheduledTimerWithTimeInterval:5 repeats:YES block:^(NSTimer *) {
+      GetFramework().InvalidateRendering();
+    }];
+  }
+  else if ([self isOnRoute])
+  {
+    f.GetRoutingManager().FollowRoute();
+  }
+}
+
 + (void)beginSketchSession
 {
   History().clear();

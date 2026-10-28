@@ -442,7 +442,8 @@ void RoutingManager::OnBuildRouteReady(Route const & route, RouterResultCode cod
   // Validate route (in case of bicycle routing it can be invalid).
   ASSERT(route.IsValid(), ());
   // Do not show the full route if one or more stops were added, for easier multi-stop trip planning.
-  if (route.IsValid() && route.GetSubrouteCount() < 2 && m_currentRouterType != routing::RouterType::Ruler)
+  if (route.IsValid() && route.GetSubrouteCount() < 2 && m_currentRouterType != routing::RouterType::Ruler &&
+      !m_backseatKeepViewport)
   {
     m2::RectD routeRect = route.GetPoly().GetLimitRect();
     routeRect.Scale(kRouteScaleMultiplier);

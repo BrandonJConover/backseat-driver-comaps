@@ -243,6 +243,7 @@ final class RouteSketchOverlay: UIView {
   }
 
   private func close() {
+    MWMRouter.setDrawModeOpen(false)
     displayLink?.invalidate()
     displayLink = nil
     removeFromSuperview()
@@ -468,6 +469,7 @@ final class RouteSketchOverlay: UIView {
     overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     overlay.onErase = { say(MWMBackseatRewriter.sketchCleared()) }
     MWMRouter.beginSketchSession()
+    MWMRouter.setDrawModeOpen(true)
     controller.view.addSubview(overlay)
   }
 

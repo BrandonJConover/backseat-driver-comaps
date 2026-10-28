@@ -31,6 +31,10 @@ typedef NS_OPTIONS(NSUInteger, MWMRouteSketchResult) {
 /// there is one, otherwise at the last stop, otherwise where the last stroke ends. Replaces any
 /// earlier drawing and stops in between.
 + (MWMRouteSketchResult)buildSketch:(NSArray<NSArray<CLLocation *> *> *)items inView:(UIView *)mapView;
+/// Draw mode is open: the map stays where the driver puts it. Location follow stops, route rebuilds
+/// don't fit the map to the route, and navigation's snap-back to the car waits. Closing restores
+/// following when a route is being driven.
++ (void)setDrawModeOpen:(BOOL)open;
 /// Draw mode session: remembers the route as it was, so Cancel can put it back.
 + (void)beginSketchSession;
 /// Puts the route back as it was when the session began (no route if there was none).
