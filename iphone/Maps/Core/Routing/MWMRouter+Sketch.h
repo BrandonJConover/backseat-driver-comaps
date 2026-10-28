@@ -31,6 +31,23 @@ typedef NS_OPTIONS(NSUInteger, MWMRouteSketchResult) {
 /// there is one, otherwise at the last stop, otherwise where the last stroke ends. Replaces any
 /// earlier drawing and stops in between.
 + (MWMRouteSketchResult)buildSketch:(NSArray<NSArray<CLLocation *> *> *)items inView:(UIView *)mapView;
+/// Draw mode session: remembers the route as it was, so Cancel can put it back.
++ (void)beginSketchSession;
+/// Puts the route back as it was when the session began (no route if there was none).
++ (void)cancelSketchSession;
+
+/// Dragging the route line (MapQuest style). Begins at `point` if it's on the route line (a new via
+/// point there) or on a via point (`handle`, from viaHandlesInView:). NO if neither.
++ (BOOL)beginRouteDragAt:(CGPoint)point inView:(UIView *)mapView;
+/// Moves the via point under the finger; the route re-plans at most every 300 ms.
++ (void)moveRouteDragTo:(CGPoint)point inView:(UIView *)mapView;
+/// Drops it there and re-plans.
++ (void)endRouteDrag;
+/// Where the via points (drawn or dragged shaping points) are on screen, in route order.
++ (NSArray<NSValue *> *)viaHandlesInView:(UIView *)mapView;
+/// Removes the via point nearest `point` (within a finger's reach) and re-plans. NO if none.
++ (BOOL)removeViaAt:(CGPoint)point inView:(UIView *)mapView;
+
 /// Where a point of the map view is on the map, and back.
 + (CLLocationCoordinate2D)coordinateAtPoint:(CGPoint)point inView:(UIView *)mapView;
 + (CGPoint)pointForCoordinate:(CLLocationCoordinate2D)coordinate inView:(UIView *)mapView;

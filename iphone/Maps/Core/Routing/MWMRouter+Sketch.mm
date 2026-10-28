@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <iterator>
+#include <limits>
+#include <cmath>
 #include <optional>
 #include <vector>
 
@@ -23,6 +25,61 @@ void Remember()
 {
   History().push_back(GetFramework().GetRoutingManager().GetRoutePoints());
 }
+
+/// The route when Draw mode opened.
+std::optional<std::vector<RouteMarkData>> & SessionStart()
+{
+  static std::optional<std::vector<RouteMarkData>> start;
+  return start;
+}
+
+/// Puts `points` back as the route, in this order, with types and indexes made consistent.
+void SetPoints(std::vector<RouteMarkData> points)
+{
+  auto & manager = GetFramework().GetRoutingManager();
+  manager.RemoveRoutePoints();
+  for (size_t i = 0; i < points.size(); ++i)
+  {
+    auto & p = points[i];
+    p.m_pointType = i == 0 ? RouteMarkType::Start : i + 1 == points.size() ? RouteMarkType::Finish : RouteMarkType::Intermediate;
+    p.m_intermediateIndex = p.m_pointType == RouteMarkType::Intermediate ? i - 1 : 0;
+    manager.AddRoutePoint(std::move(p), false /* reorderIntermediatePoints */);
+  }
+}
+
+/// Screen distance (points) within which a finger is on the line or on a handle.
+CGFloat constexpr kReach = 28;
+
+m2::PointD ToMap(CGPoint p, UIView * view)
+{
+  CGFloat const s = view.contentScaleFactor;
+  return GetFramework().P3dtoG(m2::PointD(p.x * s, p.y * s));
+}
+
+CGPoint ToScreen(m2::PointD const & g, UIView * view)
+{
+  CGFloat const s = view.contentScaleFactor;
+  auto const p = GetFramework().GtoP3d(g);
+  return CGPointMake(p.x / s, p.y / s);
+}
+
+CGFloat Distance(CGPoint a, CGPoint b) { return hypot(a.x - b.x, a.y - b.y); }
+
+/// Distance from `p` to segment ab, on screen.
+CGFloat SegmentDistance(CGPoint p, CGPoint a, CGPoint b)
+{
+  CGFloat const dx = b.x - a.x, dy = b.y - a.y;
+  CGFloat const len2 = dx * dx + dy * dy;
+  CGFloat t = len2 == 0 ? 0 : ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+  t = std::clamp<CGFloat>(t, 0, 1);
+  return Distance(p, CGPointMake(a.x + t * dx, a.y + t * dy));
+}
+
+/// The dragged via point's index in the route points, while a drag is on.
+std::optional<size_t> gDragIndex;
+CFAbsoluteTime gLastPlan = 0;
+BOOL gPlanPending = NO;
+double constexpr kPlanEvery = 0.3;
 }  // namespace
 
 @implementation MWMRouter (Sketch)
@@ -100,8 +157,11 @@ void Remember()
   auto toLatLon = [](CLLocation * c) { return backseat::LatLon{c.coordinate.latitude, c.coordinate.longitude}; };
   auto toMercator = [](CLLocation * c) { return mercator::FromLatLon(c.coordinate.latitude, c.coordinate.longitude); };
 
-  // The last stop or stroke end becomes the destination when the route has none.
+  // The last stop or stroke end becomes the destination when the route has none. Points already in
+  // the route (stops, dragged vias) stay, ahead of what was drawn.
   std::vector<RouteMarkData> middle;
+  if (!passedAny && existing.size() > 2 && existing.front().m_pointType == RouteMarkType::Start)
+    middle.assign(existing.begin() + 1, existing.end() - 1);
   size_t const maxMiddle = RoutePointsLayout::kMaxIntermediatePointsCount;
   bool trimmed = false;
   size_t stops = 0;
@@ -177,6 +237,175 @@ void Remember()
   if (trimmed)
     out |= MWMRouteSketchResultTrimmed;
   return out;
+}
+
++ (void)beginSketchSession
+{
+  History().clear();
+  SessionStart() = GetFramework().GetRoutingManager().GetRoutePoints();
+}
+
++ (void)cancelSketchSession
+{
+  auto start = std::exchange(SessionStart(), std::nullopt);
+  bool const changed = !History().empty();
+  History().clear();
+  if (!start || !changed)
+    return;
+  if (start->size() < 2)
+  {
+    [self stopRouting];
+    GetFramework().GetRoutingManager().RemoveRoutePoints();
+    return;
+  }
+  for (auto & p : *start)
+    p.m_isPassed = false;
+  SetPoints(std::move(*start));
+  [self rebuildWithBestRouter:NO];
+}
+
++ (BOOL)beginRouteDragAt:(CGPoint)point inView:(UIView *)mapView
+{
+  auto & manager = GetFramework().GetRoutingManager();
+  if (!manager.IsRoutingActive())
+    return NO;
+  auto points = manager.GetRoutePoints();
+  if (points.size() < 2)
+    return NO;
+
+  // On a via point already: drag that one.
+  for (size_t i = 1; i + 1 < points.size(); ++i)
+  {
+    if (points[i].m_isShaping && Distance(ToScreen(points[i].m_position, mapView), point) <= kReach)
+    {
+      Remember();
+      gDragIndex = i;
+      return YES;
+    }
+  }
+
+  // On the line: where along it, and so between which two route points the new via goes. (Only
+  // once a route is built: there's no line before that.)
+  auto const route = manager.RoutingSession().GetRouteForTests();
+  if (!route || !route->IsValid())
+    return NO;
+  auto const & line = route->GetFollowedPolyline().GetPolyline().GetPoints();
+  if (line.size() < 2)
+    return NO;
+  std::vector<CGPoint> screen;
+  screen.reserve(line.size());
+  for (auto const & g : line)
+    screen.push_back(ToScreen(g, mapView));
+  size_t nearest = 0;
+  CGFloat best = CGFLOAT_MAX;
+  for (size_t i = 0; i + 1 < screen.size(); ++i)
+  {
+    CGFloat const d = SegmentDistance(point, screen[i], screen[i + 1]);
+    if (d < best)
+    {
+      best = d;
+      nearest = i;
+    }
+  }
+  if (best > kReach)
+    return NO;
+  auto lineIndexOf = [&](m2::PointD const & g)
+  {
+    size_t idx = 0;
+    double bestD = std::numeric_limits<double>::max();
+    for (size_t i = 0; i < line.size(); ++i)
+    {
+      double const d = line[i].SquaredLength(g);
+      if (d < bestD)
+      {
+        bestD = d;
+        idx = i;
+      }
+    }
+    return idx;
+  };
+  size_t insertAt = points.size() - 1;
+  for (size_t i = 1; i + 1 < points.size(); ++i)
+  {
+    if (lineIndexOf(points[i].m_position) > nearest)
+    {
+      insertAt = i;
+      break;
+    }
+  }
+  Remember();
+  RouteMarkData via;
+  via.m_isShaping = true;
+  via.m_position = ToMap(point, mapView);
+  points.insert(points.begin() + insertAt, std::move(via));
+  SetPoints(std::move(points));
+  gDragIndex = insertAt;
+  return YES;
+}
+
++ (void)moveRouteDragTo:(CGPoint)point inView:(UIView *)mapView
+{
+  if (!gDragIndex)
+    return;
+  auto points = GetFramework().GetRoutingManager().GetRoutePoints();
+  if (*gDragIndex >= points.size())
+    return;
+  points[*gDragIndex].m_position = ToMap(point, mapView);
+  SetPoints(std::move(points));
+  // Re-plan as the finger moves, but not more often than the router can keep up with.
+  CFAbsoluteTime const now = CFAbsoluteTimeGetCurrent();
+  if (now - gLastPlan >= kPlanEvery)
+  {
+    gLastPlan = now;
+    [self rebuildWithBestRouter:NO];
+  }
+  else if (!gPlanPending)
+  {
+    gPlanPending = YES;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, int64_t(kPlanEvery * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      gPlanPending = NO;
+      if (gDragIndex)
+      {
+        gLastPlan = CFAbsoluteTimeGetCurrent();
+        [self rebuildWithBestRouter:NO];
+      }
+    });
+  }
+}
+
++ (void)endRouteDrag
+{
+  if (!gDragIndex)
+    return;
+  gDragIndex.reset();
+  gLastPlan = CFAbsoluteTimeGetCurrent();
+  [self rebuildWithBestRouter:NO];
+}
+
++ (NSArray<NSValue *> *)viaHandlesInView:(UIView *)mapView
+{
+  NSMutableArray<NSValue *> * handles = [NSMutableArray array];
+  for (auto const & p : GetFramework().GetRoutingManager().GetRoutePoints())
+    if (p.m_isShaping)
+      [handles addObject:[NSValue valueWithCGPoint:ToScreen(p.m_position, mapView)]];
+  return handles;
+}
+
++ (BOOL)removeViaAt:(CGPoint)point inView:(UIView *)mapView
+{
+  auto points = GetFramework().GetRoutingManager().GetRoutePoints();
+  for (size_t i = 1; i + 1 < points.size(); ++i)
+  {
+    if (points[i].m_isShaping && Distance(ToScreen(points[i].m_position, mapView), point) <= kReach)
+    {
+      Remember();
+      points.erase(points.begin() + i);
+      SetPoints(std::move(points));
+      [self rebuildWithBestRouter:NO];
+      return YES;
+    }
+  }
+  return NO;
 }
 
 + (CLLocationCoordinate2D)coordinateAtPoint:(CGPoint)point inView:(UIView *)mapView

@@ -3,7 +3,9 @@ import UIKit
 
 /// Draw-your-own route: a see-through layer over the map where the driver sketches the way they
 /// want to go before anything is routed.
-/// - One finger highlights roads. Lifting the finger doesn't route anything; draw again to add more.
+/// - Press on the blue route line (or a white via handle) and drag: the route re-plans through your
+///   finger, live. Long-press a via handle to remove it.
+/// - One finger elsewhere highlights roads. Lifting the finger doesn't route anything; draw again to add more.
 /// - Two fingers pan and pinch-zoom the map, and the drawing stays put on the map.
 /// - A long press (half a second, held still) drops a stop pin.
 /// - Undo takes back the last stroke or pin. Erase clears everything, including an earlier drawn route.
@@ -18,8 +20,19 @@ final class RouteSketchOverlay: UIView {
   private var items: [[CLLocation]] = []
   /// Erase also takes away the route drawn earlier; it happens on Go, so Cancel leaves it be.
   private var eraseRoute = false
-  /// How things were before each change, for Undo (strokes, stops and erases alike).
-  private var history: [(items: [[CLLocation]], eraseRoute: Bool)] = []
+  /// Undo steps: the drawing as it was, or a change already made to the route (a drag).
+  private enum Step {
+    case drawing(items: [[CLLocation]], eraseRoute: Bool)
+    case route
+  }
+  private var history: [Step] = []
+  /// The route itself was changed here (dragged or a via removed); Cancel puts it back.
+  private var routeChanged = false
+  /// A finger is dragging the route line, and whether it has moved yet.
+  private var dragging = false
+  private var dragMoved = false
+  private var dragStart = CGPoint.zero
+  private let handlesLayer = CAShapeLayer()
   /// Cancel was tapped once with a drawing: the next tap discards it.
   private var confirmingCancel = false
   private weak var mapView: UIView?
@@ -54,9 +67,13 @@ final class RouteSketchOverlay: UIView {
       self.layer.addSublayer(layer)
     }
     drawingLayer.opacity = 0.8
+    handlesLayer.fillColor = UIColor.white.cgColor
+    handlesLayer.strokeColor = UIColor.systemBlue.cgColor
+    handlesLayer.lineWidth = 3
+    layer.addSublayer(handlesLayer)
 
     let hint = UILabel()
-    hint.text = "One finger highlights roads. Two fingers move and zoom. Hold to drop a stop. Tap Go when done."
+    hint.text = "Drag the blue line to change roads, or draw with one finger. Two fingers move and zoom. Hold to drop a stop."
     hint.font = .preferredFont(forTextStyle: .subheadline)
     hint.textColor = .white
     hint.numberOfLines = 0
@@ -126,7 +143,7 @@ final class RouteSketchOverlay: UIView {
     return button
   }
 
-  private var hasChanges: Bool { !items.isEmpty || eraseRoute }
+  private var hasChanges: Bool { !items.isEmpty || eraseRoute || routeChanged }
 
   private func updateButtons() {
     undoButton.isHidden = history.isEmpty
@@ -140,7 +157,7 @@ final class RouteSketchOverlay: UIView {
   }
 
   private func change(_ apply: () -> Void) {
-    history.append((items, eraseRoute))
+    history.append(.drawing(items: items, eraseRoute: eraseRoute))
     apply()
     redraw()
     updateButtons()
@@ -150,9 +167,23 @@ final class RouteSketchOverlay: UIView {
 
   private func undo() {
     guard let last = history.popLast() else { return }
-    items = last.items
-    eraseRoute = last.eraseRoute
+    switch last {
+    case .drawing(let previousItems, let previousErase):
+      items = previousItems
+      eraseRoute = previousErase
+    case .route:
+      MWMRouter.undoSketch()
+      follow(for: 1.5)
+    }
     redraw()
+    updateButtons()
+  }
+
+  /// The route was changed directly (a drag, a via removed): one Undo step.
+  private func routeWasChanged() {
+    history.append(.route)
+    routeChanged = true
+    follow(for: 1.5)
     updateButtons()
   }
 
@@ -168,7 +199,7 @@ final class RouteSketchOverlay: UIView {
   private func go() {
     guard let mapView, hasChanges else { return }
     if items.isEmpty {
-      if MWMRouter.clearSketch() { onErase?() }
+      if eraseRoute, MWMRouter.clearSketch() { onErase?() }
     } else {
       onStroke?(MWMRouter.buildSketch(items, in: mapView))
     }
@@ -187,6 +218,7 @@ final class RouteSketchOverlay: UIView {
       }
       return
     }
+    MWMRouter.cancelSketchSession()
     close()
   }
 
@@ -218,7 +250,19 @@ final class RouteSketchOverlay: UIView {
   }
 
   @objc private func longPressed(_ press: UILongPressGestureRecognizer) {
-    guard press.state == .began, let stop = coordinate(at: press.location(in: self)) else { return }
+    guard press.state == .began, let mapView else { return }
+    let at = press.location(in: self)
+    // Held still on a via handle (or on the line, which just made one): remove it.
+    if dragging && !dragMoved {
+      dragging = false
+      MWMRouter.endRouteDrag()
+      if MWMRouter.removeVia(at: convert(at, to: mapView), in: mapView) {
+        routeWasChanged()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+      }
+      return
+    }
+    guard let stop = coordinate(at: at) else { return }
     current.removeAll()
     change { items.append([stop]) }
     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -265,6 +309,14 @@ final class RouteSketchOverlay: UIView {
       }
     }
     for pin in pins[pinIndex...] { pin.isHidden = true }
+    let handles = UIBezierPath()
+    if let mapView {
+      for value in MWMRouter.viaHandles(in: mapView) {
+        let p = convert(value.cgPointValue, from: mapView)
+        handles.append(UIBezierPath(ovalIn: CGRect(x: p.x - 7, y: p.y - 7, width: 14, height: 14)))
+      }
+    }
+    handlesLayer.path = handles.cgPath
     drawingLayer.path = all.cgPath
     currentLayer.path = path(for: current).cgPath
   }
@@ -296,7 +348,7 @@ final class RouteSketchOverlay: UIView {
 
   @objc private func tick() {
     redraw()
-    if !panning && Date() > followUntil {
+    if !panning && !dragging && Date() > followUntil {
       displayLink?.invalidate()
       displayLink = nil
     }
@@ -315,7 +367,18 @@ final class RouteSketchOverlay: UIView {
       next?.touchesBegan(touches, with: event)
       return
     }
-    guard let touch = touches.first, let start = coordinate(at: touch.location(in: self)) else { return }
+    guard let touch = touches.first, let mapView else { return }
+    let at = touch.location(in: self)
+    // On the route line or a via handle: drag the route instead of drawing.
+    if MWMRouter.beginRouteDrag(at: convert(at, to: mapView), in: mapView) {
+      dragging = true
+      dragMoved = false
+      dragStart = at
+      UISelectionFeedbackGenerator().selectionChanged()
+      follow(for: 0)
+      return
+    }
+    guard let start = coordinate(at: at) else { return }
     current = [start]
     redraw()
   }
@@ -323,6 +386,13 @@ final class RouteSketchOverlay: UIView {
   override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
     if panning {
       next?.touchesMoved(touches, with: event)
+      return
+    }
+    if dragging, let touch = touches.first, let mapView {
+      let at = touch.location(in: self)
+      if !dragMoved && hypot(at.x - dragStart.x, at.y - dragStart.y) < 8 { return }
+      dragMoved = true
+      MWMRouter.moveRouteDrag(to: convert(at, to: mapView), in: mapView)
       return
     }
     guard !current.isEmpty, let touch = touches.first else { return }
@@ -342,6 +412,18 @@ final class RouteSketchOverlay: UIView {
       }
       return
     }
+    if dragging {
+      dragging = false
+      MWMRouter.endRouteDrag()
+      if dragMoved {
+        routeWasChanged()
+      } else {
+        // A tap on the line, not a drag: take the via it made back out.
+        MWMRouter.undoSketch()
+        follow(for: 0.5)
+      }
+      return
+    }
     // Lifting the finger only finishes the highlight; nothing is routed until Go.
     let stroke = current
     current.removeAll()
@@ -357,6 +439,13 @@ final class RouteSketchOverlay: UIView {
       next?.touchesCancelled(touches, with: event)
       panning = false
       follow(for: 1.5)
+      return
+    }
+    if dragging {
+      // The long press took over (removing a via), or the system interrupted.
+      dragging = false
+      MWMRouter.endRouteDrag()
+      redraw()
       return
     }
     // The long press took over (a stop), or the system interrupted: drop the stroke.
@@ -378,6 +467,7 @@ final class RouteSketchOverlay: UIView {
     overlay.frame = controller.view.bounds
     overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     overlay.onErase = { say(MWMBackseatRewriter.sketchCleared()) }
+    MWMRouter.beginSketchSession()
     controller.view.addSubview(overlay)
   }
 
