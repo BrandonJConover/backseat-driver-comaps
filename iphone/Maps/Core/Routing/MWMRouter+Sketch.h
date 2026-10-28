@@ -52,6 +52,9 @@ typedef NS_OPTIONS(NSUInteger, MWMRouteSketchResult) {
 /// Removes the via point nearest `point` (within a finger's reach) and re-plans. NO if none.
 + (BOOL)removeViaAt:(CGPoint)point inView:(UIView *)mapView;
 
+/// A finger stroke moved onto the car roads it traced, or the stroke itself when there's no road
+/// data to snap to.
++ (NSArray<CLLocation *> *)snapStrokeToRoads:(NSArray<CLLocation *> *)stroke;
 /// Where a point of the map view is on the map, and back.
 + (CLLocationCoordinate2D)coordinateAtPoint:(CGPoint)point inView:(UIView *)mapView;
 + (CGPoint)pointForCoordinate:(CLLocationCoordinate2D)coordinate inView:(UIView *)mapView;

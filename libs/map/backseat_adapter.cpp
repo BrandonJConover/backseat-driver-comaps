@@ -1262,6 +1262,68 @@ backseat::Bridge BackseatAdapter::BridgeAt(backseat::LatLon const & at, double b
   return water ? backseat::Bridge::Water : backseat::Bridge::Land;
 }
 
+std::vector<backseat::LatLon> BackseatAdapter::SnapToRoads(std::vector<backseat::LatLon> const & stroke) const
+{
+  if (!m_dataSource || stroke.size() < 2)
+    return {};
+  backseat::SnapOptions const options;
+  m2::RectD rect;
+  for (auto const & p : stroke)
+    rect.Add(mercator::FromLatLon(p.lat, p.lon));
+  // A stroke across a whole region would read too many roads to answer while the finger lifts.
+  double constexpr kMaxSpanM = 30000;
+  if (mercator::DistanceOnEarth(rect.LeftBottom(), rect.RightTop()) > kMaxSpanM)
+    return {};
+  // Everything within snapping reach of the stroke.
+  rect = m2::RectD();
+  for (auto const & p : stroke)
+    rect.Add(mercator::RectByCenterXYAndSizeInMeters(mercator::FromLatLon(p.lat, p.lon), 2 * options.maxSnapM));
+
+  // Roads a car can take: the highway classes cars drive, not footways, cycleways or tracks.
+  auto const & c = classif();
+  static std::vector<uint32_t> const kCarRoads = [&]
+  {
+    std::vector<uint32_t> types;
+    for (char const * kind : {"motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link",
+                              "secondary", "secondary_link", "tertiary", "tertiary_link", "unclassified",
+                              "residential", "living_street", "service", "road"})
+      types.push_back(c.GetTypeByPath({"highway", kind}));
+    return types;
+  }();
+
+  std::vector<backseat::RoadSegment> roads;
+  m_dataSource().ForEachInRect([&](FeatureType & ft)
+  {
+    if (ft.GetGeomType() != feature::GeomType::Line)
+      return;
+    bool car = false;
+    for (uint32_t type : feature::TypesHolder(ft))
+    {
+      ftype::TruncValue(type, 2);
+      if (std::find(kCarRoads.begin(), kCarRoads.end(), type) != kCarRoads.end())
+        car = true;
+    }
+    if (!car)
+      return;
+    auto const & id = ft.GetID();
+    std::uint64_t const road = (static_cast<std::uint64_t>(std::hash<std::string>()(id.GetMwmName())) << 32) ^ id.m_index;
+    ft.ParseGeometry(FeatureType::BEST_GEOMETRY);
+    for (size_t i = 1; i < ft.GetPointsCount(); ++i)
+    {
+      m2::PointD const a = ft.GetPoint(i - 1);
+      m2::PointD const b = ft.GetPoint(i);
+      if (!rect.IsIntersect(m2::RectD(std::min(a.x, b.x), std::min(a.y, b.y), std::max(a.x, b.x), std::max(a.y, b.y))))
+        continue;
+      roads.push_back({ToBackseatLatLon(a), ToBackseatLatLon(b), road});
+    }
+  }, rect, scales::GetUpperScale());
+
+  std::vector<backseat::LatLon> out;
+  for (auto const & p : backseat::SnapStroke(stroke, roads, options))
+    out.push_back(p.at);
+  return out;
+}
+
 std::optional<backseat::Venue> BackseatAdapter::VenueAt(backseat::LatLon const & at) const
 {
   if (!m_dataSource)

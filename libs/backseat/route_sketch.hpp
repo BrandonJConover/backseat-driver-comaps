@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <string>
+#include <cstdint>
 #include <vector>
 
 namespace backseat
@@ -78,4 +79,38 @@ struct SketchVerdict
 /// What the GPS thinks of the drawn route, against the fastest one between the same stops.
 /// Within a minute counts as the same route.
 SketchVerdict JudgeSketch(double fastestMinutes, double drawnMinutes);
+
+/// One straight piece of a road the car can drive. `road` tells pieces of the same road apart from
+/// a cross street (the host uses the feature id).
+struct RoadSegment
+{
+  LatLon a;
+  LatLon b;
+  std::uint64_t road = 0;
+};
+
+struct SnapOptions
+{
+  /// The stroke is looked at every this many meters.
+  double sampleM = 15;
+  /// A sample farther than this from every road is the finger wandering off: dropped.
+  double maxSnapM = 35;
+  /// At an intersection, the road the stroke is already on wins unless another is this much closer.
+  double stickyM = 12;
+};
+
+struct SnappedPoint
+{
+  LatLon at;
+  std::uint64_t road = 0;
+};
+
+/// The stroke as points every `everyM` along it (first and last kept).
+std::vector<LatLon> ResampleStroke(std::vector<LatLon> const & stroke, double everyM);
+
+/// Moves a finger stroke onto the roads it traced: each sample goes to the nearest point on the
+/// nearest road segment, staying on the same road through intersections. Samples with no road
+/// nearby are dropped.
+std::vector<SnappedPoint> SnapStroke(std::vector<LatLon> const & stroke, std::vector<RoadSegment> const & roads,
+                                     SnapOptions const & options = {});
 }  // namespace backseat

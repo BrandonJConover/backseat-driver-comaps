@@ -425,8 +425,9 @@ final class RouteSketchOverlay: UIView {
       }
       return
     }
-    // Lifting the finger only finishes the highlight; nothing is routed until Go.
-    let stroke = current
+    // Lifting the finger only finishes the highlight; nothing is routed until Go. The highlight
+    // moves onto the roads traced, and those snapped points are what Go routes through.
+    let stroke = current.count >= 2 ? MWMRouter.snapStroke(toRoads: current) : current
     current.removeAll()
     if stroke.count >= 2 {
       change { items.append(stroke) }

@@ -2,6 +2,7 @@
 
 #include "backseat/route_sketch.hpp"
 
+#include <cmath>
 #include <vector>
 
 using namespace backseat;
@@ -104,4 +105,51 @@ TEST(SketchVerdicts)
   CHECK_EQUAL(JudgeSketch(22, 22.4).key, std::string("sketch.same"));
   CHECK_EQUAL(JudgeSketch(22, 19).key, std::string("sketch.faster"));
   CHECK_EQUAL(JudgeSketch(22, 19).minutes, 3);
+}
+
+namespace
+{
+// An east-west road along 40.0 N and a north-south one crossing it at -105.0.
+std::vector<RoadSegment> Crossroads()
+{
+  return {{{40.0, -105.01}, {40.0, -105.0}, 1},
+          {{40.0, -105.0}, {40.0, -104.99}, 1},
+          {{39.99, -105.0}, {40.0, -105.0}, 2},
+          {{40.0, -105.0}, {40.01, -105.0}, 2}};
+}
+}  // namespace
+
+TEST(SketchResamplesEvenly)
+{
+  auto const pts = ResampleStroke(Line({40.0, -105.0}, {40.0, -104.99}, 3), 100);
+  // About 850 m: a point every 100 m plus the end.
+  CHECK(pts.size() >= 9 && pts.size() <= 10);
+  for (size_t i = 1; i + 1 < pts.size(); ++i)
+    CHECK(std::fabs(SketchDistanceM(pts[i - 1], pts[i]) - 100) < 1);
+}
+
+TEST(SketchSnapsOntoTheRoadTraced)
+{
+  // Drawn ~11 m north of the east-west road.
+  auto const snapped = SnapStroke(Line({40.0001, -105.009}, {40.0001, -105.005}, 10), Crossroads());
+  CHECK(snapped.size() > 5);
+  for (auto const & p : snapped)
+  {
+    CHECK(std::fabs(p.at.lat - 40.0) < 1e-6);
+    CHECK_EQUAL(p.road, 1u);
+  }
+}
+
+TEST(SketchDropsWhereThereIsNoRoad)
+{
+  // ~110 m north of anything: nothing to snap to.
+  CHECK(SnapStroke(Line({40.001, -105.009}, {40.001, -105.005}, 5), Crossroads()).empty());
+}
+
+TEST(SketchStaysOnTheRoadThroughAnIntersection)
+{
+  // Along the east-west road, wobbling a few meters north as it crosses the north-south one.
+  std::vector<LatLon> stroke = Line({40.00003, -105.003}, {40.00003, -104.997}, 20);
+  for (auto const & p : SnapStroke(stroke, Crossroads()))
+    CHECK_EQUAL(p.road, 1u);
 }

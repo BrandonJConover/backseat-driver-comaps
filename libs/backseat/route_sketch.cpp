@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
 
 namespace backseat
 {
@@ -208,5 +209,89 @@ SketchVerdict JudgeSketch(double fastestMinutes, double drawnMinutes)
   if (diff <= -1)
     return {"sketch.faster", -diff};
   return {"sketch.same", 0};
+}
+std::vector<LatLon> ResampleStroke(std::vector<LatLon> const & stroke, double everyM)
+{
+  if (stroke.size() < 2 || everyM <= 0)
+    return stroke;
+  std::vector<LatLon> out{stroke.front()};
+  double carried = 0;
+  for (std::size_t i = 0; i + 1 < stroke.size(); ++i)
+  {
+    LatLon const & a = stroke[i];
+    LatLon const & b = stroke[i + 1];
+    double const len = SketchDistanceM(a, b);
+    double along = everyM - carried;
+    while (along <= len)
+    {
+      out.push_back(Lerp(a, b, along / len));
+      along += everyM;
+    }
+    carried = len - (along - everyM);
+  }
+  if (SketchDistanceM(out.back(), stroke.back()) > 1)
+    out.push_back(stroke.back());
+  return out;
+}
+
+namespace
+{
+struct Projection
+{
+  LatLon at;
+  double distanceM = std::numeric_limits<double>::max();
+};
+
+Projection Project(LatLon const & p, RoadSegment const & segment)
+{
+  Xy const a = ToXy(segment.a, p);
+  Xy const b = ToXy(segment.b, p);
+  double const dx = b.x - a.x;
+  double const dy = b.y - a.y;
+  double const len2 = dx * dx + dy * dy;
+  double t = len2 == 0 ? 0 : (-a.x * dx - a.y * dy) / len2;
+  t = std::clamp(t, 0.0, 1.0);
+  return {Lerp(segment.a, segment.b, t), std::hypot(a.x + t * dx, a.y + t * dy)};
+}
+}  // namespace
+
+std::vector<SnappedPoint> SnapStroke(std::vector<LatLon> const & stroke, std::vector<RoadSegment> const & roads,
+                                     SnapOptions const & options)
+{
+  std::vector<SnappedPoint> out;
+  if (stroke.empty() || roads.empty())
+    return out;
+  std::optional<std::uint64_t> onRoad;
+  for (auto const & sample : ResampleStroke(stroke, options.sampleM))
+  {
+    Projection best;
+    std::uint64_t bestRoad = 0;
+    Projection same;
+    for (auto const & segment : roads)
+    {
+      auto const projection = Project(sample, segment);
+      if (projection.distanceM < best.distanceM)
+      {
+        best = projection;
+        bestRoad = segment.road;
+      }
+      if (onRoad && segment.road == *onRoad && projection.distanceM < same.distanceM)
+        same = projection;
+    }
+    if (best.distanceM > options.maxSnapM)
+      continue;
+    // Through an intersection the cross street is briefly nearer; stay on the road being traced.
+    if (onRoad && bestRoad != *onRoad && same.distanceM <= options.maxSnapM &&
+        same.distanceM <= best.distanceM + options.stickyM)
+    {
+      best = same;
+      bestRoad = *onRoad;
+    }
+    onRoad = bestRoad;
+    if (!out.empty() && SketchDistanceM(out.back().at, best.at) < 1)
+      continue;
+    out.push_back({best.at, bestRoad});
+  }
+  return out;
 }
 }  // namespace backseat

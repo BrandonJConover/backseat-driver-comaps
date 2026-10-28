@@ -318,6 +318,13 @@ private:
   std::optional<backseat::Place> PlaceAt(backseat::LatLon const & at) const;
   bool InParkingLot(backseat::LatLon const & at) const;
   std::optional<backseat::Venue> VenueAt(backseat::LatLon const & at) const;
+
+public:
+  /// Draw mode: a finger stroke moved onto the car roads it traced (route_sketch.hpp SnapStroke).
+  /// Empty if there's no map data there or the stroke covers too much ground to look up quickly.
+  std::vector<backseat::LatLon> SnapToRoads(std::vector<backseat::LatLon> const & stroke) const;
+
+private:
   std::optional<backseat::Sight> SightAt(backseat::LatLon const & at, double bearingDeg) const;
   backseat::Bridge BridgeAt(backseat::LatLon const & at, double bearingDeg) const;
   void CheckBattery(double tMs);

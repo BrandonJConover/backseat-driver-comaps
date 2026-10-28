@@ -431,6 +431,20 @@ double constexpr kPlanEvery = 0.3;
   return NO;
 }
 
++ (NSArray<CLLocation *> *)snapStrokeToRoads:(NSArray<CLLocation *> *)stroke
+{
+  std::vector<backseat::LatLon> in;
+  for (CLLocation * c in stroke)
+    in.push_back({c.coordinate.latitude, c.coordinate.longitude});
+  auto const snapped = GetFramework().GetRoutingManager().BackseatSnapToRoads(in);
+  if (snapped.size() < 2)
+    return stroke;
+  NSMutableArray<CLLocation *> * out = [NSMutableArray arrayWithCapacity:snapped.size()];
+  for (auto const & p : snapped)
+    [out addObject:[[CLLocation alloc] initWithLatitude:p.lat longitude:p.lon]];
+  return out;
+}
+
 + (CLLocationCoordinate2D)coordinateAtPoint:(CGPoint)point inView:(UIView *)mapView
 {
   CGFloat const scale = mapView.contentScaleFactor;
