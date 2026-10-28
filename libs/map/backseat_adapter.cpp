@@ -2061,6 +2061,14 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
       snap.nextStreet = SpeakableStreetName(info.m_nextStreetName);
       snap.control = GuessControl(*route, turn.m_index);
       snap.laneSide = LaneSideFor(turn.m_lanes);
+      // The maneuver after it, for "turn left onto Winesap Drive, then right onto Cameo Lane".
+      std::vector<routing::turns::TurnItemDist> next;
+      if (route->GetNextTurns(next) && next.size() >= 2 && !next[1].m_turnItem.IsTurnNone())
+      {
+        snap.thenTurn = ToTurnKind(next[1].m_turnItem.m_turn);
+        snap.thenStreet = SpeakableStreetName(info.m_nextNextStreetName);
+        snap.thenGapM = next[1].m_distMeters - next[0].m_distMeters;
+      }
     }
     // The route ahead, for bends with no maneuver ("Hey did you know there is a curve ahead?").
     auto const & followed = route->GetFollowedPolyline();

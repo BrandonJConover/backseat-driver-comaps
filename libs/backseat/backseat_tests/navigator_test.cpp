@@ -1039,10 +1039,14 @@ TEST(LaneAdviceOncePerManeuver)
   next.laneSide = LaneSide::Right;
   nav.OnFix(At(120000, 25), next);
   nav.Poll(next);
-  // Not on top of the direction itself; a few seconds later.
+  // Not on top of the direction itself (which waits a moment after the turn); a few seconds later.
+  CHECK(!SaidKey(nav.TakeLines(), "lane.right"));
+  next.distToTurnM = 925;
+  nav.OnFix(At(123000, 25), next);
+  nav.Poll(next);
   CHECK(!SaidKey(nav.TakeLines(), "lane.right"));
   next.distToTurnM = 850;
-  nav.OnFix(At(126000, 25), next);
+  nav.OnFix(At(129000, 25), next);
   nav.Poll(next);
   CHECK(SaidKey(nav.TakeLines(), "lane.right"));
 }
@@ -1359,14 +1363,14 @@ TEST(NavLinesSayHowLongTheyCanWaitForTheGoodVoice)
       break;
     nav.OnFix(Heading(s * 1000.0, 29, 0), OnRoute(1, TurnKind::Left, dist));
     for (auto const & l : nav.TakeLines())
-      if (l.priority == Priority::Nav && dist <= 400 && dist > 100)
+      if (l.priority == Priority::Nav && dist <= 400 && dist > 200 && farAt < 0)
         farAt = dist;
-      else if (l.priority == Priority::Nav && dist <= 80)
+      else if (l.priority == Priority::Nav && dist <= 130)
         maxWait = l.maxWaitMs;
   }
-  // The far call comes early enough to wait for Kokoro; the 250 ft nag can't wait long.
+  // The far call comes early enough to wait for Kokoro; the final call ~4 s out can't wait long.
   CHECK(farAt > 300 && farAt <= 360);
-  CHECK(maxWait >= 0 && maxWait < 1000);
+  CHECK(maxWait >= 0 && maxWait < 2000);
   // Roasts don't carry one.
   nav.OnFix(Heading(200000, 29, 0), OnRoute(2, TurnKind::Right, 3000));
   for (auto const & l : nav.TakeLines())
@@ -1447,4 +1451,37 @@ TEST(RelaunchMidTripPicksUpWithoutANewGreeting)
     next += l.text + "\n";
   CHECK(next.find("Okay, real quick") == std::string::npos);  // not the first trip either
   CHECK_EQUAL(saved.Counter("_trips.started"), 2);
+}
+
+TEST(TwoTurnsCloseTogetherAreSaidAsOne)
+{
+  RouteSnapshot r = OnRoute(1, TurnKind::Left, 300);
+  r.nextStreet = "Winesap Drive";
+  r.thenTurn = TurnKind::Right;
+  r.thenStreet = "Cameo Lane";
+  r.thenGapM = 95;
+  CHECK_EQUAL(InstructionText(r), std::string("Turn left onto Winesap Drive, then right onto Cameo Lane"));
+  r.thenGapM = 400;
+  CHECK_EQUAL(InstructionText(r), std::string("Turn left onto Winesap Drive"));
+  r.thenGapM = 60;
+  r.thenTurn = TurnKind::Destination;
+  CHECK_EQUAL(InstructionText(r), std::string("Turn left onto Winesap Drive, then you've arrived"));
+}
+
+TEST(TheNextDirectionWaitsUntilTheTurnIsDone)
+{
+  Navigator nav(Config());
+  nav.OnFix(Heading(0, 10, 0), OnRoute(1, TurnKind::Right, 200));
+  nav.TakeLines();
+  // Through the turn; the next maneuver is far off, so its direction waits a moment.
+  nav.OnFix(Heading(1000, 10, 90), OnRoute(2, TurnKind::Left, 900));
+  auto const now = nav.TakeLines();
+  CHECK(std::none_of(now.begin(), now.end(), [](Commentary const & c) { return c.text.find("In ") == 0; }));
+  nav.OnFix(Heading(4000, 10, 90), OnRoute(2, TurnKind::Left, 870));
+  auto const later = nav.TakeLines();
+  CHECK(std::any_of(later.begin(), later.end(), [](Commentary const & c) { return c.text.find("turn left") != std::string::npos; }));
+  // A close one is said right away.
+  nav.OnFix(Heading(30000, 10, 0), OnRoute(3, TurnKind::Right, 120));
+  auto const close = nav.TakeLines();
+  CHECK(std::any_of(close.begin(), close.end(), [](Commentary const & c) { return c.text.find("turn right") != std::string::npos; }));
 }

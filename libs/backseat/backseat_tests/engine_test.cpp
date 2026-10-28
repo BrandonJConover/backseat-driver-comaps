@@ -90,7 +90,8 @@ TEST(CountdownNagsInOrder)
   CHECK_EQUAL(engine.OnNav(NavEvent::Progress(1000, 140)).size(), size_t{1});
   CHECK_EQUAL(engine.OnNav(NavEvent::Progress(2000, 100)).size(), size_t{0});
   CHECK_EQUAL(engine.OnNav(NavEvent::Progress(3000, 12)).size(), size_t{1});
-  CHECK_EQUAL(engine.OnNav(NavEvent::Progress(4000, 2)).size(), size_t{1});
+  // The plain final call just went out; nothing more at the turn itself.
+  CHECK_EQUAL(engine.OnNav(NavEvent::Progress(4000, 2)).size(), size_t{0});
   CHECK_EQUAL(engine.OnNav(NavEvent::Progress(6000, 0)).size(), size_t{0});
   auto const still = engine.OnNav(NavEvent::Progress(8000, 0));
   CHECK_EQUAL(still.size(), size_t{1});
@@ -151,7 +152,7 @@ TEST(TurnNagsRunInOrderAndEndWithPleaseStop)
     said.push_back(t);
   std::vector<std::string> const want = {
       "Just in case you forgot, you are turning left in 500 feet.", "By the way, did I mention you should turn left.",
-      "You are turning left.", "You are still turning left.", "Please stop turning left."};
+      "Now, turn left onto Elm.", "You are still turning left.", "Please stop turning left."};
   CHECK(said == want);
 }
 
@@ -162,14 +163,70 @@ TEST(StraightNagsOnALongStretch)
   CHECK_EQUAL(opening.size(), size_t{2});
   CHECK(opening.size() == 2 && opening[1].find("for the next 200 miles") != std::string::npos);
   auto f = FirstLineEngine();
-  f.OnNav(NavEvent::Instruction(0, "Turn right onto Main", 3000));
+  f.OnNav(NavEvent::Instruction(0, "Turn right onto Main", 2400));
   std::vector<std::string> said;
-  for (double t = 1000, d = 3000; d > 400; t += 1000, d -= 20)
+  for (double t = 1000, d = 2400; d > 400; t += 1000, d -= 10)
     for (auto const & s : Texts(f.OnNav(NavEvent::Progress(t, d))))
       said.push_back(s);
   std::vector<std::string> const want = {"Please continue straight.", "You should still be going straight.",
                                          "I'm serious."};
   CHECK(said == want);
+}
+
+TEST(ALongLegGetsAPlainOneMileReminder)
+{
+  auto e = FirstLineEngine();
+  e.OnNav(NavEvent::Instruction(0, "Turn right onto Southwest Elm Tree Road", 4900));
+  std::vector<std::string> said;
+  for (double t = 1000, d = 4900; d > 400; t += 1000, d -= 20)
+    for (auto const & s : Texts(e.OnNav(NavEvent::Progress(t, d))))
+      said.push_back(s);
+  auto const it = std::find(said.begin(), said.end(), "In 1 mile, turn right onto Southwest Elm Tree Road.");
+  CHECK(it != said.end() && it != said.begin());
+  // No more "continue straight" after it.
+  for (auto i = it; i != said.end(); ++i)
+    CHECK(i->find("traight") == std::string::npos && i->find("serious") == std::string::npos);
+}
+
+TEST(AWrongTurnCallDoesNotSilenceTheCountdown)
+{
+  // Brandon's drive home: the swing from the turn onto Walters Road read as a wrong turn right after
+  // "turn left onto Winesap Drive", and nothing else was said about Winesap.
+  auto e = FirstLineEngine();
+  e.OnNav(NavEvent::Instruction(0, "Turn left onto Winesap Drive", 110));
+  TelemetrySample a;
+  a.t = 0;
+  a.speedMps = 6;
+  a.headingDeg = 0;
+  e.OnTelemetry(a);
+  a.t = 7000;
+  a.headingDeg = 90;
+  e.OnTelemetry(a);
+  std::vector<std::string> said;
+  double const steps[][2] = {{8000, 100}, {20000, 60}, {30000, 20}, {31000, 4}};
+  for (auto const & s : steps)
+    for (auto const & x : Texts(e.OnNav(NavEvent::Progress(s[0], s[1]))))
+      said.push_back(x);
+  CHECK(std::find(said.begin(), said.end(), "Now, turn left onto Winesap Drive.") != said.end());
+}
+
+TEST(DirectionsReadNaturally)
+{
+  CHECK_EQUAL(DirectionText("Turn right onto Oak Lane", 500, Units::Mph, Control::TrafficLight),
+              std::string("In a quarter mile, at the light, turn right onto Oak Lane."));
+  CHECK_EQUAL(DirectionText("Turn left onto Elm", 120, Units::Mph, Control::StopSign),
+              std::string("In 400 feet, turn left onto Elm."));
+  CHECK_EQUAL(DirectionText("Arrive at Sundance Lane", 127, Units::Mph),
+              std::string("Your destination, Sundance Lane, is 400 feet ahead."));
+  CHECK_EQUAL(FirstManeuver("Turn left onto Winesap Drive, then right onto Cameo Lane"),
+              std::string("Turn left onto Winesap Drive"));
+  CHECK_EQUAL(FormatDistance(2900, Units::Mph), std::string("2 miles"));
+  CHECK_EQUAL(FormatDistance(1609, Units::Mph), std::string("1 mile"));
+  CHECK_EQUAL(FormatDistance(1000, Units::Kmh), std::string("1 kilometer"));
+  auto e = FirstLineEngine();
+  e.OnNav(NavEvent::Instruction(0, "Turn left onto Winesap Drive, then right onto Cameo Lane", 100));
+  auto const said = Texts(e.OnNav(NavEvent::Progress(10000, 10)));
+  CHECK(!said.empty() && said[0] == "Now, turn left onto Winesap Drive, then right onto Cameo Lane.");
 }
 
 TEST(NascarOnTheThirdLeftInARow)

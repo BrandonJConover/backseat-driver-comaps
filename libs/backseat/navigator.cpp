@@ -26,6 +26,12 @@ double constexpr kLaneSayMinM = 150;
 double constexpr kPredictionDelayMs = 25000;
 double constexpr kLaneAfterDirectionMs = 6000;
 double constexpr kLaneSayMaxM = 1500;
+/// Two maneuvers this close together are said as one: "turn left onto X, then right onto Y".
+double constexpr kChainWithinM = 150;
+/// After a turn, the next direction waits this long, so the driver is through the turn first...
+double constexpr kInstructionAfterTurnMs = 3000;
+/// ...unless the next maneuver is this close.
+double constexpr kInstructionNowWithinM = 250;
 /// Slower than this counts as stopped.
 double constexpr kStoppedMps = 0.5;
 /// Faster than this means driving again, not walking around with the phone.
@@ -303,6 +309,36 @@ std::string InstructionText(TurnKind turn, std::string const & street, std::stri
   if (!street.empty())
     text += " onto " + street;
   return text;
+}
+
+std::string InstructionText(RouteSnapshot const & route)
+{
+  std::string text = InstructionText(route.turn, route.nextStreet, route.destination);
+  if (route.thenGapM < 0 || route.thenGapM > kChainWithinM)
+    return text;
+  switch (route.turn)
+  {
+  case TurnKind::None:
+  case TurnKind::Straight:
+  case TurnKind::Destination: return text;
+  default: break;
+  }
+  std::string then;
+  switch (route.thenTurn)
+  {
+  case TurnKind::Left: then = "left"; break;
+  case TurnKind::SharpLeft: then = "a sharp left"; break;
+  case TurnKind::SlightLeft: then = "bear left"; break;
+  case TurnKind::Right: then = "right"; break;
+  case TurnKind::SharpRight: then = "a sharp right"; break;
+  case TurnKind::SlightRight: then = "bear right"; break;
+  case TurnKind::UTurn: return text + ", then make a U-turn";
+  case TurnKind::Destination: return text + ", then you've arrived";
+  default: return text;
+  }
+  if (!route.thenStreet.empty())
+    then += " onto " + route.thenStreet;
+  return text + ", then " + then;
 }
 
 Navigator::Navigator(EngineConfig config, std::vector<TripRecord> history, TripRecorded onTripRecorded,
@@ -618,7 +654,8 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   if (route.turnId != m_turnId)
   {
     // Moving on to a new maneuver means the last one was done, unless a reroute got us here.
-    if (m_turnId && !m_rerouting)
+    bool const justTurned = m_turnId && !m_rerouting;
+    if (justTurned)
     {
       Say(m_engine->OnNav(NavEvent::TurnCompleted(t, true)));
       CountLefts(t);
@@ -627,22 +664,19 @@ void Navigator::Update(double t, RouteSnapshot const & route)
       m_leftsInARow = 0;
     m_rerouting = false;
     m_turnId = route.turnId;
-    m_turnSaidAt = t;
     m_turnKind = route.turn;
-    std::string const text = InstructionText(route.turn, route.nextStreet, route.destination);
-    Trace("nav.turn", {{"id", std::to_string(*route.turnId)},
-                       {"text", text},
-                       {"dist_m", LogNum(route.distToTurnM, 0)},
-                       {"control", std::to_string(static_cast<int>(route.control))},
-                       {"lane", route.laneSide == LaneSide::Left    ? "left"
-                                : route.laneSide == LaneSide::Right ? "right"
-                                                                    : ""}});
-    Say(m_engine->OnNav(NavEvent::Instruction(t, text, route.distToTurnM, ManeuverOf(route.turn), route.control)));
-    // A roundabout with the music on: a hint about the other round thing in the car. Once a trip.
-    if (route.turn == TurnKind::Roundabout && !m_roundaboutSaid && m_musicLookup && m_musicLookup())
+    m_instructionDueAt.reset();
+    if (justTurned && route.distToTurnM >= kInstructionNowWithinM)
+      m_instructionDueAt = t + kInstructionAfterTurnMs;
+    else
+      SayInstruction(t, route);
+  }
+  else if (m_instructionDueAt)
+  {
+    if (t >= *m_instructionDueAt || route.distToTurnM < kInstructionNowWithinM)
     {
-      m_roundaboutSaid = true;
-      SayLine(t, Category::Music, "music.roundabout");
+      m_instructionDueAt.reset();
+      SayInstruction(t, route);
     }
   }
   else
@@ -652,14 +686,34 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   // "I'm going to need you to get over into the left lane. Use your blinkers this time." Once per
   // maneuver, early enough to move over and close enough that it's about this one.
   // A few seconds after the direction itself, so the two don't run together.
-  if (route.laneSide != LaneSide::None && m_laneSaidFor != route.turnId && t - m_turnSaidAt >= kLaneAfterDirectionMs &&
-      route.distToTurnM >= kLaneSayMinM &&
+  if (route.laneSide != LaneSide::None && m_laneSaidFor != route.turnId && !m_instructionDueAt &&
+      t - m_turnSaidAt >= kLaneAfterDirectionMs && route.distToTurnM >= kLaneSayMinM &&
       route.distToTurnM <= kLaneSayMaxM)
   {
     m_laneSaidFor = route.turnId;
     SayLine(t, Category::Instruction, route.laneSide == LaneSide::Left ? "lane.left" : "lane.right");
   }
   m_lastDistToTurnM = route.distToTurnM;
+}
+
+void Navigator::SayInstruction(double t, RouteSnapshot const & route)
+{
+  m_turnSaidAt = t;
+  std::string const text = InstructionText(route);
+  Trace("nav.turn", {{"id", std::to_string(*route.turnId)},
+                     {"text", text},
+                     {"dist_m", LogNum(route.distToTurnM, 0)},
+                     {"control", std::to_string(static_cast<int>(route.control))},
+                     {"lane", route.laneSide == LaneSide::Left    ? "left"
+                              : route.laneSide == LaneSide::Right ? "right"
+                                                                  : ""}});
+  Say(m_engine->OnNav(NavEvent::Instruction(t, text, route.distToTurnM, ManeuverOf(route.turn), route.control)));
+  // A roundabout with the music on: a hint about the other round thing in the car. Once a trip.
+  if (route.turn == TurnKind::Roundabout && !m_roundaboutSaid && m_musicLookup && m_musicLookup())
+  {
+    m_roundaboutSaid = true;
+    SayLine(t, Category::Music, "music.roundabout");
+  }
 }
 
 void Navigator::StartTrip(double t, RouteSnapshot const & route)

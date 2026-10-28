@@ -59,7 +59,7 @@ struct EngineConfig
   /// A stretch at least this long to the next maneuver gets "Please continue straight." nags,
   /// one every straightNagEveryMs of driving, three at most.
   double straightNagMinM = 1000;
-  double straightNagEveryMs = 30000;
+  double straightNagEveryMs = 45000;
   /// A stretch this long (about 10 miles) opens with "I don't think I'm needed for this, but ok."
   /// and then chimes in now and then for as long as it lasts.
   double straightLongM = 16000;
@@ -88,6 +88,13 @@ enum class TurnShape
 
 /// "Make a U-turn" -> UTurn. "Take the roundabout" -> Roundabout. "Take the exit on the left" -> Exit.
 TurnShape TurnShapeOf(std::string const & text);
+
+/// "Turn left onto Elm Street, then right onto Oak Lane" -> "Turn left onto Elm Street".
+std::string FirstManeuver(std::string const & text);
+
+/// The spoken direction: "In 500 feet, turn left onto Elm Street.", "In a quarter mile, at the light,
+/// turn right onto Oak Lane.", "Your destination, Sundance Lane, is 400 feet ahead."
+std::string DirectionText(std::string const & text, double distanceM, Units units, Control control = Control::None);
 
 class CritiqueEngine
 {
@@ -125,6 +132,15 @@ private:
     std::optional<double> farAt;
     /// Distance to the maneuver at the last instruction or progress update.
     double distM = 0;
+    /// Distance when it was announced, and what was announced ("Turn left onto Elm Street").
+    double legM = 0;
+    std::string text;
+    /// The 1 mile reminder was said.
+    bool reminded = false;
+    /// The heading already swung the right way at the maneuver.
+    bool turned = false;
+    /// "Your other left" was already said for this maneuver.
+    bool wrongSaid = false;
   };
 
   /// "Please continue straight." ... "You should still be going straight." ... "I'm serious."
@@ -168,6 +184,7 @@ private:
   double m_frustration = 0;
   std::optional<TelemetrySample> m_lastSample;
   double FarM() const;
+  double FinalM() const;
   double m_lastRoastAt;
   /// Set by Make() for every navigation line.
   mutable double m_lastNavAt = -1e18;

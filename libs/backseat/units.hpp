@@ -12,7 +12,8 @@ namespace backseat
 double ToDisplay(double mps, Units units);
 double FromDisplay(double value, Units units);
 
-/// Feet for mph users, meters otherwise, rounded to something a GPS would say.
+/// Feet for mph users, meters otherwise, rounded the way a person says it: "300 feet",
+/// "a quarter mile", "half a mile", "1.5 miles", "12 miles".
 std::string FormatDistance(double meters, Units units);
 
 /// JavaScript Math.round: halves round up (towards +infinity).

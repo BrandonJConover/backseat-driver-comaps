@@ -73,6 +73,10 @@ struct RouteSnapshot
   Control control = Control::None;
   /// The next maneuver needs the left or right lanes (and not the ones in the middle).
   LaneSide laneSide = LaneSide::None;
+  /// The maneuver after the next one, and how far past it, if the host knows (-1 if not).
+  TurnKind thenTurn = TurnKind::None;
+  std::string thenStreet;
+  double thenGapM = -1;
   /// What the router estimates for the whole trip, read when the trip starts.
   double etaSeconds = 0;
   std::string destination;
@@ -167,6 +171,10 @@ double CurveAheadM(std::vector<LatLon> const & ahead, double maxM, double minDeg
 /// "Turn left onto Elm Street" for a maneuver and the street after it.
 std::string InstructionText(TurnKind turn, std::string const & street, std::string const & destination);
 
+/// The next maneuver's text, with the one after it when that comes right after: "Turn left onto
+/// Winesap Drive, then right onto Cameo Lane".
+std::string InstructionText(RouteSnapshot const & route);
+
 class Navigator
 {
 public:
@@ -260,6 +268,8 @@ private:
   void ResetTrip();
   /// A maneuver was done: counts lefts in a row and unlocks NASCAR Driver on the third.
   void CountLefts(double t);
+  /// "In half a mile, turn left onto Elm Street." for the maneuver in route.
+  void SayInstruction(double t, RouteSnapshot const & route);
   void TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot const & route);
   void SayPlate(double tMs, PlateGame::Reply const & reply);
   void SayLine(double tMs, Category category, std::string const & key, Vars vars = {},
@@ -327,6 +337,9 @@ private:
   /// The maneuver the last "get into the left lane" was for; once each.
   std::optional<uint32_t> m_laneSaidFor;
   double m_turnSaidAt = -1e18;
+  /// Just past a turn, the next direction waits a moment (unless it's close) so it doesn't land
+  /// mid-turn: when it goes out.
+  std::optional<double> m_instructionDueAt;
   /// Punchlines waiting out their awkward pause, by when to say them.
   std::vector<Commentary> m_punchlines;
   double m_lastMusicCheckT = -1e18;

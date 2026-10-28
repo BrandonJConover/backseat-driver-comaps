@@ -26,6 +26,12 @@ double constexpr kCountdownFarMaxM = 805;
 double constexpr kJustAnnouncedMs = 8000;
 /// "Did I mention..." only if the far call was at least this long ago.
 double constexpr kMentionAfterFarMs = 10000;
+/// The plain "Now, turn left onto Elm Street." comes about this many seconds before the turn...
+double constexpr kFinalCallS = 4;
+/// ...unless the instruction itself was this recent; it just said the same thing.
+double constexpr kFinalAfterInstructionMs = 4000;
+/// Legs at least this long get a plain "In 1 mile, turn right onto ..." reminder, which ends the straight nags.
+double constexpr kReminderLegM = 2500;
 
 /// How much each offense winds the GPS up. Negative values calm it down.
 double FrustrationDelta(Category c)
@@ -181,6 +187,29 @@ Maneuver TurnDirectionOf(std::string const & text)
   return Maneuver::Other;
 }
 
+std::string FirstManeuver(std::string const & text)
+{
+  static std::regex const then(", then ", std::regex::icase);
+  std::smatch m;
+  return std::regex_search(text, m, then) ? text.substr(0, m.position(0)) : text;
+}
+
+std::string DirectionText(std::string const & text, double distanceM, Units units, Control control)
+{
+  static std::regex const arriveAt(R"(^arrive at (.+)$)", std::regex::icase);
+  static std::regex const arrive(R"(^arrive\b)", std::regex::icase);
+  std::string const distance = FormatDistance(distanceM, units);
+  std::smatch m;
+  if (std::regex_search(text, m, arriveAt))
+    return "Your destination, " + m[1].str() + ", is " + distance + " ahead.";
+  if (std::regex_search(text, arrive))
+    return "Your destination is " + distance + " ahead.";
+  // Lights come from the map; stop signs are only a guess (side street onto a bigger road), so
+  // they aren't named.
+  char const * at = control == Control::TrafficLight ? "at the light, " : "";
+  return "In " + distance + ", " + at + LowerFirst(text) + ".";
+}
+
 TurnShape TurnShapeOf(std::string const & text)
 {
   static std::regex const uturn(R"(\bu-?turn\b)", std::regex::icase);
@@ -304,17 +333,23 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     m_hasDestination = true;
     m_lastInstructionText = e.text;
     m_lastInstructionDistanceM = e.distanceM;
-    Maneuver const dir = e.maneuver ? *e.maneuver : TurnDirectionOf(e.text);
-    TurnShape const shape = TurnShapeOf(e.text);
+    // "Turn left onto Elm Street, then right onto Oak Lane": the countdown is about the first one.
+    std::string const first = FirstManeuver(e.text);
+    Maneuver const dir = e.maneuver ? *e.maneuver : TurnDirectionOf(first);
+    TurnShape const shape = TurnShapeOf(first);
     // Already inside the 500 ft mark when announced? Skip straight to the closer nags.
     int const stage = e.distanceM <= FarM() ? 1 : 0;
     // U-turns and roundabouts get the countdown too, without a side.
     if (dir == Maneuver::Other && shape != TurnShape::UTurn && shape != TurnShape::Roundabout)
       m_pendingTurn.reset();
     else
+    {
       m_pendingTurn =
           PendingTurn{dir == Maneuver::Right ? TurnDirection::Right : TurnDirection::Left, shape, e.t, stage, {}, false,
-                      e.distanceM};
+                      {}, e.distanceM};
+      m_pendingTurn->legM = e.distanceM;
+      m_pendingTurn->text = e.text;
+    }
     // The heading swing from the turn just finished isn't about this one.
     m_headings.clear();
     m_turnDoneSaid = false;
@@ -333,12 +368,11 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     if (e.at && !m_position)
       m_position = e.at;
     int const tier = Tier();
-    // A remark on every direction wears thin: one in three gets an opener, one in three a
-    // closer, and the rest are just the direction.
+    // The direction comes first, always: a remark goes after it, on one direction in three.
     int const n = m_instructionCount++ % 3;
-    std::string const prefix = n == 1 ? Pick("instruction.prefix", tier) : std::string();
     std::string const suffix = n == 2 ? Pick("instruction.suffix", tier) : std::string();
-    std::string const text = prefix + "In " + FormatDistance(e.distanceM, units) + ", " + LowerFirst(e.text) + "." + suffix;
+    std::string const text =
+        DirectionText(e.text, e.distanceM, units, dir == Maneuver::Other ? Control::None : e.control) + suffix;
     out.push_back(Make(e.t, Category::Instruction, text, Priority::Nav));
     if (m_straight && m_straight->longHaul)
     {
@@ -554,7 +588,7 @@ void CritiqueEngine::CheckTurnDirection(TelemetrySample const & s, std::vector<C
                    m_headings.end());
   // Only plain turns can be checked by heading: a roundabout swings both ways, and a cloverleaf exit on
   // the right loops left.
-  if (!m_pendingTurn || m_pendingTurn->shape != TurnShape::Turn)
+  if (!m_pendingTurn || m_pendingTurn->shape != TurnShape::Turn || m_pendingTurn->turned || m_pendingTurn->wrongSaid)
     return;
   // Only a swing at the maneuver is about it; a bend or a driveway a mile out is the router's
   // business (missed turn, reroute), not "your other left".
@@ -573,7 +607,9 @@ void CritiqueEngine::CheckTurnDirection(TelemetrySample const & s, std::vector<C
   {
     if (m_pendingTurn->stage >= 4)
       SayTurnDone(out, s.t, *m_pendingTurn);
-    m_pendingTurn.reset();
+    // The router says when the turn is really done; until then the countdown stays, just without
+    // "you should still be turning".
+    m_pendingTurn->turned = true;
     return;
   }
   WrongTurn(out, s.t, m_pendingTurn->dir, turned);
@@ -597,31 +633,39 @@ void CritiqueEngine::CheckNoDestination(TelemetrySample const & s, std::vector<C
 }
 
 /// "In 500 feet you are going to turn right." ... "By the way, did I mention you should turn right."
-/// ... "Hey, you should be turning right." ... "You should still be turning right." ... and once
-/// the turn is done, "Please stop turning right." (SayTurnDone). Each stage is said once. The 50 ft
-/// nag only plays when the 250 ft one didn't.
+/// ... then, a few seconds out, the plain "Now, turn right onto Oak Lane." ... "You should still be
+/// turning right." ... and once the turn is done, "Please stop turning right." (SayTurnDone). Each
+/// stage is said once. Long legs also get a plain "In 1 mile, ..." reminder.
 void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double distanceM)
 {
   if (!m_pendingTurn)
     return;
   auto & p = *m_pendingTurn;
   double const far = FarM();
-  double const near = m_config.countdownNearM;
+  double const finalM = FinalM();
   double const mention = m_config.countdownMentionM;
+  double const reminderM = m_config.units == Units::Mph ? 1609.344 : 1000;
+  if (!p.reminded && p.stage == 0 && p.legM >= kReminderLegM && distanceM <= reminderM && distanceM > 1.5 * far)
+  {
+    p.reminded = true;
+    m_straight.reset();
+    out.push_back(Make(t, Category::Instruction, DirectionText(p.text, reminderM, m_config.units), Priority::Nav));
+    return;
+  }
   char const * stage = nullptr;
-  double sayM = near;
-  // The instruction itself ("In 50 feet, turn left") was just said: a "by the way, in 250 feet"
+  double sayM = finalM;
+  // The instruction itself ("In 300 feet, turn left") was just said: a "by the way, in 250 feet"
   // on top of it is noise, and wrong. Those stages are passed over quietly.
   bool const justAnnounced = t - p.since < kJustAnnouncedMs;
-  if (p.stage == 0 && distanceM <= far && distanceM > near && justAnnounced)
+  if (p.stage == 0 && distanceM <= far && distanceM > finalM && justAnnounced)
   {
     p.stage = 1;
   }
-  else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > near && justAnnounced)
+  else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > finalM && justAnnounced)
   {
     p.mentioned = true;
   }
-  else if (p.stage == 0 && distanceM <= far && distanceM > near)
+  else if (p.stage == 0 && distanceM <= far && distanceM > finalM)
   {
     stage = "far";
     // The third left in a row and beyond: going around in circles, NASCAR style.
@@ -635,25 +679,31 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
     p.farAt = t;
   }
   // At speed the 250 ft mark comes seconds after the 500 ft one; once is enough then.
-  else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > near &&
+  else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > finalM &&
            (!p.farAt || t - *p.farAt >= kMentionAfterFarMs))
   {
     stage = "mention";
     sayM = mention;
     p.mentioned = true;
   }
-  else if (p.stage <= 1 && !p.mentioned && distanceM <= near && distanceM > 5)
+  else if (p.stage <= 1 && distanceM <= finalM && distanceM > 5)
   {
-    stage = "near";
+    // The call that matters most, so it's plain and it always comes, mention or not.
     p.stage = 2;
+    if (t - p.since < kFinalAfterInstructionMs)
+      return;
+    out.push_back(Make(t, Category::Instruction, "Now, " + LowerFirst(p.text) + ".", Priority::Nav));
+    return;
   }
   else if (p.stage <= 2 && distanceM <= 5)
   {
-    stage = "now";
+    // Only when the plain call never got its chance (the update jumped straight to the turn).
+    if (p.stage < 2)
+      stage = "now";
     p.stage = 3;
     p.atTurnSince = t;
   }
-  else if (p.stage == 3 && p.atTurnSince && t - *p.atTurnSince >= 3000)
+  else if (p.stage == 3 && !p.turned && p.atTurnSince && t - *p.atTurnSince >= 3000)
   {
     stage = "still";
     p.stage = 4;
@@ -664,6 +714,13 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   std::string const distance = FormatDistance(sayM, m_config.units);
   std::string const text = Fill(Pick(key, Tier()), {{"dir", DirName(p.dir)}, {"distance", distance}});
   out.push_back(Make(t, Category::Instruction, Capitalize(text), Priority::Nav));
+}
+
+/// Where the plain final call goes: about 4 seconds out at the current speed, 50 ft at least.
+double CritiqueEngine::FinalM() const
+{
+  double const mps = m_lastSample ? m_lastSample->speedMps : 0;
+  return std::max(m_config.countdownNearM, mps * kFinalCallS);
 }
 
 /// Where the "In 500 feet" call goes: 500 ft in town, farther out at speed so there are still
@@ -745,7 +802,10 @@ void CritiqueEngine::WrongTurn(std::vector<Commentary> & out, double t, TurnDire
 {
   if (expected == turned)
     return;
-  m_pendingTurn.reset();
+  // One "other left" per maneuver. The countdown keeps going: if the heading read was wrong, the
+  // driver still needs the turn called, and if the turn was wrong, the reroute replaces it.
+  if (m_pendingTurn)
+    m_pendingTurn->wrongSaid = true;
   m_lastWrongTurnAt = t;
   m_stats.wrongTurns++;
   Log(MakeIncident(t, IncidentKind::WrongTurn, m_lastInstructionText), at);
