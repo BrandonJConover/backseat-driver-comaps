@@ -164,6 +164,7 @@ char const * ToString(Category c)
   case Category::PhoneCall: return "phoneCall";
   case Category::Quiet: return "quiet";
   case Category::TwentyQuestions: return "twentyQuestions";
+  case Category::Road: return "road";
   case Category::Count: break;
   }
   return "?";

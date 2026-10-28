@@ -12,6 +12,7 @@ add_executable(${PROJECT_NAME}
   parity_test.cpp
   plate_game_test.cpp
   quiet_bits_test.cpp
+  road_bits_test.cpp
   voice_command_test.cpp
   rewriter_test.cpp
   route_order_test.cpp

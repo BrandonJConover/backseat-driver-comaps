@@ -170,10 +170,17 @@ double constexpr kCallMinToTurnM = 1000;
 /// Once each bit has had its first time, a quiet stretch gets one this often; the call, I spy
 /// and the fact are picked by these weights.
 double constexpr kQuietBitChance = 0.5;
+/// call 30%, I spy 15%, 20 Questions 20%, fact 15%, then an aside or a trap (20 Questions
+/// falls to the fact when it can't be offered).
 double constexpr kCallWeight = 0.3;
-double constexpr kISpyWeight = 0.2;
-/// 20 Questions (twenty_questions.hpp); the fact gets what's left.
-double constexpr kTwentyWeight = 0.3;
+double constexpr kISpyWeight = 0.15;
+/// 20 Questions (twenty_questions.hpp).
+double constexpr kTwentyWeight = 0.2;
+double constexpr kFactWeight = 0.15;
+/// The rest: a quiet aside ("I'm conserving my disappointment.") or a trap, half and half.
+double constexpr kAsideWeight = 0.1;
+/// An aside about the driver's partner instead, when there is one.
+double constexpr kPartnerAsideChance = 0.35;
 /// Speeds below this count as this for "how long until the turn" (a crawl isn't forever).
 double constexpr kQuietMinSpeedMps = 3;
 /// The GPS "listens" to the caller this long between its own lines (plus up to kCallListenSpreadMs).
@@ -279,6 +286,7 @@ double constexpr kCrawlShare = 0.3;
 double constexpr kClearShare = 0.6;
 /// Only roads at least this fast count; crawling down a 25 mph street is just driving.
 double constexpr kTrafficMinLimitMps = 15;  // ~34 mph
+double constexpr kTrafficClearedChance = 0.5;
 
 double DistanceM(LatLon const & a, LatLon const & b)
 {
@@ -443,6 +451,7 @@ Navigator::Navigator(EngineConfig config, std::vector<TripRecord> history, TripR
   }
   m_plates = PlateGame(m_config.rng);
   m_twenty = TwentyQuestions(m_config.rng);
+  m_road.SetUnits(m_config.units);
 }
 
 void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
@@ -487,6 +496,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackLeftBuilding(fix);
   TrackTwentyQuestions(fix, route);
   TrackQuietBits(fix, route);
+  TrackRoadBits(fix, route);
   // Fed up for the first time this trip: from now on it's "wise, omnipotent overseer GPS".
   if (!m_titleDemanded && Tier() == 2)
   {
@@ -544,7 +554,10 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
     double const stoppedMs = fix.tMs - *m_stopSince;
     bool const stayedInCar = m_stopWanderM < kPhoneWanderedM;
     m_stopSince.reset();
-    Say(m_engine->OnNav(NavEvent::Resumed(fix.tMs, stoppedMs, stayedInCar)));
+    // Rest areas and drive-thrus get their own lines when the car pulls out (road_bits.hpp).
+    StopSpot const spot = m_road.CurrentStopSpot();
+    if (spot != StopSpot::RestArea && spot != StopSpot::DriveThru)
+      Say(m_engine->OnNav(NavEvent::Resumed(fix.tMs, stoppedMs, stayedInCar)));
     return;
   }
   m_stopWanderM = std::max(m_stopWanderM, DistanceM(m_stopAt, here));
@@ -555,7 +568,7 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
   {
     m_pullOverSaid = true;
     // Anything that explains the stop rules out the roadside: a light, a lot, a gas station.
-    bool const explained = (m_lightLookup && m_lightLookup(m_stopAt)) ||
+    bool const explained = m_road.CurrentStopSpot() != StopSpot::None || (m_lightLookup && m_lightLookup(m_stopAt)) ||
                            (m_parkingLookup && m_parkingLookup(m_stopAt)) || (m_placeLookup && m_placeLookup(m_stopAt));
     if (!explained)
     {
@@ -571,6 +584,9 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
   if (!m_stopAnnounced && !nearDestination && fix.tMs - *m_stopSince >= kUnplannedStopAfterMs)
   {
     m_stopAnnounced = true;
+    // The drive-thru has its own lines.
+    if (m_road.CurrentStopSpot() == StopSpot::DriveThru)
+      return;
     std::optional<Place> place;
     if (m_placeLookup)
       place = m_placeLookup(m_stopAt);
@@ -613,6 +629,9 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
     m_inTraffic = false;
     m_stopGo.Reset();
     Say(m_engine->OnNav(NavEvent::Traffic(fix.tMs, false)));
+    // "Traffic's clearing up. Try to act like you've done this before." Half the time.
+    if ((m_config.rng ? m_config.rng() : 0) < kTrafficClearedChance)
+      SayLine(fix.tMs, Category::Traffic, "traffic.cleared");
   }
   if (!m_inTraffic)
     return;
@@ -1361,6 +1380,8 @@ void Navigator::ResetTrip()
   m_quietTurnId.reset();
   m_quietTurnSince = -1e18;
   m_lastCutInT = -1e18;
+  m_road.Reset();
+  m_lastRoadT = -1e18;
 }
 
 void Navigator::SetSaidLog(SaidLog log, std::function<void(SaidLog const &)> onChange)
@@ -1492,6 +1513,13 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
     SayTwenty(m_lastT, reply);
     return;
   }
+  // An answer to a question the GPS just asked ("Rate my directions so far, one to five.").
+  if (m_road.AwaitingAnswer(m_lastT))
+    if (auto const reply = m_road.OnAnswer(m_lastT, words, m_said))
+    {
+      SayLine(m_lastT, Category::Road, reply->key, reply->vars);
+      return;
+    }
   for (char const * cue : {" police ", " cop ", " cops ", " officer ", " pulled over ", " pulling us over ",
                            " pulling me over ", " trooper "})
   {
@@ -1919,14 +1947,14 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
       QuietBitBusy())
     return;
   if (t - m_tripStartT < kQuietBitAfterStartMs || t - m_lastQuietBitT < kQuietBitEveryMs ||
-      t - std::max(m_lastSpokeT, m_quietTurnSince) < kQuietSilenceMs || toTurnS < kQuietMinToTurnS)
+      t - std::max({m_lastSpokeT, m_quietTurnSince, m_lastRoadT}) < kQuietSilenceMs || toTurnS < kQuietMinToTurnS)
     return;
   bool const roomForCall = !m_callTaken && toTurnS >= kCallMinToTurnS && route.distToTurnM >= kCallMinToTurnM;
   bool const night = Night(t, {fix.lat, fix.lon});
   // 20 Questions once a trip, and not on top of the plate game.
   bool const roomForTwenty = !m_twenty.OfferedThisTrip() && m_plates.GetState() != PlateGame::State::Offered &&
                              m_plates.GetState() != PlateGame::State::Playing;
-  enum class Bit { None, Call, ISpy, Twenty, Fact } bit = Bit::None;
+  enum class Bit { None, Call, ISpy, Twenty, Fact, Aside, Trap } bit = Bit::None;
   // Each bit's first time comes as soon as there's room for it, the call first.
   if (roomForCall && !m_said.Said("call.script"))
     bit = Bit::Call;
@@ -1936,6 +1964,10 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
     bit = Bit::Fact;
   else if (roomForTwenty && !m_said.Said("twenty.offer") && !m_said.Said("twenty.start"))
     bit = Bit::Twenty;
+  else if (!m_said.Said("quiet.aside"))
+    bit = Bit::Aside;
+  else if (m_said.Recalled("note.trap").empty())
+    bit = Bit::Trap;
   else
   {
     // After that, one roll of the dice per stretch.
@@ -1948,10 +1980,14 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
     double pick = r / kQuietBitChance;
     if (!roomForCall)
       pick = kCallWeight + pick * (1 - kCallWeight);
-    bit = pick < kCallWeight                                  ? Bit::Call
-          : pick < kCallWeight + kISpyWeight                  ? Bit::ISpy
-          : pick < kCallWeight + kISpyWeight + kTwentyWeight ? (roomForTwenty ? Bit::Twenty : Bit::Fact)
-                                                              : Bit::Fact;
+    double const twenty = kCallWeight + kISpyWeight + kTwentyWeight;
+    double const fact = twenty + kFactWeight;
+    bit = pick < kCallWeight                 ? Bit::Call
+          : pick < kCallWeight + kISpyWeight ? Bit::ISpy
+          : pick < twenty                    ? (roomForTwenty ? Bit::Twenty : Bit::Fact)
+          : pick < fact                      ? Bit::Fact
+          : pick < fact + kAsideWeight       ? Bit::Aside
+                                             : Bit::Trap;
   }
   ++m_quietBits;
   m_lastQuietBitT = t;
@@ -1971,7 +2007,56 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
     SayLine(t, Category::Quiet, "fact.frame", {{"fact", m_said.Pick("fact", LinesFor("fact", 0), r)}});
     break;
   }
+  case Bit::Trap:
+  {
+    // "Rate my directions so far, one to five." The answer is used against the driver.
+    m_said.Remember("note.trap", "asked");
+    if (auto const ask = m_road.StartTrap(t, m_said))
+    {
+      Trace("quiet", {{"bit", "trap"}, {"key", ask->key}});
+      SayLine(t, Category::Quiet, ask->key, ask->vars);
+      break;
+    }
+    [[fallthrough]];
+  }
+  case Bit::Aside:
+  {
+    double const r = m_config.rng ? m_config.rng() : 0;
+    bool const partner = !m_partner.empty() && m_said.Said("quiet.aside") && r < kPartnerAsideChance;
+    Trace("quiet", {{"bit", partner ? "partner" : "aside"}});
+    if (partner)
+      SayLine(t, Category::Quiet, "partner.aside", {{"partner", m_partner}});
+    else
+      SayLine(t, Category::Quiet, "quiet.aside");
+    break;
+  }
   case Bit::None: break;
+  }
+}
+
+void Navigator::TrackRoadBits(Fix const & fix, RouteSnapshot const & route)
+{
+  RoadTick k;
+  k.tMs = fix.tMs;
+  k.here = {fix.lat, fix.lon};
+  k.speedMps = fix.speedMps;
+  k.bearingDeg = fix.bearingDeg;
+  k.steady = route.state == RouteState::OnRoute && !m_rerouting && route.turnId;
+  k.toTurnS = k.steady ? SecondsToTurn(route.distToTurnM, fix.speedMps) : 0;
+  // A quiet bit queued on this very fix hasn't reached the speaker yet, but it counts.
+  k.sinceSpokenMs = fix.tMs - std::max({m_lastSpokeT, m_quietTurnSince, m_lastQuietBitT});
+  k.tripMs = fix.tMs - m_tripStartT;
+  k.busy = QuietBitBusy() || !m_punchlines.empty();
+  k.night = KnowsTheDate(fix.tMs) && SunElevationDeg(fix.lat, fix.lon, fix.tMs) < kSunsetElevationDeg;
+  k.localHour = KnowsTheDate(fix.tMs) ? LocalTime(fix.tMs).tm_hour : -1;
+  double const r = m_config.rng ? m_config.rng() : 0;
+  for (auto const & remark : m_road.Tick(k, m_said, r))
+  {
+    Vars vars = remark.vars;
+    if (!m_partner.empty())
+      vars.emplace("partner", m_partner);
+    SayLine(fix.tMs, Category::Road, remark.key, vars);
+    m_lastRoadT = fix.tMs;
   }
 }
 

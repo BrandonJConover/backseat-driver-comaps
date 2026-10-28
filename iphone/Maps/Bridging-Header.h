@@ -80,3 +80,4 @@
 #import "SearchResult.h"
 #import "MWMBackseatRewriter.h"
 #import "MWMBackseatLog.h"
+#import "MWMBackseatRoadTrip.h"

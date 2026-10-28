@@ -80,7 +80,7 @@ P	63000	435.8
 T	64000	2.101	22	39.710293	-104.999971	5.6
 P	64000	432.8
 T	94000	1.994	22	39.710311	-104.999968	7.85
->	traffic	roast	27	1.03	If we stop any harder, we'll be parked.
+>	traffic	roast	27	1.03	The car next to us is going the exact same speed. You're in a race neither of you signed up for.
 P	94000	426.5
 T	95000	0	22	39.710311	-104.999968	8.86
 P	95000	423
@@ -10127,7 +10127,7 @@ P	71000	301.7
 F	71000	1	Colfax Avenue
 >	traffic	roast	11	1.01	Brake lights, as far as the eye can see. Colfax Avenue would have been lovely right now.
 T	101000	6.429	22.4	39.840323	-105.000518	277.43
->	traffic	roast	11	1.01	Still crawling. Still not on Colfax Avenue. Just keeping track.
+>	traffic	roast	11	1.01	We've moved about a car length. A personal best for this road.
 P	101000	294.9
 I	101000	Continue straight on Main Street	531.8	other	trafficLight
 >	instruction	nav	11	1.01	In a quarter mile, continue straight on Main Street.
@@ -15077,7 +15077,7 @@ T	52000	2.011	22.4	39.920348	-105.000003	9.48
 T	53000	5.892	22.4	39.9204	-104.999992	9.23
 >	hardAccel	roast	27	1.03	The tires just made a noise. Tires shouldn't make noises.
 T	83000	5.483	22.4	39.920449	-104.999985	6.44
->	traffic	roast	27	1.03	Time for a little reflection. On the other route. And on choices.
+>	traffic	roast	27	1.03	Lovely weather to be standing still in.
 T	113000	0	22.4	39.920449	-104.999985	8.05
 T	114000	0.552	22.4	39.920454	-104.999984	10.7
 T	115000	0.305	22.4	39.920457	-104.999983	8.01

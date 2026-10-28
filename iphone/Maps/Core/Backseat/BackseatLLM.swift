@@ -14,6 +14,8 @@ import FoundationModels
     // Load Kokoro now, not when the first route starts: its first lines would get the system voice.
     KokoroVoice.shared.start()
     KokoroVoice.tellNavigatorItsName()
+    // Signal and weather for the road-trip remarks.
+    BackseatRoadTrip.start()
     BackseatWhereTo.install()
     BackseatFileQuestions.install()
     BackseatDriveWatcher.startIfEnabled()

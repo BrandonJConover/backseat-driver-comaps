@@ -3,6 +3,7 @@
 #include "backseat/debug_log.hpp"
 #include "backseat/mileage.hpp"
 #include "backseat/navigator.hpp"
+#include "backseat/road_bits.hpp"
 #include "backseat/voice_command.hpp"
 
 #include "platform/location.hpp"
@@ -352,6 +353,14 @@ public:
   /// Draw mode: a finger stroke moved onto the car roads it traced (route_sketch.hpp SnapStroke).
   /// Empty if there's no map data there or the stroke covers too much ground to look up quickly.
   std::vector<backseat::LatLon> SnapToRoads(std::vector<backseat::LatLon> const & stroke) const;
+  /// Road-trip remarks (road_bits.hpp): what's around the car, what's along the route ahead, and
+  /// what kind of place the car stopped at.
+  backseat::Surroundings SurroundingsAt(backseat::LatLon const & p, double bearingDeg) const;
+  backseat::RouteAhead RouteAheadWithin(double maxM);
+  backseat::StopSpot StopSpotAt(backseat::LatLon const & p) const;
+  /// From the platform: the phone has (or lost) a data connection; the weather where the car is.
+  void OnConnectivity(bool online);
+  void OnWeather(std::string const & description, double windMps, double gustMps);
   /// 20 Questions: what's within about 2 km (TwentyThing tags: "water_tower", "bridge", "farm"...).
   std::set<std::string> NearbyThings(backseat::LatLon const & at) const;
   /// How wound up the GPS is this trip, 0-100 (0 with no trip), for the driving screen's Patience meter.
@@ -468,4 +477,12 @@ private:
   std::string m_callerVoiceToWarm;
   mutable std::mutex m_lastTripMutex;
   std::optional<LastTrip> m_lastTrip;
+  /// The route being followed, for the road-trip lookups (set with each location update).
+  std::shared_ptr<routing::Route const> m_route;
+  /// Rest areas, gas, coffee and viewpoints along m_route, by distance from its start; scanned once
+  /// per route in the background.
+  mutable std::mutex m_scanMutex;
+  routing::Route const * m_scannedRoute = nullptr;
+  bool m_scanning = false;
+  std::vector<std::pair<backseat::Stopover, double>> m_scannedStops;
 };

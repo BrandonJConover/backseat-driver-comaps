@@ -271,6 +271,8 @@ enum class Category
   Quiet,
   /// 20 Questions (twenty_questions.hpp; navigator only). The host listens after these, like PlateGame.
   TwentyQuestions,
+  /// Road-trip remarks: rest areas, the highway, farmland, the weather, signal (road_bits.hpp).
+  Road,
   Count
 };
 

@@ -13,6 +13,7 @@
 #include "backseat/quiet_bits.hpp"
 #include "backseat/report.hpp"
 #include "backseat/rewriter.hpp"
+#include "backseat/road_bits.hpp"
 #include "backseat/stop_go.hpp"
 #include "backseat/twenty_questions.hpp"
 
@@ -239,6 +240,15 @@ public:
   void SetSightLookup(SightLookup lookup) { m_sightLookup = std::move(lookup); }
   /// Lets the GPS comment on where we're going ("Oh, we are getting coffee?").
   void SetVenueLookup(VenueLookup lookup) { m_venueLookup = std::move(lookup); }
+  /// Road-trip remarks (road_bits.hpp): what's around the car, what's coming up on the route, and
+  /// what kind of place the car stopped at.
+  void SetSurroundingsLookup(SurroundingsLookup lookup) { m_road.SetSurroundingsLookup(std::move(lookup)); }
+  void SetRouteAheadLookup(RouteAheadLookup lookup) { m_road.SetRouteAheadLookup(std::move(lookup)); }
+  void SetStopSpotLookup(StopSpotLookup lookup) { m_road.SetStopSpotLookup(std::move(lookup)); }
+  /// The phone gained or lost its data connection ("No signal out here").
+  void OnConnectivity(double tMs, bool online) { m_road.OnConnectivity(tMs, online); }
+  /// The weather where the car is (WeatherFromNws); the host refreshes it every 15 minutes or so.
+  void OnWeather(double tMs, Weather const & weather) { m_road.OnWeather(tMs, weather); }
   /// Plates spotted on earlier trips, and where to save the log when it changes.
   void SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange);
   /// What was said on earlier trips, and where to save it when it changes (from TakeLines()).
@@ -349,6 +359,8 @@ private:
   Commentary CallLine(double tMs, std::string const & key);
   /// Puts the call on hold for directions, takes it back up, or ends it, as lines go out.
   std::vector<Commentary> FilterForCall(std::vector<Commentary> lines);
+  /// Rest areas, highways, farmland, the dark, the weather, signal and drive-thrus (road_bits.hpp).
+  void TrackRoadBits(Fix const & fix, RouteSnapshot const & route);
   /// {name}, {gps} and the driver's pronouns, for lines about the driver.
   Vars DriverVars() const;
   int Tier() const;
@@ -531,6 +543,10 @@ private:
   double m_quietTurnSince = -1e18;
   /// When something last cut into a call (m_lastSpokeT is when anything was last handed out).
   double m_lastCutInT = -1e18;
+
+  RoadBits m_road;
+  /// When the last road-trip remark went out, so a quiet-stretch bit doesn't land on top of it.
+  double m_lastRoadT = -1e18;
 
   std::optional<int> m_batteryPercent;
   std::optional<bool> m_charging;

@@ -10,6 +10,7 @@
 #include "routing/routing_session.hpp"
 #include "routing/turns.hpp"
 
+#include "indexer/feature_meta.hpp"
 #include "indexer/classificator.hpp"
 #include "indexer/data_source.hpp"
 #include "indexer/feature.hpp"
@@ -1120,6 +1121,7 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
                                        std::string const & destinationName)
 {
   m_here = mercator::FromLatLon(info.m_latitude, info.m_longitude);
+  m_route = session.IsActive() ? session.GetRouteForTests() : nullptr;
   auto route = Snapshot(session, destinationName);
   if (route.state == backseat::RouteState::OnRoute)
     route.passedExitNextM = PassedExitNextM(session, info.m_speed);
@@ -1163,6 +1165,9 @@ void BackseatAdapter::SetDataSource(std::function<DataSource &()> getter)
   m_navigator.SetPlaceLookup([this](backseat::LatLon const & at) { return PlaceAt(at); });
   m_navigator.SetParkingLookup([this](backseat::LatLon const & at) { return InParkingLot(at); });
   m_navigator.SetNearbyThingsLookup([this](backseat::LatLon const & at) { return NearbyThings(at); });
+  m_navigator.SetSurroundingsLookup([this](backseat::LatLon const & p, double bearing) { return SurroundingsAt(p, bearing); });
+  m_navigator.SetRouteAheadLookup([this](double maxM) { return RouteAheadWithin(maxM); });
+  m_navigator.SetStopSpotLookup([this](backseat::LatLon const & p) { return StopSpotAt(p); });
   m_navigator.SetBuildingLookup([this](backseat::LatLon const & at) { return BuildingAt(at); });
   m_navigator.SetSightLookup([this](backseat::LatLon const & at, double bearing) { return SightAt(at, bearing); });
   m_navigator.SetVenueLookup([this](backseat::LatLon const & at) { return VenueAt(at); });
@@ -1538,6 +1543,224 @@ backseat::Bridge BackseatAdapter::BridgeAt(backseat::LatLon const & at, double b
     }
   }, mercator::RectByCenterXYAndSizeInMeters(center, kWaterSearchM), scales::GetUpperScale());
   return water ? backseat::Bridge::Water : backseat::Bridge::Land;
+}
+
+namespace
+{
+std::vector<std::string> TypeNames(FeatureType & ft)
+{
+  std::vector<std::string> names;
+  for (uint32_t const t : feature::TypesHolder(ft))
+    names.push_back(classif().GetReadableObjectName(t));
+  return names;
+}
+
+bool AnyType(std::vector<std::string> const & names, std::initializer_list<char const *> prefixes)
+{
+  for (auto const & n : names)
+    for (char const * p : prefixes)
+      if (n.starts_with(p))
+        return true;
+  return false;
+}
+
+/// Whether `p` is inside area feature `ft`.
+bool InsideArea(FeatureType & ft, backseat::LatLon const & p)
+{
+  if (ft.GetGeomType() != feature::GeomType::Area)
+    return false;
+  std::vector<backseat::FootprintTriangle> triangles;
+  ft.ForEachTriangle([&](m2::PointD const & a, m2::PointD const & b, m2::PointD const & c)
+                     { triangles.push_back({ToBackseatLatLon(a), ToBackseatLatLon(b), ToBackseatLatLon(c)}); },
+                     FeatureType::BEST_GEOMETRY);
+  return backseat::DepthInsideM(triangles, p).has_value();
+}
+
+/// A point `meters` to the side of `p`, square to `bearingDeg` (right when positive).
+backseat::LatLon Beside(backseat::LatLon const & p, double bearingDeg, double meters)
+{
+  double const rad = (bearingDeg + 90) * M_PI / 180;
+  return {p.lat + std::cos(rad) * meters / 111320, p.lon + std::sin(rad) * meters / (111320 * std::cos(p.lat * M_PI / 180))};
+}
+
+std::initializer_list<char const *> const kFarmTypes = {"landuse-farmland", "landuse-meadow", "landuse-farmyard",
+                                                        "landuse-orchard", "landuse-vineyard"};
+std::initializer_list<char const *> const kWildTypes = {"landuse-forest", "natural-wood", "natural-scrub", "natural-heath",
+                                                        "natural-bare_rock", "natural-grassland", "natural-scree"};
+}  // namespace
+
+backseat::Surroundings BackseatAdapter::SurroundingsAt(backseat::LatLon const & p, double bearingDeg) const
+{
+  backseat::Surroundings s;
+  // Motorway and unpaved come from the route itself: the segment the car is on.
+  if (m_route && m_route->IsValid())
+  {
+    auto const & segments = m_route->GetRouteSegments();
+    size_t const i = m_route->GetFollowedPolyline().GetCurrentIter().m_ind;
+    if (i < segments.size())
+    {
+      auto const roads = segments[i].GetRoadTypes();
+      s.motorway = roads.Has(routing::RoutingOptions::Motorway);
+      s.unpaved = roads.Has(routing::RoutingOptions::Dirty);
+    }
+  }
+  if (!m_dataSource)
+    return s;
+  backseat::LatLon const left = Beside(p, bearingDeg, -40);
+  backseat::LatLon const right = Beside(p, bearingDeg, 40);
+  bool buildingsNear = false, wildHere = false, village = false, town = false;
+  m2::PointD const pt = mercator::FromLatLon(p.lat, p.lon);
+  m2::RectD const close = mercator::RectByCenterXYAndSizeInMeters(pt, 300);
+  auto const & isBuilding = ftypes::IsBuildingChecker::Instance();
+  // 600 m: enough to catch the village's place node from inside the village.
+  m_dataSource().ForEachInRect([&](FeatureType & ft)
+  {
+    auto const geom = ft.GetGeomType();
+    if (geom == feature::GeomType::Point)
+    {
+      auto const names = TypeNames(ft);
+      if (AnyType(names, {"place-village", "place-hamlet"}))
+        village = true;
+      if (AnyType(names, {"place-town", "place-city"}))
+        town = true;
+      return;
+    }
+    if (geom != feature::GeomType::Area || !ft.GetLimitRect(FeatureType::BEST_GEOMETRY).IsIntersect(close))
+      return;
+    if (isBuilding(ft))
+    {
+      buildingsNear = true;
+      return;
+    }
+    auto const names = TypeNames(ft);
+    bool const farm = AnyType(names, kFarmTypes);
+    bool const wild = AnyType(names, kWildTypes);
+    if (farm)
+    {
+      s.farmLeft = s.farmLeft || InsideArea(ft, left);
+      s.farmRight = s.farmRight || InsideArea(ft, right);
+    }
+    if (wild)
+      wildHere = wildHere || InsideArea(ft, p) || InsideArea(ft, left) || InsideArea(ft, right);
+  }, mercator::RectByCenterXYAndSizeInMeters(pt, 1200), scales::GetUpperScale());
+  s.wild = wildHere && !buildingsNear;
+  s.village = village && !town;
+  return s;
+}
+
+backseat::RouteAhead BackseatAdapter::RouteAheadWithin(double maxM)
+{
+  backseat::RouteAhead ahead;
+  auto const route = m_route;
+  if (!route || !route->IsValid() || !m_dataSource)
+    return ahead;
+  {
+    std::lock_guard<std::mutex> lock(m_scanMutex);
+    if (m_scannedRoute != route.get())
+    {
+      // Scan the new route once, off the main thread; until then nothing is known (searchedM 0,
+      // which never says "no gas").
+      if (!m_scanning)
+      {
+        m_scanning = true;
+        auto getDataSource = m_dataSource;
+        GetPlatform().RunTask(Platform::Thread::Background, [this, route, getDataSource]
+        {
+          std::vector<std::pair<backseat::Stopover, double>> stops;
+          auto const & line = route->GetPoly().GetPoints();
+          double along = 0, lastScan = -1e9;
+          // A look every ~1 km of route, 150 m to each side (rest areas sit beside the carriageway).
+          for (size_t i = 0; i + 1 < line.size(); ++i)
+          {
+            if (along - lastScan >= 1000 || i == 0)
+            {
+              lastScan = along;
+              m2::RectD rect = mercator::RectByCenterXYAndSizeInMeters(line[i], 300);
+              rect.Add(mercator::RectByCenterXYAndSizeInMeters(line[i + 1], 300));
+              double const at = along;
+              getDataSource().ForEachInRect([&](FeatureType & ft)
+              {
+                auto const names = TypeNames(ft);
+                std::optional<backseat::Stopover> kind;
+                if (AnyType(names, {"highway-rest_area", "highway-services"}))
+                  kind = backseat::Stopover::RestArea;
+                else if (AnyType(names, {"amenity-fuel"}))
+                  kind = backseat::Stopover::Fuel;
+                else if (AnyType(names, {"tourism-viewpoint"}))
+                  kind = backseat::Stopover::Viewpoint;
+                else if (AnyType(names, {"amenity-cafe", "shop-coffee"}))
+                  kind = backseat::Stopover::Coffee;
+                if (kind)
+                  stops.emplace_back(*kind, at);
+              }, rect, scales::GetUpperScale());
+            }
+            along += mercator::DistanceOnEarth(line[i], line[i + 1]);
+          }
+          std::sort(stops.begin(), stops.end(), [](auto const & a, auto const & b) { return a.second < b.second; });
+          // The same place shows up in neighbouring looks: one per kind per 500 m.
+          stops.erase(std::unique(stops.begin(), stops.end(), [](auto const & a, auto const & b)
+                                  { return a.first == b.first && std::fabs(a.second - b.second) < 500; }),
+                      stops.end());
+          std::lock_guard<std::mutex> lock(m_scanMutex);
+          m_scannedStops = std::move(stops);
+          m_scannedRoute = route.get();
+          m_scanning = false;
+        });
+      }
+      return ahead;
+    }
+  }
+  auto const & followed = route->GetFollowedPolyline();
+  double const done = followed.GetDistanceFromStartMeters();
+  double const total = followed.GetTotalDistanceMeters();
+  ahead.searchedM = std::max(0.0, std::min(maxM, total - done));
+  std::lock_guard<std::mutex> lock(m_scanMutex);
+  for (auto const & [kind, at] : m_scannedStops)
+    if (at > done && at - done <= ahead.searchedM)
+      ahead.stops.push_back({kind, at - done});
+  return ahead;
+}
+
+backseat::StopSpot BackseatAdapter::StopSpotAt(backseat::LatLon const & p) const
+{
+  if (!m_dataSource)
+    return backseat::StopSpot::None;
+  m2::PointD const pt = mercator::FromLatLon(p.lat, p.lon);
+  auto spot = backseat::StopSpot::None;
+  m_dataSource().ForEachInRect([&](FeatureType & ft)
+  {
+    auto const names = TypeNames(ft);
+    bool const restArea = AnyType(names, {"highway-rest_area", "highway-services"});
+    bool const fuel = AnyType(names, {"amenity-fuel"});
+    bool const fastFood = AnyType(names, {"amenity-fast_food"});
+    if (!restArea && !fuel && !fastFood)
+      return;
+    double const d = mercator::DistanceOnEarth(pt, feature::GetCenter(ft, FeatureType::BEST_GEOMETRY));
+    bool const inside = InsideArea(ft, p);
+    if (restArea && (inside || d < 150))
+      spot = backseat::StopSpot::RestArea;
+    else if (spot == backseat::StopSpot::None && fuel && (inside || d < 60))
+      spot = backseat::StopSpot::Fuel;
+    else if (spot == backseat::StopSpot::None && fastFood && (inside || d < 60))
+    {
+      // Where the map says there's no drive-through, there isn't one. Untagged counts: the engine
+      // only talks about the drive-thru once the car moves up and stops again (a line).
+      auto const driveThrough = ft.GetMetadata(feature::Metadata::FMD_DRIVE_THROUGH);
+      if (driveThrough.empty() || driveThrough == "yes")
+        spot = backseat::StopSpot::DriveThru;
+    }
+  }, mercator::RectByCenterXYAndSizeInMeters(pt, 300), scales::GetUpperScale());
+  return spot;
+}
+
+void BackseatAdapter::OnConnectivity(bool online)
+{
+  m_navigator.OnConnectivity(NowMs(), online);
+}
+
+void BackseatAdapter::OnWeather(std::string const & description, double windMps, double gustMps)
+{
+  m_navigator.OnWeather(NowMs(), backseat::WeatherFromNws(description, windMps, gustMps));
 }
 
 std::set<std::string> BackseatAdapter::NearbyThings(backseat::LatLon const & at) const

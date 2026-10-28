@@ -45,6 +45,24 @@ public:
   int Counter(std::string const & key) const { return std::atoi(Value(key).c_str()); }
   void SetCounter(std::string const & key, int value) { SetValue(key, std::to_string(value)); }
 
+  /// A note kept with the log, like the driver's answer to a question ("rest"), until forgotten.
+  void Remember(std::string const & key, std::string const & value)
+  {
+    m_recent[key] = {value};
+    m_dirty = true;
+  }
+  /// The note for `key`; empty when there's none.
+  std::string Recalled(std::string const & key) const
+  {
+    auto const it = m_recent.find(key);
+    return it == m_recent.end() || it->second.empty() ? std::string() : it->second.back();
+  }
+  void Forget(std::string const & key)
+  {
+    if (m_recent.erase(key))
+      m_dirty = true;
+  }
+
   /// Whether anything was picked since the last ClearDirty(), i.e. the log needs saving.
   bool Dirty() const { return m_dirty; }
   void ClearDirty() { m_dirty = false; }

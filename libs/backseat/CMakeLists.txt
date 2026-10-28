@@ -33,6 +33,8 @@ set(
   report.hpp
   rewriter.cpp
   rewriter.hpp
+  road_bits.cpp
+  road_bits.hpp
   route_order.cpp
   route_order.hpp
   route_sketch.cpp
