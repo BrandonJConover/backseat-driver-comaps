@@ -41,6 +41,7 @@ import UIKit
   @objc static func install(in view: UIView) {
     BackseatListener.prepare()
     BackseatHooks.install()
+    BackseatReturnTrip.install()
     BackseatDriveOverlay.install(in: view)
     BackseatSketch.installPreviewButton(in: view)
     // The "Where to?" card has the mic now.

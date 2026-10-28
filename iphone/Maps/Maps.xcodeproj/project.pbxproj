@@ -153,6 +153,7 @@
 		3213DE744AEA509300F3828A /* BackseatListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = A134DCF11C5D2C0CF4DD010A /* BackseatListener.swift */; };
 		BD5EA7000000000000000031 /* BackseatDriveWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000030 /* BackseatDriveWatcher.swift */; };
 		BD5EA70000000000000000B1 /* BackseatHooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000B0 /* BackseatHooks.swift */; };
+		BD5EA70000000000000000D1 /* BackseatReturnTrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000D0 /* BackseatReturnTrip.swift */; };
 		BD5EA70000000000000000C4 /* MWMBackseatLog.mm in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000C1 /* MWMBackseatLog.mm */; };
 		BD5EA70000000000000000C5 /* BackseatDriveLogSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */; };
 		8A5DF1798F484411EEE1E998 /* BackseatTalkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */; };
@@ -993,6 +994,7 @@
 		A134DCF11C5D2C0CF4DD010A /* BackseatListener.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatListener.swift; sourceTree = "<group>"; };
 		BD5EA7000000000000000030 /* BackseatDriveWatcher.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatDriveWatcher.swift; sourceTree = "<group>"; };
 		BD5EA70000000000000000B0 /* BackseatHooks.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatHooks.swift; sourceTree = "<group>"; };
+		BD5EA70000000000000000D0 /* BackseatReturnTrip.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatReturnTrip.swift; sourceTree = "<group>"; };
 		BD5EA70000000000000000C0 /* MWMBackseatLog.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MWMBackseatLog.h; sourceTree = "<group>"; };
 		BD5EA70000000000000000C1 /* MWMBackseatLog.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatLog.mm; sourceTree = "<group>"; };
 		BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatDriveLogSection.swift; sourceTree = "<group>"; };
@@ -2597,6 +2599,7 @@
 				A134DCF11C5D2C0CF4DD010A /* BackseatListener.swift */,
 				BD5EA7000000000000000030 /* BackseatDriveWatcher.swift */,
 				BD5EA70000000000000000B0 /* BackseatHooks.swift */,
+				BD5EA70000000000000000D0 /* BackseatReturnTrip.swift */,
 				BD5EA70000000000000000C0 /* MWMBackseatLog.h */,
 				BD5EA70000000000000000C1 /* MWMBackseatLog.mm */,
 				BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */,
@@ -4898,6 +4901,7 @@
 				3213DE744AEA509300F3828A /* BackseatListener.swift in Sources */,
 				BD5EA7000000000000000031 /* BackseatDriveWatcher.swift in Sources */,
 				BD5EA70000000000000000B1 /* BackseatHooks.swift in Sources */,
+				BD5EA70000000000000000D1 /* BackseatReturnTrip.swift in Sources */,
 				BD5EA70000000000000000C4 /* MWMBackseatLog.mm in Sources */,
 				BD5EA70000000000000000C5 /* BackseatDriveLogSection.swift in Sources */,
 				8A5DF1798F484411EEE1E998 /* BackseatTalkButton.swift in Sources */,

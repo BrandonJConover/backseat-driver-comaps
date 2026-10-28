@@ -234,6 +234,8 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
                                           intermediateIndex:0];
   if (![MWMRouter isRoutingActive])
     [MWMRouter removePoints];
+  // Said or tapped from the "Where to?" card: drive there now, no preview.
+  [MWMRouter startWhenReady];
   [MWMRouter buildToPoint:to bestRouter:NO];
 }
 

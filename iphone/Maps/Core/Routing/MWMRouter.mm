@@ -471,6 +471,13 @@ char const *kRenderAltitudeImagesQueueLabel = "mapsme.mwmrouter.renderAltitudeIm
   [self updateFollowingInfo];
 }
 
+// Backseat: the route being built should start navigating once it's ready.
+static BOOL gBackseatStartWhenReady = NO;
+
++ (void)startWhenReady {
+  gBackseatStartWhenReady = YES;
+}
+
 #pragma mark - MWMFrameworkRouteBuilderObserver
 
 - (void)onRouteReady:(BOOL)hasWarnings {
@@ -486,6 +493,16 @@ char const *kRenderAltitudeImagesQueueLabel = "mapsme.mwmrouter.renderAltitudeIm
 
   [[MWMMapViewControlsManager manager] onRouteReady:hasWarnings];
   [self updateFollowingInfo];
+  // Backseat: one tap to drive. A route that needs a look first (warnings, or not from here) stays
+  // in preview.
+  if (gBackseatStartWhenReady) {
+    gBackseatStartWhenReady = NO;
+    if (!hasWarnings && startPoint.isMyPosition && ![MWMRouter isOnRoute]) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [MWMRouter startRouting];
+      });
+    }
+  }
   // Backseat: a drawn route gets the GPS's opinion once it's built.
   [BackseatSketch routeReady];
 }

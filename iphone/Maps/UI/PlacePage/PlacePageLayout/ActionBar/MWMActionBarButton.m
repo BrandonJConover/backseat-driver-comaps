@@ -26,7 +26,8 @@ NSString *titleForButton(MWMActionBarButtonType type, BOOL isSelected) {
     case MWMActionBarButtonTypeRouteFrom:
       return L(@"p2p_from_here");
     case MWMActionBarButtonTypeRouteTo:
-      return L(@"p2p_to_here");
+      // Backseat: it starts driving there, so it says so.
+      return @"Start";
     case MWMActionBarButtonTypeMore:
       return L(@"placepage_more_button");
     case MWMActionBarButtonTypeRouteAddStop:

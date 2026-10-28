@@ -28,6 +28,10 @@ struct BackseatWhereToCard: View {
     @State private var places: [Place] = []
 
 
+    /// Where the last trip started, to head back to
+    @State private var returnTrip: BackseatReturnTrip.Origin?
+
+
     /// If the GPS is listening
     @State private var isListening: Bool = false
 
@@ -75,6 +79,29 @@ struct BackseatWhereToCard: View {
                         .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
+                }
+
+                // After a trip: one tap back the way you came.
+                if let returnTrip {
+                    Button {
+                        BackseatReturnTrip.headBack()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.uturn.backward")
+                                .imageScale(.small)
+
+                            Text(verbatim: returnTrip.name == "Where you started" ? "Head back" : "Head back to \(returnTrip.name)")
+                                .lineLimit(1)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 44)
+                        .background(Capsule().fill(Color.accentColor))
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(verbatim: "Head back to \(returnTrip.name)"))
                 }
 
                 if places.isEmpty {
@@ -142,5 +169,6 @@ struct BackseatWhereToCard: View {
                          minutes: (route["minutes"] as? NSNumber)?.intValue ?? 0)
         }
         isListening = BackseatListener.shared.isListening
+        returnTrip = BackseatReturnTrip.origin
     }
 }
