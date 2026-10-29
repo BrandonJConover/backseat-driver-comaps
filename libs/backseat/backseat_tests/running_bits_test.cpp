@@ -294,3 +294,44 @@ TEST(CurvesGetJokes)
   CHECK_EQUAL(first->text, std::string("Hold on tight."));
   CHECK_EQUAL(CountKey(DriveLegs(1, 6000, [](double) { return 0.0; }), "curve.bend"), 0);
 }
+
+// A cold morning: Brandon's freezing line early in the trip, the air vent one a few minutes later.
+TEST(ColdMorningsWantThePocketThenTheVent)
+{
+  EngineConfig c;
+  c.rng = SeededRng(5);
+  Navigator nav(c);
+  Weather w;
+  w.tempC = -3;
+  nav.OnWeather(0, w);
+  std::vector<Commentary> said;
+  for (double t = 0, left = 9000; left > 0; t += 1000, left -= 15)
+  {
+    RouteSnapshot r;
+    r.state = RouteState::OnRoute;
+    r.turnId = 1;
+    r.turn = TurnKind::Left;
+    r.distToTurnM = left;
+    r.destination = "Work";
+    r.etaSeconds = 600;
+    r.plannedTurns = {TurnKind::Left, TurnKind::Destination};
+    Fix f;
+    f.tMs = t;
+    f.lat = 39.7;
+    f.lon = -105;
+    f.speedMps = 15;
+    f.bearingDeg = 0;
+    nav.OnFix(f, r);
+    for (auto & l : nav.TakeLines())
+      said.push_back(std::move(l));
+  }
+  auto const at = [&](char const * key) {
+    return std::find_if(said.begin(), said.end(), [&](Commentary const & l) { return l.key == key; });
+  };
+  CHECK(at("cold.start") != said.end());
+  CHECK(at("cold.vent") != said.end());
+  CHECK_EQUAL(at("cold.start")->text, std::string("It's freezing out here. I need to go in your pocket asap."));
+  CHECK(at("cold.vent")->t - at("cold.start")->t >= 180000);
+  CHECK(WeatherFromNws("Cloudy", 1, -1, -2.5).tempC == std::optional<double>(-2.5));
+  CHECK(!WeatherFromNws("Cloudy", 1, -1).tempC);
+}

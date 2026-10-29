@@ -49,6 +49,13 @@ void GetJson(NSString * url, void (^done)(NSDictionary * _Nullable json))
 /// km/h (what NWS reports) to m/s; -1 when missing.
 double MpsFromKmh(id value) { return [value isKindOfClass:NSNumber.class] ? [value doubleValue] / 3.6 : -1; }
 
+/// The observation's air temperature in °C (what NWS reports); NaN when missing.
+double TempC(id temperature)
+{
+  id value = [temperature isKindOfClass:NSDictionary.class] ? temperature[@"value"] : nil;
+  return [value isKindOfClass:NSNumber.class] ? [value doubleValue] : NAN;
+}
+
 void FetchObservation()
 {
   if (!gStationUrl)
@@ -60,9 +67,11 @@ void FetchObservation()
     NSString * description = [props[@"textDescription"] isKindOfClass:NSString.class] ? props[@"textDescription"] : @"";
     double const wind = MpsFromKmh(props[@"windSpeed"][@"value"]);
     double const gust = MpsFromKmh(props[@"windGust"][@"value"]);
+    double const tempC = TempC(props[@"temperature"]);
     dispatch_async(dispatch_get_main_queue(), ^{
-      backseat::Trace("weather", {{"text", description.UTF8String}, {"wind", std::to_string(wind)}});
-      Backseat().OnWeather(description.UTF8String, wind, gust);
+      backseat::Trace("weather", {{"text", description.UTF8String}, {"wind", std::to_string(wind)},
+                                {"temp", std::to_string(tempC)}});
+      Backseat().OnWeather(description.UTF8String, wind, gust, tempC);
     });
   });
 }

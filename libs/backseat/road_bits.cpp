@@ -107,7 +107,7 @@ std::string RoadLower(std::string s)
 char const * const kBathroomNote = "note.bathroom";
 }  // namespace
 
-Weather WeatherFromNws(std::string const & description, double windMps, double gustMps)
+Weather WeatherFromNws(std::string const & description, double windMps, double gustMps, double tempC)
 {
   std::string const d = RoadLower(description);
   auto const has = [&d](char const * w) { return d.find(w) != std::string::npos; };
@@ -118,6 +118,8 @@ Weather WeatherFromNws(std::string const & description, double windMps, double g
   // Breezy starts around 20 mph; gusts past 35 mph push a car around.
   w.windy = has("wind") || has("breezy") || windMps >= 9 || gustMps >= 15.5;
   w.clear = !w.rain && !w.snow && !w.fog && (has("sunny") || has("clear") || has("fair"));
+  if (!std::isnan(tempC))
+    w.tempC = tempC;
   return w;
 }
 

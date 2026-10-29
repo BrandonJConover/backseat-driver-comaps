@@ -249,7 +249,12 @@ public:
   /// The phone gained or lost its data connection ("No signal out here").
   void OnConnectivity(double tMs, bool online) { m_road.OnConnectivity(tMs, online); }
   /// The weather where the car is (WeatherFromNws); the host refreshes it every 15 minutes or so.
-  void OnWeather(double tMs, Weather const & weather) { m_road.OnWeather(tMs, weather); }
+  void OnWeather(double tMs, Weather const & weather)
+  {
+    m_road.OnWeather(tMs, weather);
+    if (weather.tempC)
+      m_tempC = weather.tempC;
+  }
   /// Plates spotted on earlier trips, and where to save the log when it changes.
   void SetPlateLog(PlateLog log, std::function<void(PlateLog const &)> onChange);
   /// What was said on earlier trips, and where to save it when it changes (from TakeLines()).
@@ -332,6 +337,9 @@ private:
   /// Winding road: "Hold on tight." "10 and 2. 10 and 2." (Brandon's curve lines).
   void TrackBends(Fix const & fix, RouteSnapshot const & route);
   bool SwungLately() const;
+  /// Cold out: "It's freezing out here. I need to go in your pocket asap." then, once the car's
+  /// had time to warm up, the air vent request (Brandon's lines).
+  void TrackCold(Fix const & fix, RouteSnapshot const & route);
   void TrackFear(Fix const & fix, RouteSnapshot const & route);
   /// "Either there is a new road here or we are completely off course."
   void TrackOffRoad(Fix const & fix);
@@ -585,6 +593,10 @@ private:
   std::deque<std::pair<double, double>> m_bendHeadings;
   double m_curveAheadM = -1;
   double m_lastBendT = -1e18;
+  /// Last known air temperature, and the cold-morning bit's progress this trip (0 = not yet).
+  std::optional<double> m_tempC;
+  int m_coldStage = 0;
+  double m_coldSaidT = 0;
   int m_bendJokes = 0;
   /// Straight nags on the current leg (by maneuver id), whether it's a long haul ("straight.long"
   /// was said), and the one town leg per trip that gets Brandon's straight chain.

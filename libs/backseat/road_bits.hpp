@@ -10,6 +10,7 @@
 #include "backseat/types.hpp"
 
 #include <functional>
+#include <limits>
 #include <optional>
 #include <string>
 #include <vector>
@@ -79,12 +80,15 @@ struct Weather
   bool windy = false;
   /// Clear or sunny, nothing falling, no fog.
   bool clear = false;
+  /// Air temperature, when the observation has one.
+  std::optional<double> tempC;
 };
 
 /// Reads a National Weather Service observation (api.weather.gov, stations/{id}/observations/latest):
 /// its textDescription ("Light Rain and Fog/Mist", "Sunny") and wind speed and gusts in m/s
-/// (negative when missing).
-Weather WeatherFromNws(std::string const & description, double windMps, double gustMps);
+/// (negative when missing), and its temperature in °C (NaN when missing).
+Weather WeatherFromNws(std::string const & description, double windMps, double gustMps,
+                       double tempC = std::numeric_limits<double>::quiet_NaN());
 
 /// A line key to say and what to fill into it.
 struct RoadRemark

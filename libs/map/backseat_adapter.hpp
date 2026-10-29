@@ -360,7 +360,9 @@ public:
   backseat::StopSpot StopSpotAt(backseat::LatLon const & p) const;
   /// From the platform: the phone has (or lost) a data connection; the weather where the car is.
   void OnConnectivity(bool online);
-  void OnWeather(std::string const & description, double windMps, double gustMps);
+  /// `tempC`: the observation's temperature.value (°C), NaN when it's null.
+  void OnWeather(std::string const & description, double windMps, double gustMps,
+                 double tempC = std::numeric_limits<double>::quiet_NaN());
   /// 20 Questions: what's within about 2 km (TwentyThing tags: "water_tower", "bridge", "farm"...).
   std::set<std::string> NearbyThings(backseat::LatLon const & at) const;
   /// How wound up the GPS is this trip, 0-100 (0 with no trip), for the driving screen's Patience meter.

@@ -133,6 +133,13 @@ double constexpr kBendAfterTurnMs = 20000;
 double constexpr kBendEveryMs = 60000;
 int constexpr kBendJokesPerTrip = 8;
 double constexpr kBreathAfterTalkMs = 8000;
+/// The cold bit: at or below this (about 40 °F), in the first minutes of a trip, on half the cold
+/// trips (always the first ever), the vent request a few minutes after.
+double constexpr kColdC = 4.5;
+double constexpr kColdFromMs = 25000;
+double constexpr kColdUntilMs = 300000;
+double constexpr kColdVentAfterMs = 180000;
+double constexpr kColdChance = 0.5;
 /// SaidLog counter: trips started, finished or not.
 char const * const kTripsStartedKey = "_trips.started";
 /// SaidLog values: the trip under way (destination, last seen in s since the epoch), so a relaunch in
@@ -523,6 +530,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   while (!m_bendHeadings.empty() && fix.tMs - m_bendHeadings.front().first > kBendWindowMs)
     m_bendHeadings.pop_front();
   TrackBends(fix, route);
+  TrackCold(fix, route);
   TrackClean(fix, route);
   TrackIdle(fix, route);
   TrackWrongWay(fix, route);
@@ -1509,6 +1517,8 @@ void Navigator::ResetTrip()
   m_curveAheadM = -1;
   m_lastBendT = -1e18;
   m_bendJokes = 0;
+  m_coldStage = 0;
+  m_coldSaidT = 0;
   m_straightLeg.reset();
   m_straightNags = 0;
   m_longLeg.reset();
@@ -2149,6 +2159,37 @@ void Navigator::TrackBends(Fix const & fix, RouteSnapshot const & route)
   m_lastBendT = fix.tMs;
   ++m_bendJokes;
   SayLine(fix.tMs, Category::Fear, "curve.bend", DriverVars());
+}
+
+void Navigator::TrackCold(Fix const & fix, RouteSnapshot const & route)
+{
+  if (m_coldStage >= 3 || route.state != RouteState::OnRoute || QuietBitBusy() ||
+      (route.turnId && route.distToTurnM < kIdleQuietM) || fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+    return;
+  double const sinceStart = fix.tMs - m_tripStartT;
+  if (m_coldStage == 0)
+  {
+    if (!m_tempC || *m_tempC > kColdC || sinceStart < kColdFromMs)
+      return;
+    // One roll a trip; the first cold trip ever always gets it, so Brandon's line debuts.
+    bool const go = sinceStart <= kColdUntilMs &&
+                    (!m_said.Said("cold.start") || (m_config.rng ? m_config.rng() : 0) < kColdChance);
+    m_coldStage = go ? 1 : 3;
+    if (!go)
+      return;
+    double const f = *m_tempC * 9 / 5 + 32;
+    Vars vars = DriverVars();
+    vars["temp"] = std::to_string(static_cast<int>(std::lround(m_config.units == Units::Mph ? f : *m_tempC)));
+    m_coldSaidT = fix.tMs;
+    m_lastSpokeT = fix.tMs;
+    SayLine(fix.tMs, Category::Idle, "cold.start", vars);
+    return;
+  }
+  if (fix.tMs - m_coldSaidT < kColdVentAfterMs)
+    return;
+  m_coldStage = 3;
+  m_lastSpokeT = fix.tMs;
+  SayLine(fix.tMs, Category::Idle, "cold.vent", DriverVars());
 }
 
 bool Navigator::SwungLately() const

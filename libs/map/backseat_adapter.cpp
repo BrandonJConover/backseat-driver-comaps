@@ -1758,9 +1758,9 @@ void BackseatAdapter::OnConnectivity(bool online)
   m_navigator.OnConnectivity(NowMs(), online);
 }
 
-void BackseatAdapter::OnWeather(std::string const & description, double windMps, double gustMps)
+void BackseatAdapter::OnWeather(std::string const & description, double windMps, double gustMps, double tempC)
 {
-  m_navigator.OnWeather(NowMs(), backseat::WeatherFromNws(description, windMps, gustMps));
+  m_navigator.OnWeather(NowMs(), backseat::WeatherFromNws(description, windMps, gustMps, tempC));
 }
 
 std::set<std::string> BackseatAdapter::NearbyThings(backseat::LatLon const & at) const
