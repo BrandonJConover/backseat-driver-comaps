@@ -39,6 +39,8 @@ set(
   route_order.hpp
   route_sketch.cpp
   route_sketch.hpp
+  running_bits.cpp
+  running_bits.hpp
   rundown.cpp
   rundown.hpp
   stop_go.cpp

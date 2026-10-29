@@ -14,6 +14,7 @@
 #include "backseat/report.hpp"
 #include "backseat/rewriter.hpp"
 #include "backseat/road_bits.hpp"
+#include "backseat/running_bits.hpp"
 #include "backseat/stop_go.hpp"
 #include "backseat/twenty_questions.hpp"
 
@@ -313,6 +314,16 @@ private:
   void SayPlate(double tMs, PlateGame::Reply const & reply);
   void SayLine(double tMs, Category category, std::string const & key, Vars vars = {},
                Priority priority = Priority::Roast);
+  /// Hands a line over; "setup || punchline" is split, the punchline after an awkward pause.
+  void PushLine(Commentary c);
+  /// The running bits' say on one of the engine's lines (running_bits.hpp): it may go out as is,
+  /// be swapped for another line, or be dropped (false).
+  bool Punch(Commentary & line);
+  /// Text for a running-bit line: picked (or its story beat), filled with the driver's details
+  /// and the current speed.
+  std::string BitText(BitLine const & bit);
+  /// "You've done everything right for five minutes. I don't like it."
+  void TrackClean(Fix const & fix, RouteSnapshot const & route);
   void TrackFear(Fix const & fix, RouteSnapshot const & route);
   /// "Either there is a new road here or we are completely off course."
   void TrackOffRoad(Fix const & fix);
@@ -560,6 +571,8 @@ private:
   double m_lastCutInT = -1e18;
 
   RoadBits m_road;
+  /// Turn streaks, the trip's speeding story, the clean-driving bit, the arrival callback.
+  RunningBits m_bits;
   /// When the last road-trip remark went out, so a quiet-stretch bit doesn't land on top of it.
   double m_lastRoadT = -1e18;
 

@@ -107,6 +107,14 @@ double constexpr kSightGiveUpMs = 90000;
 double constexpr kIdleMinMs = 150000;
 double constexpr kIdleMaxMs = 300000;
 double constexpr kIdleQuietM = 600;
+/// Share of trips that may do the "you're driving too well" bit, so it stays a surprise.
+double constexpr kCleanBitChance = 0.6;
+/// The clean-driving bit waits for this much quiet before it speaks.
+double constexpr kCleanQuietMs = 20000;
+/// Correct turns in a row, across trips (RunningBits).
+char const * const kTurnStreakKey = "_turns.streak";
+/// A speeding story beat waits for the next nag when the phone has more than this left to say.
+double constexpr kStoryBusyMs = 3000;
 /// SaidLog counter: trips started, finished or not.
 char const * const kTripsStartedKey = "_trips.started";
 /// SaidLog values: the trip under way (destination, last seen in s since the epoch), so a relaunch in
@@ -491,6 +499,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
   TrackLongDrive(fix.tMs, route);
   TrackSights(fix, route);
+  TrackClean(fix, route);
   TrackIdle(fix, route);
   TrackWrongWay(fix, route);
   TrackUTurn(fix, route);
@@ -759,8 +768,10 @@ std::vector<Commentary> Navigator::KeepTurnsClear(std::vector<Commentary> lines)
   m_turnHeld = std::move(still);
   for (auto & l : lines)
   {
+    // Speeding story beats were timed to finish before the turn (Punch); holding one could drop it.
+    bool const storyBeat = l.key.rfind("speeding.story.", 0) == 0;
     bool const holdable = l.priority == Priority::Nav ? (!m_predictionText.empty() && l.text == m_predictionText)
-                                                      : HoldsForTurns(l.category);
+                                                      : HoldsForTurns(l.category) && !storyBeat;
     // Anything already waiting goes first, so a newer line waits behind it.
     if (holdable && (!m_turnHeld.empty() || m_engine->TurnNeedsQuiet(m_lastT, SpeakingMs(l.text, l.voiceSpeed))))
     {
@@ -1027,7 +1038,7 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   // The time prediction waits until the car is rolling, so the start isn't five lines in a row.
   if (m_plan.expectedMinutes > 0)
   {
-    m_predictionText = PredictTrip(m_history, m_plan, m_config.rng).text;
+    m_predictionText = PredictTrip(m_history, m_plan, m_config.rng, &m_said).text;
     SayNavLater(t + kPredictionDelayMs, m_predictionText);
   }
   Say(m_engine->OnNav(NavEvent::DestinationSet(t, route.destination)));
@@ -1469,6 +1480,7 @@ void Navigator::ResetTrip()
   m_upcomingSight.reset();
   m_lastSpokeT = -1e18;
   m_idleGapMs = 0;
+  m_bits.NewTrip((m_config.rng ? m_config.rng() : 0) < kCleanBitChance, m_said.Counter(kTurnStreakKey));
   m_wrongWaySince = -1;
   m_lastWrongWayT = -1e18;
   m_wrongWaySaid = 0;
@@ -1721,6 +1733,12 @@ void Navigator::SayLine(double tMs, Category category, std::string const & key, 
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = priority;
   c.voiceSpeed = 1 + c.frustration / 1000.0;
+  c.key = key;
+  PushLine(std::move(c));
+}
+
+void Navigator::PushLine(Commentary c)
+{
   // "Setup || punchline": the punchline waits out the setup and then an awkward pause.
   auto const pause = c.text.find(" || ");
   if (pause != std::string::npos)
@@ -1728,7 +1746,7 @@ void Navigator::SayLine(double tMs, Category category, std::string const & key, 
     Commentary punchline = c;
     punchline.text = c.text.substr(pause + 4);
     c.text.resize(pause);
-    punchline.t = tMs + SpeakingMs(c.text, c.voiceSpeed) + kAwkwardPauseMs;
+    punchline.t = c.t + SpeakingMs(c.text, c.voiceSpeed) + kAwkwardPauseMs;
     auto const at = std::find_if(m_punchlines.begin(), m_punchlines.end(),
                                  [&](Commentary const & p) { return p.t > punchline.t; });
     m_punchlines.insert(at, std::move(punchline));
@@ -1905,8 +1923,132 @@ void Navigator::SayPlate(double tMs, PlateGame::Reply const & reply)
 
 void Navigator::Say(std::vector<Commentary> const & lines, bool mayRewrite)
 {
-  for (auto const & line : lines)
-    m_gate.Push(line, mayRewrite);
+  for (auto line : lines)
+    if (Punch(line))
+      m_gate.Push(std::move(line), mayRewrite);
+}
+
+bool Navigator::Punch(Commentary & line)
+{
+  if (!m_engine || line.key.empty())
+    return true;
+  double const r = m_config.rng ? m_config.rng() : 0;
+  std::optional<BitLine> bit;
+  if (line.key == "turnCompleted.onTime")
+  {
+    bit = m_bits.OnTimeTurn(m_engine->Stats(), m_engine->Incidents(), r);
+    m_said.SetCounter(kTurnStreakKey, m_bits.Streak());
+    if (!bit)
+    {
+      Trace("say.dropped", {{"key", line.key}, {"why", "verdict.quiet"}});
+      return false;
+    }
+  }
+  else if (line.key == "speeding.barely" || line.key == "speeding.clearly")
+  {
+    // The trip's first speeding remark is the engine's; after that it's the story's turn. Way
+    // over the limit (speeding.way) always gets its own line.
+    if (!m_bits.SpeedingWasSaid())
+    {
+      m_bits.SpeedingSaid();
+      return true;
+    }
+    line.key = "speeding.still";
+    return Punch(line);
+  }
+  else if (line.key == "speeding.still")
+  {
+    m_bits.SpeedingSaid();
+    if (!m_bits.StoryPicked())
+      m_bits.SetStory(m_said.Pick("speeding.story", RunningBits::StoryIds(), r));
+    bit = m_bits.StillSpeeding(line.t);
+    if (!bit)
+    {
+      Trace("say.dropped", {{"key", line.key}, {"why", "story.wait"}});
+      return false;
+    }
+  }
+  else if (line.key == "arrived")
+  {
+    // The grade, then a callback to the trip: tacked on, so it's said in the same breath.
+    if (auto const tag = m_bits.Arrival(m_engine->Report().overall.letter, m_engine->Incidents(), r))
+      line.text += " " + BitText(*tag);
+    return true;
+  }
+  else
+  {
+    return true;
+  }
+  line.key = bit->key;
+  line.text = BitText(*bit);
+  // A story beat isn't held for a turn (KeepTurnsClear) or the story would lose its setup. If it
+  // can't be over before the turn needs quiet, or the phone is still busy (a call's last lines),
+  // it waits for the next nag.
+  if (bit->beat)
+  {
+    std::string spoken = line.text;
+    if (auto const pause = spoken.find(" || "); pause != std::string::npos)
+      spoken.replace(pause, 4, " ... ... ");
+    if (QuietBitBusy() || m_talkingUntil > line.t + kStoryBusyMs ||
+        m_engine->TurnNeedsQuiet(line.t, SpeakingMs(spoken, line.voiceSpeed) + kAwkwardPauseMs))
+    {
+      m_bits.UndoBeat();
+      Trace("say.dropped", {{"key", line.key}, {"why", "story.turn"}});
+      return false;
+    }
+  }
+  Trace("bit", {{"key", bit->key}, {"beat", bit->beat ? std::to_string(*bit->beat) : ""}});
+  // A punchline gets its pause; the setup goes out now.
+  if (line.text.find(" || ") != std::string::npos)
+  {
+    PushLine(std::move(line));
+    return false;
+  }
+  return true;
+}
+
+std::string Navigator::BitText(BitLine const & bit)
+{
+  Vars vars = DriverVars();
+  for (auto const & [k, v] : bit.vars)
+    vars[k] = v;
+  if (m_hereFix && m_lastLimitMps)
+  {
+    int const speed = static_cast<int>(JsRound(ToDisplay(std::max(0.0, m_hereFix->speedMps), m_config.units)));
+    int const limit = static_cast<int>(JsRound(ToDisplay(*m_lastLimitMps, m_config.units)));
+    vars.emplace("speed", std::to_string(speed));
+    vars.emplace("limit", std::to_string(limit));
+    vars.emplace("over", std::to_string(std::max(1, speed - limit)));
+  }
+  std::string const & tmpl = bit.beat ? LinesFor(bit.key, 0).at(*bit.beat)
+                                      : m_said.Pick(bit.key, LinesFor(bit.key, Tier()), m_config.rng ? m_config.rng() : 0);
+  return Fill(tmpl, vars);
+}
+
+void Navigator::TrackClean(Fix const & fix, RouteSnapshot const & route)
+{
+  // Turns that went by without a verdict still count toward (or break) the streak.
+  m_bits.SyncTurns(m_engine->Stats(), m_engine->Incidents());
+  if (m_said.Counter(kTurnStreakKey) != m_bits.Streak())
+    m_said.SetCounter(kTurnStreakKey, m_bits.Streak());
+  if (route.state != RouteState::OnRoute || fix.speedMps < kResumedMps || QuietBitBusy() ||
+      (route.turnId && route.distToTurnM < kIdleQuietM) || fix.tMs - std::max(m_lastSpokeT, m_tripStartT) < kCleanQuietMs)
+    return;
+  auto const bit = m_bits.CleanBeatDue(fix.tMs, m_tripStartT, m_engine->Incidents());
+  if (!bit)
+    return;
+  m_lastSpokeT = fix.tMs;
+  // Counts as the idle remark for this stretch.
+  m_idleGapMs = 0;
+  Commentary c;
+  c.t = fix.tMs;
+  c.category = Category::Idle;
+  c.key = bit->key;
+  c.frustration = m_engine->Frustration();
+  c.voiceSpeed = 1 + c.frustration / 1000.0;
+  c.text = BitText(*bit);
+  Trace("bit", {{"key", bit->key}});
+  PushLine(std::move(c));
 }
 
 void Navigator::SayNavLater(double t, std::string const & text)
@@ -2212,8 +2354,13 @@ std::vector<Commentary> Navigator::FilterForCall(std::vector<Commentary> lines)
     if (l.category == Category::PhoneCall ? !m_call.Held() : CutsIntoCall(l))
       out.push_back(std::move(l));
     else if (l.category != Category::PhoneCall)
-      // The GPS is busy on the phone; the roast can wait for another day.
+    {
+      // The GPS is busy on the phone; the roast can wait for another day. A speeding story's beat
+      // is told later instead, so the story doesn't skip a step.
+      if (l.key.rfind("speeding.story.", 0) == 0)
+        m_bits.UndoBeat();
       Trace("call.skip", {{"category", ToString(l.category)}});
+    }
   }
   m_call.Delivered();
   return out;

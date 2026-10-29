@@ -303,6 +303,8 @@ struct Commentary
   /// else on the line, e.g. the caller the GPS put on. If that's the GPS's own voice (or missing),
   /// the host uses another Kokoro voice; it never speaks these with the system voice.
   std::string voice;
+  /// The line pool it came from ("turnCompleted.onTime"); empty for directions and other built text.
+  std::string key;
 };
 
 struct TripStats

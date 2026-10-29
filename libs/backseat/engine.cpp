@@ -589,6 +589,7 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     m_stats.endedAt = e.t;
     std::string const grade = SpokenGrade(Report().overall.letter);
     out.push_back(Make(e.t, Category::Arrived, Fill(Pick("arrived", Tier()), {{"grade", grade}}), Priority::Nav));
+    out.back().key = "arrived";
     break;
   }
   }
@@ -1047,6 +1048,7 @@ bool CritiqueEngine::Roast(std::vector<Commentary> & out, double t, Category cat
   Trace("roast", {{"key", key}, {"tier", std::to_string(Tier())}, {"frustration", std::to_string(Frustration())},
                   {"urgent", urgent ? "yes" : "no"}});
   out.push_back(Make(t, category, text, Priority::Roast));
+  out.back().key = key;
   return true;
 }
 

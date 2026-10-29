@@ -42,6 +42,47 @@ std::vector<std::string> const kBrakesBefore = {
     " Last time you brake checked {brakes} times here. The guy behind you still talks about it.",
 };
 
+// More of each, for the app (PredictTrip with a SaidLog). The on-time driver heard the same single
+// line on every commute.
+std::vector<std::string> const kLeadFootMore = {
+    "Map says {expected} minutes. You'll do it in {predicted}. Not because you're good. Because you're fast. Those "
+    "are different things.",
+    "{expected} minutes, officially. Unofficially, {predicted}, and I'll have aged a year. I'm a phone. That's a lot "
+    "for a phone.",
+    "The map gave this {expected} minutes. Your right foot read that as a dare. I'm guessing {predicted}.",
+};
+std::vector<std::string> const kSlowpokeMore = {
+    "{expected} minutes for most people. {predicted} for you. I've cleared my schedule. I don't have a schedule.",
+    "Estimated time, {expected} minutes. Adjusted for you, {predicted}. Adjusted for my patience, forever.",
+    "The map says {expected} minutes. The map assumes you'll use the gas pedal. I'm saying {predicted}.",
+};
+std::vector<std::string> const kOnTimeMore = {
+    "{expected} minutes. You're weirdly consistent about this. It's the only thing you're consistent about.",
+    "Should take {expected} minutes. You usually hit that. I don't know how. I've seen you drive.",
+    "{expected} minutes, and you'll probably make it. Then you'll do something in the last block to ruin it. I'll be "
+    "ready.",
+    "{expected} minutes. You always make it right on time. It's like watching a cat land on its feet. Messy, but it "
+    "lands.",
+    "This one takes {expected} minutes, and somehow you never miss that. Don't worry, I'll find something else.",
+};
+std::vector<std::string> const kUnknownMore = {
+    "Somewhere new. I have no notes on you here. Give me ten minutes.",
+    "First time on this route. Don't worry. I'll be learning all your bad habits as we go.",
+    "Uncharted territory. For both of us. Mostly for the road.",
+};
+std::vector<std::string> const kRepeatMore = {
+    " {destination}, for the {n} time. At this point we should just get a place there.",
+};
+std::vector<std::string> const kMissedBeforeMore = {
+    " Last time here you missed {missed} turn{s}. I've been thinking about it. A lot.",
+};
+
+std::vector<std::string> Both(std::vector<std::string> a, std::vector<std::string> const & b)
+{
+  a.insert(a.end(), b.begin(), b.end());
+  return a;
+}
+
 double Median(std::vector<double> xs)
 {
   std::sort(xs.begin(), xs.end());
@@ -152,7 +193,8 @@ TripRecord RecordTrip(CritiqueEngine const & engine, TripPlan const & plan)
   return r;
 }
 
-TripPrediction PredictTrip(std::vector<TripRecord> const & history, TripPlan const & plan, Rng const & rng)
+TripPrediction PredictTrip(std::vector<TripRecord> const & history, TripPlan const & plan, Rng const & rng,
+                           SaidLog * said)
 {
   std::string const key = RouteKey(plan.origin, plan.destination);
   std::vector<TripRecord const *> sameRoute;
@@ -168,8 +210,21 @@ TripPrediction PredictTrip(std::vector<TripRecord> const & history, TripPlan con
       ratios.insert(ratios.end(), r.routeKey == key ? 3 : 1, ratio);
     }
   }
-  auto const pick = [&](std::vector<std::string> const & lines)
-  { return lines[static_cast<size_t>(std::floor(rng() * lines.size()))]; };
+  static std::map<std::vector<std::string> const *, std::pair<char const *, std::vector<std::string>>> const kBigger = {
+      {&kLeadFoot, {"_predict.leadFoot", Both(kLeadFoot, kLeadFootMore)}},
+      {&kSlowpoke, {"_predict.slowpoke", Both(kSlowpoke, kSlowpokeMore)}},
+      {&kOnTime, {"_predict.onTime", Both(kOnTime, kOnTimeMore)}},
+      {&kUnknown, {"_predict.unknown", Both(kUnknown, kUnknownMore)}},
+      {&kRepeat, {"_predict.repeat", Both(kRepeat, kRepeatMore)}},
+      {&kMissedBefore, {"_predict.missed", Both(kMissedBefore, kMissedBeforeMore)}},
+  };
+  auto const pick = [&](std::vector<std::string> const & lines) -> std::string
+  {
+    auto const big = kBigger.find(&lines);
+    if (said && big != kBigger.end())
+      return said->Pick(big->second.first, big->second.second, rng());
+    return lines[static_cast<size_t>(std::floor(rng() * lines.size()))];
+  };
 
   TripPrediction p;
   if (ratios.empty())

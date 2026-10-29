@@ -62,8 +62,10 @@ std::string RouteKey(LatLon origin, LatLon destination);
 TripRecord RecordTrip(CritiqueEngine const & engine, TripPlan const & plan);
 
 /// The opening jab when a trip starts, from the driver's habits (actual / estimated time),
-/// weighted toward this route.
-TripPrediction PredictTrip(std::vector<TripRecord> const & history, TripPlan const & plan, Rng const & rng);
+/// weighted toward this route. With `said`, lines come from bigger pools and don't repeat until
+/// the rest of their pool has had a turn (the app); without it, the original pools (TS parity).
+TripPrediction PredictTrip(std::vector<TripRecord> const & history, TripPlan const & plan, Rng const & rng,
+                           SaidLog * said = nullptr);
 /// A trip the driver makes at about the same time on certain days: the commute.
 struct Routine
 {
