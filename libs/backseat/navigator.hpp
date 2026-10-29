@@ -324,6 +324,14 @@ private:
   std::string BitText(BitLine const & bit);
   /// "You've done everything right for five minutes. I don't like it."
   void TrackClean(Fix const & fix, RouteSnapshot const & route);
+  /// Straight nags and the turn reminders before the final call: fewer of them, from bigger pools
+  /// (key + ".more"), and "follow the road" instead of "straight" in a curve. False: drop it.
+  bool PunchNag(Commentary & line, double r);
+  /// The road bends here or just ahead: the heading has swung lately, or a sharp bend is close.
+  bool Bending() const;
+  /// Winding road: "Hold on tight." "10 and 2. 10 and 2." (Brandon's curve lines).
+  void TrackBends(Fix const & fix, RouteSnapshot const & route);
+  bool SwungLately() const;
   void TrackFear(Fix const & fix, RouteSnapshot const & route);
   /// "Either there is a new road here or we are completely off course."
   void TrackOffRoad(Fix const & fix);
@@ -573,6 +581,18 @@ private:
   RoadBits m_road;
   /// Turn streaks, the trip's speeding story, the clean-driving bit, the arrival callback.
   RunningBits m_bits;
+  /// Recent headings while moving, for Bending().
+  std::deque<std::pair<double, double>> m_bendHeadings;
+  double m_curveAheadM = -1;
+  double m_lastBendT = -1e18;
+  int m_bendJokes = 0;
+  /// Straight nags on the current leg (by maneuver id), whether it's a long haul ("straight.long"
+  /// was said), and the one town leg per trip that gets Brandon's straight chain.
+  std::optional<uint32_t> m_straightLeg;
+  int m_straightNags = 0;
+  std::optional<uint32_t> m_longLeg;
+  std::optional<uint32_t> m_chainLeg;
+  bool m_chainUsed = false;
   /// When the last road-trip remark went out, so a quiet-stretch bit doesn't land on top of it.
   double m_lastRoadT = -1e18;
 

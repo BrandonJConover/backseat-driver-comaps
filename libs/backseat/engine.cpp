@@ -404,6 +404,7 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
       std::string const distance = FormatDistance(JsRound(e.distanceM / unitM) * unitM, units);
       out.push_back(Make(e.t, Category::Instruction, Fill(Pick("straight.long", tier), {{"distance", distance}}),
                          Priority::Nav));
+      out.back().key = "straight.long";
     }
     if (dir == Maneuver::Left && e.control == Control::StopSign)
     {
@@ -754,8 +755,11 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
     TraceThrottled("roast.held", key + "/turn", {{"key", key}, {"why", "turn"}});
     return;
   }
-  std::string const text = Fill(Pick(key, Tier()), {{"dir", DirName(p.dir)}, {"distance", distance}});
+  Vars const vars{{"dir", DirName(p.dir)}, {"distance", distance}};
+  std::string const text = Fill(Pick(key, Tier()), vars);
   out.push_back(Make(t, Category::Instruction, Capitalize(text), Priority::Nav));
+  out.back().key = key;
+  out.back().vars = vars;
 }
 
 /// Where the plain final call goes: about 4 seconds out at the current speed, 50 ft at least.
@@ -830,6 +834,7 @@ void CritiqueEngine::NagStraight(std::vector<Commentary> & out, double t, double
   s.stage++;
   s.lastM = distanceM;
   out.push_back(Make(t, Category::Instruction, Capitalize(Pick(key, Tier())), Priority::Nav));
+  out.back().key = key;
 }
 
 /// The driver's most recent offense, phrased for "consider this payback for ___".
@@ -1049,6 +1054,7 @@ bool CritiqueEngine::Roast(std::vector<Commentary> & out, double t, Category cat
                   {"urgent", urgent ? "yes" : "no"}});
   out.push_back(Make(t, category, text, Priority::Roast));
   out.back().key = key;
+  out.back().vars = vars;
   return true;
 }
 

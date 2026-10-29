@@ -3,6 +3,7 @@
 // speeds are meters per second.
 #pragma once
 
+#include <map>
 #include <optional>
 #include <string>
 
@@ -305,6 +306,8 @@ struct Commentary
   std::string voice;
   /// The line pool it came from ("turnCompleted.onTime"); empty for directions and other built text.
   std::string key;
+  /// What the line's placeholders were filled with, so it can be re-picked from a bigger pool.
+  std::map<std::string, std::string> vars;
 };
 
 struct TripStats

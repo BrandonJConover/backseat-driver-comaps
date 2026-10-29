@@ -115,6 +115,24 @@ double constexpr kCleanQuietMs = 20000;
 char const * const kTurnStreakKey = "_turns.streak";
 /// A speeding story beat waits for the next nag when the phone has more than this left to say.
 double constexpr kStoryBusyMs = 3000;
+/// Town straight nags (Brandon's "Please continue straight." chain) only on one leg a trip, and
+/// only one at least this long when it starts.
+double constexpr kStraightChainMinM = 600;
+/// A turn reminder ("Just in case you forgot...") is skipped on this share of turns whose
+/// instruction was recent, so it isn't the same beat at every turn.
+double constexpr kReminderSkipChance = 0.5;
+double constexpr kReminderRecentMs = 45000;
+/// Bending(): this much heading change within the window, or a sharp bend this close.
+double constexpr kBendDeg = 20;
+double constexpr kBendWindowMs = 12000;
+double constexpr kBendAheadM = 300;
+/// Curve jokes: moving at least this fast, this long after a maneuver (its swing isn't a bend),
+/// this far apart, at most this many a trip.
+double constexpr kBendMinMps = 8;
+double constexpr kBendAfterTurnMs = 20000;
+double constexpr kBendEveryMs = 60000;
+int constexpr kBendJokesPerTrip = 8;
+double constexpr kBreathAfterTalkMs = 8000;
 /// SaidLog counter: trips started, finished or not.
 char const * const kTripsStartedKey = "_trips.started";
 /// SaidLog values: the trip under way (destination, last seen in s since the epoch), so a relaunch in
@@ -499,6 +517,12 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
   TrackLongDrive(fix.tMs, route);
   TrackSights(fix, route);
+  m_curveAheadM = route.curveAheadM;
+  if (fix.bearingDeg >= 0 && fix.speedMps >= kResumedMps)
+    m_bendHeadings.emplace_back(fix.tMs, fix.bearingDeg);
+  while (!m_bendHeadings.empty() && fix.tMs - m_bendHeadings.front().first > kBendWindowMs)
+    m_bendHeadings.pop_front();
+  TrackBends(fix, route);
   TrackClean(fix, route);
   TrackIdle(fix, route);
   TrackWrongWay(fix, route);
@@ -1481,6 +1505,15 @@ void Navigator::ResetTrip()
   m_lastSpokeT = -1e18;
   m_idleGapMs = 0;
   m_bits.NewTrip((m_config.rng ? m_config.rng() : 0) < kCleanBitChance, m_said.Counter(kTurnStreakKey));
+  m_bendHeadings.clear();
+  m_curveAheadM = -1;
+  m_lastBendT = -1e18;
+  m_bendJokes = 0;
+  m_straightLeg.reset();
+  m_straightNags = 0;
+  m_longLeg.reset();
+  m_chainLeg.reset();
+  m_chainUsed = false;
   m_wrongWaySince = -1;
   m_lastWrongWayT = -1e18;
   m_wrongWaySaid = 0;
@@ -1968,6 +2001,11 @@ bool Navigator::Punch(Commentary & line)
       return false;
     }
   }
+  else if (line.key == "straight.long" || line.key.rfind("straight.", 0) == 0 ||
+           line.key.rfind("countdown.", 0) == 0)
+  {
+    return PunchNag(line, r);
+  }
   else if (line.key == "arrived")
   {
     // The grade, then a callback to the trip: tacked on, so it's said in the same breath.
@@ -2005,6 +2043,128 @@ bool Navigator::Punch(Commentary & line)
     return false;
   }
   return true;
+}
+
+bool Navigator::PunchNag(Commentary & line, double r)
+{
+  std::string key = line.key;
+  if (key == "straight.long")
+  {
+    m_longLeg = m_turnId;
+    return true;
+  }
+  bool const straight = key.rfind("straight.", 0) == 0;
+  if (straight)
+  {
+    if (m_straightLeg != m_turnId)
+    {
+      m_straightLeg = m_turnId;
+      m_straightNags = 0;
+    }
+    int const n = m_straightNags++;
+    bool const longHaul = m_longLeg && m_longLeg == m_turnId;
+    if (!longHaul)
+    {
+      // Brandon's chain is a bit, not a direction: once a trip, on a real stretch of road.
+      if (n == 0 && !m_chainUsed && m_lastDistToTurnM >= kStraightChainMinM)
+      {
+        m_chainUsed = true;
+        m_chainLeg = m_turnId;
+      }
+      if (m_chainLeg != m_turnId)
+      {
+        Trace("say.dropped", {{"key", key}, {"why", "straight.once"}});
+        return false;
+      }
+    }
+    else if (n == 2)
+    {
+      // "I'm serious." already went out right after "still" (below); this one is a later line.
+      key = "straight.later";
+    }
+    else if (n >= 3)
+    {
+      // Past the chain on a long haul: every other one, and something other than "still".
+      if (n % 2 == 0)
+      {
+        Trace("say.dropped", {{"key", key}, {"why", "straight.spaced"}});
+        return false;
+      }
+      key = "straight.later";
+    }
+    // "Continue straight" in a curve sounds broken (Brandon, 2026-10-29).
+    if (Bending())
+      key = "straight.curve";
+  }
+  else
+  {
+    // Turn reminders: only the far call and "did I mention" are optional.
+    std::string const stage = key.substr(key.rfind('.') + 1);
+    if (stage != "far" && stage != "mention")
+      return true;
+    if (m_lastT - m_turnSaidAt < kReminderRecentMs && r < kReminderSkipChance)
+    {
+      Trace("say.dropped", {{"key", key}, {"why", "reminder.skip"}});
+      return false;
+    }
+  }
+  // Re-picked from the original pool plus its ".more" lines, under its own SaidLog key (the
+  // engine's pick already went into `key`'s), so the first ever is still option 0, Brandon's line.
+  std::vector<std::string> options = LinesFor(key, Tier());
+  if (std::string const moreKey = key + ".more"; LineData().count(moreKey))
+  {
+    auto const & more = LinesFor(moreKey, Tier());
+    options.insert(options.end(), more.begin(), more.end());
+  }
+  std::string text = Fill(m_said.Pick(key + "+", options, m_config.rng ? m_config.rng() : 0), line.vars);
+  if (!text.empty())
+    text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
+  line.key = key;
+  line.text = std::move(text);
+  // On a long haul the nags are ten minutes apart, too far for "I'm serious." to land as the
+  // punchline to "You should still be going straight." So it comes right after, with a beat.
+  if (key == "straight.still" && m_longLeg && m_longLeg == m_turnId)
+  {
+    std::vector<std::string> serious = LinesFor("straight.serious", Tier());
+    std::string const moreKey = "straight.serious.more";
+    auto const & more = LinesFor(moreKey, Tier());
+    serious.insert(serious.end(), more.begin(), more.end());
+    line.text += " || " + m_said.Pick("straight.serious+", serious, m_config.rng ? m_config.rng() : 0);
+    PushLine(std::move(line));
+    return false;
+  }
+  return true;
+}
+
+void Navigator::TrackBends(Fix const & fix, RouteSnapshot const & route)
+{
+  if (route.state != RouteState::OnRoute || fix.speedMps < kBendMinMps || m_bendJokes >= kBendJokesPerTrip ||
+      QuietBitBusy() || fix.tMs - m_turnSaidAt < kBendAfterTurnMs || fix.tMs - m_lastBendT < kBendEveryMs ||
+      fix.tMs - m_lastCurveAheadT < kBendAfterTurnMs || (route.turnId && route.distToTurnM < kIdleQuietM) ||
+      fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+    return;
+  // In the bends now, not just a sharp one on the map ahead (curve.ahead has that).
+  if (!SwungLately())
+    return;
+  m_lastBendT = fix.tMs;
+  ++m_bendJokes;
+  SayLine(fix.tMs, Category::Fear, "curve.bend", DriverVars());
+}
+
+bool Navigator::SwungLately() const
+{
+  if (m_bendHeadings.size() < 2)
+    return false;
+  double const now = m_bendHeadings.back().second;
+  for (auto const & [t, deg] : m_bendHeadings)
+    if (std::fabs(std::fmod(now - deg + 540.0, 360.0) - 180.0) >= kBendDeg)
+      return true;
+  return false;
+}
+
+bool Navigator::Bending() const
+{
+  return (m_curveAheadM >= 0 && m_curveAheadM <= kBendAheadM) || SwungLately();
 }
 
 std::string Navigator::BitText(BitLine const & bit)

@@ -215,3 +215,82 @@ TEST(RunningBitsSoakCommuteJokesDontPileUp)
   // A different story most days.
   CHECK(stories.size() >= 5);
 }
+
+namespace
+{
+/// Drives `legs` straight legs of `legM` each at 15 m/s, heading from `heading(t)`; every line said.
+std::vector<Commentary> DriveLegs(int legs, double legM, std::function<double(double)> const & heading)
+{
+  EngineConfig c;
+  c.rng = SeededRng(5);
+  Navigator nav(c);
+  std::vector<Commentary> said;
+  double t = 0;
+  for (int leg = 1; leg <= legs; ++leg)
+  {
+    for (double left = legM; left > 0; left -= 15)
+    {
+      RouteSnapshot r;
+      r.state = RouteState::OnRoute;
+      r.turnId = static_cast<uint32_t>(leg);
+      r.turn = TurnKind::Left;
+      r.distToTurnM = left;
+      r.nextStreet = "Elm Street";
+      r.destination = "Grandma's";
+      r.etaSeconds = 600;
+      r.plannedTurns = {TurnKind::Left, TurnKind::Left, TurnKind::Left, TurnKind::Destination};
+      Fix f;
+      f.tMs = t;
+      f.lat = 39.7;
+      f.lon = -105;
+      f.speedMps = 15;
+      f.bearingDeg = heading(t);
+      nav.OnFix(f, r);
+      for (auto & l : nav.TakeLines())
+        said.push_back(std::move(l));
+      t += 1000;
+    }
+  }
+  return said;
+}
+
+int CountKey(std::vector<Commentary> const & lines, std::string const & prefix)
+{
+  return static_cast<int>(std::count_if(lines.begin(), lines.end(),
+                                        [&](Commentary const & l) { return l.key.rfind(prefix, 0) == 0; }));
+}
+}  // namespace
+
+// "Please continue straight." was on nearly every town leg; now Brandon's chain is once a trip.
+TEST(StraightNagsAreOnceATripInTown)
+{
+  auto const lines = DriveLegs(3, 2500, [](double) { return 0.0; });
+  int const nags = CountKey(lines, "straight.");
+  CHECK(nags >= 1);
+  CHECK(nags <= 3);
+  // Only the first leg got the chain; it starts with Brandon's line.
+  CHECK(std::all_of(lines.begin(), lines.end(), [](Commentary const & l) { return l.key.rfind("straight.", 0) != 0 || l.t < 150000; }));
+  auto const first = std::find_if(lines.begin(), lines.end(), [](Commentary const & l) { return l.key == "straight.please"; });
+  CHECK(first != lines.end());
+  CHECK_EQUAL(first->text, std::string("Please continue straight."));
+}
+
+// Through a curve it says to follow the road, not to go straight (Brandon, 2026-10-29).
+TEST(StraightNagsFollowTheRoadInACurve)
+{
+  auto const lines = DriveLegs(1, 2500, [](double t) { return std::fmod(t / 1000 * 3, 60.0); });
+  CHECK(CountKey(lines, "straight.curve") >= 1);
+  CHECK_EQUAL(CountKey(lines, "straight.please") + CountKey(lines, "straight.still") + CountKey(lines, "straight.serious"), 0);
+}
+
+// A winding road gets curve jokes, Brandon's first; a straight one doesn't.
+TEST(CurvesGetJokes)
+{
+  auto const winding = DriveLegs(1, 6000, [](double t) { return 40 * std::sin(t / 8000); });
+  int const jokes = CountKey(winding, "curve.bend");
+  CHECK(jokes >= 2);
+  auto const first = std::find_if(winding.begin(), winding.end(), [](Commentary const & l) { return l.key == "curve.bend"; });
+  CHECK(first != winding.end());
+  CHECK_EQUAL(first->text, std::string("Hold on tight."));
+  CHECK_EQUAL(CountKey(DriveLegs(1, 6000, [](double) { return 0.0; }), "curve.bend"), 0);
+}
