@@ -151,6 +151,14 @@ double constexpr kClockChangeDays = 4;
 double constexpr kYesterdayMinH = 12;
 double constexpr kYesterdayMaxH = 36;
 double constexpr kYesterdayChance = 0.3;
+/// Leaving a bar between these local hours; said on this share of those trips (always the first).
+int constexpr kNightOutFromH = 21;
+int constexpr kNightOutUntilH = 4;
+double constexpr kNightOutChance = 0.5;
+/// Leaving the bar: still parked this long into the trip gets the breathalyzer bit.
+double constexpr kNightParkedMs = 15000;
+/// Faster than this and the car has left the lot.
+double constexpr kNightMovedMps = 2.5;
 /// SaidLog counter: trips started, finished or not.
 char const * const kTripsStartedKey = "_trips.started";
 /// SaidLog values: the trip under way (destination, last seen in s since the epoch), so a relaunch in
@@ -543,6 +551,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackBends(fix, route);
   TrackCold(fix, route);
   TrackClockChange(fix, route);
+  TrackNightOut(fix, route);
   TrackClean(fix, route);
   TrackIdle(fix, route);
   TrackWrongWay(fix, route);
@@ -1011,10 +1020,17 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   m_plan.expectedMinutes = route.etaSeconds / 60;
   ResetTrip();
   m_tripStartT = t;
-  // Leaving a grocery store: the groceries are in the car.
+  // Leaving a grocery store: the groceries are in the car. Leaving a bar late: the breathalyzer or the designated driver.
+  m_fromNightlife = false;
+  m_nightMoved = false;
   if (m_placeLookup && (route.origin.lat || route.origin.lon))
-    if (auto const from = m_placeLookup(route.origin); from && from->grocery)
-      m_groceryT = t;
+    if (auto const from = m_placeLookup(route.origin))
+    {
+      if (from->grocery)
+        m_groceryT = t;
+      int const hour = KnowsTheDate(t) ? LocalTime(t).tm_hour : 12;
+      m_fromNightlife = from->nightlife && (hour >= kNightOutFromH || hour < kNightOutUntilH);
+    }
   Trace("trip.start", {{"to", route.destination},
                        {"eta_min", LogNum(route.etaSeconds / 60, 0)},
                        {"turns", std::to_string(route.plannedTurns.size())},
@@ -2258,6 +2274,26 @@ void Navigator::TrackCold(Fix const & fix, RouteSnapshot const & route)
   m_coldStage = 3;
   m_lastSpokeT = fix.tMs;
   SayLine(fix.tMs, Category::Idle, "cold.vent", DriverVars());
+}
+
+void Navigator::TrackNightOut(Fix const & fix, RouteSnapshot const & route)
+{
+  if (!m_fromNightlife)
+    return;
+  if (fix.speedMps > kNightMovedMps)
+    m_nightMoved = true;
+  // Still sitting in the bar's lot: the breathalyzer bit. Driving off: the designated driver.
+  bool const parked = !m_nightMoved && fix.speedMps < 1 && fix.tMs - m_tripStartT >= kNightParkedMs;
+  bool const driving = m_nightMoved && route.state == RouteState::OnRoute && fix.tMs - m_tripStartT >= kColdFromMs &&
+                       !(route.turnId && route.distToTurnM < kIdleQuietM);
+  if ((!parked && !driving) || QuietBitBusy() || fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+    return;
+  m_fromNightlife = false;
+  std::string const key = parked ? "nightOut.tube" : "nightOut.dd";
+  if (m_said.Said(key) && (m_config.rng ? m_config.rng() : 0) >= kNightOutChance)
+    return;
+  m_lastSpokeT = fix.tMs;
+  SayLine(fix.tMs, Category::Idle, key, DriverVars());
 }
 
 long Navigator::UtcOffsetS(double ms) const

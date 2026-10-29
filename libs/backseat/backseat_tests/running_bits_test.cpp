@@ -339,14 +339,16 @@ TEST(ColdMorningsWantThePocketThenTheVent)
 namespace
 {
 /// Drives one 9 km straight leg in `nav` from `t0`; every line said.
-std::vector<Commentary> DriveFrom(Navigator & nav, double t0, double accelAt = -1)
+std::vector<Commentary> DriveFrom(Navigator & nav, double t0, double accelAt = -1, double parkedMs = 0)
 {
   std::vector<Commentary> said;
   double speed = 0;
   for (double t = t0, left = 9000; left > 0; t += 1000, left -= speed)
   {
     // Starts from a stop; at `accelAt` floors it from a crawl.
-    if (accelAt >= 0 && t - t0 >= accelAt && t - t0 < accelAt + 4000)
+    if (t - t0 < parkedMs)
+      speed = 0;
+    else if (accelAt >= 0 && t - t0 >= accelAt && t - t0 < accelAt + 4000)
       speed = std::min(20.0, (t - t0 - accelAt) / 1000 * 6);
     else if (accelAt >= 0 && t - t0 < accelAt)
       speed = 2;
@@ -441,4 +443,44 @@ TEST(HardAccelerationGetsBrandonsLinesFirst)
   auto const accel = FindKey(lines, "hardAccel");
   CHECK(accel != nullptr);
   CHECK_EQUAL(accel->text, std::string("The brake is the other one."));
+}
+
+// Leaving a bar late at night: Brandon's designated driver line. Not at lunch, not from home.
+TEST(LeavingTheBarLateGetsTheDesignatedDriver)
+{
+  auto const bar = [](LatLon const &) { return std::optional<Place>(Place{PlaceKind::Other, "Joe's Pub", false, true}); };
+  auto const atHour = [](int hour) { return [=](double) { std::tm tm{}; tm.tm_year = 126; tm.tm_mon = 9; tm.tm_mday = 30; tm.tm_hour = hour; return tm; }; };
+
+  Navigator late(Seeded());
+  late.SetPlaceLookup(bar);
+  late.SetLocalTime(atHour(23));
+  auto const lines = DriveFrom(late, 1.7e12);
+  auto const dd = FindKey(lines, "nightOut.dd");
+  CHECK(dd != nullptr);
+  CHECK_EQUAL(dd->text, std::string("I just wanted to say. I'm really proud of you taking one for the team and being a "
+                                    "designated driver. You will get that ankle monitor off. I believe in you."));
+  CHECK(CountKey(lines, "nightOut.dd") == 1);
+  CHECK(CountKey(lines, "nightOut.tube") == 0);
+
+  // Still sitting in the lot: the breathalyzer bit instead, setup then punchline.
+  Navigator parked(Seeded());
+  parked.SetPlaceLookup(bar);
+  parked.SetLocalTime(atHour(1));
+  auto const sitting = DriveFrom(parked, 1.7e12, -1, 60000);
+  auto const tube = FindKey(sitting, "nightOut.tube");
+  CHECK(tube != nullptr);
+  CHECK_EQUAL(tube->text, std::string("Remember, you must blow into the tube to start the car."));
+  CHECK(CountKey(sitting, "nightOut.tube") == 2);
+  auto const trunk = std::find_if(sitting.begin(), sitting.end(), [&](Commentary const & l) { return l.key == "nightOut.tube" && &l != tube; });
+  CHECK_EQUAL(trunk->text, std::string("You might as well climb in the trunk. You are not going anywhere."));
+  CHECK(CountKey(sitting, "nightOut.dd") == 0);
+
+  Navigator lunch(Seeded());
+  lunch.SetPlaceLookup(bar);
+  lunch.SetLocalTime(atHour(13));
+  CHECK(CountKey(DriveFrom(lunch, 1.7e12), "nightOut.dd") == 0);
+
+  Navigator home(Seeded());
+  home.SetLocalTime(atHour(23));
+  CHECK(CountKey(DriveFrom(home, 1.7e12), "nightOut.dd") == 0);
 }

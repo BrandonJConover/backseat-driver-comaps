@@ -344,6 +344,9 @@ private:
   /// The days after a clock change: "Wasn't it brighter out at this time yesterday?" (fall back)
   /// or "Why am I so tired and why is it so dark out?" (spring forward).
   void TrackClockChange(Fix const & fix, RouteSnapshot const & route);
+  /// Leaving a bar late at night: "I'm really proud of you taking one for the team and being a
+  /// designated driver." (Brandon's line).
+  void TrackNightOut(Fix const & fix, RouteSnapshot const & route);
   /// Seconds the local clock is ahead of UTC at `ms`.
   long UtcOffsetS(double ms) const;
   void TrackFear(Fix const & fix, RouteSnapshot const & route);
@@ -608,6 +611,9 @@ private:
   double m_groceryT = -1e18;
   bool m_groceriesSaid = false;
   bool m_clockChecked = false;
+  /// The trip started at a bar late at night and its night-out line is still to come; whether the car has left the lot.
+  bool m_fromNightlife = false;
+  bool m_nightMoved = false;
   int m_bendJokes = 0;
   /// Straight nags on the current leg (by maneuver id), whether it's a long haul ("straight.long"
   /// was said), and the one town leg per trip that gets Brandon's straight chain.

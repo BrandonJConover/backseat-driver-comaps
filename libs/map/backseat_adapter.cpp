@@ -2566,6 +2566,8 @@ std::optional<backseat::Place> BackseatAdapter::PlaceAt(backseat::LatLon const &
   static uint32_t const kShop = c.GetTypeByPath({"shop"});
   static uint32_t const kGrocery[] = {c.GetTypeByPath({"shop", "supermarket"}), c.GetTypeByPath({"shop", "convenience"}),
                                       c.GetTypeByPath({"shop", "greengrocer"})};
+  static uint32_t const kNightlife[] = {c.GetTypeByPath({"amenity", "bar"}), c.GetTypeByPath({"amenity", "pub"}),
+                                        c.GetTypeByPath({"amenity", "nightclub"})};
 
   // Lower is a better explanation for the stop.
   auto const rankOf = [](backseat::PlaceKind k) { return static_cast<int>(k); };
@@ -2576,9 +2578,17 @@ std::optional<backseat::Place> BackseatAdapter::PlaceAt(backseat::LatLon const &
   {
     std::optional<backseat::PlaceKind> kind;
     bool grocery = false;
+    bool nightlife = false;
     for (uint32_t type : feature::TypesHolder(ft))
     {
       grocery = grocery || std::find(std::begin(kGrocery), std::end(kGrocery), type) != std::end(kGrocery);
+      // A bar is "Other" as a stop, but it's where a designated driver starts from.
+      if (std::find(std::begin(kNightlife), std::end(kNightlife), type) != std::end(kNightlife))
+      {
+        nightlife = true;
+        if (!kind)
+          kind = backseat::PlaceKind::Other;
+      }
       std::optional<backseat::PlaceKind> k;
       uint32_t top = type;
       ftype::TruncValue(top, 1);
@@ -2600,7 +2610,8 @@ std::optional<backseat::Place> BackseatAdapter::PlaceAt(backseat::LatLon const &
                         (rankOf(*kind) == rankOf(best->kind) && distance < bestDistance);
     if (!better)
       return;
-    best = backseat::Place{*kind, ft.GetTranslatedName().m_primary, grocery && *kind == backseat::PlaceKind::Store};
+    best = backseat::Place{*kind, ft.GetTranslatedName().m_primary, grocery && *kind == backseat::PlaceKind::Store,
+                           nightlife};
     bestDistance = distance;
   }, mercator::RectByCenterXYAndSizeInMeters(center, kPlaceSearchSizeM), scales::GetUpperScale());
   return best;
