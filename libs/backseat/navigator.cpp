@@ -140,6 +140,17 @@ double constexpr kColdFromMs = 25000;
 double constexpr kColdUntilMs = 300000;
 double constexpr kColdVentAfterMs = 180000;
 double constexpr kColdChance = 0.5;
+/// Hot: at or above this (about 86 °F). Groceries bought within the window cook after a while.
+double constexpr kHotC = 30;
+double constexpr kGroceryWindowMs = 45 * 60000.0;
+double constexpr kGroceryCookMs = 120000;
+/// Clock changes: remarked on for this many days after, once a day, in the dark.
+double constexpr kClockChangeDays = 4;
+/// A trip like this one ended between these many hours ago: "Didn't we just take this trip
+/// yesterday?" Said on this share of those trips (always the first time).
+double constexpr kYesterdayMinH = 12;
+double constexpr kYesterdayMaxH = 36;
+double constexpr kYesterdayChance = 0.3;
 /// SaidLog counter: trips started, finished or not.
 char const * const kTripsStartedKey = "_trips.started";
 /// SaidLog values: the trip under way (destination, last seen in s since the epoch), so a relaunch in
@@ -531,6 +542,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
     m_bendHeadings.pop_front();
   TrackBends(fix, route);
   TrackCold(fix, route);
+  TrackClockChange(fix, route);
   TrackClean(fix, route);
   TrackIdle(fix, route);
   TrackWrongWay(fix, route);
@@ -635,6 +647,8 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
     std::optional<Place> place;
     if (m_placeLookup)
       place = m_placeLookup(m_stopAt);
+    if (place && place->grocery)
+      m_groceryT = fix.tMs;
     Say(m_engine->OnNav(NavEvent::UnplannedStop(fix.tMs, place)));
   }
 }
@@ -997,6 +1011,10 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   m_plan.expectedMinutes = route.etaSeconds / 60;
   ResetTrip();
   m_tripStartT = t;
+  // Leaving a grocery store: the groceries are in the car.
+  if (m_placeLookup && (route.origin.lat || route.origin.lon))
+    if (auto const from = m_placeLookup(route.origin); from && from->grocery)
+      m_groceryT = t;
   Trace("trip.start", {{"to", route.destination},
                        {"eta_min", LogNum(route.etaSeconds / 60, 0)},
                        {"turns", std::to_string(route.plannedTurns.size())},
@@ -1382,7 +1400,18 @@ void Navigator::SayRoutine(double t, RouteSnapshot const & route)
   }
   // Any route driven a lot: now and then.
   if (m_tripsOnRoute >= 5 && (m_tripsOnRoute + 1) % 7 == 0)
+  {
     SayLine(t, Category::Routine, "routine.same");
+    return;
+  }
+  // The same trip as yesterday (Brandon: "Didn't we just take this trip yesterday?").
+  std::string const routeKey = RouteKey(m_plan.origin, m_plan.destination);
+  bool const yesterday = std::any_of(m_history.begin(), m_history.end(), [&](TripRecord const & r) {
+    double const agoH = (t - r.endedAt) / 3.6e6;
+    return r.routeKey == routeKey && agoH >= kYesterdayMinH && agoH <= kYesterdayMaxH;
+  });
+  if (yesterday && (!m_said.Said("routine.yesterday") || (m_config.rng ? m_config.rng() : 0) < kYesterdayChance))
+    SayLine(t, Category::Routine, "routine.yesterday", DriverVars());
 }
 
 void Navigator::TrackMusic(double tMs, RouteSnapshot const & route)
@@ -1519,6 +1548,9 @@ void Navigator::ResetTrip()
   m_bendJokes = 0;
   m_coldStage = 0;
   m_coldSaidT = 0;
+  m_hotSaid = false;
+  m_groceriesSaid = false;
+  m_clockChecked = false;
   m_straightLeg.reset();
   m_straightNags = 0;
   m_longLeg.reset();
@@ -2025,6 +2057,17 @@ bool Navigator::Punch(Commentary & line)
   }
   else
   {
+    // Brandon's newer lines for an existing pool (key.first) go ahead of it; key.more after.
+    if (line.priority == Priority::Nav || (!LineData().count(line.key + ".first") && !LineData().count(line.key + ".more")))
+      return true;
+    std::vector<std::string> options;
+    for (std::string const & k : {line.key + ".first", line.key, line.key + ".more"})
+      if (LineData().count(k))
+      {
+        auto const & pool = LinesFor(k, Tier());
+        options.insert(options.end(), pool.begin(), pool.end());
+      }
+    line.text = Fill(m_said.Pick(line.key + "+", options, r), line.vars);
     return true;
   }
   line.key = bit->key;
@@ -2163,10 +2206,38 @@ void Navigator::TrackBends(Fix const & fix, RouteSnapshot const & route)
 
 void Navigator::TrackCold(Fix const & fix, RouteSnapshot const & route)
 {
-  if (m_coldStage >= 3 || route.state != RouteState::OnRoute || QuietBitBusy() ||
-      (route.turnId && route.distToTurnM < kIdleQuietM) || fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+  if (route.state != RouteState::OnRoute || QuietBitBusy() || (route.turnId && route.distToTurnM < kIdleQuietM) ||
+      fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
     return;
   double const sinceStart = fix.tMs - m_tripStartT;
+  double const tempF = m_tempC ? *m_tempC * 9 / 5 + 32 : 0;
+  Vars vars = DriverVars();
+  if (m_tempC)
+    vars["temp"] = std::to_string(static_cast<int>(std::lround(m_config.units == Units::Mph ? tempF : *m_tempC)));
+  if (m_tempC && *m_tempC >= kHotC)
+  {
+    // Groceries in a hot car: always worth it, once they've had a couple of minutes to cook.
+    if (!m_groceriesSaid && fix.speedMps >= kResumedMps && fix.tMs - m_groceryT >= kGroceryCookMs &&
+        fix.tMs - m_groceryT <= kGroceryWindowMs)
+    {
+      m_groceriesSaid = m_hotSaid = true;
+      m_lastSpokeT = fix.tMs;
+      SayLine(fix.tMs, Category::Idle, "hot.groceries", vars);
+      return;
+    }
+    if (!m_hotSaid && sinceStart >= kColdFromMs)
+    {
+      m_hotSaid = true;
+      if (sinceStart <= kColdUntilMs && (!m_said.Said("hot.start") || (m_config.rng ? m_config.rng() : 0) < kColdChance))
+      {
+        m_lastSpokeT = fix.tMs;
+        SayLine(fix.tMs, Category::Idle, "hot.start", vars);
+      }
+    }
+    return;
+  }
+  if (m_coldStage >= 3)
+    return;
   if (m_coldStage == 0)
   {
     if (!m_tempC || *m_tempC > kColdC || sinceStart < kColdFromMs)
@@ -2177,9 +2248,6 @@ void Navigator::TrackCold(Fix const & fix, RouteSnapshot const & route)
     m_coldStage = go ? 1 : 3;
     if (!go)
       return;
-    double const f = *m_tempC * 9 / 5 + 32;
-    Vars vars = DriverVars();
-    vars["temp"] = std::to_string(static_cast<int>(std::lround(m_config.units == Units::Mph ? f : *m_tempC)));
     m_coldSaidT = fix.tMs;
     m_lastSpokeT = fix.tMs;
     SayLine(fix.tMs, Category::Idle, "cold.start", vars);
@@ -2190,6 +2258,35 @@ void Navigator::TrackCold(Fix const & fix, RouteSnapshot const & route)
   m_coldStage = 3;
   m_lastSpokeT = fix.tMs;
   SayLine(fix.tMs, Category::Idle, "cold.vent", DriverVars());
+}
+
+long Navigator::UtcOffsetS(double ms) const
+{
+  std::tm tm = LocalTime(ms);
+  return static_cast<long>(timegm(&tm) - static_cast<std::time_t>(ms / 1000));
+}
+
+void Navigator::TrackClockChange(Fix const & fix, RouteSnapshot const & route)
+{
+  if (m_clockChecked || route.state != RouteState::OnRoute || !KnowsTheDate(fix.tMs) ||
+      fix.tMs - m_tripStartT < kColdFromMs || QuietBitBusy() || (route.turnId && route.distToTurnM < kIdleQuietM) ||
+      fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+    return;
+  m_clockChecked = true;
+  long const shift = UtcOffsetS(fix.tMs) - UtcOffsetS(fix.tMs - kClockChangeDays * 86400000.0);
+  if (shift == 0 || !Night(fix.tMs, {fix.lat, fix.lon}))
+    return;
+  std::tm const now = LocalTime(fix.tMs);
+  // Fell back: dark in the evening, an hour sooner than last week. Sprang forward: dark in the morning.
+  char const * const key = shift < 0 && now.tm_hour >= 16 && now.tm_hour < 21   ? "clock.fallBack"
+                           : shift > 0 && now.tm_hour >= 5 && now.tm_hour < 10 ? "clock.springForward"
+                                                                               : nullptr;
+  int const day = now.tm_year * 1000 + now.tm_yday;
+  if (!key || m_said.Counter("_clock.day") == day)
+    return;
+  m_said.SetCounter("_clock.day", day);
+  m_lastSpokeT = fix.tMs;
+  SayLine(fix.tMs, Category::Idle, key, DriverVars());
 }
 
 bool Navigator::SwungLately() const

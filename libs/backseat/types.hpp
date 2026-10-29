@@ -99,6 +99,8 @@ struct Place
 {
   PlaceKind kind = PlaceKind::Other;
   std::optional<std::string> name;
+  /// A supermarket, convenience store or greengrocer: there are probably groceries in the car now.
+  bool grocery = false;
 };
 
 /// Events from the navigation layer (not derived from telemetry). Only the fields that

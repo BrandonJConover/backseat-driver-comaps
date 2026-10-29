@@ -2564,6 +2564,8 @@ std::optional<backseat::Place> BackseatAdapter::PlaceAt(backseat::LatLon const &
   static uint32_t const kFastFood = c.GetTypeByPath({"amenity", "fast_food"});
   static uint32_t const kRestaurant = c.GetTypeByPath({"amenity", "restaurant"});
   static uint32_t const kShop = c.GetTypeByPath({"shop"});
+  static uint32_t const kGrocery[] = {c.GetTypeByPath({"shop", "supermarket"}), c.GetTypeByPath({"shop", "convenience"}),
+                                      c.GetTypeByPath({"shop", "greengrocer"})};
 
   // Lower is a better explanation for the stop.
   auto const rankOf = [](backseat::PlaceKind k) { return static_cast<int>(k); };
@@ -2573,8 +2575,10 @@ std::optional<backseat::Place> BackseatAdapter::PlaceAt(backseat::LatLon const &
   m_dataSource().ForEachInRect([&](FeatureType & ft)
   {
     std::optional<backseat::PlaceKind> kind;
+    bool grocery = false;
     for (uint32_t type : feature::TypesHolder(ft))
     {
+      grocery = grocery || std::find(std::begin(kGrocery), std::end(kGrocery), type) != std::end(kGrocery);
       std::optional<backseat::PlaceKind> k;
       uint32_t top = type;
       ftype::TruncValue(top, 1);
@@ -2596,7 +2600,7 @@ std::optional<backseat::Place> BackseatAdapter::PlaceAt(backseat::LatLon const &
                         (rankOf(*kind) == rankOf(best->kind) && distance < bestDistance);
     if (!better)
       return;
-    best = backseat::Place{*kind, ft.GetTranslatedName().m_primary};
+    best = backseat::Place{*kind, ft.GetTranslatedName().m_primary, grocery && *kind == backseat::PlaceKind::Store};
     bestDistance = distance;
   }, mercator::RectByCenterXYAndSizeInMeters(center, kPlaceSearchSizeM), scales::GetUpperScale());
   return best;

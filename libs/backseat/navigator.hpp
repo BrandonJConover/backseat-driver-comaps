@@ -338,8 +338,14 @@ private:
   void TrackBends(Fix const & fix, RouteSnapshot const & route);
   bool SwungLately() const;
   /// Cold out: "It's freezing out here. I need to go in your pocket asap." then, once the car's
-  /// had time to warm up, the air vent request (Brandon's lines).
+  /// had time to warm up, the air vent request (Brandon's lines). Hot out: "It's like a sauna in
+  /// here.", or the eggs from the grocery store being hard boiled by now.
   void TrackCold(Fix const & fix, RouteSnapshot const & route);
+  /// The days after a clock change: "Wasn't it brighter out at this time yesterday?" (fall back)
+  /// or "Why am I so tired and why is it so dark out?" (spring forward).
+  void TrackClockChange(Fix const & fix, RouteSnapshot const & route);
+  /// Seconds the local clock is ahead of UTC at `ms`.
+  long UtcOffsetS(double ms) const;
   void TrackFear(Fix const & fix, RouteSnapshot const & route);
   /// "Either there is a new road here or we are completely off course."
   void TrackOffRoad(Fix const & fix);
@@ -597,6 +603,11 @@ private:
   std::optional<double> m_tempC;
   int m_coldStage = 0;
   double m_coldSaidT = 0;
+  bool m_hotSaid = false;
+  /// When the car was last at a grocery store (a stop on the way, or where the trip started).
+  double m_groceryT = -1e18;
+  bool m_groceriesSaid = false;
+  bool m_clockChecked = false;
   int m_bendJokes = 0;
   /// Straight nags on the current leg (by maneuver id), whether it's a long haul ("straight.long"
   /// was said), and the one town leg per trip that gets Brandon's straight chain.

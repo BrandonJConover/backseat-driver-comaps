@@ -335,3 +335,110 @@ TEST(ColdMorningsWantThePocketThenTheVent)
   CHECK(WeatherFromNws("Cloudy", 1, -1, -2.5).tempC == std::optional<double>(-2.5));
   CHECK(!WeatherFromNws("Cloudy", 1, -1).tempC);
 }
+
+namespace
+{
+/// Drives one 9 km straight leg in `nav` from `t0`; every line said.
+std::vector<Commentary> DriveFrom(Navigator & nav, double t0, double accelAt = -1)
+{
+  std::vector<Commentary> said;
+  double speed = 0;
+  for (double t = t0, left = 9000; left > 0; t += 1000, left -= speed)
+  {
+    // Starts from a stop; at `accelAt` floors it from a crawl.
+    if (accelAt >= 0 && t - t0 >= accelAt && t - t0 < accelAt + 4000)
+      speed = std::min(20.0, (t - t0 - accelAt) / 1000 * 6);
+    else if (accelAt >= 0 && t - t0 < accelAt)
+      speed = 2;
+    else
+      speed = 15;
+    RouteSnapshot r;
+    r.state = RouteState::OnRoute;
+    r.turnId = 1;
+    r.turn = TurnKind::Left;
+    r.distToTurnM = left;
+    r.destination = "Home";
+    r.etaSeconds = 600;
+    r.plannedTurns = {TurnKind::Left, TurnKind::Destination};
+    r.origin = {39.7, -105};
+    r.destinationPoint = {39.78, -105};
+    Fix f;
+    f.tMs = t;
+    f.lat = 39.7;
+    f.lon = -105;
+    f.speedMps = speed;
+    f.bearingDeg = 0;
+    nav.OnFix(f, r);
+    for (auto & l : nav.TakeLines())
+      said.push_back(std::move(l));
+  }
+  return said;
+}
+
+Commentary const * FindKey(std::vector<Commentary> const & lines, std::string const & key)
+{
+  auto const it = std::find_if(lines.begin(), lines.end(), [&](Commentary const & l) { return l.key == key; });
+  return it == lines.end() ? nullptr : &*it;
+}
+
+EngineConfig Seeded()
+{
+  EngineConfig c;
+  c.rng = SeededRng(5);
+  return c;
+}
+}  // namespace
+
+// Hot out, leaving the grocery store: Brandon's eggs line.
+TEST(HotCarCooksTheGroceries)
+{
+  Navigator nav(Seeded());
+  nav.SetPlaceLookup([](LatLon const &) { return std::optional<Place>(Place{PlaceKind::Store, "Walmart", true}); });
+  Weather w;
+  w.tempC = 35;
+  nav.OnWeather(0, w);
+  auto const lines = DriveFrom(nav, 1.7e12);
+  auto const eggs = FindKey(lines, "hot.groceries");
+  CHECK(eggs != nullptr);
+  CHECK_EQUAL(eggs->text, std::string("I think the eggs you just bought are hard boiled by now."));
+
+  Navigator plain(Seeded());
+  plain.OnWeather(0, w);
+  auto const plainLines = DriveFrom(plain, 1.7e12);
+  auto const hot = FindKey(plainLines, "hot.start");
+  CHECK(hot != nullptr);
+  CHECK_EQUAL(hot->text, std::string("It's like a sauna in here."));
+}
+
+// The evening after the clocks fall back (US, 2026-11-01), in the dark: Brandon's line, once a day.
+TEST(ClocksFallingBackGetNoticed)
+{
+  double const fallBackMs = 1793520000000.0;  // 2026-11-01 08:00 UTC
+  auto const localTime = [=](double ms)
+  {
+    std::time_t const s = static_cast<std::time_t>(ms / 1000) + (ms < fallBackMs ? -6 : -7) * 3600;
+    std::tm tm{};
+    gmtime_r(&s, &tm);
+    return tm;
+  };
+  Navigator nav(Seeded());
+  nav.SetLocalTime(localTime);
+  double const evening = 1793755800000.0;  // 2026-11-04 01:30 UTC = Nov 3, 6:30 pm MST
+  auto const evenings = DriveFrom(nav, evening);
+  auto const first = FindKey(evenings, "clock.fallBack");
+  CHECK(first != nullptr);
+  CHECK_EQUAL(first->text, std::string("Wasn't it brighter out at this time yesterday? Maybe it's just me."));
+  // Not again the same evening, and not a couple of weeks later.
+  CHECK(CountKey(DriveFrom(nav, evening + 3.6e6), "clock.fallBack") == 0);
+  CHECK(CountKey(DriveFrom(nav, evening + 14 * 86400000.0), "clock.fallBack") == 0);
+}
+
+// Flooring it: Brandon's lines debut first.
+TEST(HardAccelerationGetsBrandonsLinesFirst)
+{
+  Navigator nav(Seeded());
+  auto const lines = DriveFrom(nav, 1.7e12, 40000);
+  auto const accel = FindKey(lines, "hardAccel");
+  CHECK(accel != nullptr);
+  CHECK_EQUAL(accel->text, std::string("The brake is the other one."));
+}
