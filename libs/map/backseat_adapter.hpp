@@ -294,6 +294,13 @@ public:
   std::string VoicePreviewLine(std::string const & key, std::string const & voice);
   /// A game is waiting for the driver, so what they say is an answer, not a request.
   bool InGame() const { return m_navigator.InGame(); }
+  /// Pop quizzes need answers out loud, so they're off until the platform says it listens after
+  /// "quiz.ask" lines (LineVoice::listen).
+  void SetPopQuizOn(bool on) { m_navigator.SetPopQuizOn(on); }
+  /// The pop quiz card to show now, if any (question, choices, then the result for a moment).
+  std::optional<backseat::Navigator::QuizCard> PopQuizCard() const { return m_navigator.PopQuizCard(); }
+  /// A tap on a choice of the card; only counts off a drive (on a drive it's out loud only).
+  void QuizTapped(int choice) { m_navigator.QuizTapped(0, choice); }
   /// Kokoro's first line after the system voice had to stand in: it coughs (the platform plays a
   /// cough sound first) and blames something it ate.
   std::string VoiceRecovered() { return m_navigator.Reply("voice.recovered"); }

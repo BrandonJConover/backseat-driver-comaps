@@ -11,6 +11,7 @@
 #include "backseat/history.hpp"
 #include "backseat/indoors.hpp"
 #include "backseat/plate_game.hpp"
+#include "backseat/pop_quiz.hpp"
 #include "backseat/quiet_bits.hpp"
 #include "backseat/report.hpp"
 #include "backseat/rewriter.hpp"
@@ -19,6 +20,7 @@
 #include "backseat/stop_go.hpp"
 #include "backseat/twenty_questions.hpp"
 
+#include <array>
 #include <ctime>
 #include <deque>
 #include <functional>
@@ -350,6 +352,35 @@ public:
   /// line isn't late.
   std::string const & PhoneCallerVoice() const { return m_call.CallerVoice(); }
 
+  /// Pop quizzes (pop_quiz.hpp) need the driver to answer out loud, so they only happen once the
+  /// host says it listens after "quiz.ask" lines. Off until then.
+  void SetPopQuizOn(bool on) { m_quizOn = on; }
+  /// What the pop quiz card shows: the question while it's asked, then the result for a moment.
+  struct QuizCard
+  {
+    std::string question;
+    std::array<std::string, 3> choices;
+    /// What the driver went with, -1 for nothing (yet).
+    int picked = -1;
+    /// The right choice once the quiz is over; -1 while it's still being asked.
+    int correct = -1;
+    /// Taps count (not on a drive: on a drive it's out loud only).
+    bool tappable = false;
+    /// Brownie points so far, ever.
+    int brownies = 0;
+  };
+  std::optional<QuizCard> PopQuizCard() const;
+  /// A pop quiz is waiting and `spoken` answers it (a choice, or "I don't know"), so it goes to the
+  /// quiz before anything else: "Pull to the right and stop" isn't "stop navigation".
+  bool QuizTakes(std::string const & spoken) const
+  {
+    return QuizAsking() && ParseQuizAnswer(*m_quiz.Question(), spoken).kind != QuizHeard::Kind::Unclear;
+  }
+  /// The driver tapped a choice on the card. Ignored on a drive.
+  void QuizTapped(double tMs, int choice);
+  int BrowniePoints() const { return m_said.Counter(kBrowniesKey); }
+  static constexpr char const * kBrowniesKey = "_quiz.brownies";
+
   bool InTrip() const { return m_engine != nullptr; }
   CritiqueEngine const * Engine() const { return m_engine.get(); }
 
@@ -443,12 +474,21 @@ public:
   /// 20 Questions or the plate game is on (or offered), so what's heard goes to the game first.
   bool InGame() const
   {
-    return m_twenty.Active() || m_plates.GetState() == PlateGame::State::Offered ||
+    return QuizAsking() || m_twenty.Active() || m_plates.GetState() == PlateGame::State::Offered ||
            m_plates.GetState() == PlateGame::State::Playing;
   }
 
 private:
-  bool QuietBitBusy() const { return m_call.Active() || m_twenty.Active(); }
+  bool QuietBitBusy() const { return m_call.Active() || m_twenty.Active() || QuizAsking(); }
+  /// A pop quiz question is waiting for its answer on a trip still going.
+  bool QuizAsking() const { return m_quiz.Asking() && m_engine && !m_arrived; }
+  /// Springs a pop quiz now; `asked`: the driver asked for it. False if there's no question to ask.
+  bool StartPopQuiz(double tMs, bool asked);
+  /// Quiet stretch, no turn coming: maybe a pop quiz. Also runs out the clock on one being asked.
+  void TrackPopQuiz(Fix const & fix, RouteSnapshot const & route);
+  void SayQuizOutcome(double tMs, PopQuiz::Outcome outcome);
+  /// A "quiz.*" line, filled in, to say right away.
+  Commentary QuizLine(double tMs, std::string const & key, Vars vars = {});
   /// The GPS asks to play 20 Questions (a quiet-stretch bit). False if it can't now.
   bool OfferTwentyQuestions(Fix const & fix);
   /// Lines held near a maneuver, "anyway, where were we" after directions, nudges, giving up.
@@ -679,6 +719,14 @@ private:
 
   // 20 Questions.
   TwentyQuestions m_twenty;
+  // Pop quizzes.
+  PopQuiz m_quiz;
+  bool m_quizOn = false;
+  int m_quizzes = 0;
+  double m_lastQuizT = -1e18;
+  int m_quizUnclear = 0;
+  /// The maneuver whose quiet stretch already had its roll of the dice for a quiz.
+  std::optional<uint32_t> m_quizRolledFor;
   std::function<void(TwentyLog const &)> m_onTwentyLog;
   NearbyThingsLookup m_nearbyThings;
   /// Game lines held back while a maneuver is close; directions come first.

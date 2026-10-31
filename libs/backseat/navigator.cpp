@@ -292,6 +292,24 @@ double constexpr kQuietMinMovingMps = 5;
 
 double SecondsToTurn(double distM, double speedMps) { return distM / std::max(speedMps, kQuietMinSpeedMps); }
 
+// Pop quizzes (pop_quiz.hpp): a quiet stretch, not too early, a couple a trip, spaced out.
+double constexpr kQuizAfterStartMs = 5 * 60000;
+int constexpr kQuizzesPerTrip = 2;
+double constexpr kQuizEveryMs = 12 * 60000;
+/// The question and its answer fit before the next turn: the answer window plus reading it out.
+double constexpr kQuizMinToTurnS = 60;
+double constexpr kQuizSilenceMs = 20000;
+/// Not right on top of a phone call or I spy either.
+double constexpr kQuizAfterQuietBitMs = 3 * 60000;
+/// Each quiet stretch past all that springs one this often (the first quiz ever, always).
+double constexpr kQuizChance = 0.35;
+/// How long the driver gets once the question is read.
+double constexpr kQuizAnswerMs = 25000;
+/// A driver asking for another: not more often than this.
+double constexpr kQuizAskedEveryMs = 2 * 60000;
+/// Brownie points for the Teacher's Pet badge.
+int constexpr kTeachersPetBrownies = 10;
+
 /// Lines that still get through while the GPS is on the phone (and put the call on hold): the
 /// driver talking to it, and things that actually happened. The running commentary waits.
 bool CutsIntoCall(Commentary const & c)
@@ -598,6 +616,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackMusic(fix.tMs, route);
   TrackLeftBuilding(fix);
   TrackTwentyQuestions(fix, route);
+  TrackPopQuiz(fix, route);
   TrackQuietBits(fix, route);
   TrackRoadBits(fix, route);
   // Fed up for the first time this trip: from now on it's "wise, omnipotent overseer GPS".
@@ -2061,6 +2080,11 @@ void Navigator::ResetTrip()
   m_punchlines.clear();
   m_call.End();
   m_callTaken = false;
+  m_quiz.End();
+  m_quizzes = 0;
+  m_lastQuizT = -1e18;
+  m_quizUnclear = 0;
+  m_quizRolledFor.reset();
   m_quietBits = 0;
   m_lastQuietBitT = -1e18;
   m_quietRolledFor.reset();
@@ -2187,6 +2211,30 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
   if (!m_engine || m_arrived)
     return;
   m_lastT = std::max(m_lastT, tMs);
+  // A pop quiz is waiting: whatever was said is the answer (or a try at one).
+  if (QuizAsking())
+  {
+    QuizHeard const heard = ParseQuizAnswer(*m_quiz.Question(), text);
+    Trace("quiz", {{"event", "heard"}, {"kind", std::to_string(static_cast<int>(heard.kind))},
+                   {"choice", std::to_string(heard.choice)}});
+    std::optional<PopQuiz::Outcome> outcome;
+    if (heard.kind == QuizHeard::Kind::Choice)
+      outcome = m_quiz.Answer(heard.choice, m_lastT);
+    else if (heard.kind == QuizHeard::Kind::GiveUp)
+      outcome = m_quiz.GiveUp(m_lastT);
+    if (outcome)
+      SayQuizOutcome(m_lastT, *outcome);
+    else if (m_quizUnclear++ == 0)
+      m_gate.Push(QuizLine(m_lastT, "quiz.unclear"), false);
+    return;
+  }
+  // "Quiz me": the driver asked for it. Brown noser.
+  if (m_quizOn && !QuietBitBusy() && !m_call.Active() && AsksForPopQuiz(text) &&
+      m_lastT - m_lastQuizT >= kQuizAskedEveryMs)
+  {
+    StartPopQuiz(m_lastT, true);
+    return;
+  }
   // Mid-game, it's a question: "is it a police car?" isn't the police, and the title can wait.
   if (m_twenty.Active())
     if (auto const reply = Twenty().OnDriverSaid(text, m_lastT, Tier()))
@@ -3305,4 +3353,147 @@ void Navigator::SayTwenty(double tMs, TwentyQuestions::Reply const & reply)
   if (m_onTwentyLog)
     m_onTwentyLog(m_twenty.Log());
 }
+Commentary Navigator::QuizLine(double tMs, std::string const & key, Vars vars)
+{
+  for (auto const & [k, v] : DriverVars())
+    vars.emplace(k, v);
+  double const r = m_config.rng ? m_config.rng() : 0;
+  Commentary c;
+  c.t = tMs;
+  c.category = Category::PopQuiz;
+  c.key = key;
+  c.text = Fill(m_said.Pick(key, LinesFor(key, Tier()), r), vars);
+  c.frustration = m_engine ? m_engine->Frustration() : 0;
+  c.priority = Priority::Roast;
+  c.voiceSpeed = 1 + c.frustration / 1000.0;
+  return c;
+}
+
+bool Navigator::StartPopQuiz(double t, bool asked)
+{
+  // Road rules on car trips only; trivia anywhere.
+  bool const car = InCar(m_travelMode);
+  std::vector<std::string> ids;
+  for (auto const & q : QuizQuestions())
+    if (car || !q.road)
+      ids.push_back(q.id);
+  if (ids.empty())
+    return false;
+  double const r = m_config.rng ? m_config.rng() : 0;
+  QuizQuestion const * q = FindQuizQuestion(m_said.Pick("quiz.question", ids, r));
+  if (!q)
+    return false;
+  std::vector<Commentary> lines;
+  // "Pop quiz!" (or "Fine, brown noser" when asked), then the out-loud rule, then the question.
+  lines.push_back(QuizLine(t, asked ? "quiz.asked" : "quiz.open"));
+  lines.push_back(QuizLine(t, car ? "quiz.aloud" : "quiz.aloud.walk"));
+  lines.push_back(QuizLine(t, "quiz.ask",
+                           {{"question", q->question},
+                            {"a", QuizChoiceText(q->choices[0])},
+                            {"b", QuizChoiceText(q->choices[1])},
+                            {"c", QuizChoiceText(q->choices[2])}}));
+  double readMs = 0;
+  for (auto const & c : lines)
+    readMs += SpeakingMs(c.text, c.voiceSpeed) + 400;
+  m_quiz.Start(*q, t, t + readMs + kQuizAnswerMs, !car);
+  m_quizUnclear = 0;
+  ++m_quizzes;
+  m_lastQuizT = t;
+  Trace("quiz", {{"event", "start"}, {"id", q->id}, {"asked", asked ? "yes" : "no"}});
+  // The driver is about to answer; don't hold it up for the rewording model.
+  for (auto & c : lines)
+    m_gate.Push(std::move(c), false);
+  return true;
+}
+
+void Navigator::TrackPopQuiz(Fix const & fix, RouteSnapshot const & route)
+{
+  double const t = fix.tMs;
+  if (QuizAsking())
+  {
+    if (auto const outcome = m_quiz.Tick(t))
+      SayQuizOutcome(t, *outcome);
+    return;
+  }
+  if (!m_quizOn || m_quizzes >= kQuizzesPerTrip || QuietBitBusy() || !m_punchlines.empty())
+    return;
+  bool const steady = route.state == RouteState::OnRoute && !m_rerouting && route.turnId;
+  if (!steady || t - m_tripStartT < kQuizAfterStartMs || t - m_lastQuizT < kQuizEveryMs ||
+      t - m_lastQuietBitT < kQuizAfterQuietBitMs || t - std::max(m_lastSpokeT, m_lastRoadT) < kQuizSilenceMs)
+    return;
+  if (SecondsToTurn(route.distToTurnM, fix.speedMps) < kQuizMinToTurnS)
+    return;
+  // One roll of the dice per stretch, so it stays a surprise.
+  if (m_quizRolledFor == route.turnId)
+    return;
+  m_quizRolledFor = route.turnId;
+  bool const firstEver = !m_said.Said("quiz.question");
+  double const r = m_config.rng ? m_config.rng() : 0;
+  if (!firstEver && r >= kQuizChance)
+    return;
+  StartPopQuiz(t, false);
+}
+
+void Navigator::SayQuizOutcome(double t, PopQuiz::Outcome outcome)
+{
+  QuizQuestion const & q = *m_quiz.Question();
+  Vars vars = {{"answer", QuizChoiceText(q.choices[q.answer])}};
+  std::string key;
+  switch (outcome)
+  {
+  case PopQuiz::Outcome::Right:
+  {
+    int const brownies = m_said.Counter(kBrowniesKey) + 1;
+    m_said.SetCounter(kBrowniesKey, brownies);
+    vars["brownies"] = brownies == 1 ? std::string("one brownie point") : std::to_string(brownies) + " brownie points";
+    key = brownies == 1 ? "quiz.right.first" : "quiz.right";
+    break;
+  }
+  case PopQuiz::Outcome::Wrong:
+    m_said.SetCounter("_quiz.wrong", m_said.Counter("_quiz.wrong") + 1);
+    key = q.road ? "quiz.wrong.road" : "quiz.wrong";
+    break;
+  case PopQuiz::Outcome::GaveUp: key = "quiz.giveup"; break;
+  case PopQuiz::Outcome::TimedOut: key = "quiz.timeout"; break;
+  }
+  Trace("quiz", {{"event", "over"}, {"id", q.id}, {"key", key}, {"picked", std::to_string(m_quiz.Picked())}});
+  m_gate.Push(QuizLine(t, key, vars), false);
+  if (outcome == PopQuiz::Outcome::Right && m_said.Counter(kBrowniesKey) >= kTeachersPetBrownies &&
+      m_achievements.Unlock("teacherspet", t))
+  {
+    m_gate.Push(QuizLine(t, "badge.teacherspet"), false);
+    if (m_onAchievements)
+      m_onAchievements(m_achievements);
+    m_achievements.ClearDirty();
+  }
+}
+
+std::optional<Navigator::QuizCard> Navigator::PopQuizCard() const
+{
+  if (!m_engine || !m_quiz.Question() || !m_quiz.Showing(m_lastT))
+    return std::nullopt;
+  // Arrived mid-question: the quiz is off, nothing to show.
+  if (m_arrived && m_quiz.Asking())
+    return std::nullopt;
+  QuizQuestion const & q = *m_quiz.Question();
+  QuizCard card;
+  card.question = q.question;
+  for (size_t i = 0; i < 3; ++i)
+    card.choices[i] = QuizChoiceText(q.choices[i]);
+  card.picked = m_quiz.Picked();
+  card.correct = m_quiz.Asking() ? -1 : q.answer;
+  card.tappable = m_quiz.Tappable();
+  card.brownies = m_said.Counter(kBrowniesKey);
+  return card;
+}
+
+void Navigator::QuizTapped(double tMs, int choice)
+{
+  if (!QuizAsking() || !m_quiz.Tappable())
+    return;
+  m_lastT = std::max(m_lastT, tMs);
+  if (auto const outcome = m_quiz.Answer(choice, m_lastT))
+    SayQuizOutcome(m_lastT, *outcome);
+}
+
 }  // namespace backseat

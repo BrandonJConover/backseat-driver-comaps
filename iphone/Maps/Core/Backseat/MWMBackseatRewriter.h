@@ -40,6 +40,12 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 + (BOOL)runTool:(NSString *)name argument:(NSString *)argument spoken:(NSString *)spoken;
 /// Tells the navigator which voices there are, for "what voice options do you have?".
 + (void)shareVoices;
+/// The pop quiz card to show now, nil for none: "question", "choices" (three strings), "picked"
+/// (-1 for none yet), "correct" (-1 while it's being asked), "tappable" (off on a drive: out loud
+/// only) and "brownies" (brownie points ever). Main thread.
+@property(class, nonatomic, readonly, nullable) NSDictionary<NSString *, id> * popQuiz;
+/// A tap on choice 0, 1 or 2 of the pop quiz card. Ignored on a drive. Main thread.
++ (void)answerQuiz:(NSInteger)choice;
 /// Switches the route type ("walk", "bike", anything else is driving) and rebuilds the route; a
 /// route being followed keeps going in the new mode. Main thread.
 + (void)switchTravelMode:(NSString *)mode;
