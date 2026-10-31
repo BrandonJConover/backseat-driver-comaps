@@ -75,6 +75,8 @@ enum class AppAction
   RoastMe,
   TellJoke,
   BlameGps,
+  WhatDoYouKnow,
+  ForgetThat,
   Count
 };
 
@@ -98,7 +100,7 @@ struct AppCommand
 {
   AppAction action;
   /// NavigateTo: the place. ChangeVoice: the voice, or empty to just open the voice list.
-  /// FindAlongRoute: what to find.
+  /// FindAlongRoute: what to find. ForgetThat: what to forget, or empty for the last thing read out.
   std::string argument;
 };
 
@@ -134,6 +136,11 @@ private:
 /// Whether `name` is plausibly what was asked for: at least half the meaningful words of `asked` are
 /// in it. "Peace Lutheran" isn't "Latheron Place", however much the search thinks so.
 bool PlaceMatches(std::string const & asked, std::string const & name);
+
+/// Not an answer worth saving: "so let's see", "um", or the question said back ("favorite color").
+bool IsJunkAnswer(std::string const & topic, std::string const & fact);
+/// The saved topic meant by "my favorite color" or "the ice cream one": named by topic, else by its fact.
+std::optional<std::string> MemoryTopicNamed(DriverMemory const & memory, std::string const & named);
 
 /// "Yeah", "um", "okay": nothing to act on, unless something asked for an answer.
 bool IsFiller(std::string const & spoken);

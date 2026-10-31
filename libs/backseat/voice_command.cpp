@@ -144,6 +144,8 @@ std::vector<AppTool> const & AppTools()
       {AppAction::RoastMe, "roast_me", "Insult the driver, because they asked.", nullptr},
       {AppAction::TellJoke, "tell_joke", "Tell a joke.", nullptr},
       {AppAction::BlameGps, "blame_gps", "The driver says the GPS was wrong or at fault.", nullptr},
+      {AppAction::WhatDoYouKnow, "what_do_you_know", "Read out what's saved about the driver.", nullptr},
+      {AppAction::ForgetThat, "forget_that", "Delete something saved about the driver.", "What to forget; empty for the last thing read out."},
   };
   return tools;
 }
@@ -241,6 +243,8 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       {AppAction::TellJoke, {" tell me a joke ", " tell a joke ", " tell us a joke ", " say something funny ", " got any jokes "}},
       {AppAction::BlameGps, {" your fault ", " you're wrong ", " youre wrong ", " you were wrong ", " that's on you ",
                              " thats on you ", " you messed up ", " you got it wrong ", " blame you "}},
+      {AppAction::WhatDoYouKnow, {" what do you know about me ", " what do you remember ", " what's in my file ",
+                                  " whats in my file ", " read my file ", " what have you saved "}},
       {AppAction::SkipStop, {" skip this stop ", " skip the stop ", " skip the next stop ", " remove the stop ",
                              " remove this stop ", " cancel the stop ", " cancel this stop ", " no more stops "}},
       {AppAction::NextStop, {" what's the next stop ", " whats the next stop ", " what is the next stop ",
@@ -325,6 +329,14 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   if (words.find(" back to ") != std::string::npos && words.find(" back to where ") == std::string::npos &&
       words.find(" back to the start ") == std::string::npos)
     drop(AppAction::TakeMeBack);
+  // "Forget my favorite color", "forget that". Not "I always forget my keys": an order has no "I" first.
+  auto const anOrder = [&words](size_t at) { return at != std::string::npos && words.find(" i ") > at; };
+  for (char const * cue : {" forget that ", " forget about that ", " delete that "})
+    if (auto const at = words.find(cue); anOrder(at) && !heardAction(AppAction::ForgetThat))
+      found.push_back({at, AppCommand{AppAction::ForgetThat, {}}});
+  for (char const * cue : {" forget my ", " forget what i said about ", " delete my "})
+    if (auto const at = words.find(cue); anOrder(at) && !heardAction(AppAction::ForgetThat))
+      found.push_back({at, AppCommand{AppAction::ForgetThat, ParseTarget(words.substr(at + std::string(cue).size()))}});
   auto const stop = StopSearch(words);
   if (!stop.second.empty())
     found.push_back({stop.first, AppCommand{AppAction::FindAlongRoute, stop.second}});
@@ -435,6 +447,34 @@ bool PlaceMatches(std::string const & asked, std::string const & name)
   return big == 0 || found * 2 >= big;
 }
 
+bool IsJunkAnswer(std::string const & topic, std::string const & fact)
+{
+  std::string const words = CommandWords(fact);
+  if (IsFiller(fact))
+    return true;
+  for (char const * dodge : {" let's see ", " lets see ", " let me think ", " let me see ", " hold on ", " hang on ",
+                             " what was the question ", " i don't know ", " i dont know ", " good question ", " i forget "})
+    if (words.find(dodge) != std::string::npos)
+      return true;
+  // The question said back.
+  std::string const asked = CommandWords(topic);
+  return asked != " " && words.find(asked) != std::string::npos;
+}
+
+std::optional<std::string> MemoryTopicNamed(DriverMemory const & memory, std::string const & named)
+{
+  std::string const wanted = CommandWords(named);
+  if (wanted == " ")
+    return {};
+  for (auto const & m : memory.All())
+    if (CommandWords(m.topic).find(wanted) != std::string::npos || wanted.find(CommandWords(m.topic)) != std::string::npos)
+      return m.topic;
+  for (auto const & m : memory.All())
+    if (CommandWords(m.fact).find(wanted) != std::string::npos)
+      return m.topic;
+  return {};
+}
+
 void SpokenLines::Add(double tMs, std::string line)
 {
   m_lines.push_back({tMs, std::move(line)});
@@ -521,6 +561,8 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::RoastMe: return saidAny({"roast", "insult", "fun"});
   case AppAction::TellJoke: return saidAny({"joke", "jokes", "funny"});
   case AppAction::BlameGps: return saidAny({"fault", "wrong", "blame", "messed"}) || saidAny({"on"}) && saidAny({"you"});
+  case AppAction::WhatDoYouKnow: return saidAny({"know", "remember", "file", "saved"});
+  case AppAction::ForgetThat: return saidAny({"forget", "delete"});
   case AppAction::Count: break;
   }
   return false;

@@ -535,6 +535,11 @@ void BackseatAdapter::SetDebugLogEnabled(bool on)
 
 bool BackseatAdapter::Remember(std::string const & topic, std::string const & fact)
 {
+  if (backseat::IsJunkAnswer(topic, fact))
+  {
+    backseat::Trace("memory.rejected", {{"topic", topic}, {"fact", fact}});
+    return false;
+  }
   if (!m_memory.Remember(topic, fact, NowMs()))
     return false;
   std::ofstream(GetPlatform().SettingsPathForFile(kMemoryFile)) << m_memory.Serialize();
@@ -2268,6 +2273,33 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     heard.kind = m_navigator.InTrip() ? HeardCommand::Kind::SearchStop : HeardCommand::Kind::Search;
     heard.query = command.argument;
     return m_navigator.Reply("cmd.findStop", {{"place", command.argument}});
+  }
+  case AppAction::WhatDoYouKnow:
+  {
+    // Its own bookkeeping isn't something it knows about the driver.
+    static std::set<std::string> const kInternal = {"niceness slider", "drive ratings", "lies told", "snack retest"};
+    std::vector<backseat::DriverMemory::Memory> known;
+    for (auto const & m : m_memory.All())
+      if (kInternal.count(m.topic) == 0)
+        known.push_back(m);
+    if (known.empty())
+      return m_navigator.Reply("cmd.known.none");
+    size_t constexpr kReadOut = 6;
+    if (known.size() > kReadOut)
+      known.erase(known.begin(), known.end() - kReadOut);
+    std::string list;
+    for (auto const & m : known)
+      list += (list.empty() ? "" : ". ") + m.topic + ": " + m.fact;
+    m_lastReadTopic = known.back().topic;
+    return m_navigator.Reply("cmd.known", {{"list", list}});
+  }
+  case AppAction::ForgetThat:
+  {
+    auto const topic = command.argument.empty() ? m_lastReadTopic : backseat::MemoryTopicNamed(m_memory, command.argument);
+    if (!topic || !Forget(*topic))
+      return m_navigator.Reply("cmd.forgot.none");
+    m_lastReadTopic.reset();
+    return m_navigator.Reply("cmd.forgot", {{"thing", *topic}});
   }
   case AppAction::BeNicer: return NicenessMoved();
   case AppAction::BeMeaner: return m_navigator.Reply("cmd.meaner");

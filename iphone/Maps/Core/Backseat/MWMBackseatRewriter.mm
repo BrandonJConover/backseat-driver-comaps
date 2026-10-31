@@ -193,6 +193,8 @@ void Perform(backseat::AppCommand const & command)
   case AppAction::RoastMe:
   case AppAction::TellJoke:
   case AppAction::BlameGps:
+  case AppAction::WhatDoYouKnow:
+  case AppAction::ForgetThat:
   case AppAction::Count: break;
   }
 }

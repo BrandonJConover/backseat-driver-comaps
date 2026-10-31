@@ -428,6 +428,7 @@ private:
   bool m_askStateNext = false;
   int m_searches = 0;
   backseat::CommandRepeats m_commandRepeats;
+  std::optional<std::string> m_lastReadTopic;
   void ChoseSearchPlace(std::string const & place);
   std::string m_searchQuery;
   std::string m_placeToConfirm;

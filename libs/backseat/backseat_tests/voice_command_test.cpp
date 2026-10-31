@@ -538,6 +538,33 @@ TEST(ComedyCommandsAreHeard)
     CHECK(LinesFor(key, 0).size() >= 6);
 }
 
+TEST(YourFileCanBeReadAndCleaned)
+{
+  CHECK(Heard("what do you know about me", AppAction::WhatDoYouKnow));
+  auto const named = ParseAppCommands("forget my favorite color");
+  CHECK(named.size() == 1 && named[0].action == AppAction::ForgetThat && named[0].argument == "favorite color");
+  CHECK(ParseAppCommands("forget that")[0].argument.empty());
+  CHECK(ParseAppCommands("I forget that one").empty());
+  CHECK(ParseAppCommands("I always forget my keys").empty());
+  CHECK(ParseAppCommands("don't forget to call mom").empty());
+
+  DriverMemory memory;
+  memory.Remember("favorite color", "blue", 1);
+  memory.Remember("favorite ice cream", "mint", 2);
+  CHECK(MemoryTopicNamed(memory, "favorite color") == std::string("favorite color"));
+  CHECK(MemoryTopicNamed(memory, "the mint") == std::nullopt);
+  CHECK(MemoryTopicNamed(memory, "mint") == std::string("favorite ice cream"));
+  CHECK(!MemoryTopicNamed(memory, "dog"));
+
+  CHECK(IsJunkAnswer("favorite color", "so let's see"));
+  CHECK(IsJunkAnswer("favorite color", "um"));
+  CHECK(IsJunkAnswer("favorite color", "my favorite color"));
+  CHECK(!IsJunkAnswer("favorite color", "blue"));
+  CHECK(!IsJunkAnswer("pet", "has a dog named Biscuit"));
+  CHECK(LinesFor("cmd.known", 0).size() >= 6);
+  CHECK(LinesFor("cmd.forgot", 0).size() >= 6);
+}
+
 TEST(DrivingChatterIsntACommand)
 {
   for (char const * chatter : {"I'm skipping lunch", "next time we should stop", "what a joke", "the speed limit here is silly",
