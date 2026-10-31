@@ -445,10 +445,6 @@ import Speech
 /// missing much. Without mic permission it just plays through, and the Settings list still works.
 @objc final class BackseatVoicePreview: NSObject {
   private static var current: BackseatVoicePreview?
-  /// Long enough for a line's own mentions of its voice's name, which are all near the start of it,
-  /// plus the recognizer catching up. Until then, that name is probably the speaker being overheard.
-  private static let ownNameEcho: TimeInterval = 4.5
-
   private struct Turn {
     let voiceID: String
     let line: String
@@ -465,11 +461,10 @@ import Speech
   private var timer: Timer?
   /// Whose line is on; -1 during the introduction.
   private var index = -1
-  private var lineStartedAt: Date?
-  /// The transcript so far, and how many times each voice was already named in it when the mic could
-  /// only have been hearing the GPS.
-  private var heard = ""
-  private var baseline: [[Int]] = []
+  /// Everything the line-up has said since the transcript last started over. The mic hears the
+  /// speaker too, so a name or phrase only counts as the driver's once the transcript has it more
+  /// often than the voices themselves said it.
+  private var spoken = ""
 
   private init(turns: [Turn]) {
     self.turns = turns
@@ -503,7 +498,6 @@ import Speech
   }
 
   private func begin() {
-    baseline = turns.map { $0.names.map { _ in 0 } }
     BackseatListener.shared.startOverhearing(names: turns.flatMap(\.names)) { [weak self] text in
       self?.overheard(text)
     }
@@ -518,10 +512,7 @@ import Speech
       return
     }
     BackseatListener.shared.keepOverhearing()
-    if KokoroVoice.shared.anyVoiceSpeaking {
-      if lineStartedAt == nil, KokoroVoice.shared.isSpeakingNow { lineStartedAt = Date() }
-      return
-    }
+    if KokoroVoice.shared.anyVoiceSpeaking { return }
     guard index + 1 < turns.count else {
       let finished = onFinished
       end()
@@ -529,42 +520,23 @@ import Speech
       return
     }
     index += 1
-    remember()
-    lineStartedAt = nil
     let line = turns[index].line
+    spoken += " " + line
     KokoroVoice.shared.sayReply(line, voiceID: turns[index].voiceID) { MWMTextToSpeech.tts().play(line) }
   }
 
   private func overheard(_ text: String) {
-    heard = text
     if text.isEmpty {
-      remember()
+      // A new transcript: only what's still being said can turn up in it.
+      spoken = index >= 0 && KokoroVoice.shared.anyVoiceSpeaking ? turns[index].line : ""
       return
     }
     for (i, turn) in turns.enumerated() {
-      for (n, name) in turn.names.enumerated() {
-        let count = MWMBackseatRewriter.countVoiceName(name, in: text)
-        // The voice that's talking says its own name and phrase. The name counts once its mentions
-        // are over; either one counts if it's said more often than the line says it.
-        if i == index {
-          let saidByLine = MWMBackseatRewriter.countVoiceName(name, in: turn.line)
-          let isName = n == 0
-          let stillEcho = !isName || lineStartedAt.map { Date().timeIntervalSince($0) < Self.ownNameEcho } ?? true
-          if stillEcho && count - baseline[i][n] <= saidByLine { continue }
-        }
-        if count > baseline[i][n] {
-          picked(i)
-          return
-        }
-      }
-    }
-  }
-
-  /// Everything named so far has been dealt with.
-  private func remember() {
-    for (i, turn) in turns.enumerated() {
-      for (n, name) in turn.names.enumerated() {
-        baseline[i][n] = heard.isEmpty ? 0 : MWMBackseatRewriter.countVoiceName(name, in: heard)
+      for name in turn.names
+      where MWMBackseatRewriter.countVoiceName(name, in: text) > MWMBackseatRewriter.countVoiceName(name, in: spoken) {
+        BackseatLog.event("voice.preview.heard", ["name": name, "text": text])
+        picked(i)
+        return
       }
     }
   }
