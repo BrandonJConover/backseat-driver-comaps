@@ -75,8 +75,21 @@ final class BackseatOnboardingModel: ObservableObject {
   /// 0 for the first "do you accept these terms?", 1 after a No.
   @Published var termsRound = 0
   @Published var termsAnswered = false
+  /// The disclaimer as it's read out: one sentence at a time, each with its paragraph, so Skip can
+  /// pick up at the sentence it interrupted rather than the top of the paragraph.
+  private lazy var pieces: [(paragraph: Int, text: String)] = paragraphs.indices.flatMap { p in
+    Self.sentences(MWMBackseatRewriter.spokenDisclaimer(paragraphs[p])).map { (paragraph: p, text: $0) }
+  }
+  /// The sentence being said.
+  private var piece = 0
   /// Up to here is queued with the voice; the next one is queued when the one before starts.
   private var queuedUpTo = -1
+  /// After Skip: the complaint being said, whether it has started, when it was asked for, and
+  /// the sentence to go back to after it.
+  private var complaint: String?
+  private var complaintStarted = false
+  private var complaintAt = Date.distantPast
+  private var resumeAt = 0
   private var lastSkip = Date.distantPast
   private var startedReadingAt: Date?
   private var poll: Timer?
@@ -121,8 +134,23 @@ final class BackseatOnboardingModel: ObservableObject {
     say(line, in: voice)
   }
 
-  private func spoken(_ i: Int) -> String {
-    MWMBackseatRewriter.spokenDisclaimer(paragraphs[i]).trimmingCharacters(in: .whitespacesAndNewlines)
+  /// "It was him slash her slash the officer! He slash she..." -> one string per sentence.
+  static func sentences(_ text: String) -> [String] {
+    var out: [String] = []
+    var current = ""
+    let chars = Array(text)
+    for (i, ch) in chars.enumerated() {
+      current.append(ch)
+      let ends = ".!?".contains(ch) && (i + 1 == chars.count || chars[i + 1] == " ")
+      if ends {
+        let sentence = current.trimmingCharacters(in: .whitespaces)
+        if !sentence.isEmpty { out.append(sentence) }
+        current = ""
+      }
+    }
+    let rest = current.trimmingCharacters(in: .whitespaces)
+    if !rest.isEmpty { out.append(rest) }
+    return out
   }
 
   /// Runs `then` once the GPS has stopped talking.
@@ -149,9 +177,9 @@ final class BackseatOnboardingModel: ObservableObject {
   }
 
   private func read(from i: Int) {
-    guard i < paragraphs.count else { return }
+    guard i < pieces.count else { return }
     queuedUpTo = i
-    say(spoken(i))
+    say(pieces[i].text)
   }
 
   private func lineStarted(_ text: String) {
@@ -159,12 +187,19 @@ final class BackseatOnboardingModel: ObservableObject {
       bubble = text
       return
     }
-    guard let i = (0 ..< paragraphs.count).first(where: { spoken($0) == text }) else { return }
-    reading = i
-    // The next paragraph renders while this one plays.
-    if i + 1 < paragraphs.count, queuedUpTo <= i {
+    if text == complaint {
+      complaintStarted = true
+      return
+    }
+    // The first match from the sentence before on (a sentence can't come back earlier).
+    guard complaint == nil,
+          let i = pieces.indices.first(where: { $0 >= max(piece - 1, 0) && pieces[$0].text == text }) else { return }
+    piece = i
+    reading = pieces[i].paragraph
+    // The next sentence renders while this one plays.
+    if i + 1 < pieces.count, queuedUpTo <= i {
       queuedUpTo = i + 1
-      say(spoken(i + 1))
+      say(pieces[i + 1].text)
     }
   }
 
@@ -173,8 +208,19 @@ final class BackseatOnboardingModel: ObservableObject {
       poll?.invalidate()
       return
     }
+    if let pending = complaint {
+      // Back to the interrupted sentence once the complaint has been said, or if it never starts.
+      let said = complaintStarted && !KokoroVoice.shared.anyVoiceSpeaking
+      if said || (!complaintStarted && Date().timeIntervalSince(complaintAt) > 8) {
+        BackseatLog.event("onboarding", ["step": "resume", "sentence": String(resumeAt), "complained": said ? "yes" : "no",
+                                         "line": String(pending.prefix(40))])
+        complaint = nil
+        read(from: resumeAt)
+      }
+      return
+    }
     let last = paragraphs.count - 1
-    let readToTheEnd = reading == last && queuedUpTo == last && !KokoroVoice.shared.anyVoiceSpeaking
+    let readToTheEnd = piece == pieces.count - 1 && queuedUpTo == pieces.count - 1 && !KokoroVoice.shared.anyVoiceSpeaking
     // However the voice is doing, the buttons come after about as long as reading it takes.
     let words = paragraphs.joined(separator: " ").split(separator: " ").count
     let tooLong = startedReadingAt.map { Date().timeIntervalSince($0) > Double(words) / 2.2 + 45 } ?? false
@@ -185,14 +231,22 @@ final class BackseatOnboardingModel: ObservableObject {
     }
   }
 
-  /// The Skip button: it doesn't skip. "Stop that, I'm monologuing," and back to where it was.
+  /// The Skip button: it doesn't skip. "Stop that, I'm monologuing right now! Be patient," then
+  /// back to the sentence it was on.
   func skipPressed() {
-    guard !monologueOver, Date().timeIntervalSince(lastSkip) > 2.5 else { return }
+    guard !monologueOver, complaint == nil, Date().timeIntervalSince(lastSkip) > 2.5 else { return }
     lastSkip = Date()
-    BackseatLog.event("onboarding", ["step": "skip pressed", "paragraph": String(reading)])
+    BackseatLog.event("onboarding", ["step": "skip pressed", "sentence": String(piece)])
     KokoroVoice.shared.stop()
-    say(MWMBackseatRewriter.line("onboard.monologuing", vars: [:]))
-    read(from: reading)
+    // The sentence comes back only once the complaint is over (checkReading): it's already rendered,
+    // so queued now it would play straight away, before the complaint is even rendered.
+    let line = MWMBackseatRewriter.line("onboard.monologuing", vars: [:]).trimmingCharacters(in: .whitespacesAndNewlines)
+    resumeAt = piece
+    queuedUpTo = piece
+    complaint = line
+    complaintStarted = false
+    complaintAt = Date()
+    say(line)
   }
 
   /// 0 yes, 1 no, 2 skip.
