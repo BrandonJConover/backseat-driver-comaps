@@ -449,8 +449,6 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   for (NSUInteger i = 0; i < ids.count && i < names.count; ++i)
     voices.push_back({ids[i].UTF8String, names[i].UTF8String});
   GetFramework().GetRoutingManager().SetBackseatVoices(std::move(voices));
-  // This app can rebuild a route as a drive, so the GPS may ask "Are we actually walking there?".
-  GetFramework().GetRoutingManager().GetBackseat().SetCanSwitchTravelMode(true);
   // The mic opens after "quiz.ask" lines (listenForGameAnswer), so pop quizzes can be answered.
   GetFramework().GetRoutingManager().GetBackseat().SetPopQuizOn(true);
 }
@@ -487,18 +485,51 @@ NSString * const kBackseatDrivingHighlightChanged = @"BackseatDrivingHighlightCh
   return gDrivingHighlighted;
 }
 
-+ (void)showWalkQuestion
+/// "Are you actually intending to walk there?" is for walks longer than a couple of miles (Brandon).
+static double constexpr kWalkQuestionOverM = 3200;
+/// The walk the driver said yes to, by where it ends, so starting it doesn't ask again.
+static m2::PointD gWalkConfirmedTo{1e9, 1e9};
+
++ (BOOL)walkQuestionAllowsStart
 {
-  if (gWalkQuestion)
-    return;
+  if ([MWMRouter type] != MWMRouterTypePedestrian)
+    return YES;
+  auto & rm = GetFramework().GetRoutingManager();
+  auto const points = rm.GetRoutePoints();
+  if (points.size() < 2)
+    return YES;
+  m2::PointD const to = points.back().m_position;
+  if (mercator::DistanceOnEarth(to, gWalkConfirmedTo) < 50)
+    return YES;
+  routing::FollowingInfo info;
+  rm.GetRouteFollowingInfo(info);
+  double const lengthM = info.IsValid() ? info.m_distToTarget.To(platform::Distance::Units::Meters).GetDistance() : 0;
+  if (lengthM <= kWalkQuestionOverM)
+    return YES;
+  if (!gWalkQuestion)
+    [self askWalkQuestionTo:to];
+  return NO;
+}
+
++ (void)askWalkQuestionTo:(m2::PointD)to
+{
+  auto & rm = GetFramework().GetRoutingManager();
+  SayReply(rm.BackseatReply("mode.ask.walk"), {});
   UIAlertController * alert = [UIAlertController alertControllerWithTitle:@"Are you actually intending to walk there?"
                                                                   message:nil
                                                            preferredStyle:UIAlertControllerStyleAlert];
   [alert addAction:[UIAlertAction actionWithTitle:@"No" style:UIAlertActionStyleDefault handler:^(UIAlertAction *) {
-    GetFramework().GetRoutingManager().GetBackseat().AnswerModeQuestion(false);
+    gWalkQuestion = nil;
+    // "I'm going to need you to click the driving button." Nothing starts until it's tapped.
+    SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.no"), {});
+    gDrivingHighlighted = YES;
+    [[NSNotificationCenter defaultCenter] postNotificationName:kBackseatDrivingHighlightChanged object:nil];
   }]];
   [alert addAction:[UIAlertAction actionWithTitle:@"Yes" style:UIAlertActionStyleDefault handler:^(UIAlertAction *) {
-    GetFramework().GetRoutingManager().GetBackseat().AnswerModeQuestion(true);
+    gWalkQuestion = nil;
+    SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.yes"), {});
+    gWalkConfirmedTo = to;
+    [MWMRouter startRouting];
   }]];
   UIViewController * top = [MapViewController sharedController];
   while (top.presentedViewController)
@@ -507,37 +538,14 @@ NSString * const kBackseatDrivingHighlightChanged = @"BackseatDrivingHighlightCh
   [top presentViewController:alert animated:YES completion:nil];
 }
 
-+ (void)closeWalkQuestionIfAnswered
-{
-  UIAlertController * alert = gWalkQuestion;
-  if (alert && !GetFramework().GetRoutingManager().GetBackseat().ModeQuestionOpen())
-  {
-    gWalkQuestion = nil;
-    [alert dismissViewControllerAnimated:YES completion:nil];
-  }
-}
-
-+ (void)highlightDrivingButton
-{
-  [self closeWalkQuestionIfAnswered];
-  auto & rm = GetFramework().GetRoutingManager();
-  // Back to the route preview, still walking: the driver has to tap Driving themselves.
-  if ([MWMRouter isOnRoute] && rm.GetRoutePoints().size() >= 2)
-  {
-    rm.CloseRouting(false /* remove route points */);
-    [MWMRouter rebuildWithBestRouter:NO];
-  }
-  gDrivingHighlighted = YES;
-  [[NSNotificationCenter defaultCenter] postNotificationName:kBackseatDrivingHighlightChanged object:nil];
-}
-
 + (void)drivingButtonTapped
 {
   if (!gDrivingHighlighted)
     return;
   gDrivingHighlighted = NO;
   [[NSNotificationCenter defaultCenter] postNotificationName:kBackseatDrivingHighlightChanged object:nil];
-  // Tapped: the drive starts by itself once it's built.
+  // Tapped: the drive starts by itself once it's built, with "check the mode now and then".
+  GetFramework().GetRoutingManager().GetBackseat().WarnModeOnNextDrive();
   [MWMRouter startWhenReady];
 }
 

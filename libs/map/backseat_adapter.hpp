@@ -390,6 +390,9 @@ public:
   bool ModeQuestionOpen() const { return m_navigator.ModeAskOpen(); }
   /// The driver tapped Yes (walking) or No (not walking: Driving gets highlighted).
   void AnswerModeQuestion(bool walking) { m_navigator.AnswerModeAsk(walking); }
+  /// The driver tapped Driving after saying they're not walking: that drive's start gets "check the
+  /// mode now and then, I may swap it on you".
+  void WarnModeOnNextDrive() { m_navigator.WarnModeOnNextDrive(); }
   /// "drive" when it isn't a walk after all: the host stops navigating, shows the route types and
   /// highlights Driving for the driver to tap. Empty otherwise.
   std::string TakeTravelModeSwitch()
