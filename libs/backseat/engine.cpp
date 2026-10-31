@@ -45,8 +45,6 @@ double constexpr kRoastSpeakMs = 5000;
 double constexpr kLinePauseMs = 350;
 /// speechAware: no remark after a direction for a turn that's closer than this many seconds.
 double constexpr kSuffixMinS = 15;
-/// Moving slower than this, the car isn't heading for the turn yet (a red light, a jam).
-double constexpr kRollingMps = 3;
 
 /// How much each offense winds the GPS up. Negative values calm it down.
 double FrustrationDelta(Category c)
@@ -392,7 +390,7 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     // The direction comes first, always: a remark goes after it, on one direction in three.
     int const n = m_instructionCount++ % 3;
     double const mps = m_lastSample ? m_lastSample->speedMps : 0;
-    bool const turnIsClose = m_config.speechAware && mps >= kRollingMps && e.distanceM / mps < kSuffixMinS;
+    bool const turnIsClose = m_config.speechAware && mps >= m_config.rollingMps && e.distanceM / mps < kSuffixMinS;
     std::string const suffix = n == 2 && !turnIsClose ? Pick("instruction.suffix", tier) : std::string();
     std::string const text =
         DirectionText(e.text, e.distanceM, units, dir == Maneuver::Other ? Control::None : e.control) + suffix;
@@ -605,9 +603,9 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
 /// Correct turns are left to the routing layer's turnCompleted event.
 void CritiqueEngine::CheckTurnDirection(TelemetrySample const & s, std::vector<Commentary> & out)
 {
-  if (!s.headingDeg || s.speedMps < 3)
+  if (!s.headingDeg || s.speedMps < m_config.rollingMps)
     return;
-  if (m_pendingTurn && s.t - m_pendingTurn->since > 180000)
+  if (m_pendingTurn && s.t - m_pendingTurn->since > m_config.pendingTurnForgetMs)
     m_pendingTurn.reset();
   m_headings.push_back({s.t, *s.headingDeg});
   m_headings.erase(std::remove_if(m_headings.begin(), m_headings.end(), [&](Heading const & h) { return s.t - h.t > 12000; }),
@@ -644,9 +642,9 @@ void CritiqueEngine::CheckTurnDirection(TelemetrySample const & s, std::vector<C
 /// "I see we're driving, but you didn't tell me where we're going. Typical."
 void CritiqueEngine::CheckNoDestination(TelemetrySample const & s, std::vector<Commentary> & out)
 {
-  if (m_hasDestination || s.speedMps < 3)
+  if (m_hasDestination || s.speedMps < m_config.rollingMps)
   {
-    if (s.speedMps < 3)
+    if (s.speedMps < m_config.rollingMps)
       m_movingWithoutDestinationSince.reset();
     return;
   }
@@ -774,7 +772,7 @@ double CritiqueEngine::FinalDueM(double t, PendingTurn const & p) const
 {
   double const base = FinalM();
   double const mps = m_lastSample ? m_lastSample->speedMps : 0;
-  if (mps < kRollingMps)
+  if (mps < m_config.rollingMps)
     return base;
   std::string const call = "Now, " + LowerFirst(p.text) + ".";
   double const needMs = std::max(0.0, m_talkingUntil - t) + SpeakingMs(call) + kLinePauseMs + kFinalClearMs;
@@ -784,7 +782,7 @@ double CritiqueEngine::FinalDueM(double t, PendingTurn const & p) const
 double CritiqueEngine::MsUntilFinal(double t, PendingTurn const & p) const
 {
   double const mps = m_lastSample ? m_lastSample->speedMps : 0;
-  if (mps < kRollingMps)
+  if (mps < m_config.rollingMps)
     return 1e12;
   return (p.distM - FinalDueM(t, p)) / mps * 1000;
 }

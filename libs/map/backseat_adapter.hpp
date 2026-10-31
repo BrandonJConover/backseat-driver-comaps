@@ -400,6 +400,9 @@ private:
   backseat::Bridge BridgeAt(backseat::LatLon const & at, double bearingDeg) const;
   /// Meters to the nearest mapped car road, up to kRoadSearchM; that far if none, -1 with no map.
   double RoadDistanceAt(backseat::LatLon const & at) const;
+  /// Whether the nearest way within a few meters of `at` is a trail: a path, track, bridleway, or
+  /// anything unpaved. A sidewalk (footway) isn't one.
+  bool TrailAt(backseat::LatLon const & at) const;
   /// Right after the car drives past a highway exit (staying on the highway): how far along the
   /// route the next exit is, -1 if the trip ends first. Nothing on every other update.
   std::optional<double> PassedExitNextM(routing::RoutingSession const & session, double speedMps);

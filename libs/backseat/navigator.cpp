@@ -84,6 +84,15 @@ double constexpr kOffRoadForMs = 12000;
 double constexpr kOffRoadMinMps = 6;
 /// ...and said at most this often.
 double constexpr kOffRoadEveryMs = 300000;
+/// A walking route this much on dirt (by distance) is a hike from the start.
+double constexpr kHikeDirtShare = 0.4;
+/// On trails this long, a walk becomes a hike. It stays one for the rest of the trip.
+double constexpr kHikeAfterMs = 90000;
+double constexpr kTrailCheckEveryMs = 10000;
+/// On dirt this long (and moving), a drive becomes an off-road trip...
+double constexpr kOffRoadAfterDirtMs = 45000;
+/// ...and on pavement this long, a drive again.
+double constexpr kBackOnPavementMs = 120000;
 /// The next highway exit this far out makes the one just passed worth a remark...
 double constexpr kLastExitM = 32187;  // 20 miles
 /// ...and this far out gets Brandon's "last one for a hundred miles".
@@ -215,7 +224,6 @@ double constexpr kUTurnEveryMs = 120000;
 int constexpr kUTurnMaxPerTrip = 2;
 // Still sitting this long after the trip starts gets the brake-or-gas line.
 double constexpr kSlowStartMs = 45000;
-double constexpr kRollingMps = 3;
 /// Asking for music: once a trip, at least this far in, on a quiet stretch, if nothing is playing.
 double constexpr kMusicAfterMs = 15 * 60000;
 double constexpr kMusicCheckEveryMs = 15000;
@@ -548,29 +556,37 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
     if (fix.speedMps > *fix.speedLimitMps + kSeriousOverMps)
       m_lastBadSpeedingT = fix.tMs;
   }
+  TrackTravelMode(fix, route);
+  bool const car = InCar(m_travelMode);
   TrackStop(fix, route);
-  TrackTraffic(fix, route);
+  if (car)
+  {
+    TrackTraffic(fix, route);
+    TrackOffRoad(fix);
+    TrackLastExit(fix.tMs, route);
+    TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
+    TrackLongDrive(fix.tMs, route);
+  }
   TrackFear(fix, route);
-  TrackOffRoad(fix);
-  TrackLastExit(fix.tMs, route);
-  TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
-  TrackLongDrive(fix.tMs, route);
   TrackSights(fix, route);
   m_curveAheadM = route.curveAheadM;
-  if (fix.bearingDeg >= 0 && fix.speedMps >= kResumedMps)
+  if (fix.bearingDeg >= 0 && fix.speedMps >= MovingMps())
     m_bendHeadings.emplace_back(fix.tMs, fix.bearingDeg);
   while (!m_bendHeadings.empty() && fix.tMs - m_bendHeadings.front().first > kBendWindowMs)
     m_bendHeadings.pop_front();
-  TrackBends(fix, route);
+  if (car)
+    TrackBends(fix, route);
   TrackCold(fix, route);
   TrackClockChange(fix, route);
-  TrackNightOut(fix, route);
+  if (car)
+    TrackNightOut(fix, route);
   TrackClean(fix, route);
   TrackIdle(fix, route);
   TrackWrongWay(fix, route);
   TrackUTurn(fix, route);
   TrackSlowStart(fix);
-  TrackCurveAhead(fix, route);
+  if (car)
+    TrackCurveAhead(fix, route);
   TrackMusic(fix.tMs, route);
   TrackLeftBuilding(fix);
   TrackTwentyQuestions(fix, route);
@@ -628,7 +644,7 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
     return;
   }
   // A stop lasts until the car is moving again; walking pace with the phone is still the stop.
-  if (fix.speedMps >= kResumedMps)
+  if (fix.speedMps >= MovingMps())
   {
     double const stoppedMs = fix.tMs - *m_stopSince;
     bool const stayedInCar = m_stopWanderM < kPhoneWanderedM;
@@ -759,7 +775,15 @@ std::vector<Commentary> Navigator::TakeLines()
   }
   auto lines = KeepTurnsClear(FilterForCall(m_gate.Take()));
   if (m_travelMode != TravelMode::Drive)
-    lines.erase(std::remove_if(lines.begin(), lines.end(), [](Commentary const & l) { return OnlyInACar(l.category); }), lines.end());
+  {
+    // Off the pavement a car still brakes hard; it just has no speed limit, traffic or plates.
+    bool const offRoad = m_travelMode == TravelMode::OffRoad;
+    lines.erase(std::remove_if(lines.begin(), lines.end(), [offRoad](Commentary const & l)
+    {
+      return OnlyInACar(l.category) &&
+             !(offRoad && (l.category == Category::HardBraking || l.category == Category::HardAccel));
+    }), lines.end());
+  }
   if (!lines.empty())
     m_lastSpokeT = m_lastT;
   // What the phone will be busy saying, so the next turn call and the roasts can plan around it.
@@ -894,7 +918,7 @@ double Navigator::NavWaitMs(Commentary const & line) const
 {
   double const mps = m_lastFix ? m_lastFix->speedMps : 0;
   // Parked, or nowhere near a maneuver: nothing to be late for.
-  if (!m_turnId || mps < kRollingMps)
+  if (!m_turnId || mps < 0.75 * MovingMps())
     return kNavWaitMaxMs;
   // Done speaking before the car gets to the maneuver, with a little room to spare.
   double const untilTurnMs = (m_lastDistToTurnM - kNavDoneBeforeTurnM) / mps * 1000;
@@ -915,6 +939,12 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     }
     m_engine.reset();
     ResetTrip();
+    // An off-road trip or a hike was this trip's; the next one starts from the route type again.
+    if (m_modeFound)
+    {
+      m_modeFound = false;
+      ChangeTravelMode(BaseMode(m_travelMode), "trip.end");
+    }
     return;
   }
 
@@ -1105,10 +1135,37 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   if (config.speedingRenagMaxMs == 0)
     config.speedingRenagMaxMs = kSpeedingRenagMaxMs;
   // A phone in a pocket jolts and jumps, and that's not hard braking.
-  if (m_travelMode != TravelMode::Drive)
+  if (!InCar(m_travelMode))
   {
     config.hardBrakeMps2 = 1e9;
     config.hardAccelMps2 = 1e9;
+  }
+  // A walking route that's mostly dirt is a hike from the first step.
+  m_dirtSince.reset();
+  m_pavedSince.reset();
+  m_trailSince.reset();
+  if (m_travelMode == TravelMode::Walk && route.dirtShare >= kHikeDirtShare)
+  {
+    ChangeTravelMode(TravelMode::Hike, "route");
+    m_modeFound = true;
+  }
+  // 500 feet is a few minutes on foot: walks and rides get their turn calls closer in.
+  if (m_travelMode == TravelMode::Walk || m_travelMode == TravelMode::Hike)
+  {
+    config.countdownFarM = 46;      // 150 ft
+    config.countdownMentionM = 30;  // 100 ft
+    config.countdownNearM = 8;      // 25 ft
+    config.rollingMps = 0.8;
+    config.pendingTurnForgetMs = 20 * 60000;
+    config.straightNagMinM = 500;
+  }
+  else if (m_travelMode == TravelMode::Bike)
+  {
+    config.countdownFarM = 91;      // 300 ft
+    config.countdownMentionM = 50;  // 165 ft
+    config.countdownNearM = 12;     // 40 ft
+    config.rollingMps = 2;
+    config.pendingTurnForgetMs = 8 * 60000;
   }
   // 1 over is GPS noise, and "70, not 71" isn't funny four times a drive.
   if (config.speedingTolerance == 0)
@@ -1139,6 +1196,7 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
       m_fromNightlife = from->nightlife && (hour >= kNightOutFromH || hour < kNightOutUntilH);
     }
   Trace("trip.start", {{"to", route.destination},
+                       {"mode", TravelModeName(m_travelMode)},
                        {"eta_min", LogNum(route.etaSeconds / 60, 0)},
                        {"turns", std::to_string(route.plannedTurns.size())},
                        {"sketched", route.sketched ? "yes" : "no"}});
@@ -1186,7 +1244,8 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   std::string greeting = TripGreeting(m_history, m_config.rng, tripsBefore);
   // The greetings are written for a car; a walk gets a hello of its own.
   if (!LineFitsMode(greeting, m_travelMode))
-    greeting = Reply(m_travelMode == TravelMode::Walk ? "mode.walk" : m_travelMode == TravelMode::Bike ? "mode.bike" : "mode.offRoad");
+    greeting = Reply(m_travelMode == TravelMode::OffRoad ? std::string("mode.offRoad")
+                                                         : std::string("mode.") + TravelModeName(m_travelMode));
   SayNav(t, greeting);
   SayIndoorStart(t, route);
   // Before 5 am: "Are we off to make the donuts?"
@@ -1282,7 +1341,7 @@ void Navigator::TrackLeftBuilding(Fix const & fix)
     m_indoorOutKey.clear();
     return;
   }
-  if (fix.speedMps < kResumedMps)
+  if (fix.speedMps < MovingMps())
     return;
   SayLine(fix.tMs, Category::LongStop, m_indoorOutKey);
   m_indoorOutKey.clear();
@@ -1300,8 +1359,97 @@ std::string CompassDirection(LatLon const & from, LatLon const & to)
 
 void Navigator::SetTravelMode(TravelMode mode)
 {
+  // The same route type again: an off-road drive or a hike found along the way stays one.
+  if (m_modeFound && mode == BaseMode(m_travelMode))
+    return;
+  m_modeFound = false;
+  ChangeTravelMode(mode, "route");
+}
+
+void Navigator::DriverSetTravelMode(TravelMode mode)
+{
+  m_modeFound = false;
+  ChangeTravelMode(mode, "driver");
+}
+
+void Navigator::ChangeTravelMode(TravelMode mode, char const * why)
+{
+  if (mode != m_travelMode)
+    Trace("trip.mode", {{"mode", TravelModeName(mode)}, {"from", TravelModeName(m_travelMode)}, {"why", why}});
   m_travelMode = mode;
   SetLineTravelMode(mode);
+}
+
+double Navigator::MovingMps() const
+{
+  switch (m_travelMode)
+  {
+  case TravelMode::Walk:
+  case TravelMode::Hike: return 1;
+  case TravelMode::Bike: return 2.5;
+  case TravelMode::Drive:
+  case TravelMode::OffRoad: return kResumedMps;
+  }
+  return kResumedMps;
+}
+
+void Navigator::TrackTravelMode(Fix const & fix, RouteSnapshot const & route)
+{
+  if (route.state != RouteState::OnRoute && route.state != RouteState::OffRoute)
+    return;
+  bool const moving = fix.speedMps >= MovingMps();
+  if (InCar(m_travelMode))
+  {
+    if (!moving)
+      return;
+    if (route.onDirt)
+    {
+      m_pavedSince.reset();
+      if (!m_dirtSince)
+        m_dirtSince = fix.tMs;
+      if (m_travelMode == TravelMode::Drive && fix.tMs - *m_dirtSince >= kOffRoadAfterDirtMs)
+      {
+        ChangeTravelMode(TravelMode::OffRoad, "dirt");
+        m_modeFound = true;
+        SayLine(fix.tMs, Category::Rerouted, "offroad.enter");
+      }
+      return;
+    }
+    m_dirtSince.reset();
+    // Off the route out where the map has no road isn't pavement either.
+    if (route.state != RouteState::OnRoute)
+    {
+      m_pavedSince.reset();
+      return;
+    }
+    if (!m_pavedSince)
+      m_pavedSince = fix.tMs;
+    // Only an off-road trip the GPS noticed itself ends by itself; the driver's say-so stands.
+    if (m_travelMode == TravelMode::OffRoad && m_modeFound && fix.tMs - *m_pavedSince >= kBackOnPavementMs)
+    {
+      ChangeTravelMode(TravelMode::Drive, "pavement");
+      SayLine(fix.tMs, Category::Rerouted, "offroad.exit");
+    }
+    return;
+  }
+  // A walk on trails for a while is a hike, for the rest of the trip.
+  if (m_travelMode != TravelMode::Walk || !moving || fix.tMs - m_lastTrailCheckT < kTrailCheckEveryMs)
+    return;
+  m_lastTrailCheckT = fix.tMs;
+  bool const trail = route.onDirt || (m_trailLookup && m_trailLookup({fix.lat, fix.lon}));
+  if (!trail)
+  {
+    m_trailSince.reset();
+    return;
+  }
+  if (!m_trailSince)
+    m_trailSince = fix.tMs;
+  if (fix.tMs - *m_trailSince >= kHikeAfterMs)
+  {
+    ChangeTravelMode(TravelMode::Hike, "trail");
+    m_modeFound = true;
+    SayLine(fix.tMs, Category::Rerouted, "hike.enter");
+  }
 }
 
 void Navigator::QueueOpener(double tMs, std::string key, Vars vars)
@@ -1324,7 +1472,7 @@ std::pair<double, double> AheadAndSide(Fix const & fix, LatLon const & p)
 
 void Navigator::TrackSights(Fix const & fix, RouteSnapshot const & route)
 {
-  bool const quiet = route.state == RouteState::OnRoute && fix.speedMps >= kResumedMps && fix.bearingDeg >= 0 &&
+  bool const quiet = route.state == RouteState::OnRoute && fix.speedMps >= MovingMps() && fix.bearingDeg >= 0 &&
                      !(route.turnId && route.distToTurnM < kSightQuietM);
   // Something spotted up ahead: say it as the car is about to pass it, so it's actually in view.
   if (m_upcomingSight)
@@ -1379,7 +1527,7 @@ void Navigator::SaySight(double tMs, Sight const & sight)
 /// minutes of nothing, never near a maneuver, in the first minutes, or while crawling.
 void Navigator::TrackIdle(Fix const & fix, RouteSnapshot const & route)
 {
-  if (route.state != RouteState::OnRoute || fix.speedMps < kResumedMps || fix.tMs - m_tripStartT < 120000 ||
+  if (route.state != RouteState::OnRoute || fix.speedMps < MovingMps() || fix.tMs - m_tripStartT < 120000 ||
       (route.turnId && route.distToTurnM < kIdleQuietM) || m_upcomingSight)
     return;
   if (m_idleGapMs <= 0)
@@ -1396,7 +1544,7 @@ void Navigator::TrackWrongWay(Fix const & fix, RouteSnapshot const & route)
 {
   bool const followingRoute = route.state == RouteState::OnRoute || route.state == RouteState::NotStarted;
   double off = 0;
-  if (followingRoute && fix.bearingDeg >= 0 && route.routeBearingDeg >= 0 && fix.speedMps >= kWrongWayMinMps)
+  if (followingRoute && fix.bearingDeg >= 0 && route.routeBearingDeg >= 0 && fix.speedMps >= std::min(kWrongWayMinMps, 0.75 * MovingMps()))
   {
     off = std::fabs(std::fmod(fix.bearingDeg - route.routeBearingDeg + 540.0, 360.0) - 180.0);
   }
@@ -1460,7 +1608,7 @@ void Navigator::TrackSlowStart(Fix const & fix)
 {
   if (m_startedRolling)
     return;
-  if (fix.speedMps >= kRollingMps)
+  if (fix.speedMps >= 0.75 * MovingMps())
   {
     m_startedRolling = true;
     return;
@@ -1973,7 +2121,7 @@ bool Navigator::Parked() const
 {
   if (m_stopSince && m_lastT - *m_stopSince >= kUnplannedStopAfterMs)
     return true;
-  if (!m_lastFix || !m_parkingLookup || m_lastFix->speedMps >= kResumedMps)
+  if (!m_lastFix || !m_parkingLookup || m_lastFix->speedMps >= MovingMps())
     return false;
   return m_parkingLookup({m_lastFix->lat, m_lastFix->lon});
 }
@@ -2082,6 +2230,14 @@ void Navigator::TrackOffRoad(Fix const & fix)
     return;
   m_lastOffRoadT = fix.tMs;
   Trace("nav.offroad", {{"road_m", LogNum(dist, 0)}});
+  // The first time, the GPS takes the hint: this is an off-road trip now. After that it's lost.
+  if (m_travelMode == TravelMode::Drive)
+  {
+    ChangeTravelMode(TravelMode::OffRoad, "no_road");
+    m_modeFound = true;
+    SayLine(fix.tMs, Category::Rerouted, "offroad.enter");
+    return;
+  }
   SayLine(fix.tMs, Category::Rerouted, "offRoad");
 }
 
@@ -2092,7 +2248,7 @@ void Navigator::TrackFear(Fix const & fix, RouteSnapshot const & route)
   Vars const weight = {{"weight", CarWeight(m_config.units)}};
 
   // Bridges: checked every couple of seconds while moving.
-  if (m_bridgeLookup && fix.speedMps >= kResumedMps && fix.bearingDeg >= 0 && fix.tMs - m_lastBridgeCheckT >= 2000)
+  if (m_bridgeLookup && fix.speedMps >= MovingMps() && fix.bearingDeg >= 0 && fix.tMs - m_lastBridgeCheckT >= 2000)
   {
     m_lastBridgeCheckT = fix.tMs;
     Bridge const bridge = m_bridgeLookup({fix.lat, fix.lon}, fix.bearingDeg);
@@ -2401,7 +2557,7 @@ void Navigator::TrackCold(Fix const & fix, RouteSnapshot const & route)
   if (m_tempC && *m_tempC >= kHotC)
   {
     // Groceries in a hot car: always worth it, once they've had a couple of minutes to cook.
-    if (!m_groceriesSaid && fix.speedMps >= kResumedMps && fix.tMs - m_groceryT >= kGroceryCookMs &&
+    if (!m_groceriesSaid && fix.speedMps >= MovingMps() && fix.tMs - m_groceryT >= kGroceryCookMs &&
         fix.tMs - m_groceryT <= kGroceryWindowMs)
     {
       m_groceriesSaid = m_hotSaid = true;
@@ -2533,7 +2689,7 @@ void Navigator::TrackClean(Fix const & fix, RouteSnapshot const & route)
   m_bits.SyncTurns(m_engine->Stats(), m_engine->Incidents());
   if (m_said.Counter(kTurnStreakKey) != m_bits.Streak())
     m_said.SetCounter(kTurnStreakKey, m_bits.Streak());
-  if (route.state != RouteState::OnRoute || fix.speedMps < kResumedMps || QuietBitBusy() ||
+  if (route.state != RouteState::OnRoute || fix.speedMps < MovingMps() || QuietBitBusy() ||
       (route.turnId && route.distToTurnM < kIdleQuietM) || fix.tMs - std::max(m_lastSpokeT, m_tripStartT) < kCleanQuietMs)
     return;
   auto const bit = m_bits.CleanBeatDue(fix.tMs, m_tripStartT, m_engine->Incidents());
@@ -2702,7 +2858,7 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
     m_quietTurnId = route.turnId;
     m_quietTurnSince = t;
   }
-  if (!steady || fix.speedMps < kQuietMinMovingMps || m_quietBits >= kQuietBitsPerTrip || !m_punchlines.empty() ||
+  if (!steady || fix.speedMps < std::min(kQuietMinMovingMps, 1.25 * MovingMps()) || m_quietBits >= kQuietBitsPerTrip || !m_punchlines.empty() ||
       QuietBitBusy())
     return;
   if (t - m_tripStartT < kQuietBitAfterStartMs || t - m_lastQuietBitT < kQuietBitEveryMs ||

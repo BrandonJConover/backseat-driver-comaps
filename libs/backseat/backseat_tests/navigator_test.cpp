@@ -1621,12 +1621,17 @@ TEST(DrivingWhereTheMapHasNoRoad)
   // Crawling through a big parking lot doesn't count.
   roadM = 90;
   CHECK_EQUAL(offRoadLines(30, 60, 3), 0);
-  // Really out there: once, then not again for a while.
-  CHECK_EQUAL(offRoadLines(60, 90, 15), 1);
+  // Really out there: the GPS takes the hint, it's an off-road trip now. Then quiet for a while.
+  CHECK(nav.Mode() == TravelMode::Drive);
+  CHECK_EQUAL(offRoadLines(60, 90, 15), 0);
+  CHECK(nav.Mode() == TravelMode::OffRoad);
   CHECK_EQUAL(offRoadLines(90, 200, 15), 0);
+  // Off-roading, no road is the point: no more complaints about it.
+  CHECK_EQUAL(offRoadLines(400, 430, 15), 0);
   // No map for this area: no opinion.
   roadM = -1;
   CHECK_EQUAL(offRoadLines(600, 700, 15), 0);
+  SetLineTravelMode(TravelMode::Drive);
 }
 
 TEST(SpeedingNagsBackOffOnALongStretch)
@@ -1827,7 +1832,7 @@ TEST(LinesFollowTheTravelMode)
   CHECK(!LineFitsMode("You drive like this?", TravelMode::Bike));
   CHECK(LineFitsMode("Turn left. Try it.", TravelMode::Walk));
 
-  for (TravelMode const mode : {TravelMode::Walk, TravelMode::Bike, TravelMode::OffRoad})
+  for (TravelMode const mode : {TravelMode::Walk, TravelMode::Bike, TravelMode::OffRoad, TravelMode::Hike})
   {
     SetLineTravelMode(mode);
     for (auto const & [key, tiers] : LineData())
@@ -1889,5 +1894,146 @@ TEST(OffRoadSaysWhichWayInsteadOfRoasting)
   // Not every two seconds.
   nav.OnFix(At(12000, 10), off);
   CHECK(nav.TakeLines().empty());
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+namespace
+{
+RouteSnapshot Walkway(double distToTurnM = 2000)
+{
+  RouteSnapshot r = OnRoute(1, TurnKind::Left, distToTurnM);
+  r.destinationPoint = {39.8, -105};
+  return r;
+}
+}  // namespace
+
+TEST(AWalkOnTrailsBecomesAHike)
+{
+  Navigator nav(Config());
+  nav.SetTravelMode(TravelMode::Walk);
+  bool trail = false;
+  nav.SetTrailLookup([&](LatLon const &) { return trail; });
+  for (int i = 0; i < 60; ++i)
+    nav.OnFix(Heading(i * 1000.0, 1.4, 90), Walkway());
+  nav.TakeLines();
+  CHECK(nav.Mode() == TravelMode::Walk);
+  // A minute and a half on a trail: it's a hike now, and the GPS says so once.
+  trail = true;
+  int entered = 0;
+  for (int i = 60; i < 260; ++i)
+  {
+    nav.OnFix(Heading(i * 1000.0, 1.4, 90), Walkway());
+    for (auto const & l : nav.TakeLines())
+      entered += SaidLineOf(l.text, "hike.enter");
+  }
+  CHECK(nav.Mode() == TravelMode::Hike);
+  CHECK_EQUAL(entered, 1);
+  // The host keeps saying it's a walking route; it stays a hike for the rest of the trip.
+  nav.SetTravelMode(TravelMode::Walk);
+  CHECK(nav.Mode() == TravelMode::Hike);
+  // Trip over: the next walk starts as a walk.
+  nav.OnFix(Heading(300000, 0, 90), RouteSnapshot{});
+  CHECK(nav.Mode() == TravelMode::Walk);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(AMostlyDirtWalkIsAHikeFromTheStart)
+{
+  Navigator nav(Config());
+  nav.SetTravelMode(TravelMode::Walk);
+  RouteSnapshot r = Walkway();
+  r.dirtShare = 0.7;
+  nav.OnFix(Heading(0, 1.4, 90), r);
+  CHECK(nav.Mode() == TravelMode::Hike);
+  bool greeted = false;
+  for (auto const & l : nav.TakeLines())
+    greeted = greeted || SaidLineOf(l.text, "mode.hike");
+  CHECK(greeted);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(DirtTracksMakeItAnOffRoadTrip)
+{
+  Navigator nav(Config());
+  RouteSnapshot r = Far();
+  int entered = 0, left = 0;
+  auto const drive = [&](int from, int to)
+  {
+    for (int i = from; i < to; ++i)
+    {
+      nav.OnFix(Heading(i * 1000.0, 12, 90), r);
+      for (auto const & l : nav.TakeLines())
+      {
+        entered += SaidLineOf(l.text, "offroad.enter");
+        left += SaidLineOf(l.text, "offroad.exit");
+      }
+    }
+  };
+  drive(0, 60);
+  CHECK(nav.Mode() == TravelMode::Drive);
+  // A short gravel stretch is still a drive.
+  r.onDirt = true;
+  drive(60, 80);
+  CHECK(nav.Mode() == TravelMode::Drive);
+  // Dirt for a while: off-roading.
+  drive(80, 140);
+  CHECK(nav.Mode() == TravelMode::OffRoad);
+  CHECK_EQUAL(entered, 1);
+  // Speed limits don't come up in the dirt.
+  for (int i = 140; i < 200; ++i)
+  {
+    Fix f = Heading(i * 1000.0, 30, 90);
+    f.speedLimitMps = 15;
+    nav.OnFix(f, r);
+    CHECK(!Has(nav.TakeLines(), Category::Speeding));
+  }
+  // Two minutes back on pavement: a drive again.
+  r.onDirt = false;
+  drive(200, 260);
+  CHECK(nav.Mode() == TravelMode::OffRoad);
+  drive(260, 340);
+  CHECK(nav.Mode() == TravelMode::Drive);
+  CHECK_EQUAL(left, 1);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(OffRoadingTheDriverAskedForStaysOn)
+{
+  Navigator nav(Config());
+  nav.DriverSetTravelMode(TravelMode::OffRoad);
+  RouteSnapshot r = Far();
+  for (int i = 0; i < 400; ++i)
+    nav.OnFix(Heading(i * 1000.0, 12, 90), r);
+  CHECK(nav.Mode() == TravelMode::OffRoad);
+  // "Back on the road."
+  nav.DriverSetTravelMode(TravelMode::Drive);
+  CHECK(nav.Mode() == TravelMode::Drive);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(TurnCallsComeCloserOnFoot)
+{
+  // How far out the first reminder after the instruction comes, walking up to a left turn.
+  auto const firstReminderM = [](TravelMode mode)
+  {
+    Navigator nav(Config());
+    nav.SetTravelMode(mode);
+    double first = -1;
+    for (int i = 0; i < 1000 && first < 0; ++i)
+    {
+      double const dist = 300 - i * 0.7;
+      if (dist < 0)
+        break;
+      nav.OnFix(Heading(i * 500.0, 1.4, 90), Walkway(dist));
+      for (auto const & l : nav.TakeLines())
+        if (first < 0 && (l.key == "countdown.far" || l.key == "countdown.mention"))
+          first = dist;
+    }
+    return first;
+  };
+  double const walk = firstReminderM(TravelMode::Walk);
+  double const drive = firstReminderM(TravelMode::Drive);
+  CHECK(walk > 0 && walk <= 50);
+  CHECK(drive > 100);
   SetLineTravelMode(TravelMode::Drive);
 }

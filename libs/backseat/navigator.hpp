@@ -104,6 +104,10 @@ struct RouteSnapshot
   /// Set on the one update right after the car drives past a highway exit: how far along the route
   /// the next exit is. Negative if the trip ends before another exit.
   std::optional<double> passedExitNextM;
+  /// The route's current stretch is a dirt track or unpaved.
+  bool onDirt = false;
+  /// How much of the route (by distance, 0..1) is dirt tracks and unpaved, read when the trip starts.
+  double dirtShare = 0;
 };
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
@@ -134,6 +138,8 @@ char const * BridgeLinesKey(Bridge bridge);
 using BridgeLookup = std::function<Bridge(LatLon const &, double bearingDeg)>;
 /// Distance in meters from a spot to the nearest mapped car road; negative if the map can't tell.
 using RoadDistanceLookup = std::function<double(LatLon const &)>;
+/// Whether there's a trail (a path, track or bridleway, not a sidewalk) right under a point.
+using TrailLookup = std::function<bool(LatLon const &)>;
 
 /// What kind of notable place is at a point (a coffee shop, a theme park). Empty when nothing is.
 using VenueLookup = std::function<std::optional<Venue>(LatLon const &)>;
@@ -245,6 +251,8 @@ public:
   /// Lets the GPS panic on bridges.
   void SetBridgeLookup(BridgeLookup lookup) { m_bridgeLookup = std::move(lookup); }
   void SetRoadDistanceLookup(RoadDistanceLookup lookup) { m_roadDistanceLookup = std::move(lookup); }
+  /// Lets a walk turn into a hike once it's on trails.
+  void SetTrailLookup(TrailLookup lookup) { m_trailLookup = std::move(lookup); }
   /// Lets the GPS ask for music on a quiet drive, and keep it to itself when music is on.
   void SetMusicLookup(MusicLookup lookup) { m_musicLookup = std::move(lookup); }
   /// Local calendar time for a timestamp (ms since the epoch), for holidays. Defaults to the
@@ -301,9 +309,15 @@ public:
   void QueueOpener(double tMs, std::string key, Vars vars = {});
   /// The driver just gave a command, so a route change in the next little while is theirs.
   void NoteVoiceCommand() { m_lastVoiceCommandT = m_lastT; }
-  /// How this trip is being made. Lines and checks follow it; no speeding on foot.
+  /// How this trip is being made, from the route type (Drive, Walk or Bike). Lines and checks follow
+  /// it; no speeding on foot. On a drive or a walk the Navigator itself notices dirt and trails, and
+  /// makes it an OffRoad trip or a Hike; the same route type again keeps that.
   void SetTravelMode(TravelMode mode);
+  /// The driver said how they're traveling ("off-road mode", "back on the road"): that beats
+  /// whatever the Navigator noticed on its own.
+  void DriverSetTravelMode(TravelMode mode);
   TravelMode GetTravelMode() const { return m_travelMode; }
+  TravelMode Mode() const { return m_travelMode; }
   /// The plain direction for the current maneuver, with no jokes on it. Empty with no route.
   std::string const & LastInstructionText() const { return m_lastInstructionText; }
   static double constexpr kOpenerValidMs = 600000;
@@ -372,6 +386,10 @@ private:
   void TrackFear(Fix const & fix, RouteSnapshot const & route);
   /// "Either there is a new road here or we are completely off course."
   void TrackOffRoad(Fix const & fix);
+  void TrackTravelMode(Fix const & fix, RouteSnapshot const & route);
+  void ChangeTravelMode(TravelMode mode, char const * why);
+  /// Speed that counts as moving along on this kind of trip (a walker never does 9 mph).
+  double MovingMps() const;
   /// "I probably should have told you the exit you just passed is the last one for a hundred miles."
   void TrackLastExit(double tMs, RouteSnapshot const & route);
   void SayPolice(double tMs);
@@ -556,6 +574,14 @@ private:
   RoadDistanceLookup m_roadDistanceLookup;
   double m_lastRoadCheckT = -1e18;
   std::optional<double> m_offRoadSince;
+  // Noticing an off-road trip or a hike: how long the ground has looked like one.
+  TrailLookup m_trailLookup;
+  double m_lastTrailCheckT = -1e18;
+  std::optional<double> m_dirtSince;
+  std::optional<double> m_pavedSince;
+  std::optional<double> m_trailSince;
+  /// The off-road trip or the hike is the Navigator's own finding, not the route type or the driver.
+  bool m_modeFound = false;
   double m_lastOffRoadT = -1e18;
   double m_lastExitLineT = -1e18;
   bool m_onBridge = false;

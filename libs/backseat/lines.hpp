@@ -19,17 +19,30 @@ enum class TravelMode
   Drive,
   Walk,
   Bike,
-  /// A car, off the pavement: no lanes, no limits, no signs.
-  OffRoad
+  /// A car, off the pavement: no lanes, no limits, no signs. The driver says so ("off-road mode"),
+  /// or the Navigator notices dirt tracks, or no road at all, on a drive.
+  OffRoad,
+  /// A walk on trails and dirt paths. Found by the Navigator on a Walk; the host never sets it.
+  Hike
 };
+
+/// A car is involved: a drive, on or off the pavement.
+inline bool InCar(TravelMode mode) { return mode == TravelMode::Drive || mode == TravelMode::OffRoad; }
+/// What the host's route type would be for `mode`: an off-road trip is a drive, a hike a walk.
+inline TravelMode BaseMode(TravelMode mode)
+{
+  return mode == TravelMode::OffRoad ? TravelMode::Drive : mode == TravelMode::Hike ? TravelMode::Walk : mode;
+}
+char const * TravelModeName(TravelMode mode);
 
 /// The mode LinesFor() answers for. Driving until told otherwise.
 void SetLineTravelMode(TravelMode mode);
 /// Whether `text` makes sense for `mode`: no cars, gas or brake pedals for someone on foot.
 bool LineFitsMode(std::string const & text, TravelMode mode);
 
-/// Templates for `key` at `tier` (0..2), for the current travel mode: what fits it, plus `key`.walk or
-/// `key`.bike if there are any, or mode.generic when nothing fits. Throws std::out_of_range for an unknown key.
+/// Templates for `key` at `tier` (0..2), for the current travel mode: what fits it, plus `key`.walk,
+/// `key`.bike, `key`.hike (or else `key`.walk) or `key`.offroad if there are any, or mode.generic when
+/// nothing fits. Throws std::out_of_range for an unknown key.
 std::vector<std::string> const & LinesFor(std::string const & key, int tier);
 
 /// Fills {placeholders} from vars. {NAME} in capitals inserts the value in capitals.
