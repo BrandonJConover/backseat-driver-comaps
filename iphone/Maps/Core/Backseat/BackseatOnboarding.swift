@@ -329,6 +329,17 @@ final class BackseatOnboardingModel: ObservableObject {
     }
   }
 
+  /// The real skip, at the very bottom of the page: no more reading, straight to the question.
+  func reallySkip() {
+    BackseatLog.event("onboarding", ["step": "really skipped"])
+    complaint = nil
+    voiceChangeDue = false
+    bubble = ""
+    KokoroVoice.shared.stop()
+    monologueOver = true
+    reading = paragraphs.count - 1
+  }
+
   /// 0 yes, 1 no, 2 skip.
   func answerTerms(_ answer: Int) {
     guard !termsAnswered else { return }
@@ -626,6 +637,13 @@ struct BackseatOnboardingView: View {
             }
             if model.monologueOver {
               Text(model.termsRound == 0 ? "(Yes / No)" : "(Yes / No / Skip)").font(.body.weight(.semibold))
+            }
+            if !model.monologueOver {
+              Button("Skip", action: model.reallySkip)
+                .font(.footnote)
+                .foregroundColor(muted)
+                .underline()
+                .padding(.top, 24)
             }
           }
           .padding(.vertical, 8)
