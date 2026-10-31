@@ -18,7 +18,9 @@ enum class TravelMode
 {
   Drive,
   Walk,
-  Bike
+  Bike,
+  /// A car, off the pavement: no lanes, no limits, no signs.
+  OffRoad
 };
 
 /// The mode LinesFor() answers for. Driving until told otherwise.

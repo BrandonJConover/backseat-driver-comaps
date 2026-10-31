@@ -146,7 +146,7 @@ std::vector<AppTool> const & AppTools()
       {AppAction::BlameGps, "blame_gps", "The driver says the GPS was wrong or at fault.", nullptr},
       {AppAction::WhatDoYouKnow, "what_do_you_know", "Read out what's saved about the driver.", nullptr},
       {AppAction::ForgetThat, "forget_that", "Delete something saved about the driver.", "What to forget; empty for the last thing read out."},
-      {AppAction::SetTravelMode, "set_travel_mode", "Change how the trip is being made: walking, biking or driving.", "walk, bike or drive."},
+      {AppAction::SetTravelMode, "set_travel_mode", "Change how the trip is being made: walking, biking, driving or off-roading.", "walk, bike, drive or offroad."},
   };
   return tools;
 }
@@ -338,7 +338,9 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   for (char const * cue : {" forget my ", " forget what i said about ", " delete my "})
     if (auto const at = words.find(cue); anOrder(at) && !heardAction(AppAction::ForgetThat))
       found.push_back({at, AppCommand{AppAction::ForgetThat, ParseTarget(words.substr(at + std::string(cue).size()))}});
-  for (auto const & mode : {std::pair<char const *, char const *>{" walking directions ", "walk"}, {" i'm walking ", "walk"},
+  for (auto const & mode : {std::pair<char const *, char const *>{" off roading ", "offroad"}, {" offroading ", "offroad"},
+                            {" off road mode ", "offroad"}, {" going off road ", "offroad"}, {" we're off road ", "offroad"},
+                            {" back on the road ", "drive"}, {" walking directions ", "walk"}, {" i'm walking ", "walk"},
                             {" im walking ", "walk"}, {" on foot ", "walk"}, {" switch to walking ", "walk"},
                             {" going for a hike ", "walk"}, {" i'm hiking ", "walk"}, {" im hiking ", "walk"},
                             {" biking directions ", "bike"}, {" bike directions ", "bike"}, {" i'm biking ", "bike"},
@@ -574,7 +576,7 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::WhatDoYouKnow: return saidAny({"know", "remember", "file", "saved"});
   case AppAction::ForgetThat: return saidAny({"forget", "delete"});
   case AppAction::SetTravelMode:
-    return saidAny({"walk", "walking", "foot", "hike", "hiking", "bike", "biking", "cycling", "drive", "driving"});
+    return saidAny({"walk", "walking", "foot", "hike", "hiking", "bike", "biking", "cycling", "drive", "driving", "off", "offroading", "offroad", "road"});
   case AppAction::Count: break;
   }
   return false;

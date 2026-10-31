@@ -67,6 +67,8 @@ double constexpr kCurveGasEveryMs = 5 * 60000;
 /// Regular bridges are everywhere in a city (every overpass); water is worth a scream, but not six in
 /// eleven minutes.
 double constexpr kLandBridgeYelpEveryMs = 600000;
+/// Off-roading, how often it says where the destination is.
+double constexpr kHeadingEveryMs = 2 * 60000;
 double constexpr kWaterBridgeYelpEveryMs = 15 * 60000;
 int constexpr kWaterBridgeYelpsPerTrip = 2;
 /// Off the route this long before it's worth a joke: GPS jitter comes back within seconds.
@@ -954,6 +956,26 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     return;
   }
 
+  if (route.state == RouteState::OffRoute && m_travelMode == TravelMode::OffRoad)
+  {
+    // Leaving the route is the point. It just says which way the destination is, now and then.
+    if (prev == RouteState::OnRoute)
+    {
+      m_rerouting = true;
+      ++m_reroutes;
+      Say(m_engine->OnNav(NavEvent::Rerouted(t, true)));
+    }
+    if (m_lastFix && t - m_lastHeadingT >= kHeadingEveryMs)
+    {
+      m_lastHeadingT = t;
+      LatLon const here{m_lastFix->lat, m_lastFix->lon};
+      SayLine(t, Category::Rerouted, "mode.offRoad.heading",
+              {{"distance", FormatDistance(DistanceM(here, route.destinationPoint), m_config.units)},
+               {"direction", CompassDirection(here, route.destinationPoint)}});
+    }
+    return;
+  }
+
   if (route.state == RouteState::OffRoute)
   {
     if (prev == RouteState::OnRoute)
@@ -1164,7 +1186,7 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   std::string greeting = TripGreeting(m_history, m_config.rng, tripsBefore);
   // The greetings are written for a car; a walk gets a hello of its own.
   if (!LineFitsMode(greeting, m_travelMode))
-    greeting = Reply(m_travelMode == TravelMode::Walk ? "mode.walk" : "mode.bike");
+    greeting = Reply(m_travelMode == TravelMode::Walk ? "mode.walk" : m_travelMode == TravelMode::Bike ? "mode.bike" : "mode.offRoad");
   SayNav(t, greeting);
   SayIndoorStart(t, route);
   // Before 5 am: "Are we off to make the donuts?"
@@ -1264,6 +1286,16 @@ void Navigator::TrackLeftBuilding(Fix const & fix)
     return;
   SayLine(fix.tMs, Category::LongStop, m_indoorOutKey);
   m_indoorOutKey.clear();
+}
+
+std::string CompassDirection(LatLon const & from, LatLon const & to)
+{
+  double constexpr kRad = M_PI / 180;
+  double const east = (to.lon - from.lon) * std::cos(from.lat * kRad);
+  double const north = to.lat - from.lat;
+  double const bearing = std::fmod(std::atan2(east, north) / kRad + 360, 360);
+  static char const * const kWords[] = {"north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"};
+  return kWords[static_cast<int>(bearing / 45 + 0.5) % 8];
 }
 
 void Navigator::SetTravelMode(TravelMode mode)
@@ -1628,6 +1660,7 @@ void Navigator::ResetTrip()
   m_rerouteRoastDueAt.reset();
   m_lastInstructionText.clear();
   m_waterYelps = 0;
+  m_lastHeadingT = -1e18;
   m_lastWaterYelpT = -1e18;
   m_tagsSaid.clear();
   m_turnHeld.clear();
@@ -2027,7 +2060,7 @@ void Navigator::TrackLastExit(double tMs, RouteSnapshot const & route)
 
 void Navigator::TrackOffRoad(Fix const & fix)
 {
-  if (!m_roadDistanceLookup || fix.tMs - m_lastRoadCheckT < 2000)
+  if (m_travelMode == TravelMode::OffRoad || !m_roadDistanceLookup || fix.tMs - m_lastRoadCheckT < 2000)
     return;
   if (fix.speedMps < kOffRoadMinMps)
   {

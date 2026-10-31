@@ -572,6 +572,8 @@ TEST(TravelModeCanBeSaid)
   CHECK(ParseAppCommands("I'm biking")[0].argument == "bike");
   CHECK(ParseAppCommands("switch to driving")[0].argument == "drive");
   CHECK(ParseAppCommands("I was walking the dog").empty());
+  CHECK(ParseAppCommands("we're going off roading")[0].argument == "offroad");
+  CHECK(ParseAppCommands("we're back on the road")[0].argument == "drive");
 }
 
 TEST(DrivingChatterIsntACommand)

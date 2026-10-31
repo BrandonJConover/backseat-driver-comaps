@@ -1827,7 +1827,7 @@ TEST(LinesFollowTheTravelMode)
   CHECK(!LineFitsMode("You drive like this?", TravelMode::Bike));
   CHECK(LineFitsMode("Turn left. Try it.", TravelMode::Walk));
 
-  for (TravelMode const mode : {TravelMode::Walk, TravelMode::Bike})
+  for (TravelMode const mode : {TravelMode::Walk, TravelMode::Bike, TravelMode::OffRoad})
   {
     SetLineTravelMode(mode);
     for (auto const & [key, tiers] : LineData())
@@ -1864,4 +1864,30 @@ TEST(AWalkHasNoCarTalk)
     }
     SetLineTravelMode(TravelMode::Drive);
   }
+}
+
+TEST(OffRoadSaysWhichWayInsteadOfRoasting)
+{
+  CHECK(LineFitsMode("Please remember the brake is the other pedal.", TravelMode::OffRoad));
+  CHECK(!LineFitsMode("Stay in your lane.", TravelMode::OffRoad));
+  CHECK_EQUAL(CompassDirection({36, -94}, {37, -94}), std::string("north"));
+  CHECK_EQUAL(CompassDirection({36, -94}, {35, -95}), std::string("southwest"));
+
+  Navigator nav(Config());
+  nav.SetTravelMode(TravelMode::OffRoad);
+  RouteSnapshot off = Far();
+  off.destinationPoint = {40.7, -105};
+  nav.OnFix(At(0, 10), Far());
+  nav.OnFix(At(1000, 10), Far());
+  nav.TakeLines();
+  off.state = RouteState::OffRoute;
+  nav.OnFix(At(10000, 10), off);
+  auto const lines = nav.TakeLines();
+  CHECK(std::any_of(lines.begin(), lines.end(), [](Commentary const & l) { return l.key == "mode.offRoad.heading"; }));
+  CHECK(std::none_of(lines.begin(), lines.end(), [](Commentary const & l) { return l.key == "rerouted"; }));
+  CHECK_EQUAL(nav.Engine()->Stats().reroutes, 1);
+  // Not every two seconds.
+  nav.OnFix(At(12000, 10), off);
+  CHECK(nav.TakeLines().empty());
+  SetLineTravelMode(TravelMode::Drive);
 }

@@ -198,6 +198,9 @@ std::string InstructionText(TurnKind turn, std::string const & street, std::stri
 /// Winesap Drive, then right onto Cameo Lane".
 std::string InstructionText(RouteSnapshot const & route);
 
+/// Which way `to` is from `from`, as said out loud: "northwest".
+std::string CompassDirection(LatLon const & from, LatLon const & to);
+
 class Navigator
 {
 public:
@@ -440,6 +443,7 @@ private:
   double m_lastT = 0;
   double m_lastVoiceCommandT = -1e12;
   TravelMode m_travelMode = TravelMode::Drive;
+  double m_lastHeadingT = -1e18;
   std::string m_lastInstructionText;
   std::optional<double> m_rerouteRoastDueAt;
   /// About when the phone is done saying everything handed to it so far.

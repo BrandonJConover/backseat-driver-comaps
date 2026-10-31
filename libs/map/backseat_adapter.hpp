@@ -195,7 +195,7 @@ public:
   std::string NicenessMoved();
   /// Once the slider is back on the mean side: "Don't touch my slider."
   /// How the route is being made, for the lines and checks that fit it.
-  void SetTravelMode(backseat::TravelMode mode) { m_navigator.SetTravelMode(mode); }
+  void SetTravelMode(backseat::TravelMode mode);
   std::string ReplyLine(std::string const & key, backseat::Vars const & vars = {}) { return m_navigator.Reply(key, vars); }
   std::string NicenessSlidBack() { return m_navigator.Reply("niceness.after"); }
   /// The driver dragged the map away from the car while navigating: "Put your map away. We don't

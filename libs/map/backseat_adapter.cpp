@@ -2040,6 +2040,8 @@ std::string SpokenMph(double mps)
   return std::to_string(std::lround(backseat::ToDisplay(mps, backseat::Units::Mph)));
 }
 
+char constexpr kOffRoadKey[] = "BackseatOffRoad";
+
 char const * ReplyKey(backseat::AppAction action, std::string const & argument)
 {
   using backseat::AppAction;
@@ -2066,6 +2068,15 @@ char const * ReplyKey(backseat::AppAction action, std::string const & argument)
 }
 
 }  // namespace
+
+void BackseatAdapter::SetTravelMode(backseat::TravelMode mode)
+{
+  bool offRoad = false;
+  // Off-roading is the car router with the car's route as a suggestion, so it's the driver's say-so.
+  if (mode == backseat::TravelMode::Drive && settings::Get(kOffRoadKey, offRoad) && offRoad)
+    mode = backseat::TravelMode::OffRoad;
+  m_navigator.SetTravelMode(mode);
+}
 
 BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & text)
 {
@@ -2180,8 +2191,13 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
   backseat::Trace("command", {{"tool", backseat::ToolFor(command.action).name},
                               {"arg", command.argument},
                               {"polite", polite ? "yes" : "no"}});
-  // Tolls, highways and gas don't come up on a walk.
-  if (m_navigator.GetTravelMode() != backseat::TravelMode::Drive &&
+  // Tolls, highways and gas don't come up on a walk, and only the gas does in the dirt.
+  bool const roadOnly = command.action == AppAction::AvoidTolls || command.action == AppAction::AllowTolls ||
+                        command.action == AppAction::AvoidHighways || command.action == AppAction::AllowHighways ||
+                        command.action == AppAction::SpeedLimit || command.action == AppAction::DifferentRoute;
+  if (m_navigator.GetTravelMode() == backseat::TravelMode::OffRoad && roadOnly)
+    return m_navigator.Reply("mode.noRoads");
+  if ((m_navigator.GetTravelMode() == backseat::TravelMode::Walk || m_navigator.GetTravelMode() == backseat::TravelMode::Bike) &&
       (command.action == AppAction::AvoidTolls || command.action == AppAction::AllowTolls ||
        command.action == AppAction::AvoidHighways || command.action == AppAction::AllowHighways ||
        command.action == AppAction::SpeedLimit || command.action == AppAction::DifferentRoute ||
@@ -2282,8 +2298,12 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     return m_navigator.Reply("cmd.findStop", {{"place", command.argument}});
   }
   case AppAction::SetTravelMode:
+    settings::Set(kOffRoadKey, command.argument == "offroad");
     heard.actions.push_back(command);
-    return m_navigator.Reply(command.argument == "walk" ? "mode.walk" : command.argument == "bike" ? "mode.bike" : "mode.drive");
+    return m_navigator.Reply(command.argument == "walk"      ? "mode.walk"
+                             : command.argument == "bike"    ? "mode.bike"
+                             : command.argument == "offroad" ? "mode.offRoad"
+                                                             : "mode.drive");
   case AppAction::WhatDoYouKnow:
   {
     // Its own bookkeeping isn't something it knows about the driver.

@@ -47,6 +47,15 @@ bool LineFitsMode(std::string const & text, TravelMode mode)
   }
   lower += ' ';
   auto const has = [&lower](char const * word) { return lower.find(" " + std::string(word) + " ") != std::string::npos; };
+  if (mode == TravelMode::OffRoad)
+  {
+    static char const * const kPavement[] = {"highway", "highways", "freeway", "freeways", "motorway", "toll", "tolls",
+                                             "lane", "lanes", "traffic", "merge", "merging", "parking", "parallel"};
+    for (char const * phrase : {" speed limit ", " road trip "})
+      if (lower.find(phrase) != std::string::npos)
+        return false;
+    return std::none_of(std::begin(kPavement), std::end(kPavement), has);
+  }
   for (char const * phrase : {" speed limit ", " turn signal ", " turn signals ", " road trip ", " seat belt ", " pull over "})
     if (lower.find(phrase) != std::string::npos)
       return false;
@@ -64,7 +73,7 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
     return raw;
   static std::mutex mutex;
   static std::map<std::string, std::vector<std::string>> cache;
-  std::string const suffix = mode == TravelMode::Walk ? ".walk" : ".bike";
+  std::string const suffix = mode == TravelMode::Walk ? ".walk" : mode == TravelMode::Bike ? ".bike" : ".offroad";
   std::lock_guard lock(mutex);
   auto const [it, added] = cache.try_emplace(key + suffix + std::to_string(tier));
   if (!added)
