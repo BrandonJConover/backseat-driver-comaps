@@ -542,6 +542,9 @@ private:
   };
   std::vector<SpeedSample> m_speeds;
   bool m_inTraffic = false;
+  /// When this jam last got a line (its start counts), and how many ad-libs it's had.
+  double m_lastJamLineT = 0;
+  int m_jamAdlibs = 0;
   StopGo m_stopGo;
   AlternateLookup m_alternateLookup;
 

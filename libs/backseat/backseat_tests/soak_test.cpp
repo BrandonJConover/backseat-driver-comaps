@@ -11,7 +11,7 @@ using namespace backseat_tests;
 
 namespace
 {
-SimResult Drive(TripShape shape, uint32_t seed)
+SimResult SoakDrive(TripShape shape, uint32_t seed)
 {
   EngineConfig c;
   c.rng = SeededRng(seed);
@@ -29,7 +29,7 @@ TEST(SoakFinalTurnCallsAreOverBeforeTheTurn)
   int late = 0;
   for (uint32_t seed = 1; seed <= 40; ++seed)
   {
-    auto const r = Drive(TripShape::Town, seed);
+    auto const r = SoakDrive(TripShape::Town, seed);
     CHECK(r.arrived);
     for (auto const & m : r.maneuvers)
     {
@@ -53,7 +53,7 @@ TEST(SoakRoastsStayOutOfTheTurn)
   int crowded = 0;
   for (uint32_t seed = 1; seed <= 40; ++seed)
   {
-    auto const r = Drive(TripShape::Town, seed);
+    auto const r = SoakDrive(TripShape::Town, seed);
     for (auto const & m : r.maneuvers)
     {
       if (m.reachedMs < 0 || m.missed || !m.finalEndMs)
@@ -80,7 +80,7 @@ TEST(SoakRoadTripSpeedingNagsBackOff)
   int repeats = 0;
   for (uint32_t seed = 1; seed <= 6; ++seed)
   {
-    auto const r = Drive(TripShape::RoadTrip, seed);
+    auto const r = SoakDrive(TripShape::RoadTrip, seed);
     CHECK(r.arrived);
     minutes += (r.endMs - r.spoken.front().queuedMs) / 60000;
     std::map<std::string, int> said;
@@ -102,7 +102,7 @@ TEST(SoakRoadTripTurnsAreAllDirected)
 {
   for (uint32_t seed = 1; seed <= 6; ++seed)
   {
-    auto const r = Drive(TripShape::RoadTrip, seed);
+    auto const r = SoakDrive(TripShape::RoadTrip, seed);
     for (auto const & m : r.maneuvers)
       if (m.reachedMs >= 0 && !m.missed)
         CHECK(m.directed);

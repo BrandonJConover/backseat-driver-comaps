@@ -12,20 +12,20 @@ namespace
 double constexpr kEarthRadiusM = 6371000.0;
 double constexpr kDegToRad = 3.14159265358979323846 / 180.0;
 
-struct Xy
+struct SketchXy
 {
   double x = 0;
   double y = 0;
 };
 
 // Local flat projection around `origin`. Strokes are drawn on one screen, so this is plenty.
-Xy ToXy(LatLon const & p, LatLon const & origin)
+SketchXy ToXy(LatLon const & p, LatLon const & origin)
 {
   return {(p.lon - origin.lon) * kDegToRad * kEarthRadiusM * std::cos(origin.lat * kDegToRad),
           (p.lat - origin.lat) * kDegToRad * kEarthRadiusM};
 }
 
-double SegmentDistance(Xy const & p, Xy const & a, Xy const & b)
+double SegmentDistance(SketchXy const & p, SketchXy const & a, SketchXy const & b)
 {
   double const dx = b.x - a.x;
   double const dy = b.y - a.y;
@@ -35,7 +35,7 @@ double SegmentDistance(Xy const & p, Xy const & a, Xy const & b)
   return std::hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
-void Simplify(std::vector<Xy> const & xy, std::size_t first, std::size_t last, double tolerance,
+void Simplify(std::vector<SketchXy> const & xy, std::size_t first, std::size_t last, double tolerance,
               std::vector<bool> & keep)
 {
   if (last <= first + 1)
@@ -103,7 +103,7 @@ std::vector<LatLon> SimplifyStroke(std::vector<LatLon> const & stroke, double to
 {
   if (stroke.size() < 3)
     return stroke;
-  std::vector<Xy> xy;
+  std::vector<SketchXy> xy;
   xy.reserve(stroke.size());
   for (auto const & p : stroke)
     xy.push_back(ToXy(p, stroke.front()));
@@ -244,8 +244,8 @@ struct Projection
 
 Projection Project(LatLon const & p, RoadSegment const & segment)
 {
-  Xy const a = ToXy(segment.a, p);
-  Xy const b = ToXy(segment.b, p);
+  SketchXy const a = ToXy(segment.a, p);
+  SketchXy const b = ToXy(segment.b, p);
   double const dx = b.x - a.x;
   double const dy = b.y - a.y;
   double const len2 = dx * dx + dy * dy;
@@ -298,7 +298,7 @@ namespace
 {
 double DistanceToSegmentM(LatLon const & p, LatLon const & a, LatLon const & b)
 {
-  return SegmentDistance(Xy{}, ToXy(a, p), ToXy(b, p));
+  return SegmentDistance(SketchXy{}, ToXy(a, p), ToXy(b, p));
 }
 
 /// The line segment nearest `p` (its first vertex) and how far off it is.

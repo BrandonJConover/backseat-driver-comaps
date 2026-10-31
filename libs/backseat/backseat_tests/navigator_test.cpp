@@ -4,6 +4,7 @@
 #include "backseat/lines.hpp"
 #include "backseat/units.hpp"
 
+#include <set>
 #include <algorithm>
 #include <cmath>
 #include <memory>
@@ -1658,4 +1659,30 @@ TEST(AFirstTurnRightThereIsSaidBeforeTheGreeting)
   CHECK(lines[0].text.find("turn right onto Oak Avenue") != std::string::npos);
   // No rundown on top of it: the greeting and the direction, nothing else that's a direction.
   CHECK(std::count_if(lines.begin(), lines.end(), [](Commentary const & l) { return l.priority == Priority::Nav; }) <= 2);
+}
+
+// Ten minutes crawling along without stopping: no stop-and-go quips, so the jam gets ad-libs.
+// Brandon's first, spaced out, and not forever.
+TEST(NavigatorAdLibsALongJam)
+{
+  Navigator nav(Config());
+  double const limit = FromDisplay(65, Units::Mph);
+  nav.OnFix(At(0, limit, limit), Far());
+  nav.TakeLines();
+  std::vector<Commentary> adlibs;
+  for (int s = 1; s <= 1800; ++s)
+  {
+    nav.OnFix(At(s * 1000.0, FromDisplay(8, Units::Mph), limit), Far());
+    for (auto & l : nav.TakeLines())
+      if (l.key == "traffic.adlib")
+        adlibs.push_back(std::move(l));
+  }
+  CHECK(adlibs.size() >= 4);
+  CHECK(adlibs.size() <= 8 * 2);
+  CHECK_EQUAL(adlibs[0].text, std::string("Remember that one time you were stuck in traffic?"));
+  CHECK_EQUAL(adlibs[1].text, std::string("Oh, wait, that's right now."));
+  std::set<std::string> distinct;
+  for (auto const & l : adlibs)
+    distinct.insert(l.text);
+  CHECK(distinct.size() == adlibs.size());
 }

@@ -172,7 +172,7 @@ double constexpr kActiveTripStampEveryS = 60;
 /// still finishes this far before the maneuver.
 double constexpr kNavWaitMaxMs = 4000;
 /// The pause the phone leaves after each line.
-double constexpr kLinePauseMs = 350;
+double constexpr kNavLinePauseMs = 350;
 /// A first turn closer than this when the trip starts is said before the greeting.
 double constexpr kFirstTurnFirstWithinM = 350;
 /// "Still speeding" nags back off to one every 5 minutes on a long stretch over the limit.
@@ -202,7 +202,7 @@ double constexpr kUTurnEveryMs = 120000;
 int constexpr kUTurnMaxPerTrip = 2;
 // Still sitting this long after the trip starts gets the brake-or-gas line.
 double constexpr kSlowStartMs = 45000;
-double constexpr kRollingMps = 3;
+double constexpr kNavRollingMps = 3;
 /// Asking for music: once a trip, at least this far in, on a quiet stretch, if nothing is playing.
 double constexpr kMusicAfterMs = 15 * 60000;
 double constexpr kMusicCheckEveryMs = 15000;
@@ -343,6 +343,10 @@ double constexpr kClearShare = 0.6;
 /// Only roads at least this fast count; crawling down a 25 mph street is just driving.
 double constexpr kTrafficMinLimitMps = 15;  // ~34 mph
 double constexpr kTrafficClearedChance = 0.5;
+/// Ad-libs while stuck: none in the jam's first stretch, then at least this far apart from any
+/// other jam line, and only so many per jam.
+double constexpr kJamAdlibGapMs = 100000;
+int constexpr kJamAdlibMax = 8;
 
 double DistanceM(LatLon const & a, LatLon const & b)
 {
@@ -687,6 +691,8 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
   {
     m_inTraffic = true;
     m_stopGo.Reset();
+    m_lastJamLineT = fix.tMs;
+    m_jamAdlibs = 0;
     std::optional<std::string> alternate;
     if (m_alternateLookup)
       alternate = m_alternateLookup({fix.lat, fix.lon});
@@ -705,9 +711,25 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
     return;
   switch (m_stopGo.Update(fix.tMs, std::max(0.0, fix.speedMps)))
   {
-  case StopGo::Quip::StopGo: SayLine(fix.tMs, Category::Traffic, "traffic.stopGo"); break;
-  case StopGo::Quip::Standstill: SayLine(fix.tMs, Category::Traffic, "traffic.standstill"); break;
-  case StopGo::Quip::None: break;
+  case StopGo::Quip::StopGo:
+    SayLine(fix.tMs, Category::Traffic, "traffic.stopGo");
+    m_lastJamLineT = fix.tMs;
+    break;
+  case StopGo::Quip::Standstill:
+    SayLine(fix.tMs, Category::Traffic, "traffic.standstill");
+    m_lastJamLineT = fix.tMs;
+    break;
+  case StopGo::Quip::None:
+    // A long jam that's just a crawl gets nothing from StopGo; it gets the ad-libs.
+    if (fix.tMs - m_lastJamLineT >= kJamAdlibGapMs && m_jamAdlibs < kJamAdlibMax &&
+        fix.tMs - m_lastSpokeT >= kBreathAfterTalkMs && !QuietBitBusy() &&
+        !(route.turnId && route.distToTurnM < kIdleQuietM))
+    {
+      SayLine(fix.tMs, Category::Traffic, "traffic.adlib");
+      m_lastJamLineT = fix.tMs;
+      ++m_jamAdlibs;
+    }
+    break;
   }
 }
 
@@ -730,7 +752,7 @@ std::vector<Commentary> Navigator::TakeLines()
     m_lastSpokeT = m_lastT;
   // What the phone will be busy saying, so the next turn call and the roasts can plan around it.
   for (auto const & l : lines)
-    m_talkingUntil = std::max(m_talkingUntil, m_lastT) + SpeakingMs(l.text, l.voiceSpeed) + kLinePauseMs;
+    m_talkingUntil = std::max(m_talkingUntil, m_lastT) + SpeakingMs(l.text, l.voiceSpeed) + kNavLinePauseMs;
   if (m_engine)
     m_engine->SetTalkingUntil(m_talkingUntil);
   // Directions cut into 20 Questions: back to the game once they're done.
@@ -843,7 +865,7 @@ double Navigator::NavWaitMs(Commentary const & line) const
 {
   double const mps = m_lastFix ? m_lastFix->speedMps : 0;
   // Parked, or nowhere near a maneuver: nothing to be late for.
-  if (!m_turnId || mps < kRollingMps)
+  if (!m_turnId || mps < kNavRollingMps)
     return kNavWaitMaxMs;
   // Done speaking before the car gets to the maneuver, with a little room to spare.
   double const untilTurnMs = (m_lastDistToTurnM - kNavDoneBeforeTurnM) / mps * 1000;
@@ -1326,7 +1348,7 @@ void Navigator::TrackSlowStart(Fix const & fix)
 {
   if (m_startedRolling)
     return;
-  if (fix.speedMps >= kRollingMps)
+  if (fix.speedMps >= kNavRollingMps)
   {
     m_startedRolling = true;
     return;
