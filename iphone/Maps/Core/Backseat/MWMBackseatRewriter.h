@@ -43,13 +43,10 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 /// Switches the route type ("walk", "bike", anything else is driving) and rebuilds the route; a
 /// route being followed keeps going in the new mode. Main thread.
 + (void)switchTravelMode:(NSString *)mode;
-/// "Are you actually intending to walk there?" with Yes / No, while the GPS waits for an answer;
-/// closes by itself once it's been answered out loud. Main thread.
-+ (void)showWalkQuestion;
-+ (void)closeWalkQuestionIfAnswered;
-/// "I'm going to need you to click the driving button": navigation stops, the route types show,
-/// and Driving is highlighted until it's tapped. Main thread.
-+ (void)highlightDrivingButton;
+/// Before a walking route over 2 miles starts: NO, and "Are you actually intending to walk there?"
+/// with Yes / No goes up instead. Yes starts the walk; No highlights Driving in the route preview,
+/// and tapping it starts the drive. YES for anything else, or once the walk was confirmed. Main thread.
++ (BOOL)walkQuestionAllowsStart;
 /// Driving is highlighted for the driver to tap (MWMRoutePreview draws it).
 @property(class, nonatomic, readonly) BOOL drivingHighlighted;
 /// The highlighted Driving button was tapped: the highlight goes, and the drive starts once built.

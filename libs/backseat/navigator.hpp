@@ -334,6 +334,8 @@ public:
   bool ModeAskOpen() const { return m_modeAskOpen; }
   /// Yes, we really are walking (or no: then it's a drive). False if there was no question open.
   bool AnswerModeAsk(bool walking);
+  /// The next drive's start says "check the mode now and then, I may swap it on you" (it won't).
+  void WarnModeOnNextDrive() { m_modeWarnNextDrive = true; }
   /// Not walking after all: the route type the driver has to pick by hand ("I'm going to need you to
   /// click the driving button"). The host shows the route types with it highlighted. Empty otherwise.
   std::optional<TravelMode> TakeModeSwitch() { return std::exchange(m_modeSwitch, std::nullopt); }

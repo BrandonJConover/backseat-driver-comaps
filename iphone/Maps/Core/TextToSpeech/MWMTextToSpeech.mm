@@ -1,5 +1,4 @@
 #import <AVFoundation/AVFoundation.h>
-#import "MWMBackseatRewriter.h"
 #import "MWMRouter.h"
 #import "MWMTextToSpeech+CPP.h"
 #import "SwiftBridge.h"
@@ -420,17 +419,6 @@ using Observers = NSHashTable<Observer>;
         [weakSelf speakOneString:notification];
       }];
     }
-    // "Are you actually intending to walk there?": Yes / No on screen too.
-    BOOL const askWalk = backseat.TakeModeQuestion();
-    // "No": "I'm going to need you to click the driving button."
-    BOOL const highlightDriving = !backseat.TakeTravelModeSwitch().empty();
-    dispatch_async(dispatch_get_main_queue(), ^{
-      if (askWalk)
-        [MWMBackseatRewriter showWalkQuestion];
-      [MWMBackseatRewriter closeWalkQuestionIfAnswered];
-      if (highlightDriving)
-        [MWMBackseatRewriter highlightDrivingButton];
-    });
     // 20 Questions: the driver answers out loud, so listen once the GPS has said its piece.
     for (NSUInteger i = 0; hinted && i < voices.size(); ++i)
     {
