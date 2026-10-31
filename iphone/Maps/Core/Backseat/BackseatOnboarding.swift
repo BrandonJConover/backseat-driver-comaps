@@ -298,7 +298,17 @@ final class BackseatOnboardingModel: ObservableObject {
       skips += 1
       voiceChangeDue = skips >= 4
     }
-    let key = !enabled ? "onboard.skip.disabled" : skips == 1 ? "onboard.monologuing.first" : "onboard.monologuing"
+    // It only complains once. After that the press just changes how the reading goes.
+    if enabled, skips > 1 {
+      if voiceChangeDue {
+        voiceChangeDue = false
+        changeDisclaimerVoice()
+      }
+      bubble = ""
+      read(from: piece)
+      return
+    }
+    let key = enabled ? "onboard.monologuing.first" : "onboard.skip.disabled"
     let line = MWMBackseatRewriter.line(key, vars: [:]).trimmingCharacters(in: .whitespacesAndNewlines)
     resumeAt = piece
     queuedUpTo = piece
@@ -455,15 +465,15 @@ final class BackseatOnboardingModel: ObservableObject {
   }
 }
 
-/// Where the Skip button is running to. It changes direction and speed on every move, and works
-/// out its position frame by frame: tapping needs the real spot, which an animated offset hides.
-/// Spots run from 0 to 1 across the area it moves in.
+/// Where the Skip button is: it bounces off the edges like a screen saver, worked out frame by
+/// frame because tapping needs the real spot, which an animated offset hides. Spots run from 0 to 1
+/// across the area it moves in.
 final class SkipDodger {
-  private var from = CGPoint(x: 1, y: 1)
-  private var to = CGPoint(x: 1, y: 1)
-  private var start = Date.distantPast
-  private var duration: TimeInterval = 0
-  private var moves = 0
+  private var position = CGPoint(x: 1, y: 1)
+  /// Per second, before `quickness`. Not the same both ways, so it wanders all over the area.
+  private var velocity = CGVector(dx: -0.31, dy: -0.47)
+  private var lastFrame: Date?
+  private var nextJump = Date.distantPast
   private var enabled = true
   private var enabledUntil = Date.distantPast
 
@@ -479,25 +489,27 @@ final class SkipDodger {
 
   /// `jumping` (Reduce Motion): it sits still for a while, then appears somewhere else.
   func spot(at date: Date, jumping: Bool, quickness: Double) -> CGPoint {
-    if date.timeIntervalSince(start) >= duration { nextMove(at: date, jumping: jumping, quickness: quickness) }
-    if jumping { return from }
-    let t = CGFloat(date.timeIntervalSince(start) / duration)
-    return CGPoint(x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t)
-  }
-
-  private func nextMove(at date: Date, jumping: Bool, quickness: Double) {
-    from = to
-    moves += 1
-    // Across, then up or down, then diagonally, always towards the other side.
-    let across = moves % 3 != 2
-    let upOrDown = moves % 3 != 1
-    to = CGPoint(x: across ? Self.otherSide(of: from.x) : from.x, y: upOrDown ? Self.otherSide(of: from.y) : from.y)
-    start = date
-    duration = (jumping ? .random(in: 1.2 ... 2.2) : .random(in: 0.35 ... 1.8)) / quickness
-  }
-
-  private static func otherSide(of value: CGFloat) -> CGFloat {
-    value < 0.5 ? .random(in: 0.6 ... 1) : .random(in: 0 ... 0.4)
+    if jumping {
+      if date >= nextJump {
+        position = CGPoint(x: .random(in: 0 ... 1), y: .random(in: 0 ... 1))
+        nextJump = date.addingTimeInterval(.random(in: 1.2 ... 2.2) / quickness)
+      }
+      return position
+    }
+    // A long gap (the app was in the background) isn't a long way to travel.
+    let elapsed = CGFloat(min(lastFrame.map { date.timeIntervalSince($0) } ?? 0, 0.1) * quickness)
+    lastFrame = date
+    position.x += velocity.dx * elapsed
+    position.y += velocity.dy * elapsed
+    if position.x < 0 || position.x > 1 {
+      velocity.dx = -velocity.dx
+      position.x = min(max(position.x, 0), 1)
+    }
+    if position.y < 0 || position.y > 1 {
+      velocity.dy = -velocity.dy
+      position.y = min(max(position.y, 0), 1)
+    }
+    return position
   }
 }
 
