@@ -19,6 +19,12 @@ location::GpsInfo LinearExtrapolation(location::GpsInfo const & gpsInfo1, locati
 /// \param info2 the latest location information.
 bool AreCoordsGoodForExtrapolation(location::GpsInfo const & info1, location::GpsInfo const & info2);
 
+/// \returns how far ahead of a fix to draw it so the arrow shows where the car is now, not where it
+/// was when the fix was measured. |fixTimestampS| is the fix's own time and |nowS| the clock when it
+/// arrived, both seconds since 1970. An age over kMaxTrustedFixAgeMs means the two clocks disagree
+/// (Android stamps fixes with GPS time), so it is ignored.
+uint64_t FixAgeLeadMs(double fixTimestampS, double nowS);
+
 /// \brief This class implements linear extrapolation based on methods LinearExtrapolation()
 /// and AreCoordsGoodForExtrapolation(). The idea implemented in this class is
 /// - OnLocationUpdate() should be called from gui thread when new data from gps is available.
@@ -43,6 +49,9 @@ public:
   // Then X + 2 * kExtrapolationPeriodMs and so on till
   // X + n * kExtrapolationPeriodMs <= kMaxExtrapolationTimeMs.
   static uint64_t constexpr kExtrapolationPeriodMs = 200;
+  // Fixes arrive a few hundred ms after they were measured; at 45 mph every 100 ms is 2 m behind.
+  static uint64_t constexpr kMaxFixAgeLeadMs = 1000;
+  static uint64_t constexpr kMaxTrustedFixAgeMs = 2000;
 
   /// \param update is a function which is called with params according to extrapolated position.
   /// |update| will be called on gui thread.
@@ -67,6 +76,8 @@ private:
   location::GpsInfo m_lastGpsInfo;
   location::GpsInfo m_beforeLastGpsInfo;
   uint64_t m_consecutiveRuns = kExtrapolationCounterUndefined;
+  // FixAgeLeadMs() of |m_lastGpsInfo| when it arrived.
+  uint64_t m_fixAgeLeadMs = 0;
   // Number of calls Extrapolator::OnLocationUpdate() method. This way |m_locationUpdateCounter|
   // reflects generation of extrapolations. That mean the next gps location is
   // the next generation.

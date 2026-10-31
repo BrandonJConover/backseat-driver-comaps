@@ -28,6 +28,7 @@
 #include "geometry/parametrized_segment.hpp"
 
 #include "base/logging.hpp"
+#include "base/scope_guard.hpp"
 #include "base/timer.hpp"
 
 #include <algorithm>
@@ -1120,6 +1121,24 @@ std::string BackseatAdapter::ChatInstructions(std::string const & voiceName)
 void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::RoutingSession const & session,
                                        std::string const & destinationName)
 {
+  // How stale the fix is when it gets here, and how long since the last one: the arrow lags by the first.
+  auto const startedAt = std::chrono::steady_clock::now();
+  double const nowMs =
+      std::chrono::duration<double, std::milli>(std::chrono::system_clock::now().time_since_epoch()).count();
+  double const ageMs = nowMs - info.m_timestamp * 1000;
+  double const gapMs = m_lastFixMs > 0 ? info.m_timestamp * 1000 - m_lastFixMs : -1;
+  m_lastFixMs = info.m_timestamp * 1000;
+  if (gapMs > 2500)
+    backseat::TraceThrottled("fix.gap", "fix.gap", {{"gap_ms", backseat::LogNum(gapMs, 0)}});
+  // A named lambda: the braced initializer's commas would split the macro arguments.
+  auto const reportSlowFix = [&]
+  {
+    // The arrow can't move while this runs on the main thread.
+    auto const tookMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - startedAt).count();
+    if (tookMs > 50)
+      backseat::TraceThrottled("fix.slow", "fix.slow", {{"ms", backseat::LogNum(tookMs, 0)}});
+  };
+  SCOPE_GUARD(timeOnFix, reportSlowFix);
   m_here = mercator::FromLatLon(info.m_latitude, info.m_longitude);
   m_route = session.IsActive() ? session.GetRouteForTests() : nullptr;
   auto route = Snapshot(session, destinationName);
@@ -1147,6 +1166,8 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
                             {"limit", fix.speedLimitMps ? backseat::LogNum(*fix.speedLimitMps * 2.23694, 0) : ""},
                             {"bearing", backseat::LogNum(fix.bearingDeg, 0)},
                             {"acc_m", backseat::LogNum(info.m_horizontalAccuracy, 0)},
+                            {"age_ms", backseat::LogNum(ageMs, 0)},
+                            {"gap_ms", backseat::LogNum(gapMs, 0)},
                             {"route", RouteStateName(route.state)},
                             {"turn_m", backseat::LogNum(route.distToTurnM, 0)}});
   m_navigator.OnFix(fix, route);

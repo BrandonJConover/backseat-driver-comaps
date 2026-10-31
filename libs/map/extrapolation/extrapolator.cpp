@@ -7,7 +7,9 @@
 #include "base/assert.hpp"
 #include "base/math.hpp"
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <memory>
 
 namespace
@@ -117,6 +119,14 @@ bool AreCoordsGoodForExtrapolation(location::GpsInfo const & info1, location::Gp
          timeS <= kMaxExtrapolationTimeSeconds;
 }
 
+uint64_t FixAgeLeadMs(double fixTimestampS, double nowS)
+{
+  double const ageMs = (nowS - fixTimestampS) * 1000.0;
+  if (ageMs <= 0.0 || ageMs > Extrapolator::kMaxTrustedFixAgeMs)
+    return 0;
+  return std::min(static_cast<uint64_t>(std::llround(ageMs)), Extrapolator::kMaxFixAgeLeadMs);
+}
+
 // Extrapolator ------------------------------------------------------------------------------------
 Extrapolator::Extrapolator(ExtrapolatedLocationUpdateFn const & update)
   : m_isEnabled(false)
@@ -132,6 +142,9 @@ void Extrapolator::OnLocationUpdate(location::GpsInfo const & gpsInfo)
     m_beforeLastGpsInfo = m_lastGpsInfo;
     m_lastGpsInfo = gpsInfo;
     m_consecutiveRuns = 0;
+    auto const nowS =
+        chrono::duration<double>(chrono::system_clock::now().time_since_epoch()).count();
+    m_fixAgeLeadMs = FixAgeLeadMs(gpsInfo.m_timestamp, nowS);
     // Canceling all background tasks which are put to the queue before the task run in this method.
     ++m_locationUpdateCounter;
     m_locationUpdateMinValid = m_locationUpdateCounter;
@@ -158,7 +171,7 @@ void Extrapolator::ExtrapolatedLocationUpdate(uint64_t locationUpdateCounter)
     if (extrapolationTimeMs < kMaxExtrapolationTimeMs && m_lastGpsInfo.IsValid())
     {
       if (DoesExtrapolationWork())
-        gpsInfo = LinearExtrapolation(m_beforeLastGpsInfo, m_lastGpsInfo, extrapolationTimeMs);
+        gpsInfo = LinearExtrapolation(m_beforeLastGpsInfo, m_lastGpsInfo, extrapolationTimeMs + m_fixAgeLeadMs);
       else
         gpsInfo = m_lastGpsInfo;
     }

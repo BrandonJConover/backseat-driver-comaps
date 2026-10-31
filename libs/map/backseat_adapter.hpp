@@ -433,6 +433,8 @@ private:
   backseat::DriveDetector m_drives;
   /// For the drive log's drive start and end marks.
   bool m_wasInTrip = false;
+  // Time of the last real fix, for the drive log's gap_ms (the map arrow stops moving after 2 s).
+  double m_lastFixMs = 0;
   std::vector<backseat::LoggedDrive> m_driveLog;
   std::vector<backseat::MileagePlace> m_taggedPlaces;
   /// Region lookups are cached until the car has moved a couple of kilometers.
