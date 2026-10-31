@@ -536,14 +536,21 @@ struct BackseatOnboardingView: View {
 
   /// Comes up on the third press, and keeps score from there.
   private var scoreboard: some View {
-    HStack {
-      Text("SCOREBOARD").font(.caption.weight(.heavy)).foregroundColor(accent)
-      Spacer()
-      Text("Successes \(model.skips)").font(.headline.monospacedDigit())
-      Text("Misses \(model.misses)").font(.headline.monospacedDigit()).padding(.leading, 12)
+    HStack(spacing: 0) {
+      scoreColumn("SUCCESSES", model.skips)
+      Rectangle().fill(muted).frame(width: 1, height: 44)
+      scoreColumn("MISSES", model.misses)
     }
-    .padding(14)
+    .padding(.vertical, 8)
     .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(card))
+  }
+
+  private func scoreColumn(_ label: String, _ score: Int) -> some View {
+    VStack(spacing: 0) {
+      Text(label).font(.caption2.weight(.heavy)).foregroundColor(muted)
+      Text("\(score)").font(.system(size: 40, weight: .heavy).width(.condensed).monospacedDigit()).foregroundColor(accent)
+    }
+    .frame(maxWidth: .infinity)
   }
 
   /// It's a Skip button. It doesn't skip.
