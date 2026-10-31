@@ -3,6 +3,7 @@
 #include "backseat/debug_log.hpp"
 #include "backseat/mileage.hpp"
 #include "backseat/navigator.hpp"
+#include "backseat/onboarding.hpp"
 #include "backseat/road_bits.hpp"
 #include "backseat/voice_command.hpp"
 
@@ -142,6 +143,10 @@ public:
   static char const * const kHomeIsWorkplaceKey;
   /// Whose business the mileage log tracks: "" the driver's own, "wife", or a name ("Sarah").
   static char const * const kBusinessOwnerKey;
+  /// From the getting-to-know-you questions: "house", "apartment" or "streets"; and "yes", "no" or
+  /// "complicated" for married.
+  static char const * const kHousingKey;
+  static char const * const kMarriedKey;
   /// Rereads those settings; call after the platform changes them.
   void ReloadPersonality();
   /// Call when the driver opens their profile in Settings, and EndProfileEdit() when they leave it.
@@ -168,6 +173,14 @@ public:
   std::string SetupLine(SetupStep step, std::string const & voiceName = "Echo");
   /// False when the answer wasn't understood; ask again. Saves what it understood to settings.
   bool SetupHeard(SetupStep step, std::string const & spoken);
+
+  /// First launch, the getting-to-know-you screen (after the disclaimer and the voice pick): saves the
+  /// answer (one of AboutYouChoices) and returns the GPS's comment on it. Gender sets the driver's
+  /// pronouns, married sets or clears a spouse, and home decides which jokes fit. Empty for an
+  /// answer that isn't a choice.
+  std::string AboutYouAnswered(backseat::AboutYou question, std::string const & answer);
+  /// What the driver said about themselves, "" when they never answered.
+  std::string AboutYouAnswer(backseat::AboutYou question) const;
 
   /// Said when the app opens with no route, before listening once for a destination: "Where to?",
   /// or a guess at the usual trip ("It's Tuesday morning. Work, I assume?"). A "yes" next routes there.
