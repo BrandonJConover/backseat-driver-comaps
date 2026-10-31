@@ -1687,6 +1687,31 @@ void Navigator::TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot co
     SayPlate(tMs, m_plates.Offer(Tier()));
 }
 
+Bridge ClassifyBridge(bool water, bool rail, bool road, bool valley)
+{
+  if (water)
+    return Bridge::Water;
+  if (rail)
+    return Bridge::Rail;
+  if (road)
+    return Bridge::Road;
+  return valley ? Bridge::Valley : Bridge::Unknown;
+}
+
+char const * BridgeLinesKey(Bridge bridge)
+{
+  switch (bridge)
+  {
+  case Bridge::Water: return "fear.bridgeWater";
+  case Bridge::Rail: return "fear.bridgeRail";
+  case Bridge::Road: return "fear.bridgeRoad";
+  case Bridge::Valley: return "fear.bridgeValley";
+  case Bridge::None:
+  case Bridge::Unknown: break;
+  }
+  return "fear.bridge";
+}
+
 void Navigator::OnDriverSaid(double tMs, std::string const & text)
 {
   Trace("heard", {{"text", text}, {"parked", m_engine && !m_arrived && Parked() ? "yes" : "no"}});
@@ -1940,7 +1965,7 @@ void Navigator::TrackFear(Fix const & fix, RouteSnapshot const & route)
       if (fix.tMs - m_lastBridgeYelpT >= every)
       {
         m_lastBridgeYelpT = fix.tMs;
-        SayLine(fix.tMs, Category::Fear, bridge == Bridge::Water ? "fear.bridgeWater" : "fear.bridge", weight);
+        SayLine(fix.tMs, Category::Fear, BridgeLinesKey(bridge), weight);
       }
     }
   }

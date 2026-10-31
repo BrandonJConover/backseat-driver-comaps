@@ -116,10 +116,19 @@ using AlternateLookup = std::function<std::optional<std::string>(LatLon const &)
 enum class Bridge
 {
   None,
-  Land,
+  /// A bridge, and the map doesn't say over what. Its lines don't claim anything about what's below.
+  Unknown,
   /// Over a river, lake or the sea.
-  Water
+  Water,
+  Rail,
+  Road,
+  Valley
 };
+/// What a bridge crosses, from what the map shows under it. Water beats rail beats road beats valley:
+/// a bridge over a river and the road beside it is a bridge over water.
+Bridge ClassifyBridge(bool water, bool rail, bool road, bool valley);
+/// The line pool for a bridge of this kind.
+char const * BridgeLinesKey(Bridge bridge);
 /// Whether the car is on a bridge, given where it is and which way it's heading.
 using BridgeLookup = std::function<Bridge(LatLon const &, double bearingDeg)>;
 /// Distance in meters from a spot to the nearest mapped car road; negative if the map can't tell.
@@ -382,6 +391,15 @@ private:
   void TrackQuietBits(Fix const & fix, RouteSnapshot const & route);
   void StartCall(double tMs);
   /// A quiet-stretch bit is still going (a call, a game of 20 Questions), so nothing else should start one.
+public:
+  /// 20 Questions or the plate game is on (or offered), so what's heard goes to the game first.
+  bool InGame() const
+  {
+    return m_twenty.Active() || m_plates.GetState() == PlateGame::State::Offered ||
+           m_plates.GetState() == PlateGame::State::Playing;
+  }
+
+private:
   bool QuietBitBusy() const { return m_call.Active() || m_twenty.Active(); }
   /// The GPS asks to play 20 Questions (a quiet-stretch bit). False if it can't now.
   bool OfferTwentyQuestions(Fix const & fix);

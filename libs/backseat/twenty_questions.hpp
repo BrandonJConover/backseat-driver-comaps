@@ -158,9 +158,10 @@ public:
   static int constexpr kQuestions = 20;
   /// Recent answers kept out of the next pick.
   static size_t constexpr kRecentKeep = 25;
-  /// Quiet after a question for this long: one nudge. Then the GPS calls it.
+  /// Quiet for this long: the GPS says it heard nothing and asks again. After kMaxNudges of those, it
+  /// calls the game off, and nobody wins.
   static double constexpr kNudgeAfterMs = 75000;
-  static double constexpr kGiveUpAfterMs = 180000;
+  static int constexpr kMaxNudges = 3;
   /// No game talk this close to a maneuver (500 ft); directions come first.
   static double constexpr kHoldNearManeuverM = 152;
 
@@ -217,5 +218,6 @@ private:
   std::set<int> m_askedTraits;
   double m_lastHeardT = 0;
   bool m_nudged = false;
+  int m_nudges = 0;
 };
 }  // namespace backseat

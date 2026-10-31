@@ -1,5 +1,7 @@
 #include "drape_frontend/tile_info.hpp"
 
+#include "indexer/map_style_lock.hpp"
+
 #include "drape_frontend/engine_context.hpp"
 #include "drape_frontend/map_data_provider.hpp"
 #include "drape_frontend/metaline_manager.hpp"
@@ -66,6 +68,8 @@ void TileInfo::ReadFeatures(MapDataProvider const & model)
   {
     std::sort(m_featureInfo.begin(), m_featureInfo.end());
 
+    // One style for the whole tile; see MapStyleSwitchMutex.
+    std::shared_lock styleLock(MapStyleSwitchMutex());
     RuleDrawer drawer(std::bind(&TileInfo::IsCancelled, this), model.m_isCountryLoadedByName, make_ref(m_context),
                       m_context->GetMapLangIndex());
     model.ReadFeatures(std::bind<void>(std::ref(drawer), _1), m_featureInfo);

@@ -26,6 +26,7 @@
 
 #include "geometry/mercator.hpp"
 #include "geometry/parametrized_segment.hpp"
+#include "geometry/triangle2d.hpp"
 
 #include "base/logging.hpp"
 #include "base/timer.hpp"
@@ -1479,9 +1480,16 @@ backseat::Bridge BackseatAdapter::BridgeAt(backseat::LatLon const & at, double b
       "motorway",      "trunk",          "primary",      "secondary",      "tertiary",
       "unclassified",  "residential",    "living_street", "service",       "motorway_link",
       "trunk_link",    "primary_link",   "secondary_link", "tertiary_link", "road"};
+  static uint32_t const kRailway = c.GetTypeByPath({"railway"});
+  static std::vector<std::string> const kTracks = {"rail", "light_rail", "subway", "monorail", "narrow_gauge"};
+  // Lines and areas. Valleys aren't in the current classificator, so the lookup may find nothing.
   static std::vector<uint32_t> const kWater = {
-      c.GetTypeByPath({"natural", "water"}), c.GetTypeByPath({"waterway", "river"}),
-      c.GetTypeByPath({"waterway", "canal"}), c.GetTypeByPath({"natural", "bay"})};
+      c.GetTypeByPath({"natural", "water"}),  c.GetTypeByPath({"waterway", "river"}),
+      c.GetTypeByPath({"waterway", "canal"}), c.GetTypeByPath({"waterway", "stream"}),
+      c.GetTypeByPath({"natural", "bay"}),    c.GetTypeByPath({"natural", "strait"}),
+      c.GetTypeByPath({"natural", "coastline"})};
+  static std::vector<uint32_t> const kValleys = {c.GetTypeByPathSafe({"natural", "valley"}),
+                                                 c.GetTypeByPathSafe({"natural", "gorge"})};
 
   // Are we driving along a road bridge? Close to it and heading the same way (or the opposite
   // way on a two-way road), so passing under an overpass doesn't count.
@@ -1489,6 +1497,8 @@ backseat::Bridge BackseatAdapter::BridgeAt(backseat::LatLon const & at, double b
   double constexpr kAlongDeg = 35;
   m2::PointD const center = mercator::FromLatLon(at.lat, at.lon);
   bool onBridge = false;
+  FeatureID bridgeId;
+  std::vector<m2::PointD> deck;
   m_dataSource().ForEachInRect([&](FeatureType & ft)
   {
     if (onBridge || ft.GetGeomType() != feature::GeomType::Line)
@@ -1524,25 +1534,116 @@ backseat::Bridge BackseatAdapter::BridgeAt(backseat::LatLon const & at, double b
       diff = std::min(diff, 180 - diff);
       onBridge = diff <= kAlongDeg;
     }
+    if (onBridge)
+    {
+      bridgeId = ft.GetID();
+      for (size_t i = 0; i < ft.GetPointsCount(); ++i)
+        deck.push_back(ft.GetPoint(i));
+    }
   }, mercator::RectByCenterXYAndSizeInMeters(center, 2 * kOnBridgeM), scales::GetUpperScale());
   if (!onBridge)
     return backseat::Bridge::None;
 
-  // Any river, lake or bay right around the bridge makes it a water crossing.
-  double constexpr kWaterSearchM = 150;
-  bool water = false;
+  // What's under it: what the deck actually crosses. A rectangle search alone isn't enough, since the
+  // map index returns whole cells, so a lake down the road looked like water under every bridge.
+  double constexpr kDeckSearchM = 600;
+  double constexpr kEndMarginM = 6;
+  // A crossing away from the deck's ends: roads meeting the bridge at its ends don't go under it.
+  auto const crossesDeck = [&](FeatureType & ft)
+  {
+    double fromStart = 0;
+    double const total = [&]
+    {
+      double sum = 0;
+      for (size_t i = 1; i < deck.size(); ++i)
+        sum += mercator::DistanceOnEarth(deck[i - 1], deck[i]);
+      return sum;
+    }();
+    for (size_t i = 1; i < deck.size(); ++i)
+    {
+      m2::PointD const a = deck[i - 1];
+      m2::PointD const r = deck[i] - a;
+      double const length = mercator::DistanceOnEarth(a, deck[i]);
+      for (size_t j = 1; j < ft.GetPointsCount(); ++j)
+      {
+        m2::PointD const p = ft.GetPoint(j - 1);
+        m2::PointD const q = ft.GetPoint(j) - p;
+        double const det = r.x * q.y - r.y * q.x;
+        if (det == 0)
+          continue;
+        m2::PointD const d = p - a;
+        double const t = (d.x * q.y - d.y * q.x) / det;
+        double const u = (d.x * r.y - d.y * r.x) / det;
+        if (t < 0 || t > 1 || u < 0 || u > 1)
+          continue;
+        double const along = fromStart + t * length;
+        if (along > kEndMarginM && total - along > kEndMarginM)
+          return true;
+      }
+      fromStart += length;
+    }
+    return false;
+  };
+  // Water spread under the deck: an area with a point of the deck inside it.
+  auto const coversDeck = [&](FeatureType & ft)
+  {
+    bool covered = false;
+    ft.ForEachTriangle([&](m2::PointD const & a, m2::PointD const & b, m2::PointD const & c)
+    {
+      for (size_t i = 1; i < deck.size() && !covered; ++i)
+        for (double const t : {0.25, 0.5, 0.75})
+          if (m2::IsPointInsideTriangle(deck[i - 1] + (deck[i] - deck[i - 1]) * t, a, b, c))
+            covered = true;
+    }, scales::GetUpperScale());
+    return covered;
+  };
+  m2::RectD deckRect;
+  for (auto const & point : deck)
+    if (mercator::DistanceOnEarth(center, point) < kDeckSearchM)
+      deckRect.Add(point);
+  deckRect.Add(center);
+  m2::RectD const margin = mercator::RectByCenterXYAndSizeInMeters(center, 20);
+  deckRect.Inflate(margin.SizeX() / 2, margin.SizeY() / 2);
+
+  bool water = false, rail = false, road = false, valley = false;
   m_dataSource().ForEachInRect([&](FeatureType & ft)
   {
-    if (water)
+    if (water || ft.GetID() == bridgeId)
       return;
-    for (uint32_t type : feature::TypesHolder(ft))
+    bool isWater = false, isRail = false, isRoad = false, isValley = false;
+    for (uint32_t const full : feature::TypesHolder(ft))
     {
+      uint32_t type = full;
       ftype::TruncValue(type, 2);
-      if (std::find(kWater.begin(), kWater.end(), type) != kWater.end())
-        water = true;
+      isWater = isWater || std::find(kWater.begin(), kWater.end(), type) != kWater.end();
+      isValley = isValley || (type != 0 && std::find(kValleys.begin(), kValleys.end(), type) != kValleys.end());
+      uint32_t top = full;
+      ftype::TruncValue(top, 1);
+      if (ftype::GetLevel(full) < 2 || (top != kRailway && top != kHighway))
+        continue;
+      ClassifObject const * kind = c.GetRoot()->GetObject(ftype::GetValue(full, 0))->GetObject(ftype::GetValue(full, 1));
+      // A tunnel under the deck doesn't count: nobody's looking at it.
+      if (ftype::GetLevel(full) >= 3 && kind->GetObject(ftype::GetValue(full, 2))->GetName() == "tunnel")
+        continue;
+      auto const & names = top == kRailway ? kTracks : kCarRoads;
+      if (std::find(names.begin(), names.end(), kind->GetName()) != names.end())
+        (top == kRailway ? isRail : isRoad) = true;
     }
-  }, mercator::RectByCenterXYAndSizeInMeters(center, kWaterSearchM), scales::GetUpperScale());
-  return water ? backseat::Bridge::Water : backseat::Bridge::Land;
+    if (!isWater && !isRail && !isRoad && !isValley)
+      return;
+    auto const geom = ft.GetGeomType();
+    bool const under = geom == feature::GeomType::Area ? coversDeck(ft)
+                       : geom == feature::GeomType::Line
+                           ? (ft.ParseGeometry(scales::GetUpperScale()), crossesDeck(ft))
+                           : false;
+    if (!under)
+      return;
+    water = water || isWater;
+    rail = rail || isRail;
+    road = road || isRoad;
+    valley = valley || isValley;
+  }, deckRect, scales::GetUpperScale());
+  return backseat::ClassifyBridge(water, rail, road, valley);
 }
 
 namespace
@@ -2217,6 +2318,11 @@ std::pair<std::optional<size_t>, std::string> BackseatAdapter::PickSearchResult(
   std::string const place = m_results[*choice].name;
   m_results.clear();
   return {choice, m_navigator.Reply("search.picked", {{"place", place}})};
+}
+
+std::string BackseatAdapter::VoicePreviewLine(std::string const & key, std::string const & voice)
+{
+  return m_navigator.Reply(key, {{"voice", voice}});
 }
 
 std::string BackseatAdapter::NoAnswerToWhereTo()

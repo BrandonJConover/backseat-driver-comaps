@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <iterator>
 #include <map>
+#include <sstream>
 
 namespace backseat
 {
@@ -662,6 +663,51 @@ std::optional<size_t> ParseChoice(std::string const & spoken, std::vector<std::s
       if (has(o))
         return i;
   return {};
+}
+
+int CountVoiceName(std::string const & spoken, std::string const & name)
+{
+  std::string const words = CommandWords(spoken);
+  std::string const wanted = CommandWords(name);
+  int count = 0;
+  if (wanted.find(' ', 1) != wanted.size() - 1)
+  {
+    // Several words: the whole phrase.
+    for (size_t at = words.find(wanted); at != std::string::npos; at = words.find(wanted, at + 1))
+      ++count;
+    return count;
+  }
+  std::string const target = wanted.substr(1, wanted.size() - 2);
+  auto const close = [&target](std::string const & word)
+  {
+    if (word == target)
+      return true;
+    if (target.size() < 4 || word.size() < 3 || word[0] != target[0])
+      return false;
+    // A cut-off word, while the recognizer is still working: "jess" for Jessica.
+    if (word.size() >= 4 && target.rfind(word, 0) == 0)
+      return true;
+    // One letter off.
+    size_t const a = word.size(), b = target.size();
+    if ((a > b ? a - b : b - a) > 1)
+      return false;
+    size_t i = 0;
+    while (i < a && i < b && word[i] == target[i])
+      ++i;
+    size_t j = a, k = b;
+    while (j > i && k > i && word[j - 1] == target[k - 1])
+    {
+      --j;
+      --k;
+    }
+    return j - i <= 1 && k - i <= 1;
+  };
+  std::istringstream in(words);
+  std::string word;
+  while (in >> word)
+    if (close(word))
+      ++count;
+  return count;
 }
 
 std::vector<std::string> VoicePhrases(std::vector<VoiceOption> const & voices)

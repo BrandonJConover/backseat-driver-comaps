@@ -153,6 +153,10 @@ struct VoiceOption
 /// The silly code phrase that picks each voice, one per voice in order: Echo is "purple monkey"
 /// and Adam "elephant shoe" (Brandon's), the rest come from a pool. Lowercase.
 std::vector<std::string> VoicePhrases(std::vector<VoiceOption> const & voices);
+/// How many times `spoken` says `name`, ignoring case and tolerating a close miss by the speech
+/// recognizer: "Bela" and "Nicol" count, "Isabella" doesn't count for "Bella". A name of several
+/// words ("banana phone") must be said whole.
+int CountVoiceName(std::string const & spoken, std::string const & name);
 /// The voice whose code phrase is in `spoken`, as an index into `voices`.
 std::optional<size_t> VoiceByPhrase(std::vector<VoiceOption> const & voices, std::string const & spoken);
 /// The voice called `said` (by name or id, any case), as an index into `voices`.

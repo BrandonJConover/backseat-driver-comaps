@@ -261,6 +261,11 @@ final class KokoroVoice: NSObject {
     isBusy || (systemIsSpeaking?() ?? false)
   }
 
+  /// True once a line is actually coming out of the speaker, not just queued or rendering.
+  var isSpeakingNow: Bool {
+    player.isAudible || (systemIsSpeaking?() ?? false)
+  }
+
   /// True while Kokoro has a line queued or playing, so the audio session must stay active.
   /// Main queue only.
   @objc var isBusy: Bool {
@@ -1078,6 +1083,7 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   var systemStoodIn: () -> Void = {}
   /// Called when a call or Siri is over and the speaker is ours again.
   var interruptionEnded: () -> Void = {}
+  var isAudible: Bool { current != nil }
   var isPlaying: Bool { current != nil || !navQueue.isEmpty || !roastQueue.isEmpty || !pendingSystem.isEmpty }
   /// A navigation clip is talking or waiting to: a navigation line behind it can't go sooner.
   var navBusy: Bool { (current != nil && currentIsNav) || !navQueue.isEmpty || pendingSystem.contains { $0.nav } }

@@ -304,7 +304,10 @@ TEST(TwentyOfferYesNoAndSilence)
   TwentyQuestions ignored(SeededRng(3));
   ignored.Offer({}, false, 0, 0);
   CHECK(!ignored.Tick(30000, 0));
-  CHECK(ignored.Tick(TwentyQuestions::kNudgeAfterMs, 0)->key == "twenty.ignored");
+  // But the mic may have missed it, so it asks once more first.
+  CHECK(ignored.Tick(TwentyQuestions::kNudgeAfterMs, 0)->key == "twenty.offerAgain");
+  CHECK(ignored.Active());
+  CHECK(ignored.Tick(2 * TwentyQuestions::kNudgeAfterMs, 0)->key == "twenty.ignored");
   CHECK(!ignored.Active());
 }
 
@@ -313,11 +316,33 @@ TEST(TwentyNudgesThenCallsIt)
   TwentyQuestions g(SeededRng(5));
   g.Start({}, false, 0, 0);
   CHECK(!g.Tick(30000, 0));
-  CHECK(g.Tick(TwentyQuestions::kNudgeAfterMs, 0)->key == "twenty.nudge");
-  CHECK(!g.Tick(TwentyQuestions::kNudgeAfterMs + 1000, 0));
-  auto const end = g.Tick(TwentyQuestions::kGiveUpAfterMs, 0);
+  double t = 0;
+  for (int i = 0; i < TwentyQuestions::kMaxNudges; ++i)
+  {
+    t += TwentyQuestions::kNudgeAfterMs;
+    CHECK(g.Tick(t, 0)->key == "twenty.nudge");
+    CHECK(!g.Tick(t + 1000, 0));
+  }
+  t += TwentyQuestions::kNudgeAfterMs;
+  auto const end = g.Tick(t, 0);
   CHECK(end->key == "twenty.timeout" && end->over);
   CHECK(!g.Active());
+  // Silence is nobody's win.
+  CHECK_EQUAL(g.Log().gpsWins, 0);
+}
+
+TEST(TwentyHearsTheWayDriversActuallyAsk)
+{
+  // From a real drive: these were all taken by something other than the game.
+  auto const car = ParseTwentyHeard("Are you a car").kind;
+  CHECK(car == TwentyHeard::Kind::Guess || car == TwentyHeard::Kind::UnknownGuess);
+  CHECK(ParseTwentyHeard("Do you make noise").kind == TwentyHeard::Kind::Question);
+  CHECK(ParseTwentyHeard("Are you metal").kind == TwentyHeard::Kind::Question);
+  CHECK(ParseYesNo("yeah") == YesNo::Yes);
+  CHECK(ParseYesNo("uh huh") == YesNo::Yes);
+  CHECK(ParseYesNo("maybe") == YesNo::Yes);
+  CHECK(ParseYesNo("nope") == YesNo::No);
+  CHECK(ParseYesNo("I don't know") == YesNo::Unclear);
 }
 
 TEST(TwentyPicksFromTheRouteAndNeverRepeatsSoon)
@@ -383,7 +408,7 @@ TEST(TwentyEveryLineFills)
                            "twenty.wrongClose", "twenty.wrongFar", "twenty.wrongUnknown", "twenty.hint",
                            "twenty.noHint", "twenty.left", "twenty.lastOne", "twenty.win", "twenty.winFast",
                            "twenty.lose", "twenty.giveUp", "twenty.quit", "twenty.nudge", "twenty.timeout",
-                           "twenty.arrived", "twenty.resume", "twenty.nearby"})
+                           "twenty.arrived", "twenty.resume", "twenty.nearby", "twenty.offerAgain"})
     for (int tier = 0; tier < 3; ++tier)
     {
       std::string const k = key;
@@ -477,9 +502,9 @@ TEST(TwentyIsAQuietStretchBit)
   });
   double t = kTqDayMs;
   double dist = 60000;
-  auto const lines = TqGame(TqDrive(nav, t, 300, 1, dist));
-  // The offer, and after a minute and a bit of silence, the grudge for ignoring it.
-  CHECK_EQUAL(lines.size(), size_t{2});
+  auto const lines = TqGame(TqDrive(nav, t, 450, 1, dist));
+  // The offer, asked again after a minute and a bit of silence, then the grudge for ignoring it.
+  CHECK_EQUAL(lines.size(), size_t{3});
   CHECK(lines[0].text.find("20 questions") != std::string::npos);
   CHECK(!asked.empty());
   CHECK_EQUAL(nav.GetTwentyLog().grudges, 1);

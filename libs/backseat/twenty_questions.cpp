@@ -326,7 +326,7 @@ char const * Fact(Trait t)
 
 /// What the driver has to start a guess with: "is it", "it's", "I guess", "the answer is".
 std::vector<char const *> const kGuessCues = {"is it", "is that", "its", "it is", "i guess", "my guess is", "guess",
-                                              "the answer is", "is the answer", "are you thinking of", "was it",
+                                              "the answer is", "is the answer", "are you thinking of", "are you", "was it",
                                               "you re thinking of", "youre thinking of", "how about"};
 std::vector<char const *> const kArticles = {"a", "an", "the", "my", "your", "some", "another", "that"};
 
@@ -589,6 +589,7 @@ void TwentyQuestions::NewTrip()
   m_wrongGuesses = 0;
   m_askedTraits.clear();
   m_nudged = false;
+  m_nudges = 0;
 }
 
 TwentyThing const * TwentyQuestions::Thing() const
@@ -633,6 +634,7 @@ void TwentyQuestions::Pick(std::set<std::string> const & nearby, bool night)
   m_wrongGuesses = 0;
   m_askedTraits.clear();
   m_nudged = false;
+  m_nudges = 0;
 }
 
 TwentyQuestions::Reply TwentyQuestions::Offer(std::set<std::string> const & nearby, bool night, double tMs, int tier)
@@ -658,6 +660,7 @@ std::optional<TwentyQuestions::Reply> TwentyQuestions::OnDriverSaid(std::string 
     return {};
   m_lastHeardT = tMs;
   m_nudged = false;
+  m_nudges = 0;
   auto const heard = ParseTwentyHeard(spoken);
   if (m_state == State::Offered)
   {
@@ -801,6 +804,13 @@ TwentyQuestions::Reply TwentyQuestions::End(std::string const & key, bool gpsWon
 
 std::optional<TwentyQuestions::Reply> TwentyQuestions::Tick(double tMs, int tier)
 {
+  if (m_state == State::Offered && !m_nudged && tMs - m_lastHeardT >= kNudgeAfterMs)
+  {
+    // Maybe they answered and the mic missed it: ask again before taking it personally.
+    m_nudged = true;
+    m_lastHeardT = tMs;
+    return Make("twenty.offerAgain", tier);
+  }
   if (m_state == State::Offered && tMs - m_lastHeardT >= kNudgeAfterMs)
   {
     // Ignored. That's a no, and a rude one.
@@ -813,14 +823,15 @@ std::optional<TwentyQuestions::Reply> TwentyQuestions::Tick(double tMs, int tier
   }
   if (m_state != State::Playing)
     return {};
-  if (tMs - m_lastHeardT >= kGiveUpAfterMs)
-    return End("twenty.timeout", true, tier);
-  if (!m_nudged && tMs - m_lastHeardT >= kNudgeAfterMs)
-  {
-    m_nudged = true;
-    return Make("twenty.nudge", tier);
-  }
-  return {};
+  if (tMs - m_lastHeardT < kNudgeAfterMs)
+    return {};
+  // Silence isn't a loss: the mic may have missed them. Say so and ask again; after a few tries,
+  // call the game off without a winner.
+  m_lastHeardT = tMs;
+  if (m_nudges >= kMaxNudges)
+    return End("twenty.timeout", false, tier);
+  ++m_nudges;
+  return Make("twenty.nudge", tier);
 }
 
 std::optional<TwentyQuestions::Reply> TwentyQuestions::WrapUp(int tier)
@@ -835,6 +846,7 @@ TwentyQuestions::Reply TwentyQuestions::Resume(double tMs, int tier)
   // The pause for directions wasn't the driver going quiet.
   m_lastHeardT = tMs;
   m_nudged = false;
+  m_nudges = 0;
   return Make("twenty.resume", tier);
 }
 

@@ -270,6 +270,10 @@ public:
   /// Call when AskWhereTo() got no answer (about 45 s of silence). Says "Deciding to play it safe
   /// today, huh?" if the car hasn't moved since; empty otherwise.
   std::string NoAnswerToWhereTo();
+  /// A line from the voice preview: "cmd.voice", "voice.preview.complaint", "voice.preview.notMissing".
+  std::string VoicePreviewLine(std::string const & key, std::string const & voice);
+  /// A game is waiting for the driver, so what they say is an answer, not a request.
+  bool InGame() const { return m_navigator.InGame(); }
   /// Kokoro's first line after the system voice had to stand in: it coughs (the platform plays a
   /// cough sound first) and blames something it ate.
   std::string VoiceRecovered() { return m_navigator.Reply("voice.recovered"); }

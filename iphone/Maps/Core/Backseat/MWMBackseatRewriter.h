@@ -71,6 +71,14 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 @property(class, nonatomic, readonly) NSString * askWhereTo;
 /// What to say when nobody answered `askWhereTo`; empty for nothing.
 @property(class, nonatomic, readonly) NSString * noAnswerToWhereTo;
+/// 20 Questions or the plate game is on, so what's heard is an answer, not a request.
+@property(class, nonatomic, readonly) BOOL inGame;
+/// A line for the voice preview, with `voice` filled in.
++ (NSString *)voicePreviewLine:(NSString *)key voice:(NSString *)voice;
+/// The silly phrase that picks this voice ("banana phone").
++ (NSString *)voicePhrase:(NSString *)voiceID;
+/// How often `text` says a voice's name, tolerating the recognizer's close misses.
++ (NSInteger)countVoiceName:(NSString *)name in:(NSString *)text;
 /// Places driven to before, most driven first, for the "Where to?" list. Each has "label" ("Home",
 /// "Starbucks"), "destination", "lat", "lon", "trips" and "minutes" (usual drive time, 0 if unknown).
 + (NSArray<NSDictionary<NSString *, id> *> *)pastRoutes:(NSInteger)max;

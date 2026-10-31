@@ -203,11 +203,17 @@ bool RarePlate(std::string const & code)
 YesNo ParseYesNo(std::string const & spoken)
 {
   std::string const w = Words(spoken);
-  for (auto const * no : {"no", "nope", "nah", "not now", "pass", "no thanks", "not really", "don't", "dont", "stop"})
+  for (auto const * unsure : {"don't know", "dont know", "not sure", "no idea"})
+    if (HasWord(w, unsure))
+      return YesNo::Unclear;
+  for (auto const * no : {"no", "nope", "nah", "nay", "negative", "uh uh", "not now", "not today", "pass", "no thanks",
+                          "not really", "don't", "dont", "stop"})
     if (HasWord(w, no))
       return YesNo::No;
-  for (auto const * yes : {"yes", "yeah", "yep", "yup", "sure", "ok", "okay", "fine", "why not", "let's", "lets",
-                           "sounds good", "absolutely", "deal", "i'm in", "im in", "go"})
+  for (auto const * yes : {"yes", "yeah", "yea", "yep", "yup", "yah", "uh huh", "mm hmm", "mhm", "sure", "ok", "okay",
+                           "fine", "alright", "all right", "why not", "let's", "lets", "sounds good", "absolutely",
+                           "definitely", "of course", "certainly", "maybe", "perhaps", "i guess", "might as well",
+                           "deal", "i'm in", "im in", "go"})
     if (HasWord(w, yes))
       return YesNo::Yes;
   return YesNo::Unclear;

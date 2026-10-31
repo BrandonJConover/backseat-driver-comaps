@@ -462,6 +462,42 @@ TEST(NavigatorPanicsOverWater)
   CHECK(SaidLineOf(lines[0].text, "fear.bridgeWater"));
 }
 
+TEST(BridgesAreClassifiedByWhatTheyCross)
+{
+  CHECK(ClassifyBridge(true, true, true, true) == Bridge::Water);
+  CHECK(ClassifyBridge(false, true, true, true) == Bridge::Rail);
+  CHECK(ClassifyBridge(false, false, true, true) == Bridge::Road);
+  CHECK(ClassifyBridge(false, false, false, true) == Bridge::Valley);
+  CHECK(ClassifyBridge(false, false, false, false) == Bridge::Unknown);
+}
+
+TEST(NavigatorPicksBridgeLinesForWhatsBelow)
+{
+  for (auto const & [bridge, key] : std::vector<std::pair<Bridge, char const *>>{
+           {Bridge::Water, "fear.bridgeWater"}, {Bridge::Rail, "fear.bridgeRail"}, {Bridge::Road, "fear.bridgeRoad"},
+           {Bridge::Valley, "fear.bridgeValley"}, {Bridge::Unknown, "fear.bridge"}})
+  {
+    CHECK_EQUAL(std::string(BridgeLinesKey(bridge)), std::string(key));
+    Navigator nav(Config());
+    Bridge const kind = bridge;
+    nav.SetBridgeLookup([kind](LatLon const &, double) { return kind; });
+    for (int i = 0; i < 10; ++i)
+      nav.OnFix(Heading(i * 1000, 20, 90), Far());
+    auto lines = FearLines(nav.TakeLines());
+    CHECK_EQUAL(lines.size(), size_t(1));
+    CHECK(SaidLineOf(lines[0].text, key));
+  }
+}
+
+TEST(OnlyWaterBridgeLinesMentionWater)
+{
+  for (auto const * key : {"fear.bridge", "fear.bridgeRail", "fear.bridgeRoad", "fear.bridgeValley"})
+    for (int tier = 0; tier < 3; ++tier)
+      for (auto const & line : LinesFor(key, tier))
+        for (auto const * word : {"water", "Water", "WATER", " wet", " river", "screen"})
+          CHECK(line.find(word) == std::string::npos);
+}
+
 TEST(NavigatorYelpsInASharpCurveButNotAtATurn)
 {
   // 25 m/s (~56 mph) swinging 10 degrees a second: ~4.4 m/s^2 sideways.

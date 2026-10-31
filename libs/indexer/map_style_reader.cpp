@@ -7,7 +7,11 @@
 #include "base/file_name_utils.hpp"
 #include "base/logging.hpp"
 
+#include "indexer/classificator.hpp"
 #include "indexer/classificator_loader.hpp"
+#include "indexer/map_style_lock.hpp"
+
+#include <mutex>
 
 namespace
 {
@@ -130,10 +134,17 @@ StyleReader::StyleReader() : m_mapStyle(kDefaultMapStyle) {}
 
 void StyleReader::SetCurrentStyle(MapStyle mapStyle)
 {
+  // Other threads (tile readers, search, routing) may be using the classificator and the rules of
+  // the old style when this is called on the main thread. Clearing them here freed memory those
+  // threads were reading: the crash when a route started, as it switches to the vehicle style. So
+  // each style stays loaded once it has been used, and is never rewritten while it may be in use.
   m_loadingMapStyle = mapStyle;
-  classificator::Load();
+#ifndef BUILD_DESIGNER
+  if (!classif(mapStyle).HasTypesMapping())
+#endif
+    classificator::Load();
+  std::unique_lock lock(MapStyleSwitchMutex());
   m_mapStyle = mapStyle;
-  classificator::Cleanup();
 }
 
 MapStyle StyleReader::GetCurrentStyle() const

@@ -172,6 +172,16 @@ TEST(RepliesKnowTheDriver)
   c.rng = [] { return 0.0; };
   Navigator nav(c);
   nav.SetDriverPronouns(Pronouns::She);
+  CHECK_EQUAL(CountVoiceName("Bella", "Bella"), 1);
+  CHECK_EQUAL(CountVoiceName("uh BELLA please bella", "Bella"), 2);
+  CHECK_EQUAL(CountVoiceName("Bela", "Bella"), 1);
+  CHECK_EQUAL(CountVoiceName("Jess", "Jessica"), 1);
+  CHECK_EQUAL(CountVoiceName("Isabella", "Bella"), 0);
+  CHECK_EQUAL(CountVoiceName("heart", "Bella"), 0);
+  CHECK_EQUAL(CountVoiceName("okay banana phone", "banana phone"), 1);
+  CHECK_EQUAL(CountVoiceName("banana", "banana phone"), 0);
+  for (auto const * key : {"voice.preview.complaint", "voice.preview.notMissing"})
+    CHECK(!nav.Reply(key).empty());
   CHECK_EQUAL(nav.Reply("cmd.voice.fellForIt", {{"voice", "Echo"}}),
               std::string("Ha ha ha! I can't believe you fell for that. She's all yours, Echo."));
   nav.SetDriverName("Brandon");

@@ -144,6 +144,19 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
     [BackseatVoiceSearch start:@(heard.query.c_str())];
   for (auto const & command : heard.actions)
     Perform(command);
+  // A line-up of voices plays with the mic open, so the driver can pick one mid-way.
+  if (heard.voiceLines.size() > 1)
+  {
+    NSMutableArray<NSString *> * ids = [NSMutableArray array];
+    NSMutableArray<NSString *> * lines = [NSMutableArray array];
+    for (auto const & line : heard.voiceLines)
+    {
+      [ids addObject:@(line.voiceId.c_str())];
+      [lines addObject:@(line.text.c_str())];
+    }
+    [BackseatVoicePreview startWithVoiceIDs:ids lines:lines];
+    return;
+  }
   for (auto const & line : heard.voiceLines)
     SayReply(line.text, line.voiceId);
 }
@@ -173,7 +186,9 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
 + (void)driverSaid:(NSString *)text
 {
   // With the on-device model, it picks the app action; what it can't place goes to the keywords.
-  if (gToolHandler && gToolsAvailable)
+  // Not during a game: "Are you metal?" is a question for the game, and the model made it "list the
+  // voices". The keywords hand it to the game, and still catch real commands.
+  if (gToolHandler && gToolsAvailable && !self.inGame)
   {
     gToolHandler(text, ^(BOOL used, NSString * chat) {
       dispatch_async(dispatch_get_main_queue(), ^{
@@ -403,6 +418,33 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
 + (NSString *)askWhereTo
 {
   return @(GetFramework().GetRoutingManager().BackseatAskWhereTo().c_str());
+}
+
++ (BOOL)inGame
+{
+  return GetFramework().GetRoutingManager().BackseatInGame();
+}
+
++ (NSString *)voicePreviewLine:(NSString *)key voice:(NSString *)voice
+{
+  return @(GetFramework().GetRoutingManager().BackseatVoicePreviewLine(key.UTF8String, voice.UTF8String).c_str());
+}
+
++ (NSString *)voicePhrase:(NSString *)voiceID
+{
+  std::vector<backseat::VoiceOption> voices;
+  NSArray<NSString *> * ids = BackseatKokoroVoice.voiceIDs;
+  NSArray<NSString *> * names = BackseatKokoroVoice.voiceSpokenNames;
+  for (NSUInteger i = 0; i < ids.count && i < names.count; ++i)
+    voices.push_back({ids[i].UTF8String, names[i].UTF8String});
+  auto const phrases = backseat::VoicePhrases(voices);
+  NSUInteger const index = [ids indexOfObject:voiceID];
+  return index < phrases.size() ? @(phrases[index].c_str()) : @"";
+}
+
++ (NSInteger)countVoiceName:(NSString *)name in:(NSString *)text
+{
+  return backseat::CountVoiceName(text.UTF8String ?: "", name.UTF8String ?: "");
 }
 
 + (NSString *)noAnswerToWhereTo

@@ -51,6 +51,14 @@ import Speech
   private var answerPurpose = "answer"
   /// How long the mic waits for the first word when opened for one phrase.
   private var firstWordWait: TimeInterval = 6
+  /// After this, a hands-free wait for a destination is over. Hands-free never sends silence, so a
+  /// wait with no end would take whatever the driver says next, minutes later and about anything.
+  private var answerDeadline: Date?
+  /// Gets everything heard as it's heard, with the mic open while the GPS talks. Empty text means a
+  /// fresh transcript has started.
+  private var overhearHandler: ((String) -> Void)?
+  /// Names the recognizer should expect while overhearing.
+  private var overhearNames: [String] = []
 
   @objc private(set) var isListening = false {
     didSet { NotificationCenter.default.post(name: Self.listeningChanged, object: self) }
@@ -63,6 +71,8 @@ import Speech
       guard let self else { return }
       self.navigating = (note.object as? Bool) ?? false
       if !self.navigating { self.mutedForRoute = false }
+      // The route started: nobody's picking a destination any more.
+      if self.navigating && self.answerDeadline != nil { self.stopWaitingForAnswer() }
       self.followNavigation()
     }
     NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: audioEngine,
@@ -106,6 +116,7 @@ import Speech
     answerHandler = handler
     answerPurpose = purpose
     firstWordWait = waiting
+    answerDeadline = purpose == "destination" ? Date().addingTimeInterval(waiting) : nil
     if !isListening {
       withPermission { self.start(continuous: false) }
     }
@@ -116,7 +127,7 @@ import Speech
   /// goes to the navigator like anything else the driver says.
   @objc func listenForGameAnswer() {
     if isListening && continuous { return }
-    BackseatSetup.listen(waiting: 10, for: "game") { answer in
+    BackseatSetup.listen(waiting: 15, for: "game") { answer in
       guard !answer.isEmpty else { return }
       MWMBackseatRewriter.driverSaid(answer)
     }
@@ -125,6 +136,39 @@ import Speech
   /// Stops waiting for an answer; what's said next goes to the navigator again.
   func stopWaitingForAnswer() {
     answerHandler = nil
+    answerDeadline = nil
+  }
+
+  /// Opens the mic for `handler` and keeps it open while the GPS talks, so the driver can cut in.
+  /// Without permission the handler just never hears anything.
+  func startOverhearing(names: [String], _ handler: @escaping (String) -> Void) {
+    overhearHandler = handler
+    overhearNames = names
+    if isListening { cleanUp() }
+    withPermission { [weak self] in
+      guard let self, self.overhearHandler != nil else { return }
+      self.start(continuous: true)
+    }
+  }
+
+  /// Back to listening the way the driver has it set.
+  func stopOverhearing() {
+    guard overhearHandler != nil else { return }
+    overhearHandler = nil
+    overhearNames = []
+    cleanUp()
+    followNavigation()
+  }
+
+  /// The voices' session handling can stop the engine between lines; picks it back up.
+  func keepOverhearing() {
+    guard overhearHandler != nil, isListening, !audioEngine.isRunning else { return }
+    do {
+      try AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
+      try audioEngine.start()
+    } catch {
+      LOG(.warning, "Backseat: audio engine didn't restart: \(error)")
+    }
   }
 
   /// "Stop listening": hands-free stays off for the rest of this route, as if the mic was tapped.
@@ -135,6 +179,10 @@ import Speech
 
   /// Listens while a route is followed and hands-free is on, and stops otherwise.
   private func followNavigation() {
+    if overhearHandler != nil {
+      if !isListening { withPermission { self.start(continuous: true) } }
+      return
+    }
     let want = navigating && Self.handsFree && !mutedForRoute
     if want && !continuous {
       if isListening { cleanUp() }
@@ -213,10 +261,17 @@ import Speech
 
   /// Pauses the mic while Kokoro or the system voice talks, and listens again once it's done.
   private func followSpeech() {
+    guard overhearHandler == nil else { return }
     let speaking = KokoroVoice.shared.anyVoiceSpeaking
     if speaking && !pausedForSpeech {
       pausedForSpeech = true
-      endSegment()
+      // Mid-game, what the driver said just before a line started is still their move. The line
+      // hasn't played yet, so this can't be the GPS hearing itself.
+      if MWMBackseatRewriter.inGame, !heardTheGPS, !heard.isEmpty {
+        finish(beforeTheGPS: true)
+      } else {
+        endSegment()
+      }
       audioEngine.pause()
     } else if !speaking && pausedForSpeech {
       pausedForSpeech = false
@@ -261,16 +316,19 @@ import Speech
       request.requiresOnDeviceRecognition = true
     }
     // Most answers are one place name.
-    request.contextualStrings = ["plate", "autopilot", "take me to", "work", "home", "Hawaii", "Alaska", "Colorado", "New Mexico", "Texas", "yes", "no", "is it", "twenty questions", "I give up", "a hint"]
+    request.contextualStrings = ["plate", "autopilot", "take me to", "work", "home", "Hawaii", "Alaska", "Colorado", "New Mexico", "Texas", "yes", "no", "is it", "twenty questions", "I give up", "a hint"] + overhearNames
     self.request = request
     heard = ""
     heardTheGPS = KokoroVoice.shared.anyVoiceSpeaking
+    overhearHandler?("")
 
     task = recognizer.recognitionTask(with: request) { [weak self] result, error in
       DispatchQueue.main.async {
         guard let self, self.request === request else { return }
         if let result {
           self.heard = result.bestTranscription.formattedString
+          self.overhearHandler?(self.heard)
+          guard self.request === request else { return }
           // A short pause after speaking ends it; a final result ends it at once.
           self.restartTimeout(after: result.isFinal ? 0 : Self.pauseToFinish)
         }
@@ -304,10 +362,20 @@ import Speech
   }
 
   /// Sends what was heard, then listens again when hands-free.
-  private func finish() {
+  private func finish(beforeTheGPS: Bool = false) {
     guard isListening else { return }
+    if overhearHandler != nil {
+      // Only a fresh recognition task: the handler already heard this one as it went.
+      endSegment()
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.startSegment() }
+      return
+    }
     let text = heard.trimmingCharacters(in: .whitespacesAndNewlines)
-    let echo = heardTheGPS || KokoroVoice.shared.anyVoiceSpeaking
+    let echo = !beforeTheGPS && (heardTheGPS || KokoroVoice.shared.anyVoiceSpeaking)
+    if let answerDeadline, Date() > answerDeadline {
+      LOG(.info, "Backseat: stopped waiting for a \(answerPurpose)")
+      stopWaitingForAnswer()
+    }
     if continuous {
       endSegment()
       // The next one starts after this turn, so a failing recognizer can't spin.
@@ -319,7 +387,7 @@ import Speech
     if let answer = answerHandler, !(continuous && echo) {
       // An empty answer only counts when the mic was opened just for it.
       if !text.isEmpty || !continuous {
-        answerHandler = nil
+        stopWaitingForAnswer()
         BackseatLog.event("stt", ["for": answerPurpose, "text": text])
         answer(text)
       }
@@ -363,6 +431,145 @@ import Speech
     if !KokoroVoice.shared.anyVoiceSpeaking {
       try? session.setActive(false, options: .notifyOthersOnDeactivation)
     }
+  }
+}
+
+/// "What voices do you have?": each voice takes its turn, with the mic open. Say a voice's name (or the
+/// silly phrase it just gave) and the line-up stops there, that voice is picked, the voice that was up
+/// next complains it never got to speak, and the one that got cut off tells you that you're not
+/// missing much. Without mic permission it just plays through, and the Settings list still works.
+@objc final class BackseatVoicePreview: NSObject {
+  private static var current: BackseatVoicePreview?
+  /// Long enough for a line's own mentions of its voice's name, which are all near the start of it,
+  /// plus the recognizer catching up. Until then, that name is probably the speaker being overheard.
+  private static let ownNameEcho: TimeInterval = 4.5
+
+  private struct Turn {
+    let voiceID: String
+    let line: String
+    let names: [String]
+  }
+
+  private let turns: [Turn]
+  private let startingVoice = KokoroVoice.selectedVoiceID
+  private var timer: Timer?
+  /// Whose line is on; -1 during the introduction.
+  private var index = -1
+  private var lineStartedAt: Date?
+  /// The transcript so far, and how many times each voice was already named in it when the mic could
+  /// only have been hearing the GPS.
+  private var heard = ""
+  private var baseline: [[Int]] = []
+
+  private init(turns: [Turn]) {
+    self.turns = turns
+  }
+
+  /// Plays `lines` in `voiceIDs` in turn, after whatever is being said now.
+  @objc static func start(voiceIDs: [String], lines: [String]) {
+    current?.end()
+    let turns = zip(voiceIDs, lines).map { id, line -> Turn in
+      let spoken = KokoroVoice.voiceOptions.first { $0.id == id }?.spokenName ?? id
+      return Turn(voiceID: id, line: line, names: [spoken, MWMBackseatRewriter.voicePhrase(id)].filter { !$0.isEmpty })
+    }
+    guard !turns.isEmpty else { return }
+    let preview = BackseatVoicePreview(turns: turns)
+    current = preview
+    preview.begin()
+  }
+
+  private func begin() {
+    baseline = turns.map { $0.names.map { _ in 0 } }
+    BackseatListener.shared.startOverhearing(names: turns.flatMap(\.names)) { [weak self] text in
+      self?.overheard(text)
+    }
+    // Not at once: the introduction was queued just now and may not show as speaking yet.
+    timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in self?.tick() }
+  }
+
+  private func tick() {
+    // Picked from the Settings list while this played: that's the answer.
+    guard KokoroVoice.selectedVoiceID == startingVoice else {
+      end()
+      return
+    }
+    BackseatListener.shared.keepOverhearing()
+    if KokoroVoice.shared.anyVoiceSpeaking {
+      if lineStartedAt == nil, KokoroVoice.shared.isSpeakingNow { lineStartedAt = Date() }
+      return
+    }
+    guard index + 1 < turns.count else {
+      end()
+      return
+    }
+    index += 1
+    remember()
+    lineStartedAt = nil
+    let line = turns[index].line
+    KokoroVoice.shared.sayReply(line, voiceID: turns[index].voiceID) { MWMTextToSpeech.tts().play(line) }
+  }
+
+  private func overheard(_ text: String) {
+    heard = text
+    if text.isEmpty {
+      remember()
+      return
+    }
+    for (i, turn) in turns.enumerated() {
+      for (n, name) in turn.names.enumerated() {
+        let count = MWMBackseatRewriter.countVoiceName(name, in: text)
+        // The voice that's talking says its own name and phrase. The name counts once its mentions
+        // are over; either one counts if it's said more often than the line says it.
+        if i == index {
+          let saidByLine = MWMBackseatRewriter.countVoiceName(name, in: turn.line)
+          let isName = n == 0
+          let stillEcho = !isName || lineStartedAt.map { Date().timeIntervalSince($0) < Self.ownNameEcho } ?? true
+          if stillEcho && count - baseline[i][n] <= saidByLine { continue }
+        }
+        if count > baseline[i][n] {
+          picked(i)
+          return
+        }
+      }
+    }
+  }
+
+  /// Everything named so far has been dealt with.
+  private func remember() {
+    for (i, turn) in turns.enumerated() {
+      for (n, name) in turn.names.enumerated() {
+        baseline[i][n] = heard.isEmpty ? 0 : MWMBackseatRewriter.countVoiceName(name, in: heard)
+      }
+    }
+  }
+
+  private func picked(_ i: Int) {
+    let cutOff = index
+    end()
+    KokoroVoice.shared.selectVoice(turns[i].voiceID)
+    BackseatLog.event("voice.preview", ["picked": turns[i].voiceID, "cut_off": cutOff >= 0 ? turns[cutOff].voiceID : ""])
+    guard cutOff >= 0 else {
+      // Nobody's turn was cut short: the new voice just says hello.
+      say(MWMBackseatRewriter.voicePreviewLine("cmd.voice", voice: turns[i].names[0]), in: turns[i].voiceID)
+      return
+    }
+    // The voice that never got its turn; after the last voice, that's the first.
+    let next = turns[(cutOff + 1) % turns.count]
+    say(MWMBackseatRewriter.voicePreviewLine("voice.preview.complaint", voice: next.names[0]), in: next.voiceID)
+    say(MWMBackseatRewriter.voicePreviewLine("voice.preview.notMissing", voice: turns[cutOff].names[0]),
+        in: turns[cutOff].voiceID)
+  }
+
+  private func say(_ line: String, in voiceID: String) {
+    guard !line.isEmpty else { return }
+    KokoroVoice.shared.sayReply(line, voiceID: voiceID) { MWMTextToSpeech.tts().play(line) }
+  }
+
+  private func end() {
+    timer?.invalidate()
+    timer = nil
+    BackseatListener.shared.stopOverhearing()
+    if Self.current === self { Self.current = nil }
   }
 }
 

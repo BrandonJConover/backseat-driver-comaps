@@ -273,6 +273,11 @@ public:
     return m_backseat.PickSearchResult(spoken);
   }
   std::string BackseatNoAnswerToWhereTo() { return m_backseat.NoAnswerToWhereTo(); }
+  std::string BackseatVoicePreviewLine(std::string const & key, std::string const & voice)
+  {
+    return m_backseat.VoicePreviewLine(key, voice);
+  }
+  bool BackseatInGame() const { return m_backseat.InGame(); }
   std::vector<BackseatAdapter::PastRoute> BackseatPastRoutes(size_t max) const { return m_backseat.PastRoutes(max); }
   std::string BackseatVoiceRecovered() { return m_backseat.VoiceRecovered(); }
   bool BackseatRemember(std::string const & topic, std::string const & fact) { return m_backseat.Remember(topic, fact); }
