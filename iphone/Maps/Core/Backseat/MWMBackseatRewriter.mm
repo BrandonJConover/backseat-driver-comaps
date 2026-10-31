@@ -162,11 +162,7 @@ void Perform(backseat::AppCommand const & command)
     break;
   }
   case AppAction::SetTravelMode:
-    [MWMRouter setType:command.argument == "walk"   ? MWMRouterTypePedestrian
-                        : command.argument == "bike" ? MWMRouterTypeBicycle
-                                                     : MWMRouterTypeVehicle];
-    if ([MWMRouter isRoutingActive])
-      [MWMRouter rebuildWithBestRouter:NO];
+    [MWMBackseatRewriter switchTravelMode:@(command.argument.c_str())];
     break;
   case AppAction::DifferentRoute:
     // The router gives one best route, so another way means another kind of road.
@@ -343,7 +339,17 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
                                                        type:MWMRoutePointTypeFinish
                                           intermediateIndex:0];
   if (![MWMRouter isRoutingActive])
+  {
     [MWMRouter removePoints];
+    // The starting mode (walking, on a new install) applies here too, not only to tapped routes.
+    auto const saved = routing::GetLastUsedRouter();
+    if (saved != GetFramework().GetRoutingManager().GetRouter())
+      [MWMRouter setType:saved == routing::RouterType::Pedestrian ? MWMRouterTypePedestrian
+                         : saved == routing::RouterType::Bicycle  ? MWMRouterTypeBicycle
+                         : saved == routing::RouterType::Transit  ? MWMRouterTypePublicTransport
+                         : saved == routing::RouterType::Ruler    ? MWMRouterTypeRuler
+                                                                  : MWMRouterTypeVehicle];
+  }
   // Said or tapped from the "Where to?" card: drive there now, no preview.
   [MWMRouter startWhenReady];
   [MWMRouter buildToPoint:to bestRouter:NO];
@@ -441,6 +447,96 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   for (NSUInteger i = 0; i < ids.count && i < names.count; ++i)
     voices.push_back({ids[i].UTF8String, names[i].UTF8String});
   GetFramework().GetRoutingManager().SetBackseatVoices(std::move(voices));
+}
+
+static BOOL gDrivingHighlighted = NO;
+static __weak UIAlertController * gWalkQuestion = nil;
+NSString * const kBackseatDrivingHighlightChanged = @"BackseatDrivingHighlightChanged";
+
++ (BOOL)drivingHighlighted
+{
+  return gDrivingHighlighted;
+}
+
+/// "Are you actually intending to walk there?" is for walks longer than a couple of miles (Brandon).
+static double constexpr kWalkQuestionOverM = 3200;
+/// The walk the driver said yes to, by where it ends, so starting it doesn't ask again.
+static m2::PointD gWalkConfirmedTo{1e9, 1e9};
+
++ (BOOL)walkQuestionAllowsStart
+{
+  if ([MWMRouter type] != MWMRouterTypePedestrian)
+    return YES;
+  auto & rm = GetFramework().GetRoutingManager();
+  auto const points = rm.GetRoutePoints();
+  if (points.size() < 2)
+    return YES;
+  m2::PointD const to = points.back().m_position;
+  if (mercator::DistanceOnEarth(to, gWalkConfirmedTo) < 50)
+    return YES;
+  routing::FollowingInfo info;
+  rm.GetRouteFollowingInfo(info);
+  double const lengthM = info.IsValid() ? info.m_distToTarget.To(platform::Distance::Units::Meters).GetDistance() : 0;
+  if (lengthM <= kWalkQuestionOverM)
+    return YES;
+  if (!gWalkQuestion)
+    [self askWalkQuestionTo:to];
+  return NO;
+}
+
++ (void)askWalkQuestionTo:(m2::PointD)to
+{
+  auto & rm = GetFramework().GetRoutingManager();
+  SayReply(rm.BackseatReply("mode.ask.walk"), {});
+  UIAlertController * alert = [UIAlertController alertControllerWithTitle:@"Are you actually intending to walk there?"
+                                                                  message:nil
+                                                           preferredStyle:UIAlertControllerStyleAlert];
+  [alert addAction:[UIAlertAction actionWithTitle:@"No" style:UIAlertActionStyleDefault handler:^(UIAlertAction *) {
+    gWalkQuestion = nil;
+    // "I'm going to need you to click the driving button." Nothing starts until it's tapped.
+    SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.no"), {});
+    gDrivingHighlighted = YES;
+    [[NSNotificationCenter defaultCenter] postNotificationName:kBackseatDrivingHighlightChanged object:nil];
+  }]];
+  [alert addAction:[UIAlertAction actionWithTitle:@"Yes" style:UIAlertActionStyleDefault handler:^(UIAlertAction *) {
+    gWalkQuestion = nil;
+    SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.yes"), {});
+    gWalkConfirmedTo = to;
+    [MWMRouter startRouting];
+  }]];
+  UIViewController * top = [MapViewController sharedController];
+  while (top.presentedViewController)
+    top = top.presentedViewController;
+  gWalkQuestion = alert;
+  [top presentViewController:alert animated:YES completion:nil];
+}
+
++ (void)drivingButtonTapped
+{
+  if (!gDrivingHighlighted)
+    return;
+  gDrivingHighlighted = NO;
+  [[NSNotificationCenter defaultCenter] postNotificationName:kBackseatDrivingHighlightChanged object:nil];
+  // Tapped: the drive starts by itself once it's built, with "check the mode now and then".
+  GetFramework().GetRoutingManager().GetBackseat().WarnModeOnNextDrive();
+  [MWMRouter startWhenReady];
+}
+
++ (void)switchTravelMode:(NSString *)mode
+{
+  MWMRouterType const type = [mode isEqualToString:@"walk"]   ? MWMRouterTypePedestrian
+                             : [mode isEqualToString:@"bike"] ? MWMRouterTypeBicycle
+                                                              : MWMRouterTypeVehicle;
+  if (type == [MWMRouter type])
+    return;
+  // setType closes the route (keeping its points); build it again, and keep navigating if we were.
+  BOOL const onRoute = [MWMRouter isOnRoute];
+  [MWMRouter setType:type];
+  if (GetFramework().GetRoutingManager().GetRoutePoints().size() < 2)
+    return;
+  if (onRoute)
+    [MWMRouter startWhenReady];
+  [MWMRouter rebuildWithBestRouter:NO];
 }
 
 #pragma mark - Who's in the car

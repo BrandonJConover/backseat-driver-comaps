@@ -4,6 +4,7 @@
 #import "MWMRouter.h"
 #import "UIButton+Orientation.h"
 #import "UIImageView+Coloring.h"
+#import "MWMBackseatRewriter.h"
 #import "SwiftBridge.h"
 
 #include "platform/platform.hpp"
@@ -39,6 +40,10 @@ static CGFloat const kDrivingOptionsHeight = 48;
   self.actualVisibilityValue = NO;
   self.translatesAutoresizingMaskIntoConstraints = NO;
   [self setupProgresses];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(updateBackseatHighlight)
+                                               name:@"BackseatDrivingHighlightChanged"
+                                             object:nil];
   [self.backButton matchInterfaceOrientation];
   self.drivingOptionHeightConstraint.constant = -kDrivingOptionsHeight;
   [self applyContentViewShadow];
@@ -76,6 +81,28 @@ static CGFloat const kDrivingOptionsHeight = 48;
   [super layoutSubviews];
   [self.vehicle setNeedsLayout];
   [self resizeShadow];
+}
+
+// Backseat: "I've highlighted it on screen to make it easy for you." A pulsing ring on Driving.
+- (void)updateBackseatHighlight {
+  CALayer * layer = self.vehicle.layer;
+  if (MWMBackseatRewriter.drivingHighlighted) {
+    layer.borderColor = [UIColor colorWithRed:1 green:0.8 blue:0 alpha:1].CGColor;
+    layer.borderWidth = 3;
+    layer.cornerRadius = MIN(self.vehicle.bounds.size.width, self.vehicle.bounds.size.height) / 2;
+    if (![layer animationForKey:@"backseatPulse"]) {
+      CABasicAnimation * pulse = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
+      pulse.fromValue = @1.0;
+      pulse.toValue = @1.25;
+      pulse.duration = 0.6;
+      pulse.autoreverses = YES;
+      pulse.repeatCount = HUGE_VALF;
+      [layer addAnimation:pulse forKey:@"backseatPulse"];
+    }
+  } else {
+    layer.borderWidth = 0;
+    [layer removeAnimationForKey:@"backseatPulse"];
+  }
 }
 
 - (void)resizeShadow {
@@ -166,6 +193,8 @@ static CGFloat const kDrivingOptionsHeight = 48;
     auto const routerType = prg.first;
     if ([MWMRouter type] == routerType)
       return;
+    if (routerType == MWMRouterTypeVehicle)
+      [MWMBackseatRewriter drivingButtonTapped];
     [self selectRouter:routerType];
     [MWMRouter setType:routerType];
     [MWMRouter rebuildWithBestRouter:NO];
@@ -179,6 +208,7 @@ static CGFloat const kDrivingOptionsHeight = 48;
     return;
   [superview addSubview:self];
   [self setupConstraints];
+  [self updateBackseatHighlight];
   self.actualVisibilityValue = YES;
   dispatch_async(dispatch_get_main_queue(), ^{
     self.isVisible = YES;

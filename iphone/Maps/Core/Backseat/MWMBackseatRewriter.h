@@ -40,6 +40,17 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 + (BOOL)runTool:(NSString *)name argument:(NSString *)argument spoken:(NSString *)spoken;
 /// Tells the navigator which voices there are, for "what voice options do you have?".
 + (void)shareVoices;
+/// Switches the route type ("walk", "bike", anything else is driving) and rebuilds the route; a
+/// route being followed keeps going in the new mode. Main thread.
++ (void)switchTravelMode:(NSString *)mode;
+/// Before a walking route over 2 miles starts: NO, and "Are you actually intending to walk there?"
+/// with Yes / No goes up instead. Yes starts the walk; No highlights Driving in the route preview,
+/// and tapping it starts the drive. YES for anything else, or once the walk was confirmed. Main thread.
++ (BOOL)walkQuestionAllowsStart;
+/// Driving is highlighted for the driver to tap (MWMRoutePreview draws it).
+@property(class, nonatomic, readonly) BOOL drivingHighlighted;
+/// The highlighted Driving button was tapped: the highlight goes, and the drive starts once built.
++ (void)drivingButtonTapped;
 /// How far the next turn is while following a route, in meters; -1 without a route.
 @property(class, nonatomic, readonly) double metersToNextTurn;
 /// The speed limit here while following a route, m/s: -1 unknown, 0 unlimited.

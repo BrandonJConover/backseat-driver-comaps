@@ -70,6 +70,8 @@ using namespace std;
 namespace
 {
 char constexpr kRouterTypeKey[] = "router";
+// Backseat Driver: set once walking has been made the starting mode on this install.
+char constexpr kBackseatWalkDefaultKey[] = "BackseatWalkDefault";
 
 double constexpr kRouteScaleMultiplier = 1.5;
 
@@ -526,8 +528,17 @@ RouterType RoutingManager::GetBestRouter(m2::PointD const & startPoint, m2::Poin
 RouterType routing::GetLastUsedRouter()
 {
   string routerTypeStr;
+  // Backseat Driver starts on walking (Brandon: "it's funnier"), installs that came before this
+  // too, once; a long walk gets "Are we actually walking there?".
+  bool walkDefault = false;
+  if (!settings::Get(kBackseatWalkDefaultKey, walkDefault) || !walkDefault)
+  {
+    settings::Set(kBackseatWalkDefaultKey, true);
+    settings::Set(kRouterTypeKey, ToString(RouterType::Pedestrian));
+    return RouterType::Pedestrian;
+  }
   if (!settings::Get(kRouterTypeKey, routerTypeStr))
-    return RouterType::Vehicle;
+    return RouterType::Pedestrian;
 
   auto const routerType = FromString(routerTypeStr);
 
@@ -1293,7 +1304,9 @@ void RoutingManager::GenerateNotifications(vector<string> & turnNotifications, b
   // Keep the stock notification state moving, but say Backseat Driver's lines instead.
   vector<string> stock;
   m_routingSession.GenerateNotifications(stock, announceStreets);
-  if (m_currentRouterType == RouterType::Vehicle)
+  // Walks and rides get Backseat Driver's turn calls too (closer in, and in their own words).
+  if (m_currentRouterType == RouterType::Vehicle || m_currentRouterType == RouterType::Pedestrian ||
+      m_currentRouterType == RouterType::Bicycle)
     turnNotifications = m_backseat.TakeNotifications(m_routingSession, GetBackseatDestinationName());
   else
     turnNotifications = std::move(stock);

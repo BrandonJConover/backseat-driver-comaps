@@ -1,5 +1,6 @@
 #import "MWMRouter.h"
 #import "MWMAlertViewController+CPP.h"
+#import "MWMBackseatRewriter.h"
 #import "MWMCoreRouterType.h"
 #import "MWMFrameworkListener.h"
 #import "MWMFrameworkObservers.h"
@@ -327,6 +328,9 @@ char const *kRenderAltitudeImagesQueueLabel = "mapsme.mwmrouter.renderAltitudeIm
 }
 
 + (void)start {
+  // Backseat: a long walk waits for "Are you actually intending to walk there?" before it starts.
+  if (![MWMBackseatRewriter walkQuestionAllowsStart])
+    return;
   [self saveRoute];
   auto const doStart = ^{
     auto &rm = GetFramework().GetRoutingManager();

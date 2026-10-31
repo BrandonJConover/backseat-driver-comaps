@@ -119,6 +119,8 @@ struct RoadTick
   bool night = false;
   /// Local hour 0..23, or -1 when unknown.
   int localHour = -1;
+  /// Slowest that still counts as underway for "I just lost signal": a car's pace, or a walker's.
+  double signalMinMps = 5;
 };
 
 class RoadBits

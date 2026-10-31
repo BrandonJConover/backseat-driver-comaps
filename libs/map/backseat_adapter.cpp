@@ -104,6 +104,23 @@ backseat::TurnKind ToTurnKind(routing::turns::CarDirection d)
   }
 }
 
+/// A walking route's turns come as pedestrian directions; driving and biking ones as car directions.
+backseat::TurnKind ToTurnKind(routing::turns::TurnItem const & turn)
+{
+  using routing::turns::PedestrianDirection;
+  using backseat::TurnKind;
+  switch (turn.m_pedestrianTurn)
+  {
+  case PedestrianDirection::GoStraight: return TurnKind::Straight;
+  case PedestrianDirection::TurnRight: return TurnKind::Right;
+  case PedestrianDirection::TurnLeft: return TurnKind::Left;
+  case PedestrianDirection::ReachedYourDestination: return TurnKind::Destination;
+  case PedestrianDirection::None:
+  case PedestrianDirection::Count: break;
+  }
+  return ToTurnKind(turn.m_turn);
+}
+
 /// The router formats street names for the screen: "[2] North Colorado Boulevard" or, at
 /// exits, "[I 25] > Denver". Shields are drawn as signs there, but read aloud they come out
 /// as "bracket two". Keep the name, or the bare route number when there is no name.
@@ -1144,7 +1161,7 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
   fix.speedMps = info.m_speed;
   fix.bearingDeg = info.m_bearing;
   fix.accuracyM = info.m_horizontalAccuracy > 0 ? info.m_horizontalAccuracy : -1;
-  if (route.state != backseat::RouteState::Inactive && m_navigator.GetTravelMode() == backseat::TravelMode::Drive)
+  if (route.state != backseat::RouteState::Inactive && backseat::InCar(m_navigator.GetTravelMode()))
   {
     double const limit = session.GetCurrentSpeedLimit();
     if (limit > 0)
@@ -1185,6 +1202,7 @@ void BackseatAdapter::SetDataSource(std::function<DataSource &()> getter)
   m_navigator.SetVenueLookup([this](backseat::LatLon const & at) { return VenueAt(at); });
   m_navigator.SetBridgeLookup([this](backseat::LatLon const & at, double bearing) { return BridgeAt(at, bearing); });
   m_navigator.SetRoadDistanceLookup([this](backseat::LatLon const & at) { return RoadDistanceAt(at); });
+  m_navigator.SetTrailLookup([this](backseat::LatLon const & at) { return TrailAt(at); });
   // A stop within a light's queue is a red light, not pulling over.
   m_navigator.SetTrafficLightLookup([this](backseat::LatLon const & at)
   {
@@ -1433,6 +1451,56 @@ std::optional<double> BackseatAdapter::PassedExitNextM(routing::RoutingSession c
   }
   // Ran out of route first: the trip ends before another exit, so there's nothing to miss.
   return along >= kSearchM ? along : -1.0;
+}
+
+bool BackseatAdapter::TrailAt(backseat::LatLon const & at) const
+{
+  if (!m_dataSource)
+    return false;
+  double constexpr kOnWayM = 15;
+  auto const & c = classif();
+  static uint32_t const kHighway = c.GetTypeByPath({"highway"});
+  static uint32_t const kUnpavedGood = c.GetTypeByPath({"psurface", "unpaved_good"});
+  static uint32_t const kUnpavedBad = c.GetTypeByPath({"psurface", "unpaved_bad"});
+  static std::vector<std::string> const kTrails = {"path", "track", "bridleway"};
+  m2::PointD const center = mercator::FromLatLon(at.lat, at.lon);
+  double best = kOnWayM;
+  bool trail = false;
+  m_dataSource().ForEachInRect([&](FeatureType & ft)
+  {
+    if (ft.GetGeomType() != feature::GeomType::Line)
+      return;
+    bool isWay = false, isTrail = false;
+    for (uint32_t type : feature::TypesHolder(ft))
+    {
+      if (type == kUnpavedGood || type == kUnpavedBad)
+        isTrail = true;
+      if (ftype::GetLevel(type) < 2)
+        continue;
+      uint32_t top = type;
+      ftype::TruncValue(top, 1);
+      if (top != kHighway)
+        continue;
+      isWay = true;
+      ClassifObject const * way = c.GetRoot()->GetObject(ftype::GetValue(type, 0))->GetObject(ftype::GetValue(type, 1));
+      if (std::find(kTrails.begin(), kTrails.end(), way->GetName()) != kTrails.end())
+        isTrail = true;
+    }
+    if (!isWay)
+      return;
+    ft.ParseGeometry(scales::GetUpperScale());
+    for (size_t i = 1; i < ft.GetPointsCount(); ++i)
+    {
+      m2::ParametrizedSegment<m2::PointD> const segment(ft.GetPoint(i - 1), ft.GetPoint(i));
+      double const d = mercator::DistanceOnEarth(center, segment.ClosestPointTo(center));
+      if (d < best)
+      {
+        best = d;
+        trail = isTrail;
+      }
+    }
+  }, mercator::RectByCenterXYAndSizeInMeters(center, 2 * kOnWayM), scales::GetUpperScale());
+  return trail;
 }
 
 double BackseatAdapter::RoadDistanceAt(backseat::LatLon const & at) const
@@ -2197,7 +2265,7 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
                         command.action == AppAction::SpeedLimit || command.action == AppAction::DifferentRoute;
   if (m_navigator.GetTravelMode() == backseat::TravelMode::OffRoad && roadOnly)
     return m_navigator.Reply("mode.noRoads");
-  if ((m_navigator.GetTravelMode() == backseat::TravelMode::Walk || m_navigator.GetTravelMode() == backseat::TravelMode::Bike) &&
+  if (!backseat::InCar(m_navigator.GetTravelMode()) &&
       (command.action == AppAction::AvoidTolls || command.action == AppAction::AllowTolls ||
        command.action == AppAction::AvoidHighways || command.action == AppAction::AllowHighways ||
        command.action == AppAction::SpeedLimit || command.action == AppAction::DifferentRoute ||
@@ -2299,6 +2367,10 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
   }
   case AppAction::SetTravelMode:
     settings::Set(kOffRoadKey, command.argument == "offroad");
+    m_navigator.DriverSetTravelMode(command.argument == "walk"      ? backseat::TravelMode::Walk
+                                    : command.argument == "bike"    ? backseat::TravelMode::Bike
+                                    : command.argument == "offroad" ? backseat::TravelMode::OffRoad
+                                                                    : backseat::TravelMode::Drive);
     heard.actions.push_back(command);
     return m_navigator.Reply(command.argument == "walk"      ? "mode.walk"
                              : command.argument == "bike"    ? "mode.bike"
@@ -2938,8 +3010,9 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
                             {"speed", backseat::LogNum(c.voiceSpeed, 2)},
                             {"text", c.text}});
     out.push_back(c.text);
+    // 20 Questions and "Are you actually intending to walk there?" want an answer out loud.
     m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed, c.maxWaitMs, c.voice,
-                            c.category == backseat::Category::TwentyQuestions});
+                            c.category == backseat::Category::TwentyQuestions || c.key == "mode.ask.walk"});
     if (c.priority == backseat::Priority::Nav)
       m_lastDirection = c.text;
   }
@@ -2990,18 +3063,56 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
   {
     auto const & turn = segment.GetTurn();
     if (!turn.IsTurnNone())
-      snap.plannedTurns.push_back(ToTurnKind(turn.m_turn));
+      snap.plannedTurns.push_back(ToTurnKind(turn));
   }
   auto const & poly = route->GetPoly();
   if (poly.GetSize() > 0)
   {
     snap.origin = ToBackseatLatLon(poly.Front());
+    snap.routeLengthM = route->GetTotalDistanceMeters();
     snap.destinationPoint = ToBackseatLatLon(poly.Back());
     snap.sketched = m_routeSketched;
     if (m_routeSketched && m_fastestTo && mercator::DistanceOnEarth(*m_fastestTo, poly.Back()) < 250)
       snap.fastestSeconds = m_fastestSeconds;
   }
   // Which way the route runs from the car's matched spot, for "you're facing the wrong way".
+  // Dirt under the wheels (or boots): a drive turns into off-roading, a walk into a hike.
+  {
+    auto const & segments = route->GetRouteSegments();
+    double dirtM = 0, totalM = 0, prevM = 0;
+    for (auto const & segment : segments)
+    {
+      double const m = segment.GetDistFromBeginningMeters() - prevM;
+      prevM = segment.GetDistFromBeginningMeters();
+      totalM += m;
+      if (segment.GetRoadTypes().Has(routing::RoutingOptions::Dirty))
+        dirtM += m;
+    }
+    snap.dirtShare = totalM > 0 ? dirtM / totalM : 0;
+    if (route->GetFollowedPolyline().IsValid())
+    {
+      size_t const i = route->GetFollowedPolyline().GetCurrentIter().m_ind;
+      snap.onDirt = i < segments.size() && segments[i].GetRoadTypes().Has(routing::RoutingOptions::Dirty);
+      // The climb just ahead, for "Watch your step. It looks like we are on an incline." Each
+      // segment's junction is where it ends, so the climb starts at the previous segment's end.
+      if (route->HaveAltitudes() && i > 0 && i < segments.size())
+      {
+        auto const & from = segments[i - 1];
+        double const fromM = from.GetDistFromBeginningMeters();
+        for (size_t j = i; j < segments.size(); ++j)
+        {
+          double const runM = segments[j].GetDistFromBeginningMeters() - fromM;
+          if (runM < 40)
+            continue;
+          auto const a = from.GetJunction().GetAltitude();
+          auto const b = segments[j].GetJunction().GetAltitude();
+          if (a != geometry::kInvalidAltitude && b != geometry::kInvalidAltitude && runM < 150)
+            snap.gradeAhead = (b - a) / runM;
+          break;
+        }
+      }
+    }
+  }
   if (route->GetFollowedPolyline().IsValid())
   {
     m2::PointD const here = route->GetFollowedPolyline().GetCurrentIter().m_pt;
@@ -3023,7 +3134,7 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
     if (!turn.IsTurnNone())
     {
       snap.turnId = turn.m_index;
-      snap.turn = ToTurnKind(turn.m_turn);
+      snap.turn = ToTurnKind(turn);
       snap.distToTurnM = distanceToTurnM;
       snap.nextStreet = SpeakableStreetName(info.m_nextStreetName);
       snap.control = GuessControl(*route, turn.m_index);
@@ -3032,7 +3143,7 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
       std::vector<routing::turns::TurnItemDist> next;
       if (route->GetNextTurns(next) && next.size() >= 2 && !next[1].m_turnItem.IsTurnNone())
       {
-        snap.thenTurn = ToTurnKind(next[1].m_turnItem.m_turn);
+        snap.thenTurn = ToTurnKind(next[1].m_turnItem);
         snap.thenStreet = SpeakableStreetName(info.m_nextNextStreetName);
         snap.thenGapM = next[1].m_distMeters - next[0].m_distMeters;
       }
