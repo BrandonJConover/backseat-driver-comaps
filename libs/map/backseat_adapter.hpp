@@ -81,7 +81,9 @@ public:
       /// Route to `lat`/`lon` (home or work, worked out from past trips).
       RouteTo,
       /// Search for `query` and let the driver pick.
-      Search
+      Search,
+      /// The same, adding what's picked as a stop on the current route.
+      SearchStop
     };
     Kind kind = Kind::None;
     /// RunTool: the words didn't support that tool, so nothing ran.
@@ -192,6 +194,7 @@ public:
   /// that they tried; after that it just laughs.
   std::string NicenessMoved();
   /// Once the slider is back on the mean side: "Don't touch my slider."
+  std::string ReplyLine(std::string const & key, backseat::Vars const & vars = {}) { return m_navigator.Reply(key, vars); }
   std::string NicenessSlidBack() { return m_navigator.Reply("niceness.after"); }
   /// The driver dragged the map away from the car while navigating: "Put your map away. We don't
   /// live in the 90s anymore. We went digital." At most once every 20 minutes; empty otherwise.
@@ -498,6 +501,9 @@ private:
   std::vector<SearchResult> m_results;
   std::vector<backseat::VoiceOption> m_voices;
   mutable int m_secondsLeft = -1;
+  mutable std::string m_currentStreet;
+  double m_speedMps = 0;
+  double m_speedLimitMps = -1;
   std::string m_lastCallerVoice;
   std::string m_callerVoiceToWarm;
   mutable std::mutex m_lastTripMutex;

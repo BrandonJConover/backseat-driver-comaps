@@ -19,6 +19,8 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 + (void)setAvailable:(BOOL)available;
 /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate". Main thread.
 + (void)driverSaid:(NSString *)text;
+/// Adds a stop on the way, keeping the route's destination.
++ (void)addStop:(CLLocationCoordinate2D)coordinate title:(NSString *)title;
 /// The GPS is saying `line`, so the mic may pick it up.
 + (void)noteSpoken:(NSString *)line;
 /// The line the GPS said lately that `heard` is an echo of, if any.

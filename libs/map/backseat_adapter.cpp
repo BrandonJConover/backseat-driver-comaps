@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ctime>
 #include <cstdlib>
 #include <chrono>
 #include <fstream>
@@ -1144,6 +1145,8 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
     if (limit > 0)
       fix.speedLimitMps = limit;
   }
+  m_speedMps = info.m_speed;
+  m_speedLimitMps = fix.speedLimitMps.value_or(-1);
   if (m_debugLog.SampleDue(fix.tMs))
     backseat::Trace("fix", {{"lat", backseat::LogNum(fix.lat, 4)},
                             {"lon", backseat::LogNum(fix.lon, 4)},
@@ -2027,6 +2030,11 @@ std::string SpokenDuration(int seconds)
 }
 
 /// The reply line for an action the platform carries out.
+std::string SpokenMph(double mps)
+{
+  return std::to_string(std::lround(backseat::ToDisplay(mps, backseat::Units::Mph)));
+}
+
 char const * ReplyKey(backseat::AppAction action, std::string const & argument)
 {
   using backseat::AppAction;
@@ -2252,6 +2260,53 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
   case AppAction::CancelRoute:
     m_commandRepeats.RouteStarted();
     break;
+  case AppAction::FindAlongRoute:
+  {
+    if (command.argument.empty())
+      return {};
+    // With a route it's a stop on the way. Without one, it's just where we're going.
+    heard.kind = m_navigator.InTrip() ? HeardCommand::Kind::SearchStop : HeardCommand::Kind::Search;
+    heard.query = command.argument;
+    return m_navigator.Reply("cmd.findStop", {{"place", command.argument}});
+  }
+  case AppAction::SpeedLimit:
+    if (m_speedLimitMps <= 0)
+      return m_navigator.Reply("cmd.limit.none");
+    return m_navigator.Reply("cmd.limit", {{"limit", SpokenMph(m_speedLimitMps)}});
+  case AppAction::CurrentSpeed:
+  {
+    if (m_speedMps < 1)
+      return m_navigator.Reply("cmd.speed.none");
+    int const mph = std::lround(backseat::ToDisplay(m_speedMps, backseat::Units::Mph));
+    int const limit = m_speedLimitMps > 0 ? std::lround(backseat::ToDisplay(m_speedLimitMps, backseat::Units::Mph)) : 0;
+    if (limit > 0 && mph > limit)
+      return m_navigator.Reply("cmd.speed.over", {{"speed", std::to_string(mph)},
+                                                  {"limit", std::to_string(limit)},
+                                                  {"over", std::to_string(mph - limit)}});
+    return m_navigator.Reply("cmd.speed", {{"speed", std::to_string(mph)}});
+  }
+  case AppAction::CurrentRoad:
+    return m_currentStreet.empty() ? m_navigator.Reply("cmd.road.none")
+                                   : m_navigator.Reply("cmd.road", {{"street", m_currentStreet}});
+  case AppAction::NextTurn:
+  {
+    auto const & text = m_navigator.LastInstructionText();
+    return text.empty() ? m_navigator.Reply("cmd.nextTurn.none") : m_navigator.Reply("cmd.nextTurn", {{"instruction", text}});
+  }
+  case AppAction::ArrivalTime:
+  {
+    if (m_secondsLeft < 0)
+      return m_navigator.Reply("cmd.arrival.none");
+    std::time_t const at = std::time(nullptr) + m_secondsLeft;
+    char clock[16] = {};
+    std::strftime(clock, sizeof(clock), "%I:%M %p", std::localtime(&at));
+    return m_navigator.Reply("cmd.arrival", {{"clock", clock[0] == '0' ? clock + 1 : clock}});
+  }
+  case AppAction::DifferentRoute:
+    if (!m_navigator.InTrip())
+      return m_navigator.Reply("cmd.differentRoute.none");
+    heard.actions.push_back(command);
+    return m_navigator.Reply("cmd.differentRoute");
   case AppAction::RepeatInstruction:
     return m_lastDirection.empty() ? m_navigator.Reply("cmd.repeat.none")
                                    : m_navigator.Reply("cmd.repeat", {{"instruction", m_lastDirection}});
@@ -2834,6 +2889,7 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
 
   routing::FollowingInfo info;
   session.GetRouteFollowingInfo(info);
+  m_currentStreet = info.m_currentStreetName;
   switch (info.m_routingSessionState)
   {
   case SessionState::OnRoute: snap.state = backseat::RouteState::OnRoute; break;

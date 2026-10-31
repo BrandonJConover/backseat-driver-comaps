@@ -696,13 +696,16 @@ import Speech
   private var results: [SearchResult] = []
   private var finished = false
 
-  private init(query: String) {
+  private let asStop: Bool
+
+  private init(query: String, asStop: Bool) {
     self.query = query
+    self.asStop = asStop
   }
 
-  @objc static func start(_ query: String) {
+  @objc static func start(_ query: String, asStop: Bool) {
     current?.finish()
-    let search = BackseatVoiceSearch(query: query)
+    let search = BackseatVoiceSearch(query: query, asStop: asStop)
     current = search
     Search.add(search)
     MapsAppDelegate.theApp().searchText(query)
@@ -782,7 +785,11 @@ import Speech
   private func route(to index: Int) {
     guard results.indices.contains(index) else { return }
     let result = results[index]
-    MWMBackseatRewriter.route(to: result.coordinate, title: result.titleText)
+    if asStop {
+      MWMBackseatRewriter.addStop(result.coordinate, title: result.titleText)
+    } else {
+      MWMBackseatRewriter.route(to: result.coordinate, title: result.titleText)
+    }
   }
 
   private func say(_ line: String) {

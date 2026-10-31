@@ -4,6 +4,7 @@
 #include "backseat/navigator.hpp"
 #include "backseat/voice_command.hpp"
 
+#include <algorithm>
 #include <set>
 
 using namespace backseat;
@@ -489,6 +490,46 @@ TEST(AWeakMatchIsntAMatch)
   for (char const * key : {"search.confirm", "search.confirm.no"})
     for (int tier = 0; tier < 3; ++tier)
       CHECK(LinesFor(key, tier).size() >= 3);
+}
+
+namespace
+{
+bool Heard(std::string const & spoken, AppAction action)
+{
+  auto const commands = ParseAppCommands(spoken);
+  return std::any_of(commands.begin(), commands.end(), [action](AppCommand const & c) { return c.action == action; });
+}
+}  // namespace
+
+TEST(DrivingCommandsAreHeard)
+{
+  auto const gas = ParseAppCommands("find gas");
+  CHECK(gas.size() == 1 && gas[0].action == AppAction::FindAlongRoute && gas[0].argument == "gas station");
+  CHECK(ParseAppCommands("I need a bathroom")[0].argument == "restroom");
+  CHECK(ParseAppCommands("add a stop at Walmart please")[0].argument == "walmart");
+  CHECK(Heard("skip the next stop", AppAction::SkipStop));
+  CHECK(Heard("how far is the next stop", AppAction::NextStop));
+  CHECK(!Heard("how far is the next stop", AppAction::TimeLeft));
+  CHECK(Heard("what's the speed limit", AppAction::SpeedLimit));
+  CHECK(Heard("how fast am I going", AppAction::CurrentSpeed));
+  CHECK(Heard("what road is this", AppAction::CurrentRoad));
+  CHECK(Heard("what's the next turn", AppAction::NextTurn));
+  CHECK(!Heard("what's the next turn", AppAction::RepeatInstruction));
+  CHECK(Heard("what time will we get there", AppAction::ArrivalTime));
+  CHECK(Heard("find a different route", AppAction::DifferentRoute));
+  CHECK(Heard("take me back", AppAction::TakeMeBack));
+  CHECK(!Heard("take me back to work", AppAction::TakeMeBack));
+  CHECK(ParseAppCommands("take me back to work")[0].action == AppAction::NavigateTo);
+}
+
+TEST(DrivingChatterIsntACommand)
+{
+  for (char const * chatter : {"I'm skipping lunch", "next time we should stop", "what a joke", "the speed limit here is silly",
+                               "I can't find my gas card", "we need to talk", "there's no other way to say it"})
+  {
+    auto const commands = ParseAppCommands(chatter);
+    CHECK(commands.empty());
+  }
 }
 
 TEST(CommandsDontRunTwice)

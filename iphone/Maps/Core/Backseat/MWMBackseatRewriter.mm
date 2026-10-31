@@ -25,6 +25,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <optional>
 
 namespace
 {
@@ -138,6 +139,41 @@ void Perform(backseat::AppCommand const & command)
   case AppAction::OpenSettings: [[MapViewController sharedController] openSettings]; break;
   case AppAction::StopListening: [BackseatListener.shared pauseForRoute]; break;
   case AppAction::ListCommands: [BackseatCommandsSheet present]; break;
+  case AppAction::SkipStop:
+  case AppAction::NextStop:
+  {
+    auto & manager = GetFramework().GetRoutingManager();
+    std::optional<RouteMarkData> stop;
+    for (auto const & point : manager.GetRoutePoints())
+      if (!stop && point.m_pointType == RouteMarkType::Intermediate && !point.m_isShaping && !point.m_isPassed)
+        stop = point;
+    if (!stop)
+    {
+      SayReply(manager.BackseatReply("cmd.stop.none"), {});
+      break;
+    }
+    bool const skip = command.action == AppAction::SkipStop;
+    SayReply(manager.BackseatReply(skip ? "cmd.stop.skipped" : "cmd.stop.next", {{"place", stop->m_title.empty() ? "that stop" : stop->m_title}}), {});
+    if (skip)
+    {
+      manager.RemoveRoutePoint(RouteMarkType::Intermediate, stop->m_intermediateIndex);
+      [MWMRouter rebuildWithBestRouter:NO];
+    }
+    break;
+  }
+  case AppAction::DifferentRoute:
+    // The router gives one best route, so another way means another kind of road.
+    SetRoutingOption(^(MWMRoutingOptions * o) { o.avoidMotorway = !o.avoidMotorway; });
+    break;
+  case AppAction::TakeMeBack:
+    if (BackseatReturnTrip.originName.length == 0)
+    {
+      SayReply(GetFramework().GetRoutingManager().BackseatReply("cmd.back.none"), {});
+      break;
+    }
+    SayReply(GetFramework().GetRoutingManager().BackseatReply("cmd.back", {{"place", BackseatReturnTrip.originName.UTF8String}}), {});
+    [BackseatReturnTrip headBack];
+    break;
   // The navigator handles these itself.
   case AppAction::NavigateTo:
   case AppAction::RepeatInstruction:
@@ -145,6 +181,12 @@ void Perform(backseat::AppCommand const & command)
   case AppAction::ReportPolice:
   case AppAction::PlayPlateGame:
   case AppAction::ListVoices:
+  case AppAction::FindAlongRoute:
+  case AppAction::SpeedLimit:
+  case AppAction::CurrentSpeed:
+  case AppAction::CurrentRoad:
+  case AppAction::NextTurn:
+  case AppAction::ArrivalTime:
   case AppAction::Count: break;
   }
 }
@@ -159,8 +201,8 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   // read out what it finds.
   if (heard.kind == Kind::RouteTo)
     [MWMBackseatRewriter routeTo:CLLocationCoordinate2DMake(heard.lat, heard.lon) title:@(heard.name.c_str())];
-  else if (heard.kind == Kind::Search)
-    [BackseatVoiceSearch start:@(heard.query.c_str())];
+  else if (heard.kind == Kind::Search || heard.kind == Kind::SearchStop)
+    [BackseatVoiceSearch start:@(heard.query.c_str()) asStop:heard.kind == Kind::SearchStop];
   for (auto const & command : heard.actions)
     Perform(command);
   // A line-up of voices plays with the mic open, so the driver can pick one mid-way.
@@ -290,6 +332,16 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   // Said or tapped from the "Where to?" card: drive there now, no preview.
   [MWMRouter startWhenReady];
   [MWMRouter buildToPoint:to bestRouter:NO];
+}
+
++ (void)addStop:(CLLocationCoordinate2D)coordinate title:(NSString *)title
+{
+  MWMRoutePoint * stop = [[MWMRoutePoint alloc] initWithPoint:mercator::FromLatLon(coordinate.latitude, coordinate.longitude)
+                                                        title:title
+                                                     subtitle:@""
+                                                         type:MWMRoutePointTypeIntermediate
+                                            intermediateIndex:0];
+  [MWMRouter addPointAndRebuild:stop];
 }
 
 + (NSString *)speakSearchResults:(NSString *)query

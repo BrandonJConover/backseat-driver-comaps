@@ -59,6 +59,16 @@ enum class AppAction
   OpenSettings,
   StopListening,
   ListCommands,
+  FindAlongRoute,
+  SkipStop,
+  NextStop,
+  SpeedLimit,
+  CurrentSpeed,
+  CurrentRoad,
+  NextTurn,
+  ArrivalTime,
+  DifferentRoute,
+  TakeMeBack,
   Count
 };
 
@@ -82,6 +92,7 @@ struct AppCommand
 {
   AppAction action;
   /// NavigateTo: the place. ChangeVoice: the voice, or empty to just open the voice list.
+  /// FindAlongRoute: what to find.
   std::string argument;
 };
 

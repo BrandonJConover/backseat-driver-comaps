@@ -69,7 +69,8 @@ std::optional<DestinationCommand> ParseDestinationCommand(std::string const & sp
   std::string target;
   for (char const * cue : {" take me to ", " take us to ", " navigate to ", " drive me to ", " drive us to ",
                            " directions to ", " get me to ", " get us to ", " route to ", " route me to ",
-                           " let's go to ", " lets go to ", " head to ", " go to ", " bring me to "})
+                           " let's go to ", " lets go to ", " head to ", " go to ", " bring me to ", " take me back to ",
+                           " take us back to ", " head back to "})
   {
     auto const at = words.find(cue);
     if (at != std::string::npos)
@@ -78,6 +79,9 @@ std::optional<DestinationCommand> ParseDestinationCommand(std::string const & sp
       break;
     }
   }
+  // "Take me back to where we started" isn't a place; TakeMeBack has it.
+  if (target.rfind("where", 0) == 0 || target == "start" || target == "beginning")
+    target.clear();
   // "Take me home" needs no "to".
   for (char const * cue : {" take me home ", " take us home ", " go home ", " drive me home ", " drive us home ",
                            " navigate home ", " head home ", " bring me home ", " get me home ", " get us home "})
@@ -124,6 +128,16 @@ std::vector<AppTool> const & AppTools()
       {AppAction::OpenSettings, "open_settings", "Open the settings screen.", nullptr},
       {AppAction::StopListening, "stop_listening", "Turn off the hands-free microphone.", nullptr},
       {AppAction::ListCommands, "list_commands", "Explain what the driver can say, and show the list.", nullptr},
+      {AppAction::FindAlongRoute, "find_along_route", "Find a place to stop and add it to the route, keeping the destination.", "What to find: gas, food, coffee, a restroom, or a name."},
+      {AppAction::SkipStop, "skip_stop", "Remove the next stop from the route.", nullptr},
+      {AppAction::NextStop, "next_stop", "Say what the next stop on the route is.", nullptr},
+      {AppAction::SpeedLimit, "speed_limit", "Say the speed limit here.", nullptr},
+      {AppAction::CurrentSpeed, "current_speed", "Say how fast the car is going.", nullptr},
+      {AppAction::CurrentRoad, "current_road", "Say what road the car is on.", nullptr},
+      {AppAction::NextTurn, "next_turn", "Say what the next turn is.", nullptr},
+      {AppAction::ArrivalTime, "arrival_time", "Say what time on the clock we'll get there.", nullptr},
+      {AppAction::DifferentRoute, "different_route", "Try another way to the destination.", nullptr},
+      {AppAction::TakeMeBack, "take_me_back", "Drive back to where this trip started.", nullptr},
   };
   return tools;
 }
@@ -161,6 +175,34 @@ std::string VoiceArgument(std::string const & words)
 }
 }  // namespace
 
+namespace
+{
+/// Where in `words` a stop was asked for, and what for: "find gas", "I need a bathroom", "add a stop at Walmart".
+std::pair<size_t, std::string> StopSearch(std::string const & words)
+{
+  static std::pair<char const *, char const *> const kWants[] = {
+      {"gas", "gas station"},          {"gas station", "gas station"}, {"a gas station", "gas station"},
+      {"fuel", "gas station"},         {"food", "restaurant"},         {"something to eat", "restaurant"},
+      {"a restaurant", "restaurant"},  {"coffee", "coffee"},           {"a coffee shop", "coffee"},
+      {"a restroom", "restroom"},      {"a bathroom", "restroom"},     {"restroom", "restroom"},
+      {"bathroom", "restroom"}};
+  for (char const * cue : {" find ", " need ", " stop for ", " add a stop for ", " find me ", " need to find "})
+    for (auto const & want : kWants)
+    {
+      auto const at = words.find(cue + std::string(want.first) + " ");
+      if (at != std::string::npos)
+        return {at, want.second};
+    }
+  for (char const * cue : {" add a stop at ", " add a stop for "})
+  {
+    auto const at = words.find(cue);
+    if (at != std::string::npos)
+      return {at, ParseTarget(words.substr(at + std::string(cue).size()))};
+  }
+  return {0, {}};
+}
+}  // namespace
+
 std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
 {
   std::string const words = CommandWords(spoken);
@@ -181,8 +223,28 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                          " go quiet ", " turn off the sound ", " turn the sound off ", " hush "}},
       {AppAction::RepeatInstruction, {" repeat that ", " say that again ", " what did you say ", " come again ",
                                       " repeat the direction ", " repeat the directions ", " repeat the last ",
-                                      " what was that ", " say again ", " repeat yourself ", " what's the next turn ",
-                                      " whats the next turn ", " where do i turn "}},
+                                      " what was that ", " say again ", " repeat yourself "}},
+      {AppAction::NextTurn, {" what's the next turn ", " whats the next turn ", " what is the next turn ",
+                             " where do i turn ", " when do i turn ", " when's my next turn ", " whens my next turn ",
+                             " what's my next turn ", " whats my next turn "}},
+      {AppAction::SkipStop, {" skip this stop ", " skip the stop ", " skip the next stop ", " remove the stop ",
+                             " remove this stop ", " cancel the stop ", " cancel this stop ", " no more stops "}},
+      {AppAction::NextStop, {" what's the next stop ", " whats the next stop ", " what is the next stop ",
+                             " where's the next stop ", " wheres the next stop ", " where is the next stop ",
+                             " how far is the next stop ", " how far is the stop "}},
+      {AppAction::SpeedLimit, {" what's the speed limit ", " whats the speed limit ", " what is the speed limit ",
+                               " how fast can i go "}},
+      {AppAction::CurrentSpeed, {" how fast am i ", " how fast are we ", " what's my speed ", " whats my speed ",
+                                 " what is my speed ", " what speed am i "}},
+      {AppAction::CurrentRoad, {" what road ", " what street ", " which road ", " which street ", " what highway ",
+                                " road is this ", " street is this "}},
+      {AppAction::ArrivalTime, {" what time will we ", " what time will i ", " what time do we ", " what time do i ",
+                                " when will we arrive ", " when will i arrive ", " arrival time ", " what's our arrival ",
+                                " whats our arrival "}},
+      {AppAction::DifferentRoute, {" different route ", " another route ", " other route ", " better route ",
+                                   " alternate route ", " alternative route ", " another way ", " different way "}},
+      {AppAction::TakeMeBack, {" take me back ", " take us back ", " go back to where ", " head back ",
+                               " back where we started ", " back to the start "}},
       {AppAction::TimeLeft, {" how long ", " how much longer ", " are we there yet ", " time left ", " when will we get ",
                              " when do we get ", " when will we be ", " what's the eta ", " whats the eta ", " eta ",
                              " how far ", " how much further ", " how much farther "}},
@@ -236,6 +298,22 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   if (voiceNamed && std::none_of(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::ChangeVoice; }))
     if (auto name = VoiceArgument(words); !name.empty())
       found.push_back({words.find(" voice "), AppCommand{AppAction::ChangeVoice, std::move(name)}});
+  // "How far is the next stop?" is about the stop, not the trip, and "take me back to work" is a place.
+  auto const drop = [&found](AppAction action)
+  {
+    found.erase(std::remove_if(found.begin(), found.end(), [action](auto const & f) { return f.second.action == action; }),
+                found.end());
+  };
+  auto const heardAction = [&found](AppAction action)
+  { return std::any_of(found.begin(), found.end(), [action](auto const & f) { return f.second.action == action; }); };
+  if (heardAction(AppAction::NextStop))
+    drop(AppAction::TimeLeft);
+  if (words.find(" back to ") != std::string::npos && words.find(" back to where ") == std::string::npos &&
+      words.find(" back to the start ") == std::string::npos)
+    drop(AppAction::TakeMeBack);
+  auto const stop = StopSearch(words);
+  if (!stop.second.empty())
+    found.push_back({stop.first, AppCommand{AppAction::FindAlongRoute, stop.second}});
   // "What other voices do you have?" isn't asking for a particular one.
   if (std::any_of(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::ListVoices; }))
     found.erase(std::remove_if(found.begin(), found.end(), [](auto const & f)
@@ -412,6 +490,17 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::OpenSettings: return saidAny({"settings", "preferences", "options"});
   case AppAction::StopListening: return saidAny({"listening", "mic", "microphone", "eavesdropping"});
   case AppAction::ListCommands: return saidAny({"commands", "command", "help", "can", "how", "do"});
+  case AppAction::FindAlongRoute:
+    return argumentSaid() || saidAny({"find", "need", "stop", "gas", "food", "coffee", "restroom", "bathroom", "fuel", "eat"});
+  case AppAction::SkipStop: return saidAny({"stop", "stops"}) && saidAny({"skip", "remove", "cancel", "no"});
+  case AppAction::NextStop: return saidAny({"stop"});
+  case AppAction::SpeedLimit: return saidAny({"limit"}) || saidAny({"fast"});
+  case AppAction::CurrentSpeed: return saidAny({"fast", "speed"});
+  case AppAction::CurrentRoad: return saidAny({"road", "street", "highway"});
+  case AppAction::NextTurn: return saidAny({"turn"});
+  case AppAction::ArrivalTime: return saidAny({"time", "arrive", "arrival"});
+  case AppAction::DifferentRoute: return saidAny({"route", "way"}) && saidAny({"different", "another", "other", "better", "alternate", "alternative"});
+  case AppAction::TakeMeBack: return saidAny({"back", "start"});
   case AppAction::Count: break;
   }
   return false;

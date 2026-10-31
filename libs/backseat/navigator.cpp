@@ -1037,6 +1037,7 @@ void Navigator::SayInstruction(double t, RouteSnapshot const & route)
 {
   m_turnSaidAt = t;
   std::string const text = InstructionText(route);
+  m_lastInstructionText = text;
   Trace("nav.turn", {{"id", std::to_string(*route.turnId)},
                      {"text", text},
                      {"dist_m", LogNum(route.distToTurnM, 0)},
@@ -1581,6 +1582,7 @@ void Navigator::SayVenue(double t, RouteSnapshot const & route)
 void Navigator::ResetTrip()
 {
   m_rerouteRoastDueAt.reset();
+  m_lastInstructionText.clear();
   m_waterYelps = 0;
   m_lastWaterYelpT = -1e18;
   m_tagsSaid.clear();

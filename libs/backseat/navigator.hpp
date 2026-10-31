@@ -297,6 +297,8 @@ public:
   void QueueOpener(double tMs, std::string key, Vars vars = {});
   /// The driver just gave a command, so a route change in the next little while is theirs.
   void NoteVoiceCommand() { m_lastVoiceCommandT = m_lastT; }
+  /// The plain direction for the current maneuver, with no jokes on it. Empty with no route.
+  std::string const & LastInstructionText() const { return m_lastInstructionText; }
   static double constexpr kOpenerValidMs = 600000;
   std::vector<TripRecord> const & History() const { return m_history; }
   /// Routines learned from past trips (the commute), in local time.
@@ -433,6 +435,7 @@ private:
 
   double m_lastT = 0;
   double m_lastVoiceCommandT = -1e12;
+  std::string m_lastInstructionText;
   std::optional<double> m_rerouteRoastDueAt;
   /// About when the phone is done saying everything handed to it so far.
   double m_talkingUntil = 0;

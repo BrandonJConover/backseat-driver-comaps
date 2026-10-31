@@ -69,8 +69,11 @@ import CoreLocation
     return Origin(coordinate: coordinate, name: name, savedRoute: saved)
   }
 
+  /// What to call where the trip started; empty when there's nowhere to head back to.
+  @objc static var originName: String { origin?.name ?? "" }
+
   /// Drives back to where the trip started, straight into navigation.
-  static func headBack() {
+  @objc static func headBack() {
     guard let origin else { return }
     MWMBackseatRewriter.route(to: origin.coordinate, title: origin.name)
   }
