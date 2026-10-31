@@ -3010,8 +3010,9 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
                             {"speed", backseat::LogNum(c.voiceSpeed, 2)},
                             {"text", c.text}});
     out.push_back(c.text);
+    // 20 Questions and "Are we actually walking there?" want an answer out loud.
     m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed, c.maxWaitMs, c.voice,
-                            c.category == backseat::Category::TwentyQuestions});
+                            c.category == backseat::Category::TwentyQuestions || c.key == "mode.ask.walk"});
     if (c.priority == backseat::Priority::Nav)
       m_lastDirection = c.text;
   }

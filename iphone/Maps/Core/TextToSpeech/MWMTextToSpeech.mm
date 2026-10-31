@@ -1,4 +1,5 @@
 #import <AVFoundation/AVFoundation.h>
+#import "MWMBackseatRewriter.h"
 #import "MWMRouter.h"
 #import "MWMTextToSpeech+CPP.h"
 #import "SwiftBridge.h"
@@ -418,6 +419,15 @@ using Observers = NSHashTable<Observer>;
       [kokoro speak:notification nav:nav speed:speed maxWaitMs:maxWaitMs fallback:^{
         [weakSelf speakOneString:notification];
       }];
+    }
+    // "No answer. Switching us to driving.": the GPS decided the walk is a drive.
+    auto const modeSwitch = backseat.TakeTravelModeSwitch();
+    if (!modeSwitch.empty())
+    {
+      NSString * mode = @(modeSwitch.c_str());
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [MWMBackseatRewriter switchTravelMode:mode];
+      });
     }
     // 20 Questions: the driver answers out loud, so listen once the GPS has said its piece.
     for (NSUInteger i = 0; hinted && i < voices.size(); ++i)

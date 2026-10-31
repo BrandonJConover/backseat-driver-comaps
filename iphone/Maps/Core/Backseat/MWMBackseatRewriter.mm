@@ -162,11 +162,7 @@ void Perform(backseat::AppCommand const & command)
     break;
   }
   case AppAction::SetTravelMode:
-    [MWMRouter setType:command.argument == "walk"   ? MWMRouterTypePedestrian
-                        : command.argument == "bike" ? MWMRouterTypeBicycle
-                                                     : MWMRouterTypeVehicle];
-    if ([MWMRouter isRoutingActive])
-      [MWMRouter rebuildWithBestRouter:NO];
+    [MWMBackseatRewriter switchTravelMode:@(command.argument.c_str())];
     break;
   case AppAction::DifferentRoute:
     // The router gives one best route, so another way means another kind of road.
@@ -441,6 +437,25 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   for (NSUInteger i = 0; i < ids.count && i < names.count; ++i)
     voices.push_back({ids[i].UTF8String, names[i].UTF8String});
   GetFramework().GetRoutingManager().SetBackseatVoices(std::move(voices));
+  // This app can rebuild a route as a drive, so the GPS may ask "Are we actually walking there?".
+  GetFramework().GetRoutingManager().GetBackseat().SetCanSwitchTravelMode(true);
+}
+
++ (void)switchTravelMode:(NSString *)mode
+{
+  MWMRouterType const type = [mode isEqualToString:@"walk"]   ? MWMRouterTypePedestrian
+                             : [mode isEqualToString:@"bike"] ? MWMRouterTypeBicycle
+                                                              : MWMRouterTypeVehicle;
+  if (type == [MWMRouter type])
+    return;
+  // setType closes the route (keeping its points); build it again, and keep navigating if we were.
+  BOOL const onRoute = [MWMRouter isOnRoute];
+  [MWMRouter setType:type];
+  if (GetFramework().GetRoutingManager().GetRoutePoints().size() < 2)
+    return;
+  if (onRoute)
+    [MWMRouter startWhenReady];
+  [MWMRouter rebuildWithBestRouter:NO];
 }
 
 #pragma mark - Who's in the car

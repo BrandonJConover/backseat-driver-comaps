@@ -361,6 +361,16 @@ public:
   void SetGpsName(std::string const & name) { m_navigator.SetGpsName(name); }
   /// A caller's voice to warm up, once, when a call that will put them on starts. Empty otherwise.
   std::string TakeCallerVoiceToWarm() { return std::exchange(m_callerVoiceToWarm, std::string()); }
+  /// The host can rebuild the route as another type when the GPS asks it to (see
+  /// TakeTravelModeSwitch()); until it says so, the GPS doesn't ask "Are we actually walking there?".
+  void SetCanSwitchTravelMode(bool can) { m_navigator.SetCanAskTravelMode(can); }
+  /// "drive" when the GPS decided the walk is a drive after all (a "no", or no answer): the host
+  /// switches the route type and rebuilds the route. Empty otherwise.
+  std::string TakeTravelModeSwitch()
+  {
+    auto const mode = m_navigator.TakeModeSwitch();
+    return mode ? backseat::TravelModeName(*mode) : std::string();
+  }
 
 private:
   backseat::RouteSnapshot Snapshot(routing::RoutingSession const & session, std::string const & destinationName) const;
