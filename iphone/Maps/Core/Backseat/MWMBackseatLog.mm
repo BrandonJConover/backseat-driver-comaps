@@ -7,6 +7,8 @@
 
 #include "backseat/debug_log.hpp"
 
+#include "platform/platform.hpp"
+
 namespace
 {
 backseat::LogFields ToFields(NSDictionary<NSString *, NSString *> * dict)
@@ -49,6 +51,11 @@ NSString * DeviceModel()
     GetFramework().GetRoutingManager().GetBackseat().SetDebugLogEnabled(true);
     [NSUserDefaults.standardUserDefaults setBool:YES forKey:migrated];
   }
+}
+
++ (NSString *)directory
+{
+  return @(GetPlatform().SettingsDir().c_str());
 }
 
 + (BOOL)enabled

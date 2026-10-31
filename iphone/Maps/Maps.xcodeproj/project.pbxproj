@@ -161,6 +161,7 @@
 		BD5EA70000000000000000F7 /* BackseatAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000F6 /* BackseatAppearance.swift */; };
 		BD5EA70000000000000000C4 /* MWMBackseatLog.mm in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000C1 /* MWMBackseatLog.mm */; };
 		BD5EA70000000000000000F5 /* MWMBackseatRoadTrip.mm in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000F4 /* MWMBackseatRoadTrip.mm */; };
+		BD5EA70000000000000000D5 /* BackseatDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000D2 /* BackseatDiagnostics.swift */; };
 		BD5EA70000000000000000C5 /* BackseatDriveLogSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */; };
 		8A5DF1798F484411EEE1E998 /* BackseatTalkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */; };
 		34845DAF1E1649F6003D55B9 /* DownloaderNoResultsEmbedViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DAD1E1649F6003D55B9 /* DownloaderNoResultsEmbedViewController.swift */; };
@@ -1011,6 +1012,7 @@
 		BD5EA70000000000000000C1 /* MWMBackseatLog.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatLog.mm; sourceTree = "<group>"; };
 		BD5EA70000000000000000F3 /* MWMBackseatRoadTrip.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MWMBackseatRoadTrip.h; sourceTree = "<group>"; };
 		BD5EA70000000000000000F4 /* MWMBackseatRoadTrip.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatRoadTrip.mm; sourceTree = "<group>"; };
+		BD5EA70000000000000000D2 /* BackseatDiagnostics.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatDiagnostics.swift; sourceTree = "<group>"; };
 		BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatDriveLogSection.swift; sourceTree = "<group>"; };
 		DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatTalkButton.swift; sourceTree = "<group>"; };
 		34763EE91F2F394D00F4D2D3 /* MWMTextToSpeech+CPP.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = "MWMTextToSpeech+CPP.h"; sourceTree = "<group>"; tabWidth = 2; };
@@ -2625,6 +2627,7 @@
 				BD5EA70000000000000000F3 /* MWMBackseatRoadTrip.h */,
 				BD5EA70000000000000000F4 /* MWMBackseatRoadTrip.mm */,
 				BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */,
+				BD5EA70000000000000000D2 /* BackseatDiagnostics.swift */,
 				DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */,
 				E26D17103928978C28885B55 /* MWMBackseatRewriter.h */,
 				0CBA5579CD04841A09E00696 /* MWMBackseatRewriter.mm */,
@@ -4931,6 +4934,7 @@
 				BD5EA70000000000000000C4 /* MWMBackseatLog.mm in Sources */,
 				BD5EA70000000000000000F5 /* MWMBackseatRoadTrip.mm in Sources */,
 				BD5EA70000000000000000C5 /* BackseatDriveLogSection.swift in Sources */,
+				BD5EA70000000000000000D5 /* BackseatDiagnostics.swift in Sources */,
 				8A5DF1798F484411EEE1E998 /* BackseatTalkButton.swift in Sources */,
 				F6E2FE221E097BA00083EBEC /* MWMOpeningHoursEditorViewController.mm in Sources */,
 				ED79A5D72BDF8D6100952D1F /* SynchronizationStateResolver.swift in Sources */,

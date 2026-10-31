@@ -15,6 +15,9 @@ NS_SWIFT_NAME(BackseatLog)
                    key:(NSString *)key
                 fields:(NSDictionary<NSString *, NSString *> *)fields NS_SWIFT_NAME(throttled(_:key:_:));
 
+/// The folder the log files are in.
+@property(class, nonatomic, readonly) NSString * directory;
+
 /// "Keep a drive log" in Settings. On by default.
 @property(class, nonatomic) BOOL enabled;
 
