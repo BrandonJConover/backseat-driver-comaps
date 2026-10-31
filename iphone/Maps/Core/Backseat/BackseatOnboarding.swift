@@ -93,6 +93,8 @@ final class BackseatOnboardingModel: ObservableObject {
   private var lastSkip = Date.distantPast
   /// Presses of Skip that counted. From the first one on, the button runs away.
   @Published private(set) var skips = 0
+  /// Taps on the button while it looked disabled, or next to it once it was moving.
+  @Published private(set) var misses = 0
   /// Who reads the rest of the disclaimer after the fourth press (nil: the driver's voice).
   private var disclaimerVoice: String?
   private var startedReadingAt: Date?
@@ -254,8 +256,15 @@ final class BackseatOnboardingModel: ObservableObject {
 
   /// The Skip button: it doesn't skip. "Stop that, I'm monologuing right now! Be patient," then
   /// back to the sentence it was on.
+  /// For the scoreboard.
+  func skipMissed() {
+    guard skips > 0, !monologueOver else { return }
+    misses += 1
+  }
+
   /// A tap while it looks disabled gets called out, and doesn't count as a press.
   func skipPressed(enabled: Bool) {
+    if !enabled { skipMissed() }
     guard !monologueOver, complaint == nil, Date().timeIntervalSince(lastSkip) > 2.5 else { return }
     lastSkip = Date()
     BackseatLog.event("onboarding", ["step": "skip pressed", "sentence": String(piece)])
@@ -525,6 +534,18 @@ struct BackseatOnboardingView: View {
 
   // MARK: Screen 1
 
+  /// Comes up on the third press, and keeps score from there.
+  private var scoreboard: some View {
+    HStack {
+      Text("SCOREBOARD").font(.caption.weight(.heavy)).foregroundColor(accent)
+      Spacer()
+      Text("Successes \(model.skips)").font(.headline.monospacedDigit())
+      Text("Misses \(model.misses)").font(.headline.monospacedDigit()).padding(.leading, 12)
+    }
+    .padding(14)
+    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(card))
+  }
+
   /// It's a Skip button. It doesn't skip.
   private func skipButton(fill: Color? = nil) -> some View {
     Button {
@@ -558,6 +579,7 @@ struct BackseatOnboardingView: View {
           .padding(.vertical, 8)
         }
         .onChange(of: model.reading) { i in withAnimation { proxy.scrollTo(i, anchor: .center) } }
+        .simultaneousGesture(TapGesture().onEnded(model.skipMissed))
       }
       // It stays over the text, clear of the speech bubble and the answer buttons.
       .overlay {
@@ -580,6 +602,7 @@ struct BackseatOnboardingView: View {
           }
         }
       }
+      if model.skips >= 3 { scoreboard.transition(.opacity) }
       speechBubble
       if !model.monologueOver {
         if model.skips == 0 {
