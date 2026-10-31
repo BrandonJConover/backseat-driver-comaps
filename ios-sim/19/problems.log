@@ -1,0 +1,40 @@
+2026-10-31 17:38:10.038 Df CoMaps (Debug)[13020:3f6a3] [com.apple.UIKit:BackgroundTask] Creating new assertion because there is no existing background assertion.
+2026-10-31 17:38:10.038 Df CoMaps (Debug)[13020:3f6a3] [com.apple.UIKit:BackgroundTask] Creating new background assertion
+2026-10-31 17:38:10.038 Df CoMaps (Debug)[13020:3f6a3] [com.apple.UIKit:BackgroundTask] Created new background assertion <BKSProcessAssertion: 0x6000061197c0>
+2026-10-31 17:38:10.038 I  CoMaps (Debug)[13020:3f6a3] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "Shared Background Assertion 1 for com.brandonjconover.backseatdriver.debug" ID:(null) target:13020>
+2026-10-31 17:38:10.039 Db CoMaps (Debug)[13020:3f6a3] [com.apple.runningboard:assertion] Adding assertion 9160-13020-236 to dictionary
+2026-10-31 17:38:10.039 Df CoMaps (Debug)[13020:3f6a3] [com.apple.UIKit:BackgroundTask] Incrementing reference count for background assertion <BKSProcessAssertion: 0x6000061197c0>
+2026-10-31 17:38:10.574 Df CoMaps (Debug)[13020:3f6c3] [com.apple.UIKit:BackgroundTask] Decrementing reference count for assertion <BKSProcessAssertion: 0x6000061197c0> (used by background task with identifier 2: <_UIBackgroundTaskInfo: 0x60000175ab00>: taskID = 2, taskName = Persistent SceneSession Map Update, creationTime = 2908 (elapsed = 1))
+2026-10-31 17:38:10.574 Df CoMaps (Debug)[13020:3f6c3] [com.apple.UIKit:BackgroundTask] Will invalidate assertion: <BKSProcessAssertion: 0x6000061197c0> for task identifier: 2
+2026-10-31 17:38:11.999 I  CoMaps (Debug)[13020:3f6e2] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "com.apple.CFNetwork.StorageDB" ID:(null) target:13020>
+2026-10-31 17:38:12.020 Db CoMaps (Debug)[13020:3f6e2] [com.apple.runningboard:assertion] Adding assertion 9160-13020-246 to dictionary
+2026-10-31 17:38:17.468 I  CoMaps (Debug)[13020:3f6e3] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "com.apple.CFNetwork.StorageDB" ID:(null) target:13020>
+2026-10-31 17:38:18.449 Db CoMaps (Debug)[13020:3f6e3] [com.apple.runningboard:assertion] Adding assertion 9160-13020-276 to dictionary
+2026-10-31 17:38:20.731 I  CoMaps (Debug)[13020:3f6e3] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "com.apple.CFNetwork.StorageDB" ID:(null) target:13020>
+2026-10-31 17:38:21.021 Db CoMaps (Debug)[13020:3f6e3] [com.apple.runningboard:assertion] Adding assertion 9160-13020-290 to dictionary
+2026-10-31 17:38:27.145 I  CoMaps (Debug)[13020:3f6e2] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "com.apple.CFNetwork.StorageDB" ID:(null) target:13020>
+2026-10-31 17:38:29.634 Db CoMaps (Debug)[13020:3f6e2] [com.apple.runningboard:assertion] Adding assertion 9160-13020-334 to dictionary
+2026-10-31 17:38:40.018 I  CoMaps (Debug)[13020:3f6e2] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "com.apple.CFNetwork.StorageDB" ID:(null) target:13020>
+2026-10-31 17:38:40.142 Db CoMaps (Debug)[13020:3f6e2] [com.apple.runningboard:assertion] Adding assertion 9160-13020-487 to dictionary
+2026-10-31 17:38:45.866 I  CoMaps (Debug)[13020:3f76d] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "systemAnimationFence" ID:(null) target:13020>
+2026-10-31 17:38:45.879 Db CoMaps (Debug)[13020:3f76d] [com.apple.runningboard:assertion] Adding assertion 9160-13020-567 to dictionary
+2026-10-31 17:38:50.935 I  CoMaps (Debug)[13020:3f6e2] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "com.apple.CFNetwork.StorageDB" ID:(null) target:13020>
+2026-10-31 17:38:52.156 Db CoMaps (Debug)[13020:3f6e2] [com.apple.runningboard:assertion] Adding assertion 9160-13020-661 to dictionary
+2026-10-31 17:39:04.648 Db CoMaps (Debug)[13020:3fbc7] [com.apple.defaults:User Defaults] found no value for key EXAssertionLoggingEnabled in CFPrefsSearchListSource<0x600002c86980> (Domain: kCFPreferencesAnyApplication, Container: (null) Non-launch persona: 0)
+2026-10-31 17:39:08.590 I  CoMaps (Debug)[13020:3fbd2] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "com.apple.extension.session" ID:(null) target:13230>
+2026-10-31 17:39:08.606 Db CoMaps (Debug)[13020:3fbd2] [com.apple.runningboard:assertion] Adding assertion 9160-13020-1076 to dictionary
+2026-10-31 17:39:08.606 Df CoMaps (Debug)[13020:3fbd2] [com.apple.PlugInKit:lifecycle] [u 09F55866-A57B-4F7B-A60B-F11E9852CDC5:m (null)] [com.apple.ax.MauiTTSSupport.MauiAUSP(1.0)] acquired startup assertion
+2026-10-31 17:39:11.539 Db CoMaps (Debug)[13020:3f6c3] [com.apple.defaults:User Defaults] CFPrefsPlistSource<0x600002c00480> (Domain: com.brandonjconover.backseatdriver.debug, User: kCFPreferencesCurrentUser, ByHost: No, Container: (null), Contents Need Refresh: No) skipping setting already-present value for key backseat.coreML.loadCrashStreak
+2026-10-31 17:39:11.657 I  CoMaps (Debug)[13020:3f917] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "com.apple.extension.session" ID:(null) target:13230>
+2026-10-31 17:39:11.658 Db CoMaps (Debug)[13020:3f917] [com.apple.runningboard:assertion] Adding assertion 9160-13020-1101 to dictionary
+2026-10-31 17:39:11.658 Df CoMaps (Debug)[13020:3f917] [com.apple.PlugInKit:lifecycle] [u 09F55866-A57B-4F7B-A60B-F11E9852CDC5:m (null)] [com.apple.ax.MauiTTSSupport.MauiAUSP(1.0)] invalidating startup assertion
+2026-10-31 17:39:12.509 I  CoMaps (Debug)[13020:3f6a3] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "AudioRecording" ID:(null) target:13020>
+2026-10-31 17:39:12.511 Db CoMaps (Debug)[13020:3f6a3] [com.apple.runningboard:assertion] Adding assertion 9160-13020-1107 to dictionary
+2026-10-31 17:39:12.511 Db CoMaps (Debug)[13020:3f6a3] [com.apple.coreaudio:AMCP]           HALRBSAssertionGlue.mm:102   Acquired the AudioRecording RBSAssertion for pid: 13020
+2026-10-31 17:39:12.518 I  CoMaps (Debug)[13020:3f6a3] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "MediaPlayback" ID:(null) target:13020>
+2026-10-31 17:39:12.519 Db CoMaps (Debug)[13020:3f6a3] [com.apple.runningboard:assertion] Adding assertion 9160-13020-1108 to dictionary
+2026-10-31 17:39:12.520 Db CoMaps (Debug)[13020:3f6a3] [com.apple.coreaudio:AMCP]           HALRBSAssertionGlue.mm:102   Acquired the MediaPlayback RBSAssertion for pid: 13020
+2026-10-31 17:39:19.854 Db CoMaps (Debug)[13020:3f6c3] [com.apple.defaults:User Defaults] CFPrefsPlistSource<0x600002c00480> (Domain: com.brandonjconover.backseatdriver.debug, User: kCFPreferencesCurrentUser, ByHost: No, Container: (null), Contents Need Refresh: No) skipping setting already-present value for key backseat.coreML.loadCrashStreak
+2026-10-31 17:39:53.648 I  CoMaps (Debug)[13020:3f6e2] [com.apple.runningboard:assertion] Acquiring assertion: <RBSAssertionDescriptor| "com.apple.CFNetwork.StorageDB" ID:(null) target:13020>
+2026-10-31 17:39:53.653 Db CoMaps (Debug)[13020:3f6e2] [com.apple.runningboard:assertion] Adding assertion 9160-13020-2089 to dictionary
+Child process terminated with signal 15: Terminated
