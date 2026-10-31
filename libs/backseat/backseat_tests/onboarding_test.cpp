@@ -30,6 +30,8 @@ TEST(DisclaimerIsBrandonsWordForWord)
   CHECK(paragraphs[3].find("It was him/her/the officer! He/she/they did it.") != std::string::npos);
   CHECK(paragraphs[6].find("wrote Organic Maps and the OpenStreetMap community.") != std::string::npos);
   CHECK(paragraphs.back().find("do you accept these terms?") != std::string::npos);
+  // Brandon's add: the joke is that there isn't one.
+  CHECK(paragraphs[5].find("I will try harder next time. Did you spot my joke?") != std::string::npos);
   // Naming CoMaps changes only the thank-you.
   auto const withCoMaps = DisclaimerParagraphs(true);
   CHECK(withCoMaps[6].find("wrote CoMaps, Organic Maps and the OpenStreetMap community.") != std::string::npos);

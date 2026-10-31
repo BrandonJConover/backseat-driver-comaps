@@ -20,7 +20,7 @@ std::vector<std::string> DisclaimerParagraphs(bool creditCoMaps)
       "that you agreed to this. Don’t subject others to this app while you are in the passenger seat. They "
       "didn’t agree to the contract. You did. I can’t accept that on my conscience.",
       "By using this app, you will experience my special brand of humor. Some jokes may go over your head. Some may "
-      "not. If they don’t I promise I will try harder next time.",
+      "not. If they don’t I promise I will try harder next time. Did you spot my joke?",
       "Don’t use this app if you want to get to your destination. I have no business writing a gps software. "
       "This app was only possible due to the hard work of the open source community that wrote " + wrote +
           ". I don’t think when they set out to build their software that they intended it to be used in this "
