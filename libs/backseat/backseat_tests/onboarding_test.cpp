@@ -66,6 +66,8 @@ TEST(TermsAnswersFollowTheScript)
   CHECK_EQUAL(LinesFor("onboard.terms.yes", 0)[0], std::string("I can't believe that actually worked."));
   CHECK_EQUAL(LinesFor("onboard.monologuing.first", 0)[0], std::string("Stop that, I'm monologuing right now! Be patient."));
   CHECK_EQUAL(LinesFor("onboard.monologuing", 0)[0], std::string("Stop that, I'm monologuing right now! Be patient."));
+  CHECK_EQUAL(LinesFor("onboard.skip.disabled", 0)[0],
+              std::string("You clicked it while it was disabled. Better luck next time."));
   CHECK_EQUAL(LinesFor("onboard.voices.fellForIt", 0)[0], std::string("I can't believe you actually fell for that."));
 }
 
