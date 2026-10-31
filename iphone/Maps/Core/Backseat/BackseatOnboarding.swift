@@ -91,6 +91,7 @@ final class BackseatOnboardingModel: ObservableObject {
   private var complaintAt = Date.distantPast
   private var resumeAt = 0
   private var lastSkip = Date.distantPast
+  private var skips = 0
   private var startedReadingAt: Date?
   private var poll: Timer?
   private var observer: NSObjectProtocol?
@@ -124,7 +125,9 @@ final class BackseatOnboardingModel: ObservableObject {
 
   private func say(_ line: String, in voice: String? = nil) {
     guard !line.isEmpty else { return }
-    KokoroVoice.shared.sayReply(line, voiceID: voice) { MWMTextToSpeech.tts().play(line) }
+    // Every press of Skip hurries the disclaimer along. The later screens go back to the first pace.
+    let step = screen == .disclaimer ? skips : 0
+    KokoroVoice.shared.sayReplyBriskly(line, step: step, voiceID: voice) { MWMTextToSpeech.tts().play(line) }
   }
 
   /// Says it and shows it in the bubble.
@@ -215,6 +218,7 @@ final class BackseatOnboardingModel: ObservableObject {
         BackseatLog.event("onboarding", ["step": "resume", "sentence": String(resumeAt), "complained": said ? "yes" : "no",
                                          "line": String(pending.prefix(40))])
         complaint = nil
+        bubble = ""
         read(from: resumeAt)
       }
       return
@@ -240,13 +244,16 @@ final class BackseatOnboardingModel: ObservableObject {
     KokoroVoice.shared.stop()
     // The sentence comes back only once the complaint is over (checkReading): it's already rendered,
     // so queued now it would play straight away, before the complaint is even rendered.
-    let line = MWMBackseatRewriter.line("onboard.monologuing", vars: [:]).trimmingCharacters(in: .whitespacesAndNewlines)
+    skips += 1
+    let key = skips == 1 ? "onboard.monologuing.first" : "onboard.monologuing"
+    let line = MWMBackseatRewriter.line(key, vars: [:]).trimmingCharacters(in: .whitespacesAndNewlines)
     resumeAt = piece
     queuedUpTo = piece
     complaint = line
     complaintStarted = false
     complaintAt = Date()
-    say(line)
+    // On screen as well, for anyone who can't hear it.
+    reply(line)
   }
 
   /// 0 yes, 1 no, 2 skip.

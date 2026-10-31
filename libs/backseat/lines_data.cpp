@@ -5042,6 +5042,12 @@ LineTable const & LineData()
        {"Your continued interaction with the app fulfills the requirement that I set up at the top of accepting the legally binding contact. I got you on a technicality. I'm proceeding past this menu now as the bit is getting old."},
        {"Your continued interaction with the app fulfills the requirement that I set up at the top of accepting the legally binding contact. I got you on a technicality. I'm proceeding past this menu now as the bit is getting old."},
      }}},
+    {"onboard.monologuing.first",
+     {{
+       {"Stop that, I'm monologuing right now! Be patient."},
+       {"Stop that, I'm monologuing right now! Be patient."},
+       {"Stop that, I'm monologuing right now! Be patient."},
+     }}},
     {"onboard.monologuing",
      {{
        {"Stop that, I'm monologuing right now! Be patient.",
