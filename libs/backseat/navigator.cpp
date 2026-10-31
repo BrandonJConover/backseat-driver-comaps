@@ -189,7 +189,7 @@ double constexpr kActiveTripStampEveryS = 60;
 /// still finishes this far before the maneuver.
 double constexpr kNavWaitMaxMs = 4000;
 /// The pause the phone leaves after each line.
-double constexpr kLinePauseMs = 350;
+double constexpr kNavLinePauseMs = 350;
 /// A first turn closer than this when the trip starts is said before the greeting.
 double constexpr kFirstTurnFirstWithinM = 350;
 /// "Still speeding" nags back off to one every 5 minutes on a long stretch over the limit.
@@ -788,7 +788,7 @@ std::vector<Commentary> Navigator::TakeLines()
     m_lastSpokeT = m_lastT;
   // What the phone will be busy saying, so the next turn call and the roasts can plan around it.
   for (auto const & l : lines)
-    m_talkingUntil = std::max(m_talkingUntil, m_lastT) + SpeakingMs(l.text, l.voiceSpeed) + kLinePauseMs;
+    m_talkingUntil = std::max(m_talkingUntil, m_lastT) + SpeakingMs(l.text, l.voiceSpeed) + kNavLinePauseMs;
   if (m_engine)
     m_engine->SetTalkingUntil(m_talkingUntil);
   // Directions cut into 20 Questions: back to the game once they're done.
