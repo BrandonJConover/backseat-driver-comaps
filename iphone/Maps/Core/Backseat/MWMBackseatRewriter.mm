@@ -451,6 +451,31 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   GetFramework().GetRoutingManager().SetBackseatVoices(std::move(voices));
   // This app can rebuild a route as a drive, so the GPS may ask "Are we actually walking there?".
   GetFramework().GetRoutingManager().GetBackseat().SetCanSwitchTravelMode(true);
+  // The mic opens after "quiz.ask" lines (listenForGameAnswer), so pop quizzes can be answered.
+  GetFramework().GetRoutingManager().GetBackseat().SetPopQuizOn(true);
+}
+
++ (nullable NSDictionary<NSString *, id> *)popQuiz
+{
+  auto const card = GetFramework().GetRoutingManager().GetBackseat().PopQuizCard();
+  if (!card)
+    return nil;
+  NSMutableArray<NSString *> * choices = [NSMutableArray arrayWithCapacity:3];
+  for (auto const & c : card->choices)
+    [choices addObject:@(c.c_str())];
+  return @{
+    @"question": @(card->question.c_str()),
+    @"choices": choices,
+    @"picked": @(card->picked),
+    @"correct": @(card->correct),
+    @"tappable": @(card->tappable),
+    @"brownies": @(card->brownies),
+  };
+}
+
++ (void)answerQuiz:(NSInteger)choice
+{
+  GetFramework().GetRoutingManager().GetBackseat().QuizTapped(static_cast<int>(choice));
 }
 
 static BOOL gDrivingHighlighted = NO;

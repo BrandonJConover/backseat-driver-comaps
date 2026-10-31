@@ -9,6 +9,7 @@ std::vector<Badge> const & Badges()
 {
   static std::vector<Badge> const badges = {
       {"nascar", "NASCAR Driver", "Three left turns in a row. Round and round we go."},
+      {"teacherspet", "Teacher's Pet", "Ten brownie points from pop quizzes. Brown noser."},
   };
   return badges;
 }

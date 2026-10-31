@@ -2158,6 +2158,12 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
 {
   backseat::Trace("heard.app", {{"text", text}});
   HeardCommand heard;
+  // A pop quiz answer ("pull to the right and stop", "speed up") is an answer, not a command.
+  if (m_navigator.QuizTakes(text))
+  {
+    m_navigator.OnDriverSaid(0, text);
+    return heard;
+  }
   // "I'm a woman": it guessed wrong, and it's not happy about being corrected.
   if (auto const pronouns = backseat::PronounCorrection(text))
   {
@@ -3068,9 +3074,10 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
                             {"speed", backseat::LogNum(c.voiceSpeed, 2)},
                             {"text", c.text}});
     out.push_back(c.text);
-    // 20 Questions and "Are you actually intending to walk there?" want an answer out loud.
+    // 20 Questions, "Are you actually intending to walk there?" and a pop quiz want an answer out loud.
     m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed, c.maxWaitMs, c.voice,
-                            c.category == backseat::Category::TwentyQuestions || c.key == "mode.ask.walk"});
+                            c.category == backseat::Category::TwentyQuestions || c.key == "mode.ask.walk" ||
+                                c.key == "quiz.ask"});
     if (c.priority == backseat::Priority::Nav)
       m_lastDirection = c.text;
   }
