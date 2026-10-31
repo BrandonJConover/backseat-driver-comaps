@@ -97,6 +97,7 @@ final class BackseatOnboardingModel: ObservableObject {
   @Published private(set) var misses = 0
   /// Who reads the rest of the disclaimer after the fourth press (nil: the driver's voice).
   private var disclaimerVoice: String?
+  private var voicesHeard = Set<String>()
   private var startedReadingAt: Date?
   private var poll: Timer?
   private var observer: NSObjectProtocol?
@@ -256,6 +257,17 @@ final class BackseatOnboardingModel: ObservableObject {
 
   /// The Skip button: it doesn't skip. "Stop that, I'm monologuing right now! Be patient," then
   /// back to the sentence it was on.
+  /// The fourth press brings in the other gender, and every press after that someone new, until
+  /// they've all had a turn.
+  private func changeDisclaimerVoice() {
+    let pick = skips == 4 ? KokoroVoice.otherVoice(voiceID) : nil
+    let everyone = KokoroVoice.voiceOptions.map(\.id).filter { $0 != voiceID && $0 != disclaimerVoice }
+    let fresh = everyone.filter { !voicesHeard.contains($0) }
+    if fresh.isEmpty { voicesHeard.removeAll() }
+    disclaimerVoice = pick ?? fresh.randomElement() ?? everyone.randomElement() ?? disclaimerVoice
+    if let disclaimerVoice { voicesHeard.insert(disclaimerVoice) }
+  }
+
   /// For the scoreboard.
   func skipMissed() {
     guard skips > 0, !monologueOver else { return }
@@ -273,7 +285,7 @@ final class BackseatOnboardingModel: ObservableObject {
     // so queued now it would play straight away, before the complaint is even rendered.
     if enabled {
       skips += 1
-      if skips == 4 { disclaimerVoice = KokoroVoice.otherVoice(voiceID) }
+      if skips >= 4 { changeDisclaimerVoice() }
     }
     let key = !enabled ? "onboard.skip.disabled" : skips == 1 ? "onboard.monologuing.first" : "onboard.monologuing"
     let line = MWMBackseatRewriter.line(key, vars: [:]).trimmingCharacters(in: .whitespacesAndNewlines)
