@@ -1356,7 +1356,7 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
 
 /// How fast the first launch talks, as a multiple of the usual pace.
 enum FirstLaunchTempo: Float, CaseIterable {
-  case half = 0.5
+  case third = 0.33
   case normal = 1
   case brisk = 1.2
   case faster = 1.35

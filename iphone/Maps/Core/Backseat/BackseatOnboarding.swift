@@ -141,13 +141,13 @@ final class BackseatOnboardingModel: ObservableObject {
     }
   }
 
-  /// Faster, faster, half speed, then normal speed from the fourth press on.
+  /// Faster, faster, a third of normal speed, then normal speed from the fourth press on.
   private static func tempo(afterSkips skips: Int) -> FirstLaunchTempo {
     switch skips {
     case 0: return .brisk
     case 1: return .faster
     case 2: return .fastest
-    case 3: return .half
+    case 3: return .third
     default: return .normal
     }
   }
@@ -253,7 +253,7 @@ final class BackseatOnboardingModel: ObservableObject {
     let readToTheEnd = piece == pieces.count - 1 && queuedUpTo == pieces.count - 1 && !KokoroVoice.shared.anyVoiceSpeaking
     // However the voice is doing, the buttons come after about as long as reading it takes.
     let words = paragraphs.joined(separator: " ").split(separator: " ").count
-    let tooLong = startedReadingAt.map { Date().timeIntervalSince($0) > Double(words) / (skips >= 3 ? 1.1 : 2.2) + 45 } ?? false
+    let tooLong = startedReadingAt.map { Date().timeIntervalSince($0) > Double(words) / (skips >= 3 ? 0.75 : 2.2) + 45 } ?? false
     if readToTheEnd || tooLong {
       monologueOver = true
       reading = last
