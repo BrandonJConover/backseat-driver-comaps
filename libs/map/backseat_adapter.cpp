@@ -2269,6 +2269,23 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     heard.query = command.argument;
     return m_navigator.Reply("cmd.findStop", {{"place", command.argument}});
   }
+  case AppAction::BeNicer: return NicenessMoved();
+  case AppAction::BeMeaner: return m_navigator.Reply("cmd.meaner");
+  case AppAction::GradeSoFar:
+  {
+    auto const * engine = m_navigator.Engine();
+    if (!engine || !m_navigator.InTrip())
+      return m_navigator.Reply("cmd.grade.none");
+    auto const report = engine->Report();
+    return m_navigator.Reply("cmd.grade", {{"grade", backseat::SpokenGrade(report.overall.letter)},
+                                           {"missed", std::to_string(report.missed)},
+                                           {"reroutes", std::to_string(report.reroutes)},
+                                           {"ontime", std::to_string(report.onTime)},
+                                           {"over", std::to_string(report.maxOverLimit)}});
+  }
+  case AppAction::RoastMe: return m_navigator.Reply("cmd.roastMe");
+  case AppAction::TellJoke: return m_navigator.Reply("cmd.joke");
+  case AppAction::BlameGps: return m_navigator.Reply("cmd.blame");
   case AppAction::SpeedLimit:
     if (m_speedLimitMps <= 0)
       return m_navigator.Reply("cmd.limit.none");

@@ -69,6 +69,12 @@ enum class AppAction
   ArrivalTime,
   DifferentRoute,
   TakeMeBack,
+  BeNicer,
+  BeMeaner,
+  GradeSoFar,
+  RoastMe,
+  TellJoke,
+  BlameGps,
   Count
 };
 

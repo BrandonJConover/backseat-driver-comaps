@@ -522,6 +522,22 @@ TEST(DrivingCommandsAreHeard)
   CHECK(ParseAppCommands("take me back to work")[0].action == AppAction::NavigateTo);
 }
 
+TEST(ComedyCommandsAreHeard)
+{
+  CHECK(Heard("could you be nicer", AppAction::BeNicer));
+  CHECK(Heard("be meaner", AppAction::BeMeaner));
+  CHECK(Heard("how am I doing", AppAction::GradeSoFar));
+  CHECK(Heard("roast me", AppAction::RoastMe));
+  CHECK(Heard("tell me a joke", AppAction::TellJoke));
+  CHECK(Heard("that was your fault", AppAction::BlameGps));
+  CHECK(Heard("you're wrong", AppAction::BlameGps));
+  // Plain talk stays plain talk.
+  for (char const * chatter : {"what a joke", "that movie was funny", "they're mean people", "he has a nice car"})
+    CHECK(ParseAppCommands(chatter).empty());
+  for (char const * key : {"cmd.meaner", "cmd.grade", "cmd.grade.none", "cmd.roastMe", "cmd.joke", "cmd.blame"})
+    CHECK(LinesFor(key, 0).size() >= 6);
+}
+
 TEST(DrivingChatterIsntACommand)
 {
   for (char const * chatter : {"I'm skipping lunch", "next time we should stop", "what a joke", "the speed limit here is silly",

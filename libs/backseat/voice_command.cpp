@@ -138,6 +138,12 @@ std::vector<AppTool> const & AppTools()
       {AppAction::ArrivalTime, "arrival_time", "Say what time on the clock we'll get there.", nullptr},
       {AppAction::DifferentRoute, "different_route", "Try another way to the destination.", nullptr},
       {AppAction::TakeMeBack, "take_me_back", "Drive back to where this trip started.", nullptr},
+      {AppAction::BeNicer, "be_nicer", "The driver wants the GPS to be nicer.", nullptr},
+      {AppAction::BeMeaner, "be_meaner", "The driver wants the GPS to be meaner.", nullptr},
+      {AppAction::GradeSoFar, "grade_so_far", "Give a report card for the trip so far.", nullptr},
+      {AppAction::RoastMe, "roast_me", "Insult the driver, because they asked.", nullptr},
+      {AppAction::TellJoke, "tell_joke", "Tell a joke.", nullptr},
+      {AppAction::BlameGps, "blame_gps", "The driver says the GPS was wrong or at fault.", nullptr},
   };
   return tools;
 }
@@ -227,6 +233,14 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       {AppAction::NextTurn, {" what's the next turn ", " whats the next turn ", " what is the next turn ",
                              " where do i turn ", " when do i turn ", " when's my next turn ", " whens my next turn ",
                              " what's my next turn ", " whats my next turn "}},
+      {AppAction::BeNicer, {" be nicer ", " be nice ", " nicer to me ", " stop being mean ", " stop being so mean ", " be kinder "}},
+      {AppAction::BeMeaner, {" be meaner ", " be mean ", " meaner to me ", " be more mean "}},
+      {AppAction::GradeSoFar, {" grade me ", " grade so far ", " what's my grade ", " whats my grade ", " how am i doing ",
+                               " how am i driving ", " my report card ", " give me a report card "}},
+      {AppAction::RoastMe, {" roast me ", " insult me ", " make fun of me "}},
+      {AppAction::TellJoke, {" tell me a joke ", " tell a joke ", " tell us a joke ", " say something funny ", " got any jokes "}},
+      {AppAction::BlameGps, {" your fault ", " you're wrong ", " youre wrong ", " you were wrong ", " that's on you ",
+                             " thats on you ", " you messed up ", " you got it wrong ", " blame you "}},
       {AppAction::SkipStop, {" skip this stop ", " skip the stop ", " skip the next stop ", " remove the stop ",
                              " remove this stop ", " cancel the stop ", " cancel this stop ", " no more stops "}},
       {AppAction::NextStop, {" what's the next stop ", " whats the next stop ", " what is the next stop ",
@@ -501,6 +515,12 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::ArrivalTime: return saidAny({"time", "arrive", "arrival"});
   case AppAction::DifferentRoute: return saidAny({"route", "way"}) && saidAny({"different", "another", "other", "better", "alternate", "alternative"});
   case AppAction::TakeMeBack: return saidAny({"back", "start"});
+  case AppAction::BeNicer: return saidAny({"nice", "nicer", "kinder", "mean"});
+  case AppAction::BeMeaner: return saidAny({"mean", "meaner"});
+  case AppAction::GradeSoFar: return saidAny({"grade", "doing", "driving", "card"});
+  case AppAction::RoastMe: return saidAny({"roast", "insult", "fun"});
+  case AppAction::TellJoke: return saidAny({"joke", "jokes", "funny"});
+  case AppAction::BlameGps: return saidAny({"fault", "wrong", "blame", "messed"}) || saidAny({"on"}) && saidAny({"you"});
   case AppAction::Count: break;
   }
   return false;

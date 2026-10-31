@@ -187,6 +187,12 @@ void Perform(backseat::AppCommand const & command)
   case AppAction::CurrentRoad:
   case AppAction::NextTurn:
   case AppAction::ArrivalTime:
+  case AppAction::BeNicer:
+  case AppAction::BeMeaner:
+  case AppAction::GradeSoFar:
+  case AppAction::RoastMe:
+  case AppAction::TellJoke:
+  case AppAction::BlameGps:
   case AppAction::Count: break;
   }
 }
