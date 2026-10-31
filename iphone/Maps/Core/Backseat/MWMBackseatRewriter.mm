@@ -24,6 +24,7 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 
 namespace
 {
@@ -60,6 +61,24 @@ std::shared_ptr<BlockRewriter> & Installed()
 
 MWMBackseatToolHandler gToolHandler;
 BOOL gToolsAvailable = NO;
+
+// The voice queues lines from several threads.
+std::mutex & SpokenLinesMutex()
+{
+  static std::mutex mutex;
+  return mutex;
+}
+
+backseat::SpokenLines & RecentlySpoken()
+{
+  static backseat::SpokenLines lines;
+  return lines;
+}
+
+double NowMs()
+{
+  return NSDate.date.timeIntervalSince1970 * 1000;
+}
 
 /// Says a line in `voiceId` (the picked voice when empty), in turn with the other replies.
 void SayReply(std::string const & text, std::string const & voiceId)
@@ -185,6 +204,12 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
 
 + (void)driverSaid:(NSString *)text
 {
+  // "Yeah": nothing for the model to make into a route. The keywords still catch an answer to a question.
+  if (backseat::IsFiller(text.UTF8String ?: ""))
+  {
+    Perform(GetFramework().GetRoutingManager().BackseatDriverSaid(text.UTF8String ?: ""));
+    return;
+  }
   // With the on-device model, it picks the app action; what it can't place goes to the keywords.
   // Not during a game: "Are you metal?" is a question for the game, and the model made it "list the
   // voices". The keywords hand it to the game, and still catch real commands.
@@ -207,6 +232,19 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
     return;
   }
   Perform(GetFramework().GetRoutingManager().BackseatDriverSaid(text.UTF8String ?: ""));
+}
+
++ (void)noteSpoken:(NSString *)line
+{
+  std::lock_guard lock(SpokenLinesMutex());
+  RecentlySpoken().Add(NowMs(), line.UTF8String ?: "");
+}
+
++ (NSString *)echoOf:(NSString *)heard
+{
+  std::lock_guard lock(SpokenLinesMutex());
+  auto const line = RecentlySpoken().EchoOf(NowMs(), heard.UTF8String ?: "");
+  return line ? @(line->c_str()) : nil;
 }
 
 + (void)installToolHandler:(MWMBackseatToolHandler)handler
@@ -287,10 +325,14 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   return descriptions;
 }
 
-+ (void)runTool:(NSString *)name argument:(NSString *)argument spoken:(NSString *)spoken
++ (BOOL)runTool:(NSString *)name argument:(NSString *)argument spoken:(NSString *)spoken
 {
-  Perform(GetFramework().GetRoutingManager().BackseatRunTool(name.UTF8String ?: "", argument.UTF8String ?: "",
-                                                             spoken.UTF8String ?: ""));
+  auto const heard = GetFramework().GetRoutingManager().BackseatRunTool(name.UTF8String ?: "", argument.UTF8String ?: "",
+                                                                        spoken.UTF8String ?: "");
+  if (heard.unsupported)
+    return NO;
+  Perform(heard);
+  return YES;
 }
 
 + (double)metersToNextTurn

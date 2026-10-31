@@ -267,6 +267,173 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   return out;
 }
 
+namespace
+{
+std::vector<std::string> WordsOf(std::string const & text)
+{
+  std::istringstream in(CommandWords(text));
+  std::vector<std::string> words;
+  std::string word;
+  while (in >> word)
+    words.push_back(word);
+  return words;
+}
+
+bool IsSmallWord(std::string const & word)
+{
+  static char const * const kSmall[] = {"a", "an", "the", "to", "of", "in", "on", "at", "me", "my", "i", "you", "your",
+                                        "it", "it's", "is", "are", "and", "or", "we", "us", "be", "that", "this", "for"};
+  return std::find_if(std::begin(kSmall), std::end(kSmall), [&word](char const * s) { return word == s; }) != std::end(kSmall);
+}
+
+bool Contains(std::vector<std::string> const & words, std::string const & word)
+{
+  return std::find(words.begin(), words.end(), word) != words.end();
+}
+}  // namespace
+
+bool IsEchoOf(std::string const & heard, std::string const & line)
+{
+  auto const said = WordsOf(heard);
+  auto const spoken = WordsOf(line);
+  size_t meaningful = 0, matched = 0;
+  for (auto const & word : said)
+  {
+    if (IsSmallWord(word))
+      continue;
+    ++meaningful;
+    matched += Contains(spoken, word) ? 1 : 0;
+  }
+  // "Take me to the store" shouldn't be an echo of a line with "take me to the" in it.
+  if (meaningful < 2)
+    return false;
+  if (static_cast<double>(matched) / meaningful >= 0.6)
+    return true;
+  size_t constexpr kRun = 3;
+  std::string const paddedLine = CommandWords(line);
+  for (size_t i = 0; i + kRun <= said.size(); ++i)
+  {
+    size_t bigWords = 0;
+    std::string run = " ";
+    for (size_t j = i; j < i + kRun; ++j)
+    {
+      run += said[j] + " ";
+      bigWords += IsSmallWord(said[j]) ? 0 : 1;
+    }
+    if (bigWords >= 2 && paddedLine.find(run) != std::string::npos)
+      return true;
+  }
+  return false;
+}
+
+void SpokenLines::Add(double tMs, std::string line)
+{
+  m_lines.push_back({tMs, std::move(line)});
+}
+
+std::optional<std::string> SpokenLines::EchoOf(double tMs, std::string const & heard)
+{
+  m_lines.erase(std::remove_if(m_lines.begin(), m_lines.end(), [tMs](Spoken const & s) { return tMs - s.tMs > kWindowMs; }),
+                m_lines.end());
+  for (auto it = m_lines.rbegin(); it != m_lines.rend(); ++it)
+    if (IsEchoOf(heard, it->line))
+      return it->line;
+  return {};
+}
+
+bool IsFiller(std::string const & spoken)
+{
+  static char const * const kFiller[] = {"yeah", "yes", "yep", "yup", "ok", "okay", "uh", "um", "umm", "mm", "mmm", "hmm",
+                                         "huh", "oh", "ah", "no", "nope", "nah", "sure", "right", "so", "well"};
+  auto const words = WordsOf(spoken);
+  return std::all_of(words.begin(), words.end(), [](std::string const & word)
+  { return std::find_if(std::begin(kFiller), std::end(kFiller), [&word](char const * f) { return word == f; }) != std::end(kFiller); });
+}
+
+bool WordsSupportTool(AppAction action, std::string const & argument, std::string const & spoken)
+{
+  auto const said = WordsOf(spoken);
+  auto const saidAny = [&said](std::initializer_list<char const *> words)
+  { return std::any_of(words.begin(), words.end(), [&said](char const * w) { return Contains(said, w); }); };
+  auto const argumentSaid = [&]
+  {
+    auto const wanted = WordsOf(argument);
+    size_t big = 0, found = 0;
+    for (auto const & word : wanted)
+    {
+      if (IsSmallWord(word))
+        continue;
+      ++big;
+      found += Contains(said, word) ? 1 : 0;
+    }
+    return big > 0 && found * 2 >= big;
+  };
+  switch (action)
+  {
+  case AppAction::NavigateTo:
+    return argumentSaid() || ParseDestinationCommand(spoken) ||
+           saidAny({"take", "navigate", "drive", "directions", "route", "head", "bring", "go"});
+  case AppAction::CancelRoute: return saidAny({"cancel", "stop", "end", "forget", "quit"});
+  case AppAction::Mute: return saidAny({"mute", "quiet", "shut", "hush", "silence", "stop", "sound"});
+  case AppAction::Unmute: return saidAny({"unmute", "un", "talk", "speak", "sound", "back"});
+  case AppAction::RepeatInstruction: return saidAny({"repeat", "again", "what", "what's", "whats", "next", "where"});
+  case AppAction::TimeLeft:
+    return saidAny({"long", "far", "eta", "time", "when", "there", "minutes", "left", "longer", "further", "farther"});
+  case AppAction::ReportPolice: return saidAny({"police", "cop", "cops", "pulled", "pulling", "trooper", "sheriff", "officer"});
+  case AppAction::PlayPlateGame: return saidAny({"plate", "plates", "license", "game"});
+  case AppAction::AvoidTolls:
+  case AppAction::AllowTolls: return saidAny({"toll", "tolls"});
+  case AppAction::AvoidHighways:
+  case AppAction::AllowHighways: return saidAny({"highway", "highways", "freeway", "freeways", "interstate", "back"});
+  case AppAction::ChangeVoice:
+    return argumentSaid() || saidAny({"voice", "voices", "switch", "change", "sound"});
+  case AppAction::ListVoices: return saidAny({"voice", "voices"});
+  case AppAction::ZoomIn:
+  case AppAction::ZoomOut: return saidAny({"zoom", "closer", "farther"});
+  case AppAction::Recenter: return saidAny({"center", "recenter", "re", "where"});
+  case AppAction::RouteOverview: return saidAny({"route", "overview", "map", "whole"});
+  case AppAction::OpenSettings: return saidAny({"settings", "preferences", "options"});
+  case AppAction::StopListening: return saidAny({"listening", "mic", "microphone", "eavesdropping"});
+  case AppAction::ListCommands: return saidAny({"commands", "command", "help", "can", "how", "do"});
+  case AppAction::Count: break;
+  }
+  return false;
+}
+
+namespace
+{
+/// "Peace Lutheran" and "Peace Lutheran and Rogers" are the same place being asked for.
+bool SameDestination(std::string const & a, std::string const & b)
+{
+  std::string const wordsA = CommandWords(a), wordsB = CommandWords(b);
+  return wordsA.find(wordsB) != std::string::npos || wordsB.find(wordsA) != std::string::npos;
+}
+}  // namespace
+
+bool CommandRepeats::IsRepeat(AppCommand const & command, double tMs)
+{
+  // Asking twice is the point of these.
+  if (command.action == AppAction::RepeatInstruction || command.action == AppAction::TimeLeft ||
+      command.action == AppAction::ZoomIn || command.action == AppAction::ZoomOut)
+    return false;
+  m_ran.erase(std::remove_if(m_ran.begin(), m_ran.end(), [tMs](Ran const & r) { return tMs - r.tMs >= kRepeatMs; }), m_ran.end());
+  std::string const key = std::to_string(static_cast<int>(command.action)) + CommandWords(command.argument);
+  if (command.action == AppAction::NavigateTo)
+  {
+    bool const building = m_buildingSince && tMs - *m_buildingSince < kBuildingMaxMs;
+    if ((building || m_lastNavigateAt && tMs - *m_lastNavigateAt < kRepeatMs) && SameDestination(m_buildingTo, command.argument))
+      return true;
+    m_buildingSince = tMs;
+    m_lastNavigateAt = tMs;
+    m_buildingTo = command.argument;
+    return false;
+  }
+  if (std::any_of(m_ran.begin(), m_ran.end(), [&key](Ran const & r) { return r.key == key; }))
+    return true;
+  m_ran.push_back({tMs, key});
+  return false;
+}
+
 bool SaidYes(std::string const & spoken)
 {
   std::string const words = CommandWords(spoken);

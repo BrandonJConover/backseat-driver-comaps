@@ -568,6 +568,7 @@ final class KokoroVoice: NSObject {
   private func enqueue(_ text: String, nav: Bool, speed: Float, voice requested: String?, keep: Bool,
                        fallback: @escaping () -> Void, budget: TimeInterval = navDeadline,
                        noWait: Bool = false) {
+    MWMBackseatRewriter.noteSpoken(text)
     let queuedAt = Date()
     lock.lock()
     if loadOnFirstLine {

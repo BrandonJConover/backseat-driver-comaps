@@ -84,6 +84,8 @@ public:
       Search
     };
     Kind kind = Kind::None;
+    /// RunTool: the words didn't support that tool, so nothing ran.
+    bool unsupported = false;
     double lat = 0;
     double lon = 0;
     std::string name;
@@ -410,6 +412,7 @@ private:
   double m_exitCheckAt = 0;
   bool m_askStateNext = false;
   int m_searches = 0;
+  backseat::CommandRepeats m_commandRepeats;
   /// The usual trip AskWhereTo() guessed, waiting for a "yes".
   struct Guess
   {

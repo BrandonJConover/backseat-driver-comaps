@@ -19,6 +19,10 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 + (void)setAvailable:(BOOL)available;
 /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate". Main thread.
 + (void)driverSaid:(NSString *)text;
+/// The GPS is saying `line`, so the mic may pick it up.
++ (void)noteSpoken:(NSString *)line;
+/// The line the GPS said lately that `heard` is an echo of, if any.
++ (nullable NSString *)echoOf:(NSString *)heard;
 /// Lets the GPS see whether other audio (music, podcasts) is playing.
 + (void)installMusicCheck;
 
@@ -30,7 +34,8 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 /// Each app action as "what it does", for the "what can you do?" sheet.
 @property(class, nonatomic, readonly) NSArray<NSString *> * commandDescriptions;
 /// Carries out the action the model picked. Main thread.
-+ (void)runTool:(NSString *)name argument:(NSString *)argument spoken:(NSString *)spoken;
+/// NO when what was said doesn't support the tool: nothing ran.
++ (BOOL)runTool:(NSString *)name argument:(NSString *)argument spoken:(NSString *)spoken;
 /// Tells the navigator which voices there are, for "what voice options do you have?".
 + (void)shareVoices;
 /// How far the next turn is while following a route, in meters; -1 without a route.

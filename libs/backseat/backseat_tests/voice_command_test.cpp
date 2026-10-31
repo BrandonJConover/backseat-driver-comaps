@@ -433,3 +433,70 @@ TEST(BusinessOwnerAnswers)
   CHECK(BusinessOwnerPossessive("wife") == "your wife's");
   CHECK(BusinessOwnerPossessive("Sarah") == "Sarah's");
 }
+
+TEST(TheGpsDoesntObeyItself)
+{
+  std::string const line = "Please stop making a U-turn. If you keep going, we'll be headed the wrong way again.";
+  CHECK(IsEchoOf("Wrong way again", line));
+  CHECK(IsEchoOf("Right away", "peace Lutheran. Yes, boss. Right away, boss."));
+  CHECK(IsEchoOf("Three results", "I found three results. First, Peace Lutheran Church."));
+  CHECK(IsEchoOf("headed the wrong way", line));
+  // The driver's own words, even with a line's small words in them.
+  CHECK(!IsEchoOf("Take me to work", "Take me to the moon, you said? Fine."));
+  CHECK(!IsEchoOf("go to the store", "You should go to the left lane."));
+  CHECK(!IsEchoOf("Yes", "Yes, boss."));
+  CHECK(!IsEchoOf("work", "Back to work."));
+  CHECK(!IsEchoOf("", line));
+
+  SpokenLines lines;
+  lines.Add(1000, line);
+  CHECK(lines.EchoOf(12000, "Wrong way again") == line);
+  CHECK(!lines.EchoOf(12000, "Take me to Walmart"));
+  CHECK(!lines.EchoOf(21001, "Wrong way again"));
+}
+
+TEST(ChatterIsntACommand)
+{
+  CHECK(IsFiller("Yeah"));
+  CHECK(IsFiller("uh, okay"));
+  CHECK(IsFiller(""));
+  CHECK(!IsFiller("Yeah take me home"));
+  CHECK(!IsFiller("Walmart"));
+
+  CHECK(!WordsSupportTool(AppAction::NavigateTo, "Melissa Drive", "Yeah"));
+  CHECK(!WordsSupportTool(AppAction::NavigateTo, "Peace Lutheran", "Wrong way again"));
+  CHECK(WordsSupportTool(AppAction::NavigateTo, "Sundance Lane", "Take me home"));
+  CHECK(WordsSupportTool(AppAction::NavigateTo, "Peace Lutheran", "Peace Lutheran"));
+  CHECK(WordsSupportTool(AppAction::NavigateTo, "the airport", "I need the airport"));
+  CHECK(!WordsSupportTool(AppAction::ListVoices, "", "Are you metal"));
+  CHECK(WordsSupportTool(AppAction::ListVoices, "", "what voices do you have"));
+  CHECK(WordsSupportTool(AppAction::ChangeVoice, "Heart", "Switch to heart"));
+  CHECK(WordsSupportTool(AppAction::ChangeVoice, "Pink", "Pink a pink"));
+  CHECK(!WordsSupportTool(AppAction::ChangeVoice, "Heart", "I love this road"));
+  CHECK(!WordsSupportTool(AppAction::CancelRoute, "", "I hate this song"));
+  CHECK(WordsSupportTool(AppAction::CancelRoute, "", "stop the route"));
+}
+
+TEST(CommandsDontRunTwice)
+{
+  CommandRepeats repeats;
+  CHECK(!repeats.IsRepeat({AppAction::NavigateTo, "peace Lutheran and Rogers"}, 0));
+  CHECK(repeats.IsRepeat({AppAction::NavigateTo, "Peace Lutheran"}, 4000));
+  // Still being built after the 15 seconds that catch any other repeat.
+  CHECK(repeats.IsRepeat({AppAction::NavigateTo, "peace lutheran"}, 40000));
+  // Somewhere else is a new request.
+  CHECK(!repeats.IsRepeat({AppAction::NavigateTo, "Walmart"}, 41000));
+  repeats.RouteStarted();
+  // Started, but the same words a moment later are still a repeat.
+  CHECK(repeats.IsRepeat({AppAction::NavigateTo, "walmart"}, 42000));
+  CHECK(!repeats.IsRepeat({AppAction::NavigateTo, "walmart"}, 57000));
+  // A route that never came can be asked for again.
+  CHECK(!repeats.IsRepeat({AppAction::NavigateTo, "walmart"}, 118000));
+
+  CHECK(!repeats.IsRepeat({AppAction::Mute, ""}, 200000));
+  CHECK(repeats.IsRepeat({AppAction::Mute, ""}, 210000));
+  CHECK(!repeats.IsRepeat({AppAction::Unmute, ""}, 211000));
+  CHECK(!repeats.IsRepeat({AppAction::Mute, ""}, 216000));
+  CHECK(!repeats.IsRepeat({AppAction::RepeatInstruction, ""}, 217000));
+  CHECK(!repeats.IsRepeat({AppAction::RepeatInstruction, ""}, 218000));
+}

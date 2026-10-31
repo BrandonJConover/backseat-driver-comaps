@@ -165,11 +165,14 @@ private struct AppActionTool: Tool {
   func call(arguments: GeneratedContent) async throws -> String {
     let action = try arguments.value(String.self, forProperty: "action")
     let argument = (try? arguments.value(String?.self, forProperty: "argument")) ?? nil
-    turn.markUsed()
     let spoken = turn.spoken
-    await MainActor.run {
+    let ran = await MainActor.run {
       MWMBackseatRewriter.runTool(action, argument: argument ?? "", spoken: spoken)
     }
+    guard ran else {
+      return "The driver didn't ask for that, and nothing happened. Don't run an action; answer in one short line."
+    }
+    turn.markUsed()
     return "Done. The app already told the driver; don't add anything."
   }
 }

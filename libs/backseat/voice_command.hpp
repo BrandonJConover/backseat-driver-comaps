@@ -90,6 +90,64 @@ struct AppCommand
 /// which already listens for them.
 std::vector<AppCommand> ParseAppCommands(std::string const & spoken);
 
+/// Whether `heard` is the GPS's own `line` coming back through the mic: most of its meaningful words
+/// are in the line, or three words in a row are. One word isn't enough to tell ("work", "yes").
+bool IsEchoOf(std::string const & heard, std::string const & line);
+
+/// What the GPS said lately, to catch its own voice in the mic after it stops talking.
+class SpokenLines
+{
+public:
+  /// How long a line can come back: speech still queued, room reverb, a slow recognizer.
+  static double constexpr kWindowMs = 20000;
+
+  void Add(double tMs, std::string line);
+  /// The recent line `heard` is an echo of, if any.
+  std::optional<std::string> EchoOf(double tMs, std::string const & heard);
+
+private:
+  struct Spoken
+  {
+    double tMs;
+    std::string line;
+  };
+  std::vector<Spoken> m_lines;
+};
+
+/// "Yeah", "um", "okay": nothing to act on, unless something asked for an answer.
+bool IsFiller(std::string const & spoken);
+
+/// Whether the words support the tool the model picked. It made "Yeah" into navigate_to Melissa Drive
+/// and "Are you metal?" into list_voices. A place needs a go-ahead word ("take me", "navigate") or to
+/// have been said; everything else needs a word about it.
+bool WordsSupportTool(AppAction action, std::string const & argument, std::string const & spoken);
+
+/// Stops a command from running twice: the recognizer and the model both repeat themselves, and each
+/// extra navigate_to restarts the search or the route.
+class CommandRepeats
+{
+public:
+  static double constexpr kRepeatMs = 15000;
+  /// A route that long in the making has failed, and asking again is fair.
+  static double constexpr kBuildingMaxMs = 60000;
+
+  /// Whether `command` repeats a recent one. If not, it's remembered as the latest.
+  bool IsRepeat(AppCommand const & command, double tMs);
+  /// The route started: it's no longer being built.
+  void RouteStarted() { m_buildingSince.reset(); }
+
+private:
+  struct Ran
+  {
+    double tMs;
+    std::string key;
+  };
+  std::vector<Ran> m_ran;
+  std::optional<double> m_buildingSince;
+  std::optional<double> m_lastNavigateAt;
+  std::string m_buildingTo;
+};
+
 /// "Yes", "yeah", "yep", "you got it"...
 bool SaidYes(std::string const & spoken);
 /// "No", "nope", "nah", "not really"...

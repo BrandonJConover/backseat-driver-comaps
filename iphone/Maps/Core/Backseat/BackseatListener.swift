@@ -370,7 +370,12 @@ import Speech
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.startSegment() }
       return
     }
-    let text = heard.trimmingCharacters(in: .whitespacesAndNewlines)
+    var text = heard.trimmingCharacters(in: .whitespacesAndNewlines)
+    // Its own voice can come back after it stops talking, and "Wrong way again" isn't the driver.
+    if !text.isEmpty, let line = MWMBackseatRewriter.echo(of: text) {
+      BackseatLog.event("stt.echo", ["text": text, "line": line])
+      text = ""
+    }
     let echo = !beforeTheGPS && (heardTheGPS || KokoroVoice.shared.anyVoiceSpeaking)
     if let answerDeadline, Date() > answerDeadline {
       LOG(.info, "Backseat: stopped waiting for a \(answerPurpose)")

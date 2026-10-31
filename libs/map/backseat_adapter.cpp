@@ -2139,6 +2139,12 @@ BackseatAdapter::HeardCommand BackseatAdapter::RunTool(std::string const & name,
     LOG(LWARNING, ("Backseat: no such tool", name));
     return heard;
   }
+  if (!backseat::WordsSupportTool(*action, argument, spoken))
+  {
+    backseat::Trace("command.rejected", {{"tool", name}, {"arg", argument}, {"text", spoken}});
+    heard.unsupported = true;
+    return heard;
+  }
   heard.reply = Run({*action, argument}, backseat::SaidPolitely(spoken), heard);
   return heard;
 }
@@ -2146,6 +2152,13 @@ BackseatAdapter::HeardCommand BackseatAdapter::RunTool(std::string const & name,
 std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool polite, HeardCommand & heard)
 {
   using backseat::AppAction;
+  double const nowMs = std::chrono::duration<double, std::milli>(
+                           std::chrono::system_clock::now().time_since_epoch()).count();
+  if (m_commandRepeats.IsRepeat(command, nowMs))
+  {
+    backseat::Trace("command.dup", {{"tool", backseat::ToolFor(command.action).name}, {"arg", command.argument}});
+    return {};
+  }
   LOG(LINFO, ("Backseat: command", backseat::ToolFor(command.action).name, command.argument));
   backseat::Trace("command", {{"tool", backseat::ToolFor(command.action).name},
                               {"arg", command.argument},
@@ -2164,8 +2177,6 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     if (!polite)
     {
       // Barked orders get Brandon's "Alright, bossy" when the trip starts, not a reply now.
-      double const nowMs = std::chrono::duration<double, std::milli>(
-                               std::chrono::system_clock::now().time_since_epoch()).count();
       m_navigator.QueueOpener(nowMs, "bossy", {{"place", place}});
     }
     else
@@ -2226,6 +2237,9 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     }
     return reply;
   }
+  case AppAction::CancelRoute:
+    m_commandRepeats.RouteStarted();
+    break;
   case AppAction::RepeatInstruction:
     return m_lastDirection.empty() ? m_navigator.Reply("cmd.repeat.none")
                                    : m_navigator.Reply("cmd.repeat", {{"instruction", m_lastDirection}});
@@ -2770,7 +2784,10 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
   session.GetRouteFollowingInfo(info);
   switch (info.m_routingSessionState)
   {
-  case SessionState::OnRoute: snap.state = backseat::RouteState::OnRoute; break;
+  case SessionState::OnRoute:
+    snap.state = backseat::RouteState::OnRoute;
+    m_commandRepeats.RouteStarted();
+    break;
   case SessionState::RouteNotStarted:
   case SessionState::RouteBuilding: snap.state = backseat::RouteState::NotStarted; break;
   case SessionState::RouteNeedsRebuild:
