@@ -40,6 +40,9 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 + (BOOL)runTool:(NSString *)name argument:(NSString *)argument spoken:(NSString *)spoken;
 /// Tells the navigator which voices there are, for "what voice options do you have?".
 + (void)shareVoices;
+/// Switches the route type ("walk", "bike", anything else is driving) and rebuilds the route; a
+/// route being followed keeps going in the new mode. Main thread.
++ (void)switchTravelMode:(NSString *)mode;
 /// How far the next turn is while following a route, in meters; -1 without a route.
 @property(class, nonatomic, readonly) double metersToNextTurn;
 /// The speed limit here while following a route, m/s: -1 unknown, 0 unlimited.

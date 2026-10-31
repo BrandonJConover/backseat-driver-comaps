@@ -178,6 +178,12 @@ double constexpr kNightParkedMs = 15000;
 double constexpr kNightMovedMps = 2.5;
 /// SaidLog counter: trips started, finished or not.
 char const * const kTripsStartedKey = "_trips.started";
+/// The route type (drive, walk or bike) of the last trip, for "Oh, we're walking now?".
+char const * const kLastModeKey = "_mode.last";
+/// Set once the driver says yes, we really are walking: the GPS stops asking.
+char const * const kWalkConfirmedKey = "_mode.walkConfirmed";
+/// How long the GPS waits for "yes, we're walking" before it decides it's a drive.
+double constexpr kModeAskWaitMs = 10000;
 /// SaidLog values: the trip under way (destination, last seen in s since the epoch), so a relaunch in
 /// the middle of it (a crash, or iOS closing the app in the background) picks it back up instead
 /// of opening a brand new trip with the greeting and rundown all over again.
@@ -955,6 +961,9 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   if (m_arrived)
     return;
 
+  if (m_modeAskUntil && t >= *m_modeAskUntil)
+    ResolveModeAsk(false, "mode.ask.timeout");
+
   RouteState const prev = m_lastState;
   m_lastState = route.state;
   if (route.state != prev)
@@ -1238,6 +1247,7 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   size_t const tripsBefore =
       std::max(m_history.size(), static_cast<size_t>(std::max(0, m_said.Counter(kTripsStartedKey))));
   m_said.SetCounter(kTripsStartedKey, static_cast<int>(tripsBefore + 1));
+  m_tripsBeforeThis = static_cast<int>(tripsBefore);
   Trace("trip.number", {{"before", std::to_string(tripsBefore)}});
   // The first turn is right there: the direction goes first, then the greeting, and the rundown
   // (after the first trip ever) is left out so the final call isn't stuck behind it.
@@ -1248,12 +1258,32 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
     m_turnKind = route.turn;
     SayInstruction(t, route);
   }
+  // The app starts on walking: "Are we actually walking there?" until the driver says yes.
+  TravelMode const base = BaseMode(m_travelMode);
+  std::string const lastMode = m_said.Value(kLastModeKey);
+  m_said.SetValue(kLastModeKey, TravelModeName(base));
+  bool const askWalk = m_canAskMode && base == TravelMode::Walk && m_said.Value(kWalkConfirmedKey).empty();
+  m_modeAskUntil.reset();
+  if (askWalk)
+  {
+    SayLine(t, Category::Instruction, "mode.ask.walk", {}, Priority::Nav);
+    m_modeAskUntil = t + kModeAskWaitMs + 6000;
+    Trace("trip.modeAsk", {{"answer", "asked"}});
+  }
   std::string greeting = TripGreeting(m_history, m_config.rng, tripsBefore);
   // The greetings are written for a car; a walk gets a hello of its own.
   if (!LineFitsMode(greeting, m_travelMode))
     greeting = Reply(m_travelMode == TravelMode::OffRoad ? std::string("mode.offRoad")
                                                          : std::string("mode.") + TravelModeName(m_travelMode));
-  SayNav(t, greeting);
+  // Asking takes the greeting's place, and the rundown and prediction wait for the real trip.
+  if (!askWalk)
+    SayNav(t, greeting);
+  // Walking last time, driving now: "Oh, so now we're driving?"
+  if (!askWalk && !lastMode.empty() && lastMode != TravelModeName(base))
+  {
+    char const * const from = lastMode == "walk" ? "walking" : lastMode == "bike" ? "biking" : "driving";
+    SayLine(t, Category::Instruction, std::string("mode.switch.") + TravelModeName(base), {{"from", from}});
+  }
   SayIndoorStart(t, route);
   // Before 5 am: "Are we off to make the donuts?"
   if (KnowsTheDate(t) && LocalTime(t).tm_hour < 5)
@@ -1274,7 +1304,10 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   }
   // The first trip's rundown is a speed run: every turn, rattled off, then a request for music.
   // After that, a drawn route gets "We're doing your route" instead of the rundown.
-  if (m_sketched && tripsBefore > 0)
+  if (askWalk)
+  {
+  }
+  else if (m_sketched && tripsBefore > 0)
     SayLine(t, Category::Instruction, "sketch.start");
   else if (!turnFirst || tripsBefore == 0)
   {
@@ -1283,7 +1316,7 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
       SayNav(t, rundown, tripsBefore == 0 ? kRattleSpeed : 1.0);
   }
   // The time prediction waits until the car is rolling, so the start isn't five lines in a row.
-  if (m_plan.expectedMinutes > 0)
+  if (m_plan.expectedMinutes > 0 && !askWalk)
   {
     m_predictionText = PredictTrip(m_history, m_plan, m_config.rng, &m_said).text;
     if (LineFitsMode(m_predictionText, m_travelMode))
@@ -1378,6 +1411,33 @@ void Navigator::DriverSetTravelMode(TravelMode mode)
 {
   m_modeFound = false;
   ChangeTravelMode(mode, "driver");
+  // The driver said it: no need to ask, or to remark on the switch when the route comes back.
+  m_said.SetValue(kLastModeKey, TravelModeName(BaseMode(mode)));
+  if (m_modeAskUntil)
+  {
+    m_modeAskUntil.reset();
+    if (BaseMode(mode) == TravelMode::Walk)
+      m_said.SetValue(kWalkConfirmedKey, "yes");
+    else
+      m_said.SetCounter(kTripsStartedKey, m_tripsBeforeThis);
+  }
+}
+
+void Navigator::ResolveModeAsk(bool walking, char const * key)
+{
+  m_modeAskUntil.reset();
+  Trace("trip.modeAsk", {{"answer", walking ? "walk" : "drive"}, {"key", key}});
+  SayLine(m_lastT, Category::Instruction, key, {}, Priority::Nav);
+  if (walking)
+  {
+    m_said.SetValue(kWalkConfirmedKey, "yes");
+    return;
+  }
+  // The route comes back as a drive: that's this trip still, so it gets the first trip's rundown.
+  m_said.SetCounter(kTripsStartedKey, m_tripsBeforeThis);
+  ChangeTravelMode(TravelMode::Drive, "asked");
+  m_said.SetValue(kLastModeKey, TravelModeName(TravelMode::Drive));
+  m_modeSwitch = TravelMode::Drive;
 }
 
 void Navigator::ChangeTravelMode(TravelMode mode, char const * why)
@@ -2135,6 +2195,17 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
       SayTwenty(m_lastT, *reply);
       return;
     }
+  // "Are we actually walking there?"
+  if (m_modeAskUntil && SaidYes(text))
+  {
+    ResolveModeAsk(true, "mode.ask.yes");
+    return;
+  }
+  if (m_modeAskUntil && SaidNo(text))
+  {
+    ResolveModeAsk(false, "mode.ask.no");
+    return;
+  }
   // "We're getting pulled over": the GPS knows exactly whose fault that is.
   std::string words = " ";
   for (unsigned char const ch : text)

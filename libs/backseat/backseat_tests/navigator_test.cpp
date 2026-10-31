@@ -2112,3 +2112,87 @@ TEST(AHikeGetsBrandonsOutdoorsBits)
   CHECK(outdoors <= 2);
   SetLineTravelMode(TravelMode::Drive);
 }
+
+namespace
+{
+int CountKey(std::vector<Commentary> const & lines, std::string const & key)
+{
+  return static_cast<int>(std::count_if(lines.begin(), lines.end(), [&](Commentary const & l) { return SaidLineOf(l.text, key); }));
+}
+}  // namespace
+
+TEST(AWalkingRouteAsksAndNoAnswerMeansDriving)
+{
+  Navigator nav(Config());
+  nav.SetCanAskTravelMode(true);
+  nav.SetTravelMode(TravelMode::Walk);
+  std::vector<Commentary> said;
+  for (int i = 0; i < 30; ++i)
+  {
+    nav.OnFix(Heading(i * 1000.0, 0, 90), Walkway());
+    for (auto & l : nav.TakeLines())
+      said.push_back(l);
+  }
+  CHECK_EQUAL(CountKey(said, "mode.ask.walk"), 1);
+  CHECK_EQUAL(CountKey(said, "mode.ask.timeout"), 1);
+  CHECK(nav.TakeModeSwitch() == TravelMode::Drive);
+  CHECK(!nav.TakeModeSwitch());
+  // The host rebuilds the route as a drive: a fresh start, with no "so now we're driving?".
+  nav.OnFix(Heading(31000, 0, 90), RouteSnapshot{});
+  nav.SetTravelMode(TravelMode::Drive);
+  said.clear();
+  for (int i = 32; i < 40; ++i)
+  {
+    nav.OnFix(Heading(i * 1000.0, 0, 90), Far());
+    for (auto & l : nav.TakeLines())
+      said.push_back(l);
+  }
+  CHECK(!said.empty());
+  CHECK_EQUAL(CountKey(said, "mode.switch.drive"), 0);
+  CHECK_EQUAL(CountKey(said, "mode.ask.walk"), 0);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(YesWeAreWalkingStopsTheAsking)
+{
+  Navigator nav(Config());
+  nav.SetCanAskTravelMode(true);
+  nav.SetTravelMode(TravelMode::Walk);
+  nav.OnFix(Heading(0, 0, 90), Walkway());
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk"), 1);
+  nav.OnDriverSaid(2000, "yes");
+  std::vector<Commentary> said;
+  for (int i = 3; i < 30; ++i)
+  {
+    nav.OnFix(Heading(i * 1000.0, 1.4, 90), Walkway());
+    for (auto & l : nav.TakeLines())
+      said.push_back(l);
+  }
+  CHECK_EQUAL(CountKey(said, "mode.ask.yes"), 1);
+  CHECK_EQUAL(CountKey(said, "mode.ask.timeout"), 0);
+  CHECK(!nav.TakeModeSwitch());
+  CHECK(nav.Mode() == TravelMode::Walk);
+  // The next walk just starts.
+  nav.OnFix(Heading(31000, 0, 90), RouteSnapshot{});
+  nav.OnFix(Heading(40000, 0, 90), Walkway());
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk"), 0);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(SwitchingTravelModesGetsARemark)
+{
+  Navigator nav(Config());
+  nav.OnFix(Heading(0, 0, 90), Far());
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.switch.drive"), 0);
+  nav.OnFix(Heading(1000, 0, 90), RouteSnapshot{});
+  // Walking now, after a drive.
+  nav.SetTravelMode(TravelMode::Walk);
+  nav.OnFix(Heading(5000, 0, 90), Walkway());
+  auto const lines = nav.TakeLines();
+  CHECK_EQUAL(CountKey(lines, "mode.switch.walk"), 1);
+  // Same mode again: nothing to remark on.
+  nav.OnFix(Heading(6000, 0, 90), RouteSnapshot{});
+  nav.OnFix(Heading(9000, 0, 90), Walkway());
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.switch.walk"), 0);
+  SetLineTravelMode(TravelMode::Drive);
+}

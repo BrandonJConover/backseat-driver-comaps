@@ -26,6 +26,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace backseat
@@ -329,6 +330,12 @@ public:
   void DriverSetTravelMode(TravelMode mode);
   TravelMode GetTravelMode() const { return m_travelMode; }
   TravelMode Mode() const { return m_travelMode; }
+  /// The host can switch the route type when asked (TakeModeSwitch()), so on a walking route the GPS
+  /// asks "Are we actually walking there?" until the driver says yes.
+  void SetCanAskTravelMode(bool can) { m_canAskMode = can; }
+  /// The route type the GPS decided on (no answer, or "no, we're driving"); the host rebuilds the
+  /// route with it. Empty when there's nothing to switch.
+  std::optional<TravelMode> TakeModeSwitch() { return std::exchange(m_modeSwitch, std::nullopt); }
   /// The plain direction for the current maneuver, with no jokes on it. Empty with no route.
   std::string const & LastInstructionText() const { return m_lastInstructionText; }
   static double constexpr kOpenerValidMs = 600000;
@@ -469,6 +476,8 @@ private:
   /// One-line bits wait a few trips before coming back, so they stay a surprise.
   bool Rested(std::string const & key) const;
   void MarkSaid(std::string const & key);
+  /// The answer to "Are we actually walking there?" (or the lack of one).
+  void ResolveModeAsk(bool walking, char const * key);
   /// {name}, {gps} and the driver's pronouns, for lines about the driver.
   Vars DriverVars() const;
   int Tier() const;
@@ -607,6 +616,12 @@ private:
   bool m_modeFound = false;
   /// A bike trip that's been on trails or dirt a while: mountain biking.
   bool m_mountainBike = false;
+  /// "Are we actually walking there?": asked, and switching to driving at this time if no answer.
+  bool m_canAskMode = false;
+  std::optional<double> m_modeAskUntil;
+  std::optional<TravelMode> m_modeSwitch;
+  /// The trip count before this trip, given back when the asked-about walk turns into a drive.
+  int m_tripsBeforeThis = 0;
   std::optional<double> m_effortSince;
   bool m_inclineSaid = false;
   bool m_effortSaid = false;

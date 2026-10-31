@@ -526,8 +526,9 @@ RouterType RoutingManager::GetBestRouter(m2::PointD const & startPoint, m2::Poin
 RouterType routing::GetLastUsedRouter()
 {
   string routerTypeStr;
+  // Backseat Driver starts on walking (Brandon: "it's funnier"); the GPS asks if we really are.
   if (!settings::Get(kRouterTypeKey, routerTypeStr))
-    return RouterType::Vehicle;
+    return RouterType::Pedestrian;
 
   auto const routerType = FromString(routerTypeStr);
 
