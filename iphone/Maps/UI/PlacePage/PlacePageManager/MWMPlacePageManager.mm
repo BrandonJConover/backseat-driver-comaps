@@ -50,6 +50,8 @@ using namespace storage;
   [self setRouterByMode];
 
   MWMRoutePoint *point = [self routePoint:data withType:MWMRoutePointTypeFinish intermediateIndex:0];
+  // Backseat: "Start" drives there now; the route preview is skipped when the route starts here.
+  [MWMRouter startWhenReady];
   [MWMRouter buildToPoint:point bestRouter:YES];
   [self closePlacePage];
 }

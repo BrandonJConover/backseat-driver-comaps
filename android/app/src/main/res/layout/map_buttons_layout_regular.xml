@@ -42,6 +42,19 @@
     android:clipChildren="false"
     android:clipToPadding="false"
     android:padding="@dimen/nav_frame_padding">
+    <!-- Backseat Driver: talk to the GPS ("take me to work"). -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+      android:id="@+id/backseat_talk"
+      style="@style/MwmWidget.M3.FAB.MapButton"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginBottom="@dimen/margin_half"
+      android:contentDescription="@string/backseat_talk"
+      android:tint="?iconTint"
+      app:layout_constraintBottom_toTopOf="@+id/zoom_buttons_container"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:shapeAppearance="@style/Widget.MaterialComponents.FloatingActionButton"
+      app:srcCompat="@drawable/ic_mic_white" />
     <include
       layout="@layout/map_buttons_zoom"
       android:layout_width="wrap_content"

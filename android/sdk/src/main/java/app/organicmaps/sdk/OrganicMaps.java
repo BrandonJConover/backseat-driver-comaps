@@ -7,6 +7,7 @@ import androidx.lifecycle.DefaultLifecycleObserver;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.ProcessLifecycleOwner;
 import androidx.preference.PreferenceManager;
+import app.organicmaps.sdk.backseat.BackseatRewriter;
 import app.organicmaps.sdk.bookmarks.data.BookmarkManager;
 import app.organicmaps.sdk.bookmarks.data.Icon;
 import app.organicmaps.sdk.downloader.Android7RootCertificateWorkaround;
@@ -190,6 +191,7 @@ public final class OrganicMaps implements DefaultLifecycleObserver
     BookmarkManager.loadBookmarks();
     TtsPlayer.INSTANCE.initialize(mContext);
     RoutingController.get().initialize(mLocationHelper);
+    BackseatRewriter.initialize(mContext);
 
     TrafficManager.INSTANCE.initialize();
     mSubwayManager.initialize();

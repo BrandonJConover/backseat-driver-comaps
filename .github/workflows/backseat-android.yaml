@@ -1,0 +1,129 @@
+name: Backseat Driver Android
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'backseat/**'
+    paths:
+      - 3party/**
+      - android/**
+      - cmake/**
+      - CMakeLists.txt
+      - configure.sh
+      - libs/**
+      - .gitmodules
+      - .github/workflows/backseat-android.yaml
+  # Pull requests into the Backseat branches build too (they don't publish).
+  pull_request:
+    branches:
+      - 'backseat/**'
+    paths:
+      - 3party/**
+      - android/**
+      - cmake/**
+      - CMakeLists.txt
+      - configure.sh
+      - libs/**
+      - .gitmodules
+      - .github/workflows/backseat-android.yaml
+
+env:
+  JAVA_HOME: /usr/lib/jvm/temurin-21-jdk-amd64  # Java 21 is required for Android Gradle 8 plugin
+
+jobs:
+  engine-tests:
+    name: Critique engine tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - name: Build and test libs/backseat on its own
+        run: |
+          cmake -S libs/backseat -B build/backseat -DCMAKE_BUILD_TYPE=Debug -DCMAKE_UNITY_BUILD=ON \
+            -DCMAKE_CXX_FLAGS="-Wall -Wextra -fsanitize=address,undefined"
+          cmake --build build/backseat -j"$(nproc)"
+          build/backseat/backseat_tests/backseat_tests
+
+  android:
+    name: Build Android debug APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+
+      - name: Install build tools and dependencies
+        run: |
+          sudo apt-get update -y
+          # configure.sh builds host tools (style compiler etc.) that need Qt.
+          sudo apt-get install -y ninja-build \
+            qt6-base-dev \
+            qt6-declarative-dev \
+            qt6-positioning-dev \
+            libqt6svg6-dev \
+            optipng \
+            libfreetype-dev \
+            libharfbuzz-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            python3-pip \
+            zlib1g-dev
+          pip install "protobuf<3.21" --break-system-packages
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Parallel submodules checkout
+        run: git submodule update --depth 1 --init --recursive --jobs=$(($(nproc) * 20))
+
+      - name: Configure ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.workflow }}
+
+      - name: Compile FdroidDebug (arm64)
+        working-directory: android
+        env:
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+        run: |
+          set -o pipefail
+          ./gradlew -Parm64 assembleFdroidDebug 2>&1 | tee ../build.log
+
+      - name: Report build errors as annotations
+        if: failure()
+        run: |
+          # Surface the errors where the API can read them (check-run annotations).
+          grep -nE "error:|error G|FAILED|What went wrong|Could not|undefined reference|fatal" build.log | tail -40 > errors.txt || true
+          tail -25 build.log >> errors.txt
+          msg=$(sed -e 's/%/%25/g' errors.txt | awk '{printf "%s%%0A", $0}')
+          echo "::error title=Android build log::${msg}"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: backseat-driver-android-debug
+          path: android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+
+      # A fixed pre-release always holds the newest test build, so it can be installed
+      # straight from a phone's browser without signing in or unzipping.
+      - name: Publish to the poc-latest pre-release
+        if: github.ref == 'refs/heads/backseat/engine'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          apk=$(find android/app/build/outputs/apk -name '*.apk' | head -1)
+          cp "$apk" BackseatDriver-debug.apk
+          gh release view poc-latest >/dev/null 2>&1 || \
+            gh release create poc-latest --prerelease --title "Backseat Driver test build" \
+              --notes "Newest debug build from the backseat/engine branch. Android only, arm64." --target "$GITHUB_SHA"
+          gh release upload poc-latest BackseatDriver-debug.apk --clobber

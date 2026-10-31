@@ -42,13 +42,9 @@ final class ThemeManager: NSObject {
     }(actualTheme)
 
     let isCarPlayActive = CarPlayService.shared.isCarplayActivated
-    if !isCarPlayActive, Settings.mapAppearance == .light {
-      if actualTheme == .vehicleDay || actualTheme == .vehicleNight {
-          FrameworkHelper.setTheme(.vehicleDay)
-      } else {
-          FrameworkHelper.setTheme(.day)
-      }
-    } else if !isCarPlayActive, Settings.mapAppearance == .dark {
+    // Backseat Driver: the map is always the night map (the yellow route sits on it), whatever the
+    // stock "map appearance" setting was left at.
+    if !isCarPlayActive {
       if actualTheme == .vehicleDay || actualTheme == .vehicleNight {
         FrameworkHelper.setTheme(.vehicleNight)
       } else {
@@ -68,7 +64,9 @@ final class ThemeManager: NSObject {
   }
 
   @objc static func invalidate() {
-    instance.update(theme: SettingsBridge.theme())
+    // Backseat Driver: always night, app and map (the night-drive look); the stock Day/Auto choice is
+    // hidden in Settings.
+    instance.update(theme: .night)
   }
 
   @available(iOS 13.0, *)

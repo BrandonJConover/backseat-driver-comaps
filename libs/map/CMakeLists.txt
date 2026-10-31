@@ -4,6 +4,8 @@ set(SRC
   api_mark_point.cpp
   api_mark_point.hpp
   benchmark_tools.hpp
+  backseat_adapter.cpp
+  backseat_adapter.hpp
   benchmark_tools.cpp
   bookmark.cpp
   bookmark.hpp
@@ -88,6 +90,7 @@ omim_add_library(${PROJECT_NAME} ${SRC})
 
 target_link_libraries(${PROJECT_NAME}
   PUBLIC
+    backseat
     base
     coding
     drape

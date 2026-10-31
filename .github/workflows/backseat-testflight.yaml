@@ -1,0 +1,160 @@
+name: Backseat Driver TestFlight
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'backseat/**'
+    paths:
+      - 3party/**
+      - iphone/**
+      - xcode/**
+      - libs/**
+      - configure.sh
+      - .gitmodules
+      - .github/workflows/backseat-testflight.yaml
+
+jobs:
+  testflight:
+    name: Archive and upload to TestFlight
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
+      LANG: en_US.UTF-8
+      LANGUAGE: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      # Secrets can't gate a job directly, so check them first and skip the rest when absent.
+      - name: Check signing secrets
+        id: secrets
+        env:
+          P8: ${{ secrets.APPSTORE_API_KEY_P8 }}
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ISSUER: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$P8" ] && [ -n "$KEY_ID" ] && [ -n "$ISSUER" ] && [ -n "$TEAM" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning title=TestFlight skipped::Add APPSTORE_API_KEY_P8, APPSTORE_API_KEY_ID, APPSTORE_API_ISSUER_ID and APPLE_TEAM_ID to the repo secrets."
+          fi
+
+      - name: Install dependencies
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          brew install qt optipng
+          pip3 install "protobuf<3.21" --break-system-packages
+          # Apple's component downloads fail now and then; retry before giving up.
+          retry() { for i in 1 2 3; do "$@" && return 0; echo "Attempt $i failed: $*"; sleep 30; done; return 1; }
+          retry xcodebuild -downloadComponent metalToolchain
+          retry xcodebuild -downloadPlatform iOS
+
+      - uses: actions/checkout@v6
+        if: steps.secrets.outputs.ready == 'true'
+
+      - name: Parallel submodules checkout
+        if: steps.secrets.outputs.ready == 'true'
+        run: git submodule update --depth 1 --init --recursive --jobs=$(($(sysctl -n hw.logicalcpu) * 20))
+
+      - name: Configure repository
+        if: steps.secrets.outputs.ready == 'true'
+        run: ./configure.sh
+
+      - name: Install distribution certificate
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -hex 16)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          # Without a certificate, Xcode cloud signing (via the API key) makes one if the key allows it.
+          if [ -n "$BUILD_CERTIFICATE_BASE64" ]; then
+            echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+            security import "$RUNNER_TEMP/cert.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          fi
+          security find-identity -v -p codesigning
+
+      - name: Install App Store Connect API key
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          P8: ${{ secrets.APPSTORE_API_KEY_P8 }}
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$P8" > ~/private_keys/AuthKey_${KEY_ID}.p8
+
+      - name: Archive
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ISSUER: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -workspace xcode/CoMaps.xcworkspace \
+            -scheme CoMaps \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/BackseatDriver.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${KEY_ID}.p8 \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER" \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM="$TEAM" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            MARKETING_VERSION=0.1.0 \
+            2>&1 | tee "$RUNNER_TEMP/build.log" | grep -E "error:|warning: .*sign|BUILD|ARCHIVE" || true
+          test -d "$RUNNER_TEMP/BackseatDriver.xcarchive"
+
+      - name: Upload to TestFlight
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ISSUER: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$TEAM</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><false/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/BackseatDriver.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${KEY_ID}.p8 \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER" \
+            2>&1 | tee "$RUNNER_TEMP/export.log"
+
+      # Job logs can't be fetched from the dev container, so surface errors as annotations.
+      - name: Report errors
+        if: failure()
+        run: |
+          cat "$RUNNER_TEMP"/build.log "$RUNNER_TEMP"/export.log 2>/dev/null \
+            | grep -nE "error:|error -|Error Domain|No profiles|No Accounts|provisioning|requires a provisioning|FAILED" | tail -40 > errors.txt || true
+          msg=$(sed -e 's/%/%25/g' errors.txt | awk '{printf "%s%%0A", $0}')
+          echo "::error title=TestFlight log::${msg}"

@@ -240,7 +240,8 @@ using Observers = NSHashTable<Observer>;
 #pragma mark - Notifications
 
 - (void)onSearchStarted {
-  for (Observer observer in self.observers) {
+  // A copy: an observer may remove itself (or add another) from its callback.
+  for (Observer observer in self.observers.allObjects) {
     if ([observer respondsToSelector:@selector(onSearchStarted)])
       [observer onSearchStarted];
   }
@@ -248,7 +249,8 @@ using Observers = NSHashTable<Observer>;
 
 - (void)onSearchCompleted {
   [self updateItemsIndexWithBannerReload:YES];
-  for (Observer observer in self.observers) {
+  // A copy: an observer may remove itself (or add another) from its callback.
+  for (Observer observer in self.observers.allObjects) {
     if ([observer respondsToSelector:@selector(onSearchCompleted)])
       [observer onSearchCompleted];
   }
@@ -256,7 +258,8 @@ using Observers = NSHashTable<Observer>;
 
 - (void)onSearchResultsUpdated {
   [self updateItemsIndexWithBannerReload:NO];
-  for (Observer observer in self.observers) {
+  // A copy: an observer may remove itself (or add another) from its callback.
+  for (Observer observer in self.observers.allObjects) {
     if ([observer respondsToSelector:@selector(onSearchResultsUpdated)])
       [observer onSearchResultsUpdated];
   }

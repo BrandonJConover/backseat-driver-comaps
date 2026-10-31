@@ -13,6 +13,7 @@
 #import "MWMPlacePageProtocol.h"
 #import "MapsAppDelegate.h"
 #import "SwiftBridge.h"
+#import "MWMBackseatRewriter.h"
 
 #import <CoreApi/Framework.h>
 #import <CoreApi/MWMFrameworkHelper.h>
@@ -333,11 +334,16 @@ m2::PointD ToPixelPoint(UIView * view, CGPoint pt) {
   return self.view.traitCollection.forceTouchCapability == UIForceTouchCapabilityAvailable;
 }
 
+// Backseat: when the driver last touched the map, to tell their pans from the app's own moves.
+static NSDate *gBackseatLastMapTouch;
+
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+  gBackseatLastMapTouch = [NSDate date];
   [self sendTouchType:df::TouchEvent::TOUCH_DOWN withTouches:touches andEvent:event];
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+  gBackseatLastMapTouch = [NSDate date];
   [self sendTouchType:df::TouchEvent::TOUCH_MOVE withTouches:nil andEvent:event];
 }
 
@@ -409,6 +415,8 @@ m2::PointD ToPixelPoint(UIView * view, CGPoint pt) {
     [self onGetFocus:self.deferredFocusValue];
 
   [MWMRouter restoreRouteIfNeeded];
+  [BackseatTalkButton installIn:self.controlsView];
+  [MWMBackseatRewriter installMusicCheck];
 
   self.view.clipsToBounds = YES;
   [MWMKeyboard addObserver:self];
@@ -456,6 +464,8 @@ m2::PointD ToPixelPoint(UIView * view, CGPoint pt) {
   // Otherwise PP container view is nil, or there is no animation/selection of the point.
   if (DeepLinkHandler.shared.hasPendingDeepLink)
     (void)[DeepLinkHandler.shared handleDeepLinkAndReset];
+  // Backseat Driver introduces itself and asks who's driving, once, before the first trip.
+  [BackseatSetup startIfNeeded];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -663,6 +673,12 @@ m2::PointD ToPixelPoint(UIView * view, CGPoint pt) {
 }
 
 - (void)processMyPositionStateModeEvent:(MWMMyPositionMode)mode {
+  // Backseat: the driver dragged the map off the car mid-trip.
+  BOOL const wasFollowing = self.currentPositionMode == MWMMyPositionModeFollow ||
+                            self.currentPositionMode == MWMMyPositionModeFollowAndRotate;
+  if (wasFollowing && mode == MWMMyPositionModeNotFollow && [MWMRouter isOnRoute] && gBackseatLastMapTouch &&
+      -gBackseatLastMapTouch.timeIntervalSinceNow < 1.5)
+    dispatch_async(dispatch_get_main_queue(), ^{ [BackseatHooks mapBrowsed]; });
   self.currentPositionMode = mode;
   [MWMLocationManager setMyPositionMode:mode];
   NSArray<id<MWMLocationModeListener>> *objects = self.listeners.allObjects;

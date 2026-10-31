@@ -41,10 +41,11 @@ final class ActionBarViewController: UIViewController {
         fatalError()
       }
     } else {
+      // Backseat: Start goes last, on the right under the thumb, and gets double width.
       configButton1()
       configButton2()
-      configButton3()
       configButton4()
+      configButton3()
     }
 
     setupButtonsState()
@@ -73,7 +74,8 @@ final class ActionBarViewController: UIViewController {
         buttons.append(.call)
       }
       if !isRoutePlanning {
-        buttons.append(.routeFrom)
+        // Backseat: trips start from here, so "Route from" waits under More.
+        additionalButtons.append(.routeFrom)
       }
     case .trackRecording:
       break
@@ -128,7 +130,9 @@ final class ActionBarViewController: UIViewController {
 
   private func configButton4() {
     guard !additionalButtons.isEmpty else { return }
-    additionalButtons.count == 1 ? visibleButtons.append(additionalButtons[0]) : visibleButtons.append(.more)
+    // Backseat: "Route from" alone still goes under More, so Start has the room.
+    additionalButtons == [.routeFrom] || additionalButtons.count > 1
+      ? visibleButtons.append(.more) : visibleButtons.append(additionalButtons[0])
   }
 
   private func setupButtonsState() {
@@ -149,6 +153,18 @@ final class ActionBarViewController: UIViewController {
         break
       }
     }
+    widenStartButton()
+  }
+
+  /// Backseat: Start is twice as wide as the other buttons.
+  private func widenStartButton() {
+    let buttons = zip(visibleButtons, stackView.arrangedSubviews)
+    guard let start = buttons.first(where: { $0.0 == .routeTo })?.1 else { return }
+    let others = buttons.map(\.1).filter { $0 !== start }
+    guard let first = others.first else { return }
+    stackView.distribution = .fill
+    others.dropFirst().forEach { $0.widthAnchor.constraint(equalTo: first.widthAnchor).isActive = true }
+    start.widthAnchor.constraint(equalTo: first.widthAnchor, multiplier: 2).isActive = true
   }
 
   private func buttonState(_ buttonType: ActionBarButtonType) -> (selected: Bool, enabled: Bool) {

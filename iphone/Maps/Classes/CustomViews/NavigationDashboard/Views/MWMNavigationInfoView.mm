@@ -253,6 +253,7 @@ BOOL defaultOrientation(CGSize const &size) {
   self.navigationInfo = info;
   if (self.state != MWMNavigationInfoViewStateNavigation)
     return;
+  [self backseatRestyle];
   if (info.streetName.length != 0) {
     [self setStreetNameVisible:YES];
     NSAttributedString * attributed =
@@ -269,6 +270,9 @@ BOOL defaultOrientation(CGSize const &size) {
     [self setTurnsViewVisible:YES];
     [self setupLanesViewIfNeeded];
     [self.lanesView setLanes:info.lanes];
+    // Backseat: a new maneuver pops the yellow turn box so the change catches the eye.
+    if (self.nextTurnImageView.image != info.turnImage && self.nextTurnImageView.image != nil)
+      [self backseatPopTurn];
     self.nextTurnImageView.image = info.turnImage;
 
     if (info.roundExitNumber == 0) {
@@ -278,10 +282,15 @@ BOOL defaultOrientation(CGSize const &size) {
       self.roundTurnLabel.text = @(info.roundExitNumber).stringValue;
     }
 
-    NSDictionary *turnNumberAttributes =
-      @{NSForegroundColorAttributeName: [UIColor white], NSFontAttributeName: IPAD ? [UIFont bold36] : [UIFont bold28]};
-    NSDictionary *turnLegendAttributes =
-      @{NSForegroundColorAttributeName: [UIColor white], NSFontAttributeName: IPAD ? [UIFont bold24] : [UIFont bold16]};
+    // Backseat Driver: dark condensed digits on the yellow turn box.
+    NSDictionary *turnNumberAttributes = @{
+      NSForegroundColorAttributeName: MWMBackseatTheme.ink,
+      NSFontAttributeName: [MWMBackseatTheme numberFont:IPAD ? 40 : 32]
+    };
+    NSDictionary *turnLegendAttributes = @{
+      NSForegroundColorAttributeName: MWMBackseatTheme.ink,
+      NSFontAttributeName: [MWMBackseatTheme bodyFont:IPAD ? 22 : 15 weight:UIFontWeightBold]
+    };
 
     NSMutableAttributedString *distance = [[NSMutableAttributedString alloc] initWithString:info.distanceToTurn
                                                                                  attributes:turnNumberAttributes];
@@ -526,5 +535,39 @@ BOOL defaultOrientation(CGSize const &size) {
 // MARK: Update Theme
 - (void)applyTheme {
   [self setSearchState:_searchState];
+  [self backseatRestyle];
+}
+
+// Backseat Driver's night-drive turn card: a yellow box with a dark arrow and distance, the "then"
+// turn and the street name on dark cards. Runs after the stock style sheets so it wins over them.
+- (void)backseatRestyle {
+  self.nextTurnImageView.tintColor = MWMBackseatTheme.ink;
+  self.roundTurnLabel.textColor = MWMBackseatTheme.ink;
+  self.secondTurnImageView.tintColor = MWMBackseatTheme.text;
+  self.streetNameLabel.textColor = MWMBackseatTheme.text;
+  self.streetNameLabel.font = [MWMBackseatTheme bodyFont:IPAD ? 24 : 20 weight:UIFontWeightSemibold];
+  [self backseatRestyleView:self];
+}
+
+- (void)backseatPopTurn {
+  UIView * box = self.nextTurnImageView.superview.superview ?: self.nextTurnImageView;
+  [MWMBackseatTheme pop:box];
+}
+
+- (void)backseatRestyleView:(UIView *)view {
+  NSString * style = view.styleName;
+  if ([style isEqualToString:@"FirstTurnView"]) {
+    view.backgroundColor = MWMBackseatTheme.accent;
+    view.layer.cornerRadius = 16;
+    view.layer.cornerCurve = kCACornerCurveContinuous;
+  } else if ([style isEqualToString:@"SecondTurnView"]) {
+    view.backgroundColor = MWMBackseatTheme.card;
+    view.layer.cornerRadius = 14;
+    view.layer.cornerCurve = kCACornerCurveContinuous;
+  } else if ([style isEqualToString:@"StreetNameBackgroundView"]) {
+    [MWMBackseatTheme styleCard:view radius:22];
+  }
+  for (UIView * subview in view.subviews)
+    [self backseatRestyleView:subview];
 }
 @end

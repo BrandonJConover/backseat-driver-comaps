@@ -85,6 +85,25 @@ struct SettingsView: View {
             List {
                 Section {
                     NavigationLink {
+                        SettingsBackseatView()
+                    } label: {
+                        HStack {
+                            Image(systemName: "car.side")
+
+                            Text(verbatim: "Backseat Driver")
+                                .lineLimit(1)
+
+                            Spacer(minLength: 0)
+
+                            Text(verbatim: KokoroVoice.selectedVoiceName)
+                                .lineLimit(1)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section {
+                    NavigationLink {
                         ProfileView()
                     } label: {
                         HStack {
@@ -104,7 +123,7 @@ struct SettingsView: View {
                         }
                     }
                 }
-                
+
                 Section {
                     Toggle("autodownload", isOn: $hasAutomaticDownload)
                         .tint(.accent)
@@ -143,16 +162,9 @@ struct SettingsView: View {
                 }
                 
                 Section {
-                    Picker(selection: $selectedAppearance) {
-                        ForEach(Settings.Appearance.allCases) { appearance in
-                            Text(appearance.description)
-                        }
-                    } label: {
-                        Text("pref_appearance_title")
-                    }
-                    
+                    // Backseat Driver: always night, so no appearance choice.
                     Picker(selection: $selectedCustomButtonKind) {
-                        ForEach(MapCustomButton.Kind.allCases) { customButtonKind in
+                        ForEach(MapCustomButton.Kind.offered) { customButtonKind in
                             Text(customButtonKind.description)
                         }
                     } label: {
@@ -171,14 +183,6 @@ struct SettingsView: View {
                 }
                 
                 Section {
-                    Picker(selection: $selectedMapAppearance) {
-                        ForEach(Settings.Appearance.allCases) { mapAppearance in
-                            Text(mapAppearance.description)
-                        }
-                    } label: {
-                        Text("pref_mapappearance_title")
-                    }
-
                     VStack(alignment: .leading) {
                         Text("pref_font_size")
                         Slider(
@@ -339,6 +343,7 @@ struct SettingsView: View {
                     Text("enable_logging_warning_message")
                 }
             }
+            .backseatList()
             .navigationTitle("settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

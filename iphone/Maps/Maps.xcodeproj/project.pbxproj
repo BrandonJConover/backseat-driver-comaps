@@ -52,6 +52,7 @@
 		27362BD72F4284FA00BCB1FB /* drules_proto_public-transport_outdoor_dark.bin in Resources */ = {isa = PBXBuildFile; fileRef = 27362BCB2F4284FA00BCB1FB /* drules_proto_public-transport_outdoor_dark.bin */; };
 		27362BD82F4284FA00BCB1FB /* drules_proto_public-transport_outdoor_light.bin in Resources */ = {isa = PBXBuildFile; fileRef = 27362BCC2F4284FA00BCB1FB /* drules_proto_public-transport_outdoor_light.bin */; };
 		27362BE42F43257A00BCB1FB /* MapSearchButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27362BE32F43257000BCB1FB /* MapSearchButton.swift */; };
+		BD5EA7000000000000000013 /* BackseatWhereToCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000012 /* BackseatWhereToCard.swift */; };
 		27362BE62F434C9900BCB1FB /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27362BE52F434C9200BCB1FB /* MapView.swift */; };
 		27362BE82F434CA400BCB1FB /* MapOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27362BE72F434C9E00BCB1FB /* MapOverlayView.swift */; };
 		2744A9912F23D86D00E7D02C /* AlternativeMapLanguageHandling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2744A98E2F23D86B00E7D02C /* AlternativeMapLanguageHandling.swift */; };
@@ -73,6 +74,7 @@
 		279367562E1BE16300AA5C3D /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279367552E1BE16300AA5C3D /* Settings.swift */; };
 		2793675A2E1BE17300AA5C3D /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279367592E1BE17300AA5C3D /* SettingsView.swift */; };
 		27AF184C2E1D5B2D00CD41E2 /* SettingsNavigationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AF184B2E1D5A2700CD41E2 /* SettingsNavigationView.swift */; };
+		BD5EA7000000000000000011 /* SettingsBackseatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000010 /* SettingsBackseatView.swift */; };
 		27AF18502E1DB61600CD41E2 /* VoiceRoutingLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AF184F2E1DB61500CD41E2 /* VoiceRoutingLanguage.swift */; };
 		27AF18522E1DB62000CD41E2 /* DistanceUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AF18512E1DB61F00CD41E2 /* DistanceUnit.swift */; };
 		27AF18542E1DB62700CD41E2 /* MobileDataPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AF18532E1DB62600CD41E2 /* MobileDataPolicy.swift */; };
@@ -96,6 +98,9 @@
 		3404755F1E081A4600C92850 /* MWMLocationPredictor.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3404752F1E081A4600C92850 /* MWMLocationPredictor.mm */; };
 		340475621E081A4600C92850 /* MWMNetworkPolicy+UI.m in Sources */ = {isa = PBXBuildFile; fileRef = 340475321E081A4600C92850 /* MWMNetworkPolicy+UI.m */; };
 		340475651E081A4600C92850 /* MWMRouter.mm in Sources */ = {isa = PBXBuildFile; fileRef = 340475361E081A4600C92850 /* MWMRouter.mm */; };
+		BD5EA70000000000000000A3 /* MWMRouter+Sketch.mm in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000A1 /* MWMRouter+Sketch.mm */; };
+		BD5EA70000000000000000FA /* MWMRouter+Plan.mm in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000F9 /* MWMRouter+Plan.mm */; };
+		BD5EA70000000000000000A4 /* RouteSketchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000A2 /* RouteSketchOverlay.swift */; };
 		3404756B1E081A4600C92850 /* MWMSearch+CoreSpotlight.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3404753B1E081A4600C92850 /* MWMSearch+CoreSpotlight.mm */; };
 		3404756E1E081A4600C92850 /* MWMSearch.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3404753D1E081A4600C92850 /* MWMSearch.mm */; };
 		340475711E081A4600C92850 /* MWMSettings.mm in Sources */ = {isa = PBXBuildFile; fileRef = 340475411E081A4600C92850 /* MWMSettings.mm */; };
@@ -143,6 +148,21 @@
 		3472B5D3200F501500DC6CD5 /* BackgroundFetchTaskFrameworkType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3472B5D1200F501500DC6CD5 /* BackgroundFetchTaskFrameworkType.swift */; };
 		3472B5E1200F86C800DC6CD5 /* MWMEditorHelper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3472B5DF200F86C800DC6CD5 /* MWMEditorHelper.mm */; };
 		34763EE71F2F392300F4D2D3 /* MWMTextToSpeech.mm in Sources */ = {isa = PBXBuildFile; fileRef = 34763EE51F2F392300F4D2D3 /* MWMTextToSpeech.mm */; };
+		563A9DD993C1192095F00911 /* MWMBackseatRewriter.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0CBA5579CD04841A09E00696 /* MWMBackseatRewriter.mm */; };
+		6BDF13DF3D46F27095EBC5E3 /* MWMBackseatTestDrive.mm in Sources */ = {isa = PBXBuildFile; fileRef = 52B06F3EF2E413E793E4938C /* MWMBackseatTestDrive.mm */; };
+		5CB2DD731D55FAF37F276ABC /* BackseatLLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3771351F90A1F053385C4151 /* BackseatLLM.swift */; };
+		3213DE744AEA509300F3828A /* BackseatListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = A134DCF11C5D2C0CF4DD010A /* BackseatListener.swift */; };
+		BD5EA7000000000000000031 /* BackseatDriveWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000030 /* BackseatDriveWatcher.swift */; };
+		BD5EA70000000000000000B1 /* BackseatHooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000B0 /* BackseatHooks.swift */; };
+		BD5EA70000000000000000D1 /* BackseatReturnTrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000D0 /* BackseatReturnTrip.swift */; };
+		BD5EA70000000000000000E1 /* BackseatTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000E0 /* BackseatTheme.swift */; };
+		BD5EA70000000000000000E3 /* BackseatCaptionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000E2 /* BackseatCaptionView.swift */; };
+		BD5EA70000000000000000F1 /* BackseatArrivalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000F0 /* BackseatArrivalCard.swift */; };
+		BD5EA70000000000000000F7 /* BackseatAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000F6 /* BackseatAppearance.swift */; };
+		BD5EA70000000000000000C4 /* MWMBackseatLog.mm in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000C1 /* MWMBackseatLog.mm */; };
+		BD5EA70000000000000000F5 /* MWMBackseatRoadTrip.mm in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000F4 /* MWMBackseatRoadTrip.mm */; };
+		BD5EA70000000000000000C5 /* BackseatDriveLogSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */; };
+		8A5DF1798F484411EEE1E998 /* BackseatTalkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */; };
 		34845DAF1E1649F6003D55B9 /* DownloaderNoResultsEmbedViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DAD1E1649F6003D55B9 /* DownloaderNoResultsEmbedViewController.swift */; };
 		34845DB31E165E24003D55B9 /* SearchNoResultsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DB11E165E24003D55B9 /* SearchNoResultsViewController.swift */; };
 		34845DB71E166084003D55B9 /* Common.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34845DB51E166084003D55B9 /* Common.swift */; };
@@ -689,6 +709,8 @@
 		FA85D44E279B738F00B858E9 /* CopyableLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA85D44D279B738F00B858E9 /* CopyableLabel.swift */; };
 		FA8E808925F412E2002A1434 /* FirstSession.mm in Sources */ = {isa = PBXBuildFile; fileRef = FA8E808825F412E2002A1434 /* FirstSession.mm */; };
 		FAF9DDA32A86DC54000D7037 /* libharfbuzz.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FAF9DDA22A86DC54000D7037 /* libharfbuzz.a */; };
+		BD5EA7000000000000000003 /* KokoroVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000002 /* KokoroVoice.swift */; };
+		BD5EA7000000000000000006 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = BD5EA7000000000000000005 /* FluidAudio */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -824,6 +846,7 @@
 		27362BCB2F4284FA00BCB1FB /* drules_proto_public-transport_outdoor_dark.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = "drules_proto_public-transport_outdoor_dark.bin"; path = "../../data/drules_proto_public-transport_outdoor_dark.bin"; sourceTree = "<group>"; };
 		27362BCC2F4284FA00BCB1FB /* drules_proto_public-transport_outdoor_light.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = "drules_proto_public-transport_outdoor_light.bin"; path = "../../data/drules_proto_public-transport_outdoor_light.bin"; sourceTree = "<group>"; };
 		27362BE32F43257000BCB1FB /* MapSearchButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapSearchButton.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000012 /* BackseatWhereToCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackseatWhereToCard.swift; sourceTree = "<group>"; };
 		27362BE52F434C9200BCB1FB /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		27362BE72F434C9E00BCB1FB /* MapOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapOverlayView.swift; sourceTree = "<group>"; };
 		2744A98E2F23D86B00E7D02C /* AlternativeMapLanguageHandling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlternativeMapLanguageHandling.swift; sourceTree = "<group>"; };
@@ -845,6 +868,7 @@
 		279367552E1BE16300AA5C3D /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
 		279367592E1BE17300AA5C3D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = UI/Settings/SettingsView.swift; sourceTree = SOURCE_ROOT; };
 		27AF184B2E1D5A2700CD41E2 /* SettingsNavigationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsNavigationView.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000010 /* SettingsBackseatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsBackseatView.swift; sourceTree = "<group>"; };
 		27AF184F2E1DB61500CD41E2 /* VoiceRoutingLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRoutingLanguage.swift; sourceTree = "<group>"; };
 		27AF18512E1DB61F00CD41E2 /* DistanceUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DistanceUnit.swift; sourceTree = "<group>"; };
 		27AF18532E1DB62600CD41E2 /* MobileDataPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileDataPolicy.swift; sourceTree = "<group>"; };
@@ -883,6 +907,11 @@
 		340475321E081A4600C92850 /* MWMNetworkPolicy+UI.m */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.objc; path = "MWMNetworkPolicy+UI.m"; sourceTree = "<group>"; tabWidth = 2; };
 		340475351E081A4600C92850 /* MWMRouter.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMRouter.h; sourceTree = "<group>"; tabWidth = 2; };
 		340475361E081A4600C92850 /* MWMRouter.mm */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMRouter.mm; sourceTree = "<group>"; tabWidth = 2; };
+		BD5EA70000000000000000A0 /* MWMRouter+Sketch.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "MWMRouter+Sketch.h"; sourceTree = "<group>"; };
+		BD5EA70000000000000000A1 /* MWMRouter+Sketch.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = "MWMRouter+Sketch.mm"; sourceTree = "<group>"; };
+		BD5EA70000000000000000F8 /* MWMRouter+Plan.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "MWMRouter+Plan.h"; sourceTree = "<group>"; };
+		BD5EA70000000000000000F9 /* MWMRouter+Plan.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = "MWMRouter+Plan.mm"; sourceTree = "<group>"; };
+		BD5EA70000000000000000A2 /* RouteSketchOverlay.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RouteSketchOverlay.swift; sourceTree = "<group>"; };
 		3404753A1E081A4600C92850 /* MWMSearch+CoreSpotlight.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = "MWMSearch+CoreSpotlight.h"; sourceTree = "<group>"; tabWidth = 2; };
 		3404753B1E081A4600C92850 /* MWMSearch+CoreSpotlight.mm */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.cpp.objcpp; path = "MWMSearch+CoreSpotlight.mm"; sourceTree = "<group>"; tabWidth = 2; };
 		3404753C1E081A4600C92850 /* MWMSearch.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMSearch.h; sourceTree = "<group>"; tabWidth = 2; };
@@ -965,6 +994,25 @@
 		347526FB1DC0B00F00918CF5 /* common-release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "common-release.xcconfig"; path = "../../xcode/common-release.xcconfig"; sourceTree = "<group>"; };
 		34763EE41F2F392300F4D2D3 /* MWMTextToSpeech.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMTextToSpeech.h; sourceTree = "<group>"; tabWidth = 2; };
 		34763EE51F2F392300F4D2D3 /* MWMTextToSpeech.mm */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMTextToSpeech.mm; sourceTree = "<group>"; tabWidth = 2; };
+		E26D17103928978C28885B55 /* MWMBackseatRewriter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MWMBackseatRewriter.h; sourceTree = "<group>"; };
+		0CBA5579CD04841A09E00696 /* MWMBackseatRewriter.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatRewriter.mm; sourceTree = "<group>"; };
+		A81B8A62C7102ECAD1FED099 /* MWMBackseatTestDrive.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MWMBackseatTestDrive.h; sourceTree = "<group>"; };
+		52B06F3EF2E413E793E4938C /* MWMBackseatTestDrive.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatTestDrive.mm; sourceTree = "<group>"; };
+		3771351F90A1F053385C4151 /* BackseatLLM.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatLLM.swift; sourceTree = "<group>"; };
+		A134DCF11C5D2C0CF4DD010A /* BackseatListener.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatListener.swift; sourceTree = "<group>"; };
+		BD5EA7000000000000000030 /* BackseatDriveWatcher.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatDriveWatcher.swift; sourceTree = "<group>"; };
+		BD5EA70000000000000000B0 /* BackseatHooks.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatHooks.swift; sourceTree = "<group>"; };
+		BD5EA70000000000000000D0 /* BackseatReturnTrip.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatReturnTrip.swift; sourceTree = "<group>"; };
+		BD5EA70000000000000000E0 /* BackseatTheme.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatTheme.swift; sourceTree = "<group>"; };
+		BD5EA70000000000000000E2 /* BackseatCaptionView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatCaptionView.swift; sourceTree = "<group>"; };
+		BD5EA70000000000000000F0 /* BackseatArrivalCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatArrivalCard.swift; sourceTree = "<group>"; };
+		BD5EA70000000000000000F6 /* BackseatAppearance.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatAppearance.swift; sourceTree = "<group>"; };
+		BD5EA70000000000000000C0 /* MWMBackseatLog.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MWMBackseatLog.h; sourceTree = "<group>"; };
+		BD5EA70000000000000000C1 /* MWMBackseatLog.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatLog.mm; sourceTree = "<group>"; };
+		BD5EA70000000000000000F3 /* MWMBackseatRoadTrip.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MWMBackseatRoadTrip.h; sourceTree = "<group>"; };
+		BD5EA70000000000000000F4 /* MWMBackseatRoadTrip.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMBackseatRoadTrip.mm; sourceTree = "<group>"; };
+		BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatDriveLogSection.swift; sourceTree = "<group>"; };
+		DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatTalkButton.swift; sourceTree = "<group>"; };
 		34763EE91F2F394D00F4D2D3 /* MWMTextToSpeech+CPP.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = "MWMTextToSpeech+CPP.h"; sourceTree = "<group>"; tabWidth = 2; };
 		34763EEA1F2F3AD700F4D2D3 /* MWMTextToSpeechObserver.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMTextToSpeechObserver.h; sourceTree = "<group>"; tabWidth = 2; };
 		34763F0B1F30CCAC00F4D2D3 /* MWMEditorCellType.h */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = MWMEditorCellType.h; sourceTree = "<group>"; tabWidth = 2; };
@@ -1830,6 +1878,7 @@
 		FAF9A8A82CE0CEC000F6604D /* lv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.stringsdict; name = lv; path = lv.lproj/Localizable.stringsdict; sourceTree = "<group>"; };
 		FAF9DDA22A86DC54000D7037 /* libharfbuzz.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libharfbuzz.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAFF42291347F101009BBB14 /* World.mwm */ = {isa = PBXFileReference; lastKnownFileType = file; name = World.mwm; path = ../../data/World.mwm; sourceTree = "<group>"; };
+		BD5EA7000000000000000002 /* KokoroVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KokoroVoice.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1837,6 +1886,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BD5EA7000000000000000006 /* FluidAudio in Frameworks */,
 				FAF9DDA32A86DC54000D7037 /* libharfbuzz.a in Frameworks */,
 				FA456C3C26BDC6AD00B83C20 /* Chart.framework in Frameworks */,
 				FA853BF326BC5DE50026D455 /* libshaders.a in Frameworks */,
@@ -1962,6 +2012,7 @@
 				271146C02F4C966100D982DA /* Layers Button */,
 				27362B9E2F4240CE00BCB1FB /* Custom Button */,
 				27362BE32F43257000BCB1FB /* MapSearchButton.swift */,
+				BD5EA7000000000000000012 /* BackseatWhereToCard.swift */,
 				27362BA12F4240CE00BCB1FB /* Position Button */,
 				27362BA42F4240CE00BCB1FB /* Zoom Buttons */,
 				27362BA52F4240CE00BCB1FB /* MapButtonStyle.swift */,
@@ -2250,6 +2301,7 @@
 				340475391E081A4600C92850 /* Search */,
 				3404753F1E081A4600C92850 /* Settings */,
 				340475421E081A4600C92850 /* Storage */,
+				0C0A9FC062CAF6A0ABA31EE1 /* Backseat */,
 				34763EE31F2F392300F4D2D3 /* TextToSpeech */,
 			);
 			path = Core;
@@ -2293,6 +2345,11 @@
 				34AC8FC81EFC01F500E7F910 /* MWMRoutePoint+CPP.h */,
 				340475351E081A4600C92850 /* MWMRouter.h */,
 				340475361E081A4600C92850 /* MWMRouter.mm */,
+				BD5EA70000000000000000A0 /* MWMRouter+Sketch.h */,
+				BD5EA70000000000000000A1 /* MWMRouter+Sketch.mm */,
+				BD5EA70000000000000000F8 /* MWMRouter+Plan.h */,
+				BD5EA70000000000000000F9 /* MWMRouter+Plan.mm */,
+				BD5EA70000000000000000A2 /* RouteSketchOverlay.swift */,
 				340B33C41F3AEFDB00A8C1B4 /* MWMRouter+RouteManager.mm */,
 				3426DEB21F45AE5100D1C43C /* MWMRouterRecommendation.h */,
 				34B127E71FBDD410008713D9 /* MWMRouterTransitStepInfo.h */,
@@ -2551,6 +2608,32 @@
 			path = BackgroundFetchTask;
 			sourceTree = "<group>";
 		};
+		0C0A9FC062CAF6A0ABA31EE1 /* Backseat */ = {
+			isa = PBXGroup;
+			children = (
+				3771351F90A1F053385C4151 /* BackseatLLM.swift */,
+				A134DCF11C5D2C0CF4DD010A /* BackseatListener.swift */,
+				BD5EA7000000000000000030 /* BackseatDriveWatcher.swift */,
+				BD5EA70000000000000000B0 /* BackseatHooks.swift */,
+				BD5EA70000000000000000D0 /* BackseatReturnTrip.swift */,
+				BD5EA70000000000000000E0 /* BackseatTheme.swift */,
+				BD5EA70000000000000000E2 /* BackseatCaptionView.swift */,
+				BD5EA70000000000000000F0 /* BackseatArrivalCard.swift */,
+				BD5EA70000000000000000F6 /* BackseatAppearance.swift */,
+				BD5EA70000000000000000C0 /* MWMBackseatLog.h */,
+				BD5EA70000000000000000C1 /* MWMBackseatLog.mm */,
+				BD5EA70000000000000000F3 /* MWMBackseatRoadTrip.h */,
+				BD5EA70000000000000000F4 /* MWMBackseatRoadTrip.mm */,
+				BD5EA70000000000000000C2 /* BackseatDriveLogSection.swift */,
+				DF6DECFF74A648CD4B0F1357 /* BackseatTalkButton.swift */,
+				E26D17103928978C28885B55 /* MWMBackseatRewriter.h */,
+				0CBA5579CD04841A09E00696 /* MWMBackseatRewriter.mm */,
+				A81B8A62C7102ECAD1FED099 /* MWMBackseatTestDrive.h */,
+				52B06F3EF2E413E793E4938C /* MWMBackseatTestDrive.mm */,
+			);
+			path = Backseat;
+			sourceTree = "<group>";
+		};
 		34763EE31F2F392300F4D2D3 /* TextToSpeech */ = {
 			isa = PBXGroup;
 			children = (
@@ -2560,6 +2643,7 @@
 				34763EEA1F2F3AD700F4D2D3 /* MWMTextToSpeechObserver.h */,
 				4B83AE472C2E59F800B0C3BC /* TTSTester.h */,
 				4B83AE482C2E59F800B0C3BC /* TTSTester.mm */,
+				BD5EA7000000000000000001 /* Kokoro */,
 			);
 			path = TextToSpeech;
 			sourceTree = "<group>";
@@ -3991,6 +4075,7 @@
 				6F6D3992304DEAF3005FDA3E /* CustomMapServerView.swift */,
 				279367592E1BE17300AA5C3D /* SettingsView.swift */,
 				27AF184B2E1D5A2700CD41E2 /* SettingsNavigationView.swift */,
+				BD5EA7000000000000000010 /* SettingsBackseatView.swift */,
 				272F1F352E0EE00B00FA52EF /* Profile */,
 			);
 			path = Settings;
@@ -4073,6 +4158,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		BD5EA7000000000000000001 /* Kokoro */ = {
+			isa = PBXGroup;
+			children = (
+				BD5EA7000000000000000002 /* KokoroVoice.swift */,
+			);
+			path = Kokoro;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -4095,6 +4188,9 @@
 				ED46DDE02D098A0C007CACD6 /* PBXTargetDependency */,
 			);
 			name = CoMaps;
+			packageProductDependencies = (
+				BD5EA7000000000000000005 /* FluidAudio */,
+			);
 			productName = Maps;
 			productReference = 6741AA5D1BF340DE002C974C /* CoMaps (Debug).app */;
 			productType = "com.apple.product-type.application";
@@ -4218,6 +4314,9 @@
 				af,
 			);
 			mainGroup = 29B97314FDCFA39411CA2CEA /* Maps */;
+			packageReferences = (
+				BD5EA7000000000000000004 /* XCRemoteSwiftPackageReference "FluidAudio" */,
+			);
 			productRefGroup = 19C28FACFE9D520D11CA2CBB /* Products */;
 			projectDirPath = "";
 			projectReferences = (
@@ -4443,6 +4542,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BD5EA7000000000000000003 /* KokoroVoice.swift in Sources */,
 				ED914ABE2D351FF800973C45 /* UILabel+SetFontStyle.swift in Sources */,
 				34845DB71E166084003D55B9 /* Common.swift in Sources */,
 				47F4F21323A6EC420022FD56 /* DownloadMapsViewController.swift in Sources */,
@@ -4670,6 +4770,7 @@
 				349A13831DEC138C00C7DB60 /* MWMMobileInternetAlert.m in Sources */,
 				6741A9EC1BF340DE002C974C /* MWMCircularProgress.m in Sources */,
 				27AF184C2E1D5B2D00CD41E2 /* SettingsNavigationView.swift in Sources */,
+				BD5EA7000000000000000011 /* SettingsBackseatView.swift in Sources */,
 				993DF11923F6BDB100AC231A /* UITextFieldRenderer.swift in Sources */,
 				272F1F462E0EEF9400FA52EF /* SafariView.swift in Sources */,
 				340475591E081A4600C92850 /* WebViewController.m in Sources */,
@@ -4816,6 +4917,21 @@
 				ED7CCC4F2C1362E300E2A737 /* FileType.swift in Sources */,
 				4767CDA820AB401000BD8166 /* LinkTextView.swift in Sources */,
 				34763EE71F2F392300F4D2D3 /* MWMTextToSpeech.mm in Sources */,
+				563A9DD993C1192095F00911 /* MWMBackseatRewriter.mm in Sources */,
+				6BDF13DF3D46F27095EBC5E3 /* MWMBackseatTestDrive.mm in Sources */,
+				5CB2DD731D55FAF37F276ABC /* BackseatLLM.swift in Sources */,
+				3213DE744AEA509300F3828A /* BackseatListener.swift in Sources */,
+				BD5EA7000000000000000031 /* BackseatDriveWatcher.swift in Sources */,
+				BD5EA70000000000000000B1 /* BackseatHooks.swift in Sources */,
+				BD5EA70000000000000000D1 /* BackseatReturnTrip.swift in Sources */,
+				BD5EA70000000000000000E1 /* BackseatTheme.swift in Sources */,
+				BD5EA70000000000000000E3 /* BackseatCaptionView.swift in Sources */,
+				BD5EA70000000000000000F1 /* BackseatArrivalCard.swift in Sources */,
+				BD5EA70000000000000000F7 /* BackseatAppearance.swift in Sources */,
+				BD5EA70000000000000000C4 /* MWMBackseatLog.mm in Sources */,
+				BD5EA70000000000000000F5 /* MWMBackseatRoadTrip.mm in Sources */,
+				BD5EA70000000000000000C5 /* BackseatDriveLogSection.swift in Sources */,
+				8A5DF1798F484411EEE1E998 /* BackseatTalkButton.swift in Sources */,
 				F6E2FE221E097BA00083EBEC /* MWMOpeningHoursEditorViewController.mm in Sources */,
 				ED79A5D72BDF8D6100952D1F /* SynchronizationStateResolver.swift in Sources */,
 				999FC12B23ABB4B800B0E6F9 /* FontStyleSheet.swift in Sources */,
@@ -4851,6 +4967,7 @@
 				EDF838842C00B640007E4E67 /* SynchronizationFileWriter.swift in Sources */,
 				6741AA191BF340DE002C974C /* MWMDownloaderDialogCell.m in Sources */,
 				27362BE42F43257A00BCB1FB /* MapSearchButton.swift in Sources */,
+				BD5EA7000000000000000013 /* BackseatWhereToCard.swift in Sources */,
 				993DF10823F6BDB100AC231A /* IColors.swift in Sources */,
 				4707E4B12372FE860017DF6E /* PlacePageViewController.swift in Sources */,
 				34AB66441FC5AA330078E451 /* RouteManagerViewModelProtocol.swift in Sources */,
@@ -4895,6 +5012,9 @@
 				F6FEA82E1C58F108007223CC /* MWMButton.m in Sources */,
 				34B924431DC8A29C0008D971 /* MWMMailViewController.m in Sources */,
 				340475651E081A4600C92850 /* MWMRouter.mm in Sources */,
+				BD5EA70000000000000000A3 /* MWMRouter+Sketch.mm in Sources */,
+				BD5EA70000000000000000FA /* MWMRouter+Plan.mm in Sources */,
+				BD5EA70000000000000000A4 /* RouteSketchOverlay.swift in Sources */,
 				47E3C72F2111F472008B3B27 /* CoverVerticalModalTransitioning.swift in Sources */,
 				34E776101F14B165003040B3 /* VisibleArea.swift in Sources */,
 				ED0C54992C6E6AF000253A5F /* TrackRecordingManager.swift in Sources */,
@@ -5214,18 +5334,22 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 0;
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
-				INFOPLIST_KEY_CFBundleDisplayName = "${PRODUCT_NAME}";
+				INFOPLIST_KEY_CFBundleDisplayName = "Backseat (Debug)";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = NO;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 CoMaps Contributors. All rights reserved.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "To log drives you start without opening the app, Backseat Driver needs location Always. Your trips stay on this phone.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Determining your location is necessary for navigation and for saving your recently travelled track.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Backseat Driver uses motion to notice when you start driving, so your mileage log fills itself in, and to notice potholes so it can complain about them.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Backseat Driver listens when you tap the mic, so you can call out license plates and talk back.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Turns what you say to Backseat Driver into text, on this device when it can.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UIStatusBarHidden = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -5233,7 +5357,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 2026.01.01;
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-				PRODUCT_BUNDLE_IDENTIFIER = app.comaps.debug;
+				PRODUCT_BUNDLE_IDENTIFIER = com.brandonjconover.backseatdriver.debug;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 			};
 			name = Debug;
@@ -5250,18 +5374,22 @@
 				CURRENT_PROJECT_VERSION = 0;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
-				INFOPLIST_KEY_CFBundleDisplayName = "${PRODUCT_NAME}";
+				INFOPLIST_KEY_CFBundleDisplayName = "Backseat Driver";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = NO;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 CoMaps Contributors. All rights reserved.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "To log drives you start without opening the app, Backseat Driver needs location Always. Your trips stay on this phone.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Determining your location is necessary for navigation and for saving your recently travelled track.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Backseat Driver uses motion to notice when you start driving, so your mileage log fills itself in, and to notice potholes so it can complain about them.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Backseat Driver listens when you tap the mic, so you can call out license plates and talk back.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Turns what you say to Backseat Driver into text, on this device when it can.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UIStatusBarHidden = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -5269,7 +5397,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 2026.01.01;
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-				PRODUCT_BUNDLE_IDENTIFIER = app.comaps;
+				PRODUCT_BUNDLE_IDENTIFIER = com.brandonjconover.backseatdriver;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 			};
 			name = Release;
@@ -5283,7 +5411,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.comaps.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.brandonjconover.backseatdriver.tests;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoMaps (Debug).app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoMaps (Debug)";
 			};
@@ -5298,7 +5426,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.comaps.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.brandonjconover.backseatdriver.tests;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoMaps (Debug).app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoMaps (Debug)";
 			};
@@ -5316,7 +5444,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CoMapsWidgetExtension/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = CoMaps;
+				INFOPLIST_KEY_CFBundleDisplayName = "Backseat Driver";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 CoMaps Contributors. All rights reserved.";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -5327,7 +5455,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 2026.01.01;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-				PRODUCT_BUNDLE_IDENTIFIER = app.comaps.debug.widgetextension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.brandonjconover.backseatdriver.debug.widgetextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
@@ -5346,7 +5474,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CoMapsWidgetExtension/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = CoMaps;
+				INFOPLIST_KEY_CFBundleDisplayName = "Backseat Driver";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 CoMaps Contributors. All rights reserved.";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -5356,7 +5484,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 2026.01.01;
-				PRODUCT_BUNDLE_IDENTIFIER = app.comaps.widgetextension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.brandonjconover.backseatdriver.widgetextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
@@ -5371,11 +5499,11 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 347526FA1DC0B00F00918CF5 /* common-debug.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "Debug Icon";
+				ASSETCATALOG_COMPILER_APPICON_NAME = "Backseat Icon";
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				BUNDLE_IDENTIFIER = app.comaps.debug;
+				BUNDLE_IDENTIFIER = com.brandonjconover.backseatdriver.debug;
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
-				DEVELOPMENT_TEAM = 534D2KJBUK;
+				DEVELOPMENT_TEAM = "";
 				GCC_PRECOMPILE_PREFIX_HEADER = NO;
 				GCC_PREFIX_HEADER = Maps_Prefix.pch;
 				HEADER_SEARCH_PATHS = (
@@ -5414,11 +5542,11 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 347526FB1DC0B00F00918CF5 /* common-release.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = Icon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "Backseat Icon";
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				BUNDLE_IDENTIFIER = app.comaps;
+				BUNDLE_IDENTIFIER = com.brandonjconover.backseatdriver;
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
-				DEVELOPMENT_TEAM = 534D2KJBUK;
+				DEVELOPMENT_TEAM = "";
 				GCC_PRECOMPILE_PREFIX_HEADER = NO;
 				GCC_PREFIX_HEADER = Maps_Prefix.pch;
 				HEADER_SEARCH_PATHS = (
@@ -5493,6 +5621,23 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+/* Begin XCRemoteSwiftPackageReference section */
+		BD5EA7000000000000000004 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/FluidInference/FluidAudio";
+			requirement = {
+				kind = exactVersion;
+				version = 0.17.7;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+/* Begin XCSwiftPackageProductDependency section */
+		BD5EA7000000000000000005 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BD5EA7000000000000000004 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 29B97313FDCFA39411CA2CEA /* Project object */;
 }

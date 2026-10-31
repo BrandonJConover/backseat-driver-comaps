@@ -15,6 +15,7 @@
 #import "MapViewController.h"
 #import "NSDate+TimeDistance.h"
 #import "SwiftBridge.h"
+#import "MWMBackseatTestDrive.h"
 
 
 #import <CarPlay/CarPlay.h>
@@ -106,6 +107,10 @@ void InitLocalizedStrings() {
   NSTimeInterval const minimumBackgroundFetchIntervalInSeconds = 6 * 60 * 60;
   [UIApplication.sharedApplication setMinimumBackgroundFetchInterval:minimumBackgroundFetchIntervalInSeconds];
   [self updateApplicationIconBadgeNumber];
+  [TrackRecordingManager.shared stopLeftoverRecording];
+  // The record-track button isn't offered any more; don't leave it as the map's custom button.
+  if ([[NSUserDefaults.standardUserDefaults stringForKey:@"LeftButtonType"] isEqualToString:@"RecordTrack"])
+    [NSUserDefaults.standardUserDefaults setObject:@"Favourites" forKey:@"LeftButtonType"];
   [TrackRecordingManager.shared setup];
   [self startObservingLifecycle];
 }
@@ -119,9 +124,21 @@ void InitLocalizedStrings() {
   [HttpThreadImpl setDownloadIndicatorProtocol:self];
 
   InitLocalizedStrings();
+  // Backseat Driver's night-drive look for UIKit's own controls, before any screen is made.
+  [MWMBackseatAppearance applyProxies];
   [MWMThemeManager invalidate];
+  // Backseat Driver: the tilted 3D map with buildings while driving, on by default (once; the
+  // driver can still turn it off in Settings).
+  if (![NSUserDefaults.standardUserDefaults boolForKey:@"Backseat3dDefault"])
+  {
+    GetFramework().Save3dMode(true /* allow3d */, true /* allow3dBuildings */);
+    GetFramework().Allow3dMode(true, true);
+    [NSUserDefaults.standardUserDefaults setBool:YES forKey:@"Backseat3dDefault"];
+  }
 
   [self commonInit];
+  [BackseatLLM install];
+  [MWMBackseatTestDrive startIfRequested];
 
   if ([FirstSession isFirstSession]) {
     [self firstLaunchSetup];

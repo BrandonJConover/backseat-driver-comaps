@@ -92,8 +92,9 @@ extension PlacePageHeaderViewController: PlacePageHeaderViewProtocol {
       return
     }
 
+    // Backseat: big condensed titles, like a road sign.
     let titleAttributes: [NSAttributedString.Key: Any] = [
-      .font: StyleManager.shared.theme!.fonts.semibold20,
+      .font: BackseatTheme.number(30),
       .foregroundColor: UIColor.blackPrimaryText()
     ]
 

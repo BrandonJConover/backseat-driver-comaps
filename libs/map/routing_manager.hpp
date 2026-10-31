@@ -1,5 +1,6 @@
 #pragma once
 
+#include "map/backseat_adapter.hpp"
 #include "map/extrapolation/extrapolator.hpp"
 #include "map/routing_mark.hpp"
 #include "map/transit/transit_display.hpp"
@@ -236,6 +237,94 @@ public:
   /// \note Current notifications will be deleted after call and second call
   /// will not return previous data, only newer.
   void GenerateNotifications(std::vector<std::string> & notifications, bool announceStreets);
+  /// Title of the route's finish point, as Backseat Driver should call it.
+  std::string GetBackseatDestinationName() const;
+  /// Lets the platform plug in its on-device model to reword Backseat Driver's roasts.
+  void SetBackseatRewriter(std::shared_ptr<backseat::LineRewriter> rewriter) { m_backseat.SetRewriter(std::move(rewriter)); }
+  /// What the driver said out loud (speech recognition), for the license plate game. GUI thread.
+  void SetBackseatMusicCheck(std::function<bool()> check) { m_backseat.SetMusicCheck(std::move(check)); }
+  BackseatAdapter::HeardCommand BackseatDriverSaid(std::string const & text) { return m_backseat.OnDriverSaid(text); }
+  /// Call after the Settings screen writes one of BackseatAdapter's personality keys.
+  void ReloadBackseatPersonality() { m_backseat.ReloadPersonality(); }
+  void BackseatBeginProfileEdit() { m_backseat.BeginProfileEdit(); }
+  std::string BackseatEndProfileEdit() { return m_backseat.EndProfileEdit(); }
+  BackseatAdapter::HeardCommand BackseatRunTool(std::string const & name, std::string const & argument,
+                                                std::string const & spoken)
+  {
+    return m_backseat.RunTool(name, argument, spoken);
+  }
+  void SetBackseatVoices(std::vector<backseat::VoiceOption> voices) { m_backseat.SetVoices(std::move(voices)); }
+  std::string BackseatSetupLine(BackseatAdapter::SetupStep step, std::string const & voiceName)
+  {
+    return m_backseat.SetupLine(step, voiceName);
+  }
+  bool BackseatSetupHeard(BackseatAdapter::SetupStep step, std::string const & spoken)
+  {
+    return m_backseat.SetupHeard(step, spoken);
+  }
+  std::string BackseatAskWhereTo() { return m_backseat.AskWhereTo(); }
+  BackseatAdapter::SearchSpeech BackseatSpeakSearchResults(std::string const & query,
+                                                           std::vector<BackseatAdapter::SearchResult> results)
+  {
+    return m_backseat.SpeakSearchResults(query, std::move(results));
+  }
+  std::pair<std::optional<size_t>, std::string> BackseatPickSearchResult(std::string const & spoken)
+  {
+    return m_backseat.PickSearchResult(spoken);
+  }
+  std::string BackseatNoAnswerToWhereTo() { return m_backseat.NoAnswerToWhereTo(); }
+  std::vector<BackseatAdapter::PastRoute> BackseatPastRoutes(size_t max) const { return m_backseat.PastRoutes(max); }
+  std::string BackseatVoiceRecovered() { return m_backseat.VoiceRecovered(); }
+  bool BackseatRemember(std::string const & topic, std::string const & fact) { return m_backseat.Remember(topic, fact); }
+  bool BackseatForget(std::string const & topic) { return m_backseat.Forget(topic); }
+  std::vector<backseat::DriverMemory::Memory> BackseatMemories() const { return m_backseat.Memories(); }
+  std::string BackseatChatInstructions(std::string const & voiceName) { return m_backseat.ChatInstructions(voiceName); }
+  std::string BackseatFileQuestion() { return m_backseat.FileQuestion(); }
+  std::string BackseatFileAnswer(std::string const & spoken) { return m_backseat.FileAnswer(spoken); }
+  std::string BackseatNicenessMoved() { return m_backseat.NicenessMoved(); }
+  std::string BackseatNicenessSlidBack() { return m_backseat.NicenessSlidBack(); }
+  std::string BackseatMapBrowsed() { return m_backseat.MapBrowsed(); }
+  std::string BackseatTypingDestination() { return m_backseat.TypingDestination(); }
+  std::string BackseatRoughRoad() { return m_backseat.RoughRoad(); }
+  std::string BackseatArrivalSurvey() { return m_backseat.ArrivalSurvey(); }
+  std::string BackseatSurveyAnswer(std::string const & spoken) { return m_backseat.SurveyAnswer(spoken); }
+  std::string BackseatDriveSample(double lat, double lon, double speedMps, double accuracyM, int activity, double tMs)
+  {
+    return m_backseat.OnDriveSample(lat, lon, speedMps, accuracyM, activity, tMs);
+  }
+  std::string BackseatMileageFinish() { return m_backseat.MileageFinish(); }
+  bool BackseatMileageOn() const { return m_backseat.MileageOn(); }
+  std::vector<backseat::LoggedDrive> BackseatMileageLog() const { return m_backseat.MileageLog(); }
+  backseat::MileageYear BackseatMileageSummary(int year) const { return m_backseat.MileageSummary(year); }
+  std::string BackseatMileageCsv(int year) const { return m_backseat.MileageCsv(year); }
+  size_t BackseatSimilarDrives(size_t index) const { return m_backseat.SimilarDrives(index); }
+  std::string BackseatReassignDrive(size_t index, backseat::Bucket bucket, bool similarToo, std::string const & purpose)
+  {
+    return m_backseat.ReassignDrive(index, bucket, similarToo, purpose);
+  }
+  void BackseatTagPlace(std::string const & name, double lat, double lon, backseat::PlaceRole role)
+  {
+    m_backseat.TagPlace(name, lat, lon, role);
+  }
+  std::vector<backseat::MileagePlace> BackseatTaggedPlaces() const { return m_backseat.TaggedPlaces(); }
+  std::string BackseatMileageYearEnd() { return m_backseat.MileageYearEnd(); }
+  std::string BackseatMileageTurnedOn() { return m_backseat.MileageTurnedOn(); }
+  bool BackseatMileageListening() const { return m_backseat.MileageListening(); }
+  std::string BackseatMileageAnswer(std::string const & spoken) { return m_backseat.MileageAnswer(spoken); }
+  std::string BackseatBusinessOwner() const { return m_backseat.BusinessOwner(); }
+  void BackseatSetBusinessOwner(std::string const & owner) { m_backseat.SetBusinessOwner(owner); }
+  void BackseatSketchApplied(bool addedStop, bool trimmed) { m_backseat.SketchApplied(addedStop, trimmed); }
+  int BackseatFrustration() const { return m_backseat.Frustration(); }
+  std::vector<backseat::LatLon> BackseatSnapToRoads(std::vector<backseat::LatLon> const & stroke) const
+  {
+    return m_backseat.SnapToRoads(stroke);
+  }
+  std::string BackseatTakeSketchVerdict() { return m_backseat.TakeSketchVerdict(); }
+  std::string BackseatSketchCleared() { return m_backseat.SketchCleared(); }
+  std::vector<std::pair<std::string, std::string>> BackseatLearnedFacts() const { return m_backseat.LearnedFacts(); }
+  /// Backseat Driver's voicing hints for the lines GenerateNotifications() just returned.
+  BackseatAdapter const & GetBackseat() const { return m_backseat; }
+  BackseatAdapter & GetBackseat() { return m_backseat; }
 
   void AddRoutePoint(RouteMarkData && markData, bool reorderIntermediatePoints = true);
   void ContinueRouteToPoint(RouteMarkData && markData);
@@ -250,6 +339,27 @@ public:
   void HideRoutePoint(RouteMarkType type, size_t intermediateIndex = 0);
   bool CouldAddIntermediatePoint() const;
   bool IsMyPosition(RouteMarkType type, size_t intermediateIndex = 0);
+
+  struct RouteSketchResult
+  {
+    bool applied = false;
+    /// The stroke ended on empty map, so a stop (or a new destination) was added there.
+    bool addedStop = false;
+    /// The 100-point limit cut the stroke short.
+    bool trimmed = false;
+    size_t shapingPoints = 0;
+  };
+  /// Backseat: the driver drew `stroke` (mercator, in drawing order) on the map. Reshapes the leg
+  /// between the stops nearest its ends, or adds a stop where it ends on empty map. With no route
+  /// yet, it starts from my position. Replaces any earlier drawing on that leg. Call BuildRoute()
+  /// afterwards. `metersPerPixel` is the screen scale while drawing.
+  RouteSketchResult ApplyRouteSketch(std::vector<m2::PointD> const & stroke, double metersPerPixel);
+  /// Removes every drawn shaping point, keeping the stops. Returns false if there were none.
+  bool ClearRouteSketch();
+  bool HasRouteSketch() const;
+  /// Backseat Draw mode is open: rebuilt routes don't move the map (no fit-to-route), so panning
+  /// while drawing and re-planning stays where the driver put it.
+  void SetBackseatKeepViewport(bool keep) { m_backseatKeepViewport = keep; }
 
   void SetRouterImpl(routing::RouterType type);
   void RemoveRoute(bool deactivateFollowing);
@@ -400,6 +510,8 @@ private:
 
   BookmarkManager * m_bmManager = nullptr;
   extrapolation::Extrapolator m_extrapolator;
+  /// Backseat Driver: replaces the stock voice prompts with the critique engine's lines.
+  BackseatAdapter m_backseat;
 
   std::vector<dp::DrapeID> m_drapeSubroutes;
   mutable std::mutex m_drapeSubroutesMutex;
@@ -419,4 +531,5 @@ private:
   TransitReadManager * m_transitReadManager = nullptr;
 
   DECLARE_THREAD_CHECKER(m_threadChecker);
+  bool m_backseatKeepViewport = false;
 };

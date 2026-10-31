@@ -93,7 +93,7 @@ extension GlobalStyleSheet: IStyleSheet {
       }
     case .tableViewHeaderFooterView:
       return .add { s in
-        s.font = fonts.medium14
+        s.font = fonts.bold14
         s.fontColor = colors.blackSecondaryText
       }
     case .defaultSearchBar:
@@ -106,7 +106,7 @@ extension GlobalStyleSheet: IStyleSheet {
       }
     case .searchBar:
       return .add { s in
-        s.backgroundColor = colors.white
+        s.backgroundColor = colors.pressBackground
         s.barTintColor = colors.primary
         s.fontColor = colors.blackPrimaryText
         s.fontColorDetailed = UIColor.white
@@ -115,16 +115,17 @@ extension GlobalStyleSheet: IStyleSheet {
     case .navigationBar:
       return .add { s in
         s.barTintColor = colors.primary
-        s.tintColor = colors.whitePrimaryText
+        s.tintColor = colors.linkBlue
         s.backgroundImage = UIImage()
         s.shadowImage = UIImage()
-        s.font = fonts.header
+        // Backseat: condensed, sign-like screen titles.
+        s.font = BackseatTheme.number(22, weight: .bold)
         s.fontColor = colors.whitePrimaryText
       }
     case .navigationBarItem:
       return .add { s in
         s.font = fonts.regular18
-        s.fontColor = colors.whitePrimaryText
+        s.fontColor = colors.linkBlue
         s.fontColorDisabled = UIColor.lightGray
         s.fontColorHighlighted = colors.whitePrimaryTextHighlighted
         s.tintColor = colors.whitePrimaryText
@@ -187,9 +188,10 @@ extension GlobalStyleSheet: IStyleSheet {
     case .bottomTabBarButton:
       return .add { s in
         s.backgroundColor = colors.tabBarButtonBackground
-        s.tintColor = colors.blackSecondaryText
+        s.tintColor = colors.blackPrimaryText
         s.coloring = MWMButtonColoring.black
-        s.cornerRadius = .buttonDefault
+        // Backseat: rounded squares like the driving-screen buttons.
+        s.cornerRadius = .custom(16)
         s.shadowColor = UIColor(0,0,0,alpha20)
         s.shadowOpacity = 1
         s.shadowOffset = CGSize(width: 0, height: 1)
@@ -253,7 +255,7 @@ extension GlobalStyleSheet: IStyleSheet {
       }
     case .alertView:
       return .add { s in
-        s.cornerRadius = .modalSheet
+        s.cornerRadius = .custom(24)
         s.shadowRadius = 6
         s.shadowColor = UIColor(0,0,0,alpha20)
         s.shadowOpacity = 1
@@ -283,10 +285,11 @@ extension GlobalStyleSheet: IStyleSheet {
       }
     case .flatNormalButton:
       return .add { s in
-        s.font = fonts.medium14
-        s.cornerRadius = .buttonDefault
+        s.font = fonts.semibold14
+        s.cornerRadius = .custom(14)
         s.clip = true
-        s.fontColor = colors.whitePrimaryText
+        // Backseat: dark text on the yellow button.
+        s.fontColor = BackseatTheme.ink
         s.backgroundColor = colors.linkBlue
         s.fontColorHighlighted = colors.whitePrimaryTextHighlighted
         s.fontColorDisabled = colors.whitePrimaryTextHighlighted

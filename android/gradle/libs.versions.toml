@@ -10,6 +10,7 @@ androidToolsDesugar = "2.1.5"
 tripletPlayPublisher = "3.13.0"
 microgServicesLocation = "0.3.14.250932"
 appDevNextAndroidChart = "3.1.0.31"
+commonsCompress = "1.21"
 
 # Testing
 robo = "4.16.1"
@@ -34,6 +35,7 @@ androidxConstraintLayout = "2.2.1"
 androidxLifecycleProcess = "2.9.4"
 
 [libraries]
+apache-commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commonsCompress" }
 google-guava = { module = "com.google.guava:guava", version.ref = "googleGuava" }
 android-tools = { module = "com.android.tools.build:gradle", version.ref = "androidGradlePlugin" }
 huawei-publish = { module = "ru.cian:huawei-publish-gradle-plugin", version.ref = "huaweiPublish" }

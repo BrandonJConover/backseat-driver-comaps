@@ -3,6 +3,8 @@ import ru.cian.huawei.publish.BuildFormat
 import ru.cian.huawei.publish.DeployType
 import ru.cian.huawei.publish.ReleaseNote
 import ru.cian.huawei.publish.ReleaseNotesExtension
+import java.net.URI
+import java.security.MessageDigest
 import java.util.Locale
 
 buildscript {
@@ -31,8 +33,8 @@ java {
     }
 }
 
-val appName = "CoMaps"
-val appId = "app.comaps"
+val appName = "Backseat Driver"
+val appId = "com.brandonjconover.backseatdriver"
 // These are properly set in the 'secure.properties.*' files but must be declared here for build sync to succeed.
 project.ext["secretTestStoreFile"] = "comaps-test.keystore"
 project.ext["secretTestStorePassword"] = ""
@@ -193,7 +195,7 @@ android {
         getByName("debug") {
             storeFile = project.projectDir.resolve(File(comapsDebugKeystorePath))
             storePassword = "12345678"
-            keyAlias = "$appName Debug"
+            keyAlias = "CoMaps Debug"  // alias inside the committed debug keystore
             keyPassword = "12345678"
         }
         create("test") {
@@ -356,8 +358,35 @@ androidComponents {
   }
 }
 
+// ML Kit (Backseat Driver's Gemini Nano) pulls in Google's base/basement/tasks libraries,
+// which microG already provides for location; keep microG's single copy.
+configurations.configureEach {
+    exclude(group = "com.google.android.gms", module = "play-services-tasks")
+    exclude(group = "com.google.android.gms", module = "play-services-basement")
+    exclude(group = "com.google.android.gms", module = "play-services-base")
+}
+
+// Backseat Driver: sherpa-onnx runs the Kokoro voice. Its AAR isn't on Maven, so it's fetched from
+// the project's GitHub release once and checked against a pinned SHA-256.
+val sherpaOnnxVersion = "1.13.8"
+val sherpaOnnxSha256 = "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96"
+val sherpaOnnxAar = layout.projectDirectory.file("libs/sherpa-onnx-$sherpaOnnxVersion.aar").asFile
+fun sha256Of(file: File): String =
+    MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { b -> "%02x".format(b) }
+if (!sherpaOnnxAar.exists() || sha256Of(sherpaOnnxAar) != sherpaOnnxSha256) {
+    sherpaOnnxAar.parentFile.mkdirs()
+    val url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v$sherpaOnnxVersion/sherpa-onnx-$sherpaOnnxVersion.aar"
+    logger.lifecycle("Downloading $url")
+    val partial = File(sherpaOnnxAar.path + ".partial")
+    URI(url).toURL().openStream().use { input -> partial.outputStream().use { output -> input.copyTo(output) } }
+    check(sha256Of(partial) == sherpaOnnxSha256) { "sherpa-onnx AAR checksum mismatch" }
+    partial.renameTo(sherpaOnnxAar)
+}
+
 dependencies {
     implementation(project(":sdk"))
+    implementation(files(sherpaOnnxAar))
+    implementation(libs.apache.commons.compress)
     coreLibraryDesugaring(libs.android.tools.desugar)
 
     // Google Play Location Services

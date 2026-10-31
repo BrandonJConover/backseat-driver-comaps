@@ -107,6 +107,14 @@ final class TrackRecordingManager: NSObject {
     }
   }
 
+  /// Backseat Driver never resumes a recording at launch: one left on made the app open into the
+  /// recording sheet every time. What was recorded is saved, not thrown away.
+  @objc
+  func stopLeftoverRecording() {
+    guard isActive() else { return }
+    stopAndSave()
+  }
+
   @objc
   func isActive() -> Bool {
     recordingState == .active
