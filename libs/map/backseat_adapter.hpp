@@ -509,6 +509,8 @@ private:
   /// Region lookups are cached until the car has moved a couple of kilometers.
   std::optional<m2::PointD> m_regionAt;
   std::string m_region;
+  /// Where the country was last looked up for the navigator (holidays), and what it was.
+  std::optional<m2::PointD> m_countryAt;
   /// "Welcome to Utah" was already said on this drive.
   bool m_saidOutOfState = false;
   enum class MileageAsk

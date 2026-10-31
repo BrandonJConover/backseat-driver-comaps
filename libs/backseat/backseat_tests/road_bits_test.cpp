@@ -597,3 +597,19 @@ TEST(ParkedAtAFastFoodPlaceIsNotADriveThru)
   d.Run(40, 10);
   CHECK(d.heard.empty());
 }
+
+TEST(RoadWeatherReadsMetNorwaySymbols)
+{
+  // Outside the US the app passes MET Norway's symbol code where NWS would give a description.
+  CHECK(WeatherFromNws("lightsnow", 2, 4, -3).snow);
+  CHECK(WeatherFromNws("heavysleetshowersandthunder_day", 2, 4, 1).snow);
+  CHECK(WeatherFromNws("rainshowers_night", 2, 4, 8).rain);
+  CHECK(WeatherFromNws("lightrainandthunder", 2, 4, 15).rain);
+  CHECK(WeatherFromNws("fog", 1, 2, 5).fog);
+  CHECK(WeatherFromNws("clearsky_day", 1, 2, 20).clear);
+  CHECK(WeatherFromNws("fair_night", 1, 2, 12).clear);
+  Weather const cloudy = WeatherFromNws("partlycloudy_day", 3, -1, 10);
+  CHECK(!cloudy.rain && !cloudy.snow && !cloudy.fog && !cloudy.clear && !cloudy.windy);
+  CHECK(WeatherFromNws("cloudy", 4, 16, 10).windy);  // gusts in m/s, as MET reports them
+  CHECK(WeatherFromNws("cloudy", 4, -1, -20).tempC == -20);
+}

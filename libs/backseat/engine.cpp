@@ -174,6 +174,21 @@ Incident MakeIncident(double t, IncidentKind kind, std::optional<std::string> de
 }
 }  // namespace
 
+EngineConfig ForUnits(EngineConfig config, Units units)
+{
+  if (config.units == units)
+    return config;
+  // The defaults are written for mph; each is carried over at the same real speed and rounded the
+  // way a driver would put it (4 mph is about 6 km/h, 10 is 16, 15 is 25).
+  auto const convert = [&](double v) { return ToDisplay(FromDisplay(v, config.units), units); };
+  config.clearlyOver = static_cast<int>(JsRound(convert(config.clearlyOver)));
+  config.wayOver = static_cast<int>(JsRound(convert(config.wayOver)));
+  config.speedingTolerance = static_cast<int>(JsRound(convert(config.speedingTolerance)));
+  config.tooSlowMargin = JsRound(convert(config.tooSlowMargin) / 5) * 5;
+  config.units = units;
+  return config;
+}
+
 Rng SeededRng(uint32_t seed)
 {
   return [a = seed]() mutable
@@ -927,7 +942,9 @@ void CritiqueEngine::CheckSpeeding(TelemetrySample const & s, TelemetrySample co
     m_lastSpeedingLogAt = s.t;
   }
 
-  SpeedBand const band = over >= 10 ? SpeedBand::Way : over >= 4 ? SpeedBand::Clearly : SpeedBand::Barely;
+  SpeedBand const band = over >= m_config.wayOver     ? SpeedBand::Way
+                         : over >= m_config.clearlyOver ? SpeedBand::Clearly
+                                                        : SpeedBand::Barely;
   static char const * const kBandKeys[] = {"speeding.barely", "speeding.clearly", "speeding.way"};
   Vars const vars{{"speed", Num(speed)}, {"limit", Num(limit)}, {"over", Num(over)}, {"unit", UnitWord(units)}};
   bool const escalated = !m_speedingBand || static_cast<int>(band) > static_cast<int>(*m_speedingBand);

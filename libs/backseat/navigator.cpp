@@ -554,6 +554,18 @@ Navigator::Navigator(EngineConfig config, std::vector<TripRecord> history, TripR
   m_plates = PlateGame(m_config.rng);
   m_twenty = TwentyQuestions(m_config.rng);
   m_road.SetUnits(m_config.units);
+  SetLineMetric(m_config.units == Units::Kmh);
+}
+
+void Navigator::SetUnits(Units units)
+{
+  SetLineMetric(units == Units::Kmh);
+  if (units == m_config.units)
+    return;
+  m_config = ForUnits(m_config, units);
+  m_road.SetUnits(units);
+  if (m_engine)
+    m_engine->SetUnits(units);
 }
 
 void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
@@ -1972,10 +1984,20 @@ void Navigator::SayHoliday(double t)
     key = "holiday.newYear";
   else if (month == 2 && day == 14)
     key = "holiday.valentines";
-  else if (month == 7 && day == 4)
-    key = "holiday.july4";
-  else if (month == 11 && tm.tm_wday == 4 && day >= 22 && day <= 28)  // fourth Thursday
-    key = "holiday.thanksgiving";
+  else if (m_country == "Canada")
+  {
+    if (month == 7 && day == 1)
+      key = "holiday.canadaDay";
+    else if (month == 10 && tm.tm_wday == 1 && day >= 8 && day <= 14)  // second Monday
+      key = "holiday.thanksgiving";
+  }
+  else if (m_country.empty() || m_country == "US")
+  {
+    if (month == 7 && day == 4)
+      key = "holiday.july4";
+    else if (month == 11 && tm.tm_wday == 4 && day >= 22 && day <= 28)  // fourth Thursday
+      key = "holiday.thanksgiving";
+  }
   if (key)
     SayLine(t, Category::Holiday, key);
 }

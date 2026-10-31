@@ -60,6 +60,13 @@ void SetLineHousing(Housing housing);
 /// jokes for the streets; no lawn, driveway or mortgage jokes for an apartment.
 bool LineFitsHousing(std::string const & text, Housing housing);
 
+/// Whether LinesFor() answers for a metric driver: the few lines with a distance written into them
+/// ("we moved four feet", "for a quarter mile") come back in meters and kilometers. Off until told.
+void SetLineMetric(bool metric);
+/// `text` with its written-in imperial distances said in metric (MetricWording("Ten feet of
+/// glory") is "Three meters of glory"). Lines without any come back as they are.
+std::string MetricWording(std::string const & text);
+
 /// Templates for `key` at `tier` (0..2), for the current travel mode: what fits it, plus `key`.walk,
 /// `key`.bike, `key`.hike (or else `key`.walk) or `key`.offroad if there are any, or mode.generic when
 /// nothing fits. Lines that don't fit the driver's housing are left out too, unless that would leave

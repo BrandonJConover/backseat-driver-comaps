@@ -905,6 +905,63 @@ TEST(NavigatorHatesChristmasLights)
   CHECK(SaidLineOf(said[0].text, "holiday.halloween"));
 }
 
+TEST(NavigatorKeepsCanadianHolidays)
+{
+  // wday matters for Thanksgiving: 2026-10-12 is Canada's (second Monday), 2026-11-26 is the US one.
+  auto const at = [](int month, int day, int wday)
+  {
+    return [=](double)
+    {
+      std::tm tm{};
+      tm.tm_mon = month - 1;
+      tm.tm_mday = day;
+      tm.tm_wday = wday;
+      tm.tm_hour = 9;
+      return tm;
+    };
+  };
+  auto const opening = [&](std::string const & country, std::function<std::tm(double)> clock) -> std::string
+  {
+    Navigator nav(Config());
+    nav.SetCountry(country);
+    nav.SetLocalTime(clock);
+    nav.OnFix(At(0, 15), Far());
+    auto const said = LinesOf(nav.TakeLines(), Category::Holiday);
+    return said.empty() ? std::string() : said[0].text;
+  };
+  CHECK(SaidLineOf(opening("Canada", at(7, 1, 3)), "holiday.canadaDay"));
+  CHECK(opening("Canada", at(7, 4, 6)).empty());
+  CHECK(SaidLineOf(opening("Canada", at(10, 12, 1)), "holiday.thanksgiving"));
+  CHECK(opening("Canada", at(11, 26, 4)).empty());
+  CHECK(SaidLineOf(opening("US", at(7, 4, 6)), "holiday.july4"));
+  CHECK(SaidLineOf(opening("", at(11, 26, 4)), "holiday.thanksgiving"));
+  CHECK(opening("US", at(10, 12, 1)).empty());
+  CHECK(opening("UK", at(7, 4, 6)).empty());
+  CHECK(SaidLineOf(opening("UK", at(10, 31, 6)), "holiday.halloween"));
+}
+
+TEST(NavigatorSwitchesToKilometers)
+{
+  Navigator nav(Config());
+  CHECK(nav.GetUnits() == Units::Mph);
+  nav.SetUnits(Units::Kmh);
+  CHECK(nav.GetUnits() == Units::Kmh);
+  bool sawMeters = false;
+  for (int tier = 0; tier < 3; ++tier)
+    for (auto const & line : LinesFor("traffic.stopGo", tier))
+    {
+      CHECK(line.find(" feet") == std::string::npos);
+      sawMeters = sawMeters || line.find("meter") != std::string::npos;
+    }
+  CHECK(sawMeters);
+  nav.SetUnits(Units::Mph);
+  bool sawFeet = false;
+  for (int tier = 0; tier < 3; ++tier)
+    for (auto const & line : LinesFor("traffic.stopGo", tier))
+      sawFeet = sawFeet || line.find(" feet") != std::string::npos;
+  CHECK(sawFeet);
+}
+
 TEST(NavigatorPointsAtTheVolumeKnobAtRoundabouts)
 {
   bool music = true;

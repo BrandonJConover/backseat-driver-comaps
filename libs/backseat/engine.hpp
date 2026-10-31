@@ -37,6 +37,10 @@ struct EngineConfig
   Units units = Units::Mph;
   /// Display units over the limit before it counts as speeding. 0 means 51 in a 50 is a crime.
   int speedingTolerance = 0;
+  /// Display units over the limit for the "clearly" and "way over" speeding lines. ForUnits() sets
+  /// the km/h equivalents (about 6 and 16) so a metric driver isn't called a menace at 4 over.
+  int clearlyOver = 4;
+  int wayOver = 10;
   /// The same, where the limit is 55 mph or more. Below 0: speedingTolerance. Not in the TS engine.
   int speedingToleranceFast = -1;
   /// "Barely" lines at most this often. 0: no limit (the TS engine's behavior).
@@ -96,6 +100,10 @@ struct EngineConfig
   /// Lines said on earlier trips, so picks avoid them too. Not owned; null keeps it per trip.
   SaidLog * saidLog = nullptr;
 };
+/// `config` switched to `units`, with the display-unit thresholds (speeding bands, too slow) moved
+/// to their equivalents so the GPS behaves the same in km/h as in mph.
+EngineConfig ForUnits(EngineConfig config, Units units);
+
 
 /// "Turn left onto Elm" -> Left. "Keep right at the fork" -> Right. "Continue" -> Other.
 Maneuver TurnDirectionOf(std::string const & text);
@@ -137,6 +145,8 @@ public:
   /// Grade + heat map. Valid mid-trip too.
   TripReport Report() const;
   EngineConfig const & Config() const { return m_config; }
+  /// The driver changed units mid-trip: speeds, distances and thresholds follow from the next sample.
+  void SetUnits(Units units) { m_config = ForUnits(m_config, units); }
 
   /// The phone is busy saying what it was handed until about `t` (speechAware only).
   void SetTalkingUntil(double t) { m_talkingUntil = std::max(m_talkingUntil, t); }
