@@ -445,10 +445,6 @@ import Speech
 /// missing much. Without mic permission it just plays through, and the Settings list still works.
 @objc final class BackseatVoicePreview: NSObject {
   private static var current: BackseatVoicePreview?
-  /// Long enough for a line's own mentions of its voice's name, which are all near the start of it,
-  /// plus the recognizer catching up. Until then, that name is probably the speaker being overheard.
-  private static let ownNameEcho: TimeInterval = 4.5
-
   private struct Turn {
     let voiceID: String
     let line: String
@@ -457,14 +453,18 @@ import Speech
 
   private let turns: [Turn]
   private let startingVoice = KokoroVoice.selectedVoiceID
+  /// First launch: a pick goes here (the voice id) instead of switching voices on the spot, so the
+  /// old voice can gloat and the driver can type the phrase first. `onFinished` hears that the
+  /// line-up ran out with nobody picked.
+  private var onPick: ((String) -> Void)?
+  private var onFinished: (() -> Void)?
   private var timer: Timer?
   /// Whose line is on; -1 during the introduction.
   private var index = -1
-  private var lineStartedAt: Date?
-  /// The transcript so far, and how many times each voice was already named in it when the mic could
-  /// only have been hearing the GPS.
-  private var heard = ""
-  private var baseline: [[Int]] = []
+  /// Everything the line-up has said since the transcript last started over. The mic hears the
+  /// speaker too, so a name or phrase only counts as the driver's once the transcript has it more
+  /// often than the voices themselves said it.
+  private var spoken = ""
 
   private init(turns: [Turn]) {
     self.turns = turns
@@ -472,6 +472,11 @@ import Speech
 
   /// Plays `lines` in `voiceIDs` in turn, after whatever is being said now.
   @objc static func start(voiceIDs: [String], lines: [String]) {
+    start(voiceIDs: voiceIDs, lines: lines, onPick: nil, onFinished: nil)
+  }
+
+  /// Like start(voiceIDs:lines:), with the first launch's own handling of a pick.
+  static func start(voiceIDs: [String], lines: [String], onPick: ((String) -> Void)?, onFinished: (() -> Void)?) {
     current?.end()
     let turns = zip(voiceIDs, lines).map { id, line -> Turn in
       let spoken = KokoroVoice.voiceOptions.first { $0.id == id }?.spokenName ?? id
@@ -479,12 +484,20 @@ import Speech
     }
     guard !turns.isEmpty else { return }
     let preview = BackseatVoicePreview(turns: turns)
+    preview.onPick = onPick
+    preview.onFinished = onFinished
     current = preview
     preview.begin()
   }
 
+  /// Stops the line-up (the driver left the screen or tapped a voice).
+  static func cancel() {
+    guard let preview = current else { return }
+    preview.onFinished = nil
+    preview.end()
+  }
+
   private func begin() {
-    baseline = turns.map { $0.names.map { _ in 0 } }
     BackseatListener.shared.startOverhearing(names: turns.flatMap(\.names)) { [weak self] text in
       self?.overheard(text)
     }
@@ -499,51 +512,31 @@ import Speech
       return
     }
     BackseatListener.shared.keepOverhearing()
-    if KokoroVoice.shared.anyVoiceSpeaking {
-      if lineStartedAt == nil, KokoroVoice.shared.isSpeakingNow { lineStartedAt = Date() }
-      return
-    }
+    if KokoroVoice.shared.anyVoiceSpeaking { return }
     guard index + 1 < turns.count else {
+      let finished = onFinished
       end()
+      finished?()
       return
     }
     index += 1
-    remember()
-    lineStartedAt = nil
     let line = turns[index].line
+    spoken += " " + line
     KokoroVoice.shared.sayReply(line, voiceID: turns[index].voiceID) { MWMTextToSpeech.tts().play(line) }
   }
 
   private func overheard(_ text: String) {
-    heard = text
     if text.isEmpty {
-      remember()
+      // A new transcript: only what's still being said can turn up in it.
+      spoken = index >= 0 && KokoroVoice.shared.anyVoiceSpeaking ? turns[index].line : ""
       return
     }
     for (i, turn) in turns.enumerated() {
-      for (n, name) in turn.names.enumerated() {
-        let count = MWMBackseatRewriter.countVoiceName(name, in: text)
-        // The voice that's talking says its own name and phrase. The name counts once its mentions
-        // are over; either one counts if it's said more often than the line says it.
-        if i == index {
-          let saidByLine = MWMBackseatRewriter.countVoiceName(name, in: turn.line)
-          let isName = n == 0
-          let stillEcho = !isName || lineStartedAt.map { Date().timeIntervalSince($0) < Self.ownNameEcho } ?? true
-          if stillEcho && count - baseline[i][n] <= saidByLine { continue }
-        }
-        if count > baseline[i][n] {
-          picked(i)
-          return
-        }
-      }
-    }
-  }
-
-  /// Everything named so far has been dealt with.
-  private func remember() {
-    for (i, turn) in turns.enumerated() {
-      for (n, name) in turn.names.enumerated() {
-        baseline[i][n] = heard.isEmpty ? 0 : MWMBackseatRewriter.countVoiceName(name, in: heard)
+      for name in turn.names
+      where MWMBackseatRewriter.countVoiceName(name, in: text) > MWMBackseatRewriter.countVoiceName(name, in: spoken) {
+        BackseatLog.event("voice.preview.heard", ["name": name, "text": text])
+        picked(i)
+        return
       }
     }
   }
@@ -551,6 +544,12 @@ import Speech
   private func picked(_ i: Int) {
     let cutOff = index
     end()
+    if let onPick {
+      BackseatLog.event("voice.preview", ["picked": turns[i].voiceID, "cut_off": cutOff >= 0 ? turns[cutOff].voiceID : "",
+                                          "for": "first launch"])
+      onPick(turns[i].voiceID)
+      return
+    }
     KokoroVoice.shared.selectVoice(turns[i].voiceID)
     BackseatLog.event("voice.preview", ["picked": turns[i].voiceID, "cut_off": cutOff >= 0 ? turns[cutOff].voiceID : ""])
     guard cutOff >= 0 else {
@@ -585,7 +584,8 @@ import Speech
   private static var running = false
 
   @objc static func startIfNeeded() {
-    guard !running, !UserDefaults.standard.bool(forKey: doneKey), MWMBackseatRewriter.driverName.isEmpty else { return }
+    guard !running, BackseatOnboarding.isDone, !UserDefaults.standard.bool(forKey: doneKey),
+          MWMBackseatRewriter.driverName.isEmpty else { return }
     running = true
     // Give Kokoro up to half a minute to load, so the introduction is in its voice.
     waitForKokoro(tries: 60) {
@@ -633,7 +633,19 @@ import Speech
   }
 
   static var isDone: Bool {
-    !running && (UserDefaults.standard.bool(forKey: doneKey) || !MWMBackseatRewriter.driverName.isEmpty)
+    !running && BackseatOnboarding.isDone &&
+      (UserDefaults.standard.bool(forKey: doneKey) || !MWMBackseatRewriter.driverName.isEmpty)
+  }
+
+  /// The first-launch screens already did the introductions and got the name: all that's left is
+  /// "Okay Doug, where are we headed?" (after whatever it's still saying), and listening for it.
+  static func finishAfterOnboarding() {
+    UserDefaults.standard.set(true, forKey: doneKey)
+    let voiceName = KokoroVoice.voiceOptions.first { $0.id == KokoroVoice.selectedVoiceID }?.spokenName ?? "Echo"
+    say(.whereTo, voiceName: voiceName)
+    listen(waiting: 45, for: "destination") { answer in
+      if !answer.isEmpty { MWMBackseatRewriter.driverSaid(answer) }
+    }
   }
 
   static func waitForKokoro(tries: Int, then: @escaping () -> Void) {

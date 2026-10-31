@@ -12,6 +12,7 @@
 
 #include <CoreApi/Framework.h>
 
+#include "backseat/onboarding.hpp"
 #include "backseat/rewriter.hpp"
 #include "backseat/voice_command.hpp"
 
@@ -22,6 +23,7 @@
 
 #include "routing/following_info.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -447,6 +449,31 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   for (NSUInteger i = 0; i < ids.count && i < names.count; ++i)
     voices.push_back({ids[i].UTF8String, names[i].UTF8String});
   GetFramework().GetRoutingManager().SetBackseatVoices(std::move(voices));
+  // The mic opens after "quiz.ask" lines (listenForGameAnswer), so pop quizzes can be answered.
+  GetFramework().GetRoutingManager().GetBackseat().SetPopQuizOn(true);
+}
+
++ (nullable NSDictionary<NSString *, id> *)popQuiz
+{
+  auto const card = GetFramework().GetRoutingManager().GetBackseat().PopQuizCard();
+  if (!card)
+    return nil;
+  NSMutableArray<NSString *> * choices = [NSMutableArray arrayWithCapacity:3];
+  for (auto const & c : card->choices)
+    [choices addObject:@(c.c_str())];
+  return @{
+    @"question": @(card->question.c_str()),
+    @"choices": choices,
+    @"picked": @(card->picked),
+    @"correct": @(card->correct),
+    @"tappable": @(card->tappable),
+    @"brownies": @(card->brownies),
+  };
+}
+
++ (void)answerQuiz:(NSInteger)choice
+{
+  GetFramework().GetRoutingManager().GetBackseat().QuizTapped(static_cast<int>(choice));
 }
 
 static BOOL gDrivingHighlighted = NO;
@@ -671,6 +698,89 @@ static m2::PointD gWalkConfirmedTo{1e9, 1e9};
 + (NSString *)voiceRecovered
 {
   return @(GetFramework().GetRoutingManager().BackseatVoiceRecovered().c_str());
+}
+
++ (NSArray<NSString *> *)disclaimerParagraphs:(BOOL)creditCoMaps
+{
+  NSMutableArray<NSString *> * out = [NSMutableArray array];
+  for (auto const & p : backseat::DisclaimerParagraphs(creditCoMaps))
+    [out addObject:@(p.c_str())];
+  return out;
+}
+
++ (NSString *)spokenDisclaimer:(NSString *)paragraph
+{
+  return @(backseat::SpokenDisclaimer(paragraph.UTF8String ?: "").c_str());
+}
+
++ (NSArray<NSString *> *)termsAnswer:(NSInteger)answer round:(NSInteger)round done:(BOOL *)done
+{
+  auto const reply = backseat::AnswerTerms(static_cast<backseat::TermsAnswer>(std::clamp<NSInteger>(answer, 0, 2)),
+                                           static_cast<int>(round));
+  if (done)
+    *done = reply.done;
+  NSMutableArray<NSString *> * out = [NSMutableArray array];
+  for (auto const & key : reply.keys)
+    [out addObject:@(GetFramework().GetRoutingManager().BackseatReply(key).c_str())];
+  return out;
+}
+
++ (NSString *)line:(NSString *)key vars:(NSDictionary<NSString *, NSString *> *)vars
+{
+  backseat::Vars v;
+  for (NSString * name in vars)
+    v[name.UTF8String] = vars[name].UTF8String ?: "";
+  return @(GetFramework().GetRoutingManager().BackseatReply(key.UTF8String ?: "", v).c_str());
+}
+
+static backseat::AboutYou AboutYouQuestion(NSInteger question)
+{
+  return static_cast<backseat::AboutYou>(std::clamp<NSInteger>(question, 0, 2));
+}
+
++ (NSString *)aboutYouQuestion:(NSInteger)question
+{
+  return @(GetFramework().GetRoutingManager().BackseatReply(backseat::AboutYouQuestionKey(AboutYouQuestion(question))).c_str());
+}
+
++ (NSArray<NSString *> *)aboutYouChoices:(NSInteger)question
+{
+  NSMutableArray<NSString *> * out = [NSMutableArray array];
+  for (auto const & choice : backseat::AboutYouChoices(AboutYouQuestion(question)))
+    [out addObject:@(choice.c_str())];
+  return out;
+}
+
++ (NSString *)aboutYouAnswered:(NSInteger)question answer:(NSString *)answer
+{
+  return @(GetFramework().GetRoutingManager().BackseatAboutYouAnswered(AboutYouQuestion(question), answer.UTF8String ?: "").c_str());
+}
+
++ (NSString *)aboutYouAnswer:(NSInteger)question
+{
+  return @(GetFramework().GetRoutingManager().BackseatAboutYouAnswer(AboutYouQuestion(question)).c_str());
+}
+
++ (NSArray<NSString *> *)voiceAuditions:(NSArray<NSString *> *)voiceIDs
+{
+  NSArray<NSString *> * ids = BackseatKokoroVoice.voiceIDs;
+  NSArray<NSString *> * names = BackseatKokoroVoice.voiceSpokenNames;
+  NSMutableArray<NSString *> * out = [NSMutableArray array];
+  for (NSString * voiceID in voiceIDs)
+  {
+    NSUInteger const i = [ids indexOfObject:voiceID];
+    NSString * name = i < names.count ? names[i] : voiceID;
+    // "purple monkey" -> "Purple Monkey", as the line-up says it.
+    NSString * phrase = [self voicePhrase:voiceID].capitalizedString;
+    [out addObject:@(GetFramework().GetRoutingManager().BackseatReply(
+                         "cmd.voice.audition", {{"voice", name.UTF8String}, {"phrase", phrase.UTF8String}}).c_str())];
+  }
+  return out;
+}
+
++ (BOOL)typed:(NSString *)typed matchesPhrase:(NSString *)phrase
+{
+  return backseat::TypedPhraseMatches(typed.UTF8String ?: "", phrase.UTF8String ?: "");
 }
 
 static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == MWMBackseatSetupStepPassenger);

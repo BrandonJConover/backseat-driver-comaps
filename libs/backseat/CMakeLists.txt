@@ -25,8 +25,12 @@ set(
   mileage.hpp
   navigator.cpp
   navigator.hpp
+  onboarding.cpp
+  onboarding.hpp
   plate_game.cpp
   plate_game.hpp
+  pop_quiz.cpp
+  pop_quiz.hpp
   quiet_bits.cpp
   quiet_bits.hpp
   report.cpp

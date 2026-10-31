@@ -444,6 +444,8 @@ char const * const BackseatAdapter::kMileageOnKey = "BackseatMileageOn";
 char const * const BackseatAdapter::kMileageTalkKey = "BackseatMileageTalk";
 char const * const BackseatAdapter::kHomeIsWorkplaceKey = "BackseatHomeIsWorkplace";
 char const * const BackseatAdapter::kBusinessOwnerKey = "BackseatBusinessOwner";
+char const * const BackseatAdapter::kHousingKey = "BackseatHousing";
+char const * const BackseatAdapter::kMarriedKey = "BackseatMarried";
 
 namespace
 {
@@ -495,6 +497,9 @@ void BackseatAdapter::ReloadPersonality()
   m_navigator.SetPartner(partner, PronounsFrom(partnerPronouns));
   m_navigator.SetDriverPronouns(PronounsFrom(driverPronouns));
   m_navigator.SetCarHasAutopilot(autopilot);
+  std::string housing;
+  settings::TryGet(kHousingKey, housing);
+  m_navigator.SetHousing(backseat::HousingFrom(housing));
 }
 
 BackseatAdapter::BackseatAdapter()
@@ -885,7 +890,7 @@ std::string BackseatAdapter::OnDriveEnded(backseat::Drive const & drive)
     m_askedDrive = m_driveLog.size() - 1;
     return m_navigator.Reply("mileage.askBusiness", {{"owner", backseat::BusinessOwnerPossessive(BusinessOwner())}});
   }
-  if (logged.flags & backseat::kFarFromHome)
+  if ((logged.flags & backseat::kFarFromHome) && m_navigator.GetHousing() != backseat::Housing::Streets)
     return m_navigator.Reply("mileage.farAway");
   if (logged.flags & backseat::kNewPlace)
     return m_navigator.Reply("mileage.newPlace");
@@ -952,6 +957,9 @@ void BackseatAdapter::TagPlace(std::string const & name, double lat, double lon,
 std::string BackseatAdapter::AskAboutHome()
 {
   using backseat::PlaceRole;
+  // "Was that home?" isn't a question for someone living on the streets.
+  if (m_navigator.GetHousing() == backseat::Housing::Streets)
+    return {};
   if (std::any_of(m_taggedPlaces.begin(), m_taggedPlaces.end(), [](auto const & p) { return p.role == PlaceRole::Home; }))
     return {};
   char const * const kAskedKey = "BackseatHomeAsked";
@@ -2150,6 +2158,12 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
 {
   backseat::Trace("heard.app", {{"text", text}});
   HeardCommand heard;
+  // A pop quiz answer ("pull to the right and stop", "speed up") is an answer, not a command.
+  if (m_navigator.QuizTakes(text))
+  {
+    m_navigator.OnDriverSaid(0, text);
+    return heard;
+  }
   // "I'm a woman": it guessed wrong, and it's not happy about being corrected.
   if (auto const pronouns = backseat::PronounCorrection(text))
   {
@@ -2167,7 +2181,8 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
   if (auto const partner = backseat::MentionedPartner(text))
   {
     std::string current;
-    if (!settings::Get(kPartnerKey, current) || current.empty())
+    // "Spouse" is from the married question; "my wife" says which.
+    if (!settings::Get(kPartnerKey, current) || current.empty() || current == "spouse")
     {
       settings::Set(kPartnerKey, partner->word);
       settings::Set(kPartnerPronounsKey, partner->pronouns);
@@ -2722,6 +2737,55 @@ bool BackseatAdapter::SetupHeard(SetupStep step, std::string const & spoken)
   return true;
 }
 
+std::string BackseatAdapter::AboutYouAnswered(backseat::AboutYou question, std::string const & answer)
+{
+  using backseat::AboutYou;
+  std::string const key = backseat::AboutYouLineKey(question, answer);
+  if (key.empty())
+    return {};
+  switch (question)
+  {
+  case AboutYou::Gender: settings::Set(kDriverPronounsKey, backseat::PronounsForGender(answer)); break;
+  case AboutYou::Married:
+  {
+    settings::Set(kMarriedKey, answer);
+    std::string partner;
+    settings::TryGet(kPartnerKey, partner);
+    bool const spouse = partner == "wife" || partner == "husband" || partner == "spouse";
+    // Married to someone it doesn't know yet: "your spouse", until "my wife" or "my husband" comes up.
+    if (answer == "yes" && partner.empty())
+    {
+      settings::Set(kPartnerKey, std::string("spouse"));
+      settings::Set(kPartnerPronounsKey, std::string("they"));
+    }
+    else if (answer == "no" && spouse)
+      settings::Set(kPartnerKey, std::string());
+    break;
+  }
+  case AboutYou::Home: settings::Set(kHousingKey, answer); break;
+  }
+  ReloadPersonality();
+  std::string name;
+  settings::TryGet(kDriverNameKey, name);
+  return m_navigator.Reply(key, {{"name", name}});
+}
+
+std::string BackseatAdapter::AboutYouAnswer(backseat::AboutYou question) const
+{
+  using backseat::AboutYou;
+  std::string value;
+  switch (question)
+  {
+  case AboutYou::Gender:
+    if (settings::Get(kDriverPronounsKey, value))
+      return value == "he" ? "man" : value == "she" ? "woman" : value.empty() ? "" : "skip";
+    return {};
+  case AboutYou::Married: settings::TryGet(kMarriedKey, value); return value;
+  case AboutYou::Home: settings::TryGet(kHousingKey, value); return value;
+  }
+  return {};
+}
+
 std::vector<std::pair<std::string, std::string>> BackseatAdapter::LearnedFacts() const
 {
   std::vector<std::pair<std::string, std::string>> facts;
@@ -3010,9 +3074,10 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
                             {"speed", backseat::LogNum(c.voiceSpeed, 2)},
                             {"text", c.text}});
     out.push_back(c.text);
-    // 20 Questions and "Are you actually intending to walk there?" want an answer out loud.
+    // 20 Questions, "Are you actually intending to walk there?" and a pop quiz want an answer out loud.
     m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed, c.maxWaitMs, c.voice,
-                            c.category == backseat::Category::TwentyQuestions || c.key == "mode.ask.walk"});
+                            c.category == backseat::Category::TwentyQuestions || c.key == "mode.ask.walk" ||
+                                c.key == "quiz.ask"});
     if (c.priority == backseat::Priority::Nav)
       m_lastDirection = c.text;
   }
