@@ -690,6 +690,7 @@ import Speech
   /// How long to wait for the search, and for the driver to pick.
   private static let searchWait: TimeInterval = 10
   private static let pickWait: TimeInterval = 20
+  private static let confirmWait: TimeInterval = 15
 
   private let query: String
   private var results: [SearchResult] = []
@@ -729,10 +730,13 @@ import Speech
     }
     var pick = -1
     var none = ObjCBool(false)
+    var confirm = ObjCBool(false)
     let line = MWMBackseatRewriter.speakSearchResults(query, names: names, distances: found.map { NSNumber(value: $0.1) },
-                                                      pick: &pick, none: &none)
+                                                      pick: &pick, none: &none, confirm: &confirm)
     say(line)
-    if pick >= 0 {
+    if confirm.boolValue {
+      listenForConfirm(pick)
+    } else if pick >= 0 {
       route(to: pick)
     } else if !none.boolValue {
       listenForPick(tries: 2)
@@ -743,13 +747,35 @@ import Speech
     BackseatSetup.listen(waiting: Self.pickWait, for: "destination") { [self] answer in
       guard !answer.isEmpty else { return }
       var index = -1
-      let line = MWMBackseatRewriter.pickSearchResult(answer, index: &index)
+      var confirm = ObjCBool(false)
+      let line = MWMBackseatRewriter.pickSearchResult(answer, index: &index, confirm: &confirm)
       say(line)
-      if index >= 0 {
+      if confirm.boolValue {
+        listenForConfirm(index)
+      } else if index >= 0 {
         route(to: index)
       } else if tries > 1 {
         listenForPick(tries: tries - 1)
       }
+    }
+  }
+
+  /// "Latheron Place? Say yes." Routes on yes; anything else, or nothing, leaves the route alone.
+  private func listenForConfirm(_ index: Int) {
+    var answered = false
+    let settle: (String) -> Void = { [self] answer in
+      guard !answered else { return }
+      answered = true
+      var confirmed = ObjCBool(false)
+      say(MWMBackseatRewriter.confirmSearchResult(answer, confirmed: &confirmed))
+      if confirmed.boolValue { route(to: index) }
+    }
+    BackseatSetup.listen(waiting: Self.confirmWait, for: "confirm", settle)
+    // Hands-free never sends silence.
+    DispatchQueue.main.asyncAfter(deadline: .now() + Self.confirmWait + 5) {
+      guard !answered else { return }
+      BackseatListener.shared.stopWaitingForAnswer()
+      settle("")
     }
   }
 

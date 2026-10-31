@@ -1,5 +1,6 @@
 #include "check.hpp"
 
+#include "backseat/lines.hpp"
 #include "backseat/navigator.hpp"
 #include "backseat/voice_command.hpp"
 
@@ -475,6 +476,19 @@ TEST(ChatterIsntACommand)
   CHECK(!WordsSupportTool(AppAction::ChangeVoice, "Heart", "I love this road"));
   CHECK(!WordsSupportTool(AppAction::CancelRoute, "", "I hate this song"));
   CHECK(WordsSupportTool(AppAction::CancelRoute, "", "stop the route"));
+}
+
+TEST(AWeakMatchIsntAMatch)
+{
+  CHECK(!PlaceMatches("peace Lutheran", "Latheron Place"));
+  CHECK(PlaceMatches("peace Lutheran and Rogers", "Peace Lutheran Church"));
+  CHECK(PlaceMatches("walmart", "Wal-Mart Supercenter"));
+  CHECK(PlaceMatches("the airport", "XNA Airport"));
+  CHECK(!PlaceMatches("coffee", "Starbucks"));
+  // Everything the search asks to confirm has lines to say it with.
+  for (char const * key : {"search.confirm", "search.confirm.no"})
+    for (int tier = 0; tier < 3; ++tier)
+      CHECK(LinesFor(key, tier).size() >= 3);
 }
 
 TEST(CommandsDontRunTwice)

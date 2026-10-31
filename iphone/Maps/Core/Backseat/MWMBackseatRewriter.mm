@@ -297,6 +297,7 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
                        distances:(NSArray<NSNumber *> *)distances
                             pick:(NSInteger *)pick
                             none:(BOOL *)none
+                         confirm:(BOOL *)confirm
 {
   std::vector<BackseatAdapter::SearchResult> results;
   for (NSUInteger i = 0; i < names.count && i < distances.count; ++i)
@@ -307,13 +308,23 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
     *pick = speech.pick ? static_cast<NSInteger>(*speech.pick) : -1;
   if (none)
     *none = speech.none;
+  if (confirm)
+    *confirm = speech.confirm;
   return @(speech.line.c_str());
 }
 
-+ (NSString *)pickSearchResult:(NSString *)answer index:(NSInteger *)index
++ (NSString *)pickSearchResult:(NSString *)answer index:(NSInteger *)index confirm:(BOOL *)confirm
 {
-  auto const [picked, line] = GetFramework().GetRoutingManager().BackseatPickSearchResult(answer.UTF8String ?: "");
-  *index = picked ? static_cast<NSInteger>(*picked) : -1;
+  auto const pick = GetFramework().GetRoutingManager().BackseatPickSearchResult(answer.UTF8String ?: "");
+  *index = pick.index ? static_cast<NSInteger>(*pick.index) : -1;
+  *confirm = pick.confirm;
+  return @(pick.line.c_str());
+}
+
++ (NSString *)confirmSearchResult:(NSString *)answer confirmed:(BOOL *)confirmed
+{
+  auto const [yes, line] = GetFramework().GetRoutingManager().BackseatConfirmSearchResult(answer.UTF8String ?: "");
+  *confirmed = yes;
   return @(line.c_str());
 }
 

@@ -326,6 +326,23 @@ bool IsEchoOf(std::string const & heard, std::string const & line)
   return false;
 }
 
+bool PlaceMatches(std::string const & asked, std::string const & name)
+{
+  std::string squashed;
+  for (auto const & word : WordsOf(name))
+    squashed += word;
+  size_t big = 0, found = 0;
+  for (auto const & word : WordsOf(asked))
+  {
+    if (IsSmallWord(word))
+      continue;
+    ++big;
+    // Squashed so "walmart" finds "Wal-Mart".
+    found += squashed.find(word) != std::string::npos ? 1 : 0;
+  }
+  return big == 0 || found * 2 >= big;
+}
+
 void SpokenLines::Add(double tMs, std::string line)
 {
   m_lines.push_back({tMs, std::move(line)});

@@ -2159,6 +2159,7 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     backseat::Trace("command.dup", {{"tool", backseat::ToolFor(command.action).name}, {"arg", command.argument}});
     return {};
   }
+  m_navigator.NoteVoiceCommand();
   LOG(LINFO, ("Backseat: command", backseat::ToolFor(command.action).name, command.argument));
   backseat::Trace("command", {{"tool", backseat::ToolFor(command.action).name},
                               {"arg", command.argument},
@@ -2174,10 +2175,14 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
                               : *known == backseat::KnownPlace::Home ? "your home"
                                                                      : "your work";
     std::string reply;
+    bool replyNamesPlace = true;
     if (!polite)
     {
       // Barked orders get Brandon's "Alright, bossy" when the trip starts, not a reply now.
-      m_navigator.QueueOpener(nowMs, "bossy", {{"place", place}});
+      if (known)
+        m_navigator.QueueOpener(nowMs, "bossy", {{"place", place}});
+      else
+        m_bossyAboutSearch = true;
     }
     else
     {
@@ -2193,6 +2198,7 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
       {
         facts.resize(3);
         reply = m_navigator.Reply("memory.basic", {{"facts", facts[0] + ", " + facts[1] + ", and " + facts[2]}});
+        replyNamesPlace = false;
       }
       // Brandon: "You like country music. Well yee haw cowboy..." Ammunition from the file.
       else if (auto const music = m_memory.Recall("favorite music"); music && m_navigates % 4 == 2)
@@ -2211,9 +2217,12 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
         return reply;
       }
     }
-    // Somewhere new (or home/work before there's enough history): let the driver pick.
+    // Somewhere new (or home/work before there's enough history): let the driver pick. No naming it
+    // yet: what was heard may not be what's found, and the line for what's found comes with the pick.
     heard.kind = HeardCommand::Kind::Search;
     heard.query = command.argument;
+    if (replyNamesPlace)
+      reply.clear();
     // "Starbucks in Colorado, or Starbucks in Alaska?" Not every time, or it gets old.
     if (!known && (m_askStateNext || ++m_searches % 5 == 0))
     {
@@ -2297,15 +2306,26 @@ BackseatAdapter::SearchSpeech BackseatAdapter::SpeakSearchResults(std::string co
   size_t constexpr kReadOut = 3;
   SearchSpeech speech;
   m_results.clear();
+  m_searchQuery = query;
   if (results.empty())
   {
     speech.none = true;
     speech.line = m_navigator.Reply("search.none", {{"place", query}});
+    m_commandRepeats.RouteStarted();
+    m_bossyAboutSearch = false;
     return speech;
   }
   if (results.size() == 1)
   {
     speech.pick = 0;
+    if (!backseat::PlaceMatches(query, results[0].name))
+    {
+      speech.confirm = true;
+      m_placeToConfirm = results[0].name;
+      speech.line = m_navigator.Reply("search.confirm", {{"place", results[0].name}});
+      return speech;
+    }
+    ChoseSearchPlace(results[0].name);
     speech.line = m_navigator.Reply("search.one", {{"place", results[0].name}});
     return speech;
   }
@@ -2321,17 +2341,46 @@ BackseatAdapter::SearchSpeech BackseatAdapter::SpeakSearchResults(std::string co
   return speech;
 }
 
-std::pair<std::optional<size_t>, std::string> BackseatAdapter::PickSearchResult(std::string const & spoken)
+BackseatAdapter::SearchPick BackseatAdapter::PickSearchResult(std::string const & spoken)
 {
   std::vector<std::string> names;
   for (auto const & r : m_results)
     names.push_back(r.name);
   auto const choice = backseat::ParseChoice(spoken, names);
   if (!choice)
-    return {std::nullopt, m_navigator.Reply("search.huh")};
+    return {std::nullopt, m_navigator.Reply("search.huh"), false};
   std::string const place = m_results[*choice].name;
   m_results.clear();
-  return {choice, m_navigator.Reply("search.picked", {{"place", place}})};
+  // "The third one", and the third one isn't what was asked for. Saying its name settles it.
+  if (!backseat::PlaceMatches(m_searchQuery, place) && !backseat::PlaceMatches(spoken, place))
+  {
+    m_placeToConfirm = place;
+    return {choice, m_navigator.Reply("search.confirm", {{"place", place}}), true};
+  }
+  ChoseSearchPlace(place);
+  return {choice, m_navigator.Reply("search.picked", {{"place", place}}), false};
+}
+
+std::pair<bool, std::string> BackseatAdapter::ConfirmSearchResult(std::string const & spoken)
+{
+  std::string const place = std::exchange(m_placeToConfirm, {});
+  if (!backseat::SaidYes(spoken))
+  {
+    m_commandRepeats.RouteStarted();
+    m_bossyAboutSearch = false;
+    return {false, m_navigator.Reply("search.confirm.no")};
+  }
+  ChoseSearchPlace(place);
+  return {true, m_navigator.Reply("search.picked", {{"place", place}})};
+}
+
+void BackseatAdapter::ChoseSearchPlace(std::string const & place)
+{
+  // The "Alright, bossy" names where it's actually going.
+  if (std::exchange(m_bossyAboutSearch, false))
+    m_navigator.QueueOpener(std::chrono::duration<double, std::milli>(
+                                std::chrono::system_clock::now().time_since_epoch()).count(),
+                            "bossy", {{"place", place}});
 }
 
 std::string BackseatAdapter::VoicePreviewLine(std::string const & key, std::string const & voice)

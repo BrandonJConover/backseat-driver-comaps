@@ -180,7 +180,9 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
                             pick:(NSInteger * _Nullable)pick
                             none:(BOOL * _Nullable)none;
 /// "The second one": the result picked (-1 when not understood) and the line to say.
-+ (NSString *)pickSearchResult:(NSString *)answer index:(NSInteger *)index;
++ (NSString *)pickSearchResult:(NSString *)answer index:(NSInteger *)index confirm:(BOOL *)confirm;
+/// The answer to "Latheron Place? Say yes." Empty when nobody answered. Route only when confirmed.
++ (NSString *)confirmSearchResult:(NSString *)answer confirmed:(BOOL *)confirmed;
 /// Builds a route to a place by voice.
 + (void)routeTo:(CLLocationCoordinate2D)coordinate title:(NSString *)title;
 /// What the GPS has worked out about the driver, as label / value pairs ("Works at", "Acme Corp").

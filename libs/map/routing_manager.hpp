@@ -268,9 +268,13 @@ public:
   {
     return m_backseat.SpeakSearchResults(query, std::move(results));
   }
-  std::pair<std::optional<size_t>, std::string> BackseatPickSearchResult(std::string const & spoken)
+  BackseatAdapter::SearchPick BackseatPickSearchResult(std::string const & spoken)
   {
     return m_backseat.PickSearchResult(spoken);
+  }
+  std::pair<bool, std::string> BackseatConfirmSearchResult(std::string const & spoken)
+  {
+    return m_backseat.ConfirmSearchResult(spoken);
   }
   std::string BackseatNoAnswerToWhereTo() { return m_backseat.NoAnswerToWhereTo(); }
   std::string BackseatVoicePreviewLine(std::string const & key, std::string const & voice)

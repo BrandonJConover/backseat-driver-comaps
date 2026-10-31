@@ -114,6 +114,10 @@ private:
   std::vector<Spoken> m_lines;
 };
 
+/// Whether `name` is plausibly what was asked for: at least half the meaningful words of `asked` are
+/// in it. "Peace Lutheran" isn't "Latheron Place", however much the search thinks so.
+bool PlaceMatches(std::string const & asked, std::string const & name);
+
 /// "Yeah", "um", "okay": nothing to act on, unless something asked for an answer.
 bool IsFiller(std::string const & spoken);
 

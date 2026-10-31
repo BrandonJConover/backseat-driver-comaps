@@ -295,11 +295,23 @@ public:
     std::string line;
     std::optional<size_t> pick;
     bool none = false;
+    /// `pick` doesn't look like what was asked for: listen, and pass the answer to ConfirmSearchResult().
+    bool confirm = false;
   };
   SearchSpeech SpeakSearchResults(std::string const & query, std::vector<SearchResult> results);
   /// "The second one": which result, and the line to say ("Starbucks. Good choice."). No index
   /// means it didn't understand; say the line ("First, second, or third?") and listen again.
-  std::pair<std::optional<size_t>, std::string> PickSearchResult(std::string const & spoken);
+  /// With `confirm`, the pick doesn't look like what was asked for: say the line, listen, and pass the
+  /// answer to ConfirmSearchResult() before routing.
+  struct SearchPick
+  {
+    std::optional<size_t> index;
+    std::string line;
+    bool confirm = false;
+  };
+  SearchPick PickSearchResult(std::string const & spoken);
+  /// The answer to "Latheron Place? Say yes." Empty when nobody answered. Whether to route, and the line.
+  std::pair<bool, std::string> ConfirmSearchResult(std::string const & spoken);
 
   /// What the GPS has worked out about the driver, for the profile screen: label and value, e.g.
   /// {"Works at", "Acme Corp"}, {"Commute", "Mon to Fri, around 8:05 AM"}.
@@ -413,6 +425,10 @@ private:
   bool m_askStateNext = false;
   int m_searches = 0;
   backseat::CommandRepeats m_commandRepeats;
+  void ChoseSearchPlace(std::string const & place);
+  std::string m_searchQuery;
+  std::string m_placeToConfirm;
+  bool m_bossyAboutSearch = false;
   /// The usual trip AskWhereTo() guessed, waiting for a "yes".
   struct Guess
   {
