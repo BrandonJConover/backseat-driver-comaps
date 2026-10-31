@@ -1293,7 +1293,9 @@ void RoutingManager::GenerateNotifications(vector<string> & turnNotifications, b
   // Keep the stock notification state moving, but say Backseat Driver's lines instead.
   vector<string> stock;
   m_routingSession.GenerateNotifications(stock, announceStreets);
-  if (m_currentRouterType == RouterType::Vehicle)
+  // Walks and rides get Backseat Driver's turn calls too (closer in, and in their own words).
+  if (m_currentRouterType == RouterType::Vehicle || m_currentRouterType == RouterType::Pedestrian ||
+      m_currentRouterType == RouterType::Bicycle)
     turnNotifications = m_backseat.TakeNotifications(m_routingSession, GetBackseatDestinationName());
   else
     turnNotifications = std::move(stock);

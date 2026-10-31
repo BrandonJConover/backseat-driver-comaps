@@ -9,22 +9,22 @@ namespace backseat
 {
 namespace
 {
-struct Xy
+struct IndoorXy
 {
   double x, y;
 };
 
 /// Meters east and north of `origin`; flat is fine at building size.
-Xy Local(LatLon const & origin, LatLon const & p)
+IndoorXy Local(LatLon const & origin, LatLon const & p)
 {
   double constexpr kMPerDeg = 111320;
   double const kPi = std::acos(-1.0);
   return {(p.lon - origin.lon) * kMPerDeg * std::cos(origin.lat * kPi / 180), (p.lat - origin.lat) * kMPerDeg};
 }
 
-double Cross(Xy const & o, Xy const & a, Xy const & b) { return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x); }
+double Cross(IndoorXy const & o, IndoorXy const & a, IndoorXy const & b) { return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x); }
 
-bool Contains(Xy const & a, Xy const & b, Xy const & c, Xy const & p)
+bool Contains(IndoorXy const & a, IndoorXy const & b, IndoorXy const & c, IndoorXy const & p)
 {
   double const d1 = Cross(a, b, p), d2 = Cross(b, c, p), d3 = Cross(c, a, p);
   bool const neg = d1 < 0 || d2 < 0 || d3 < 0;
@@ -33,7 +33,7 @@ bool Contains(Xy const & a, Xy const & b, Xy const & c, Xy const & p)
 }
 
 /// Distance from the origin (the point) to segment ab.
-double DistToSegment(Xy const & a, Xy const & b)
+double DistToSegment(IndoorXy const & a, IndoorXy const & b)
 {
   double const dx = b.x - a.x, dy = b.y - a.y;
   double const len2 = dx * dx + dy * dy;
@@ -54,7 +54,7 @@ Edge MakeEdge(LatLon const & a, LatLon const & b)
 
 std::optional<double> DepthInsideM(std::vector<FootprintTriangle> const & footprint, LatLon const & p)
 {
-  Xy const origin{0, 0};
+  IndoorXy const origin{0, 0};
   bool inside = false;
   std::map<Edge, int> edges;
   for (auto const & t : footprint)
@@ -72,8 +72,8 @@ std::optional<double> DepthInsideM(std::vector<FootprintTriangle> const & footpr
   {
     if (n != 1)
       continue;
-    Xy const a = Local(p, {e.first.first, e.first.second});
-    Xy const b = Local(p, {e.second.first, e.second.second});
+    IndoorXy const a = Local(p, {e.first.first, e.first.second});
+    IndoorXy const b = Local(p, {e.second.first, e.second.second});
     depth = std::min(depth, DistToSegment(a, b));
   }
   return depth;

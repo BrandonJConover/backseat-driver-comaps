@@ -67,6 +67,12 @@ struct EngineConfig
   double countdownNearM = 15;  // 50 ft
   /// "By the way, did I mention you should turn right." Said in place of the 50 ft nag.
   double countdownMentionM = 76;  // 250 ft
+  /// Speed that counts as rolling along (heading checks, "how long until the turn"). A walker
+  /// rolls at 1 m/s; a car at 3.
+  double rollingMps = 3;
+  /// A turn announced this long ago and still not reached is forgotten (heading checks, countdown).
+  /// Three minutes in a car; on foot the next turn can be ten minutes away.
+  double pendingTurnForgetMs = 180000;
   /// A stretch at least this long to the next maneuver gets "Please continue straight." nags,
   /// one every straightNagEveryMs of driving, three at most.
   double straightNagMinM = 1000;
