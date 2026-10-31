@@ -20,6 +20,7 @@ import FoundationModels
     BackseatFileQuestions.install()
     BackseatDriveWatcher.startIfEnabled()
     BackseatDiagnostics.shared.install()
+    BackseatLogUploader.shared.install()
     // December or January, once: the year in miles.
     DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
       let yearEnd = MWMBackseatRewriter.mileageYearEnd

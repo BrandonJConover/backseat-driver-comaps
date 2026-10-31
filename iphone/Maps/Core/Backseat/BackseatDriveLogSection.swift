@@ -11,6 +11,9 @@ struct BackseatDriveLogSection: View {
   @State private var shareURL: URL?
   @State private var confirmDelete = false
   @State private var exportFailed = false
+  @State private var uploads = BackseatLogUploader.enabled
+  @State private var hasToken = BackseatLogUploader.hasToken
+  @State private var token = ""
 
   var body: some View {
     Section {
@@ -23,11 +26,34 @@ struct BackseatDriveLogSection: View {
           exportFailed = true
         }
       }
+      Toggle("Upload drive logs", isOn: $uploads)
+        .disabled(!hasToken)
+        .onChange(of: uploads) { _, on in
+          BackseatLogUploader.enabled = on
+          if on { BackseatLogUploader.shared.uploadPending() }
+        }
+      SecureField(hasToken ? "GitHub log token (saved)" : "GitHub log token", text: $token)
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+        .onSubmit {
+          guard !token.isEmpty else { return }
+          BackseatLogToken.set(token)
+          token = ""
+          hasToken = true
+          BackseatLogUploader.shared.uploadPending()
+        }
+      if hasToken {
+        Button("Upload now") { BackseatLogUploader.shared.uploadNow() }
+        Button("Remove log token", role: .destructive) {
+          BackseatLogToken.set("")
+          hasToken = false
+        }
+      }
       Button("Delete drive log", role: .destructive) { confirmDelete = true }
     } header: {
       Text("Drive log")
     } footer: {
-      Text("A record of what the GPS said and why on recent drives, so problems can be tracked down. It stays on this iPhone and is only sent if you share it.")
+      Text("A record of what the GPS said and why on recent drives, so problems can be tracked down. It stays on this iPhone unless you share it or add a log token, which uploads each drive, including its GPS track, to your private GitHub repository.")
     }
     // The engine may have changed it since this view was made (or it was made before the engine).
     .onAppear { enabled = BackseatLog.enabled }

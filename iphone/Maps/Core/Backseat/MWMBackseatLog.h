@@ -3,7 +3,8 @@
 NS_ASSUME_NONNULL_BEGIN
 
 /// The drive log (libs/backseat/debug_log.hpp), for Swift: writes events from the voice layer and
-/// exports the whole log for the share sheet. Everything stays on the phone until the driver shares it.
+/// exports the whole log for the share sheet. It stays on the phone until the driver shares it or adds
+/// a log token (BackseatLogUploader).
 NS_SWIFT_NAME(BackseatLog)
 @interface MWMBackseatLog : NSObject
 

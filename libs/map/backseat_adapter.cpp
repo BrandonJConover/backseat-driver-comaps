@@ -1125,7 +1125,10 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
   m_route = session.IsActive() ? session.GetRouteForTests() : nullptr;
   auto route = Snapshot(session, destinationName);
   if (route.state == backseat::RouteState::OnRoute)
+  {
     route.passedExitNextM = PassedExitNextM(session, info.m_speed);
+    m_commandRepeats.RouteStarted();
+  }
   if (route.state == backseat::RouteState::Inactive && !m_navigator.InTrip())
     return;
   backseat::Fix fix;
@@ -2833,10 +2836,7 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
   session.GetRouteFollowingInfo(info);
   switch (info.m_routingSessionState)
   {
-  case SessionState::OnRoute:
-    snap.state = backseat::RouteState::OnRoute;
-    m_commandRepeats.RouteStarted();
-    break;
+  case SessionState::OnRoute: snap.state = backseat::RouteState::OnRoute; break;
   case SessionState::RouteNotStarted:
   case SessionState::RouteBuilding: snap.state = backseat::RouteState::NotStarted; break;
   case SessionState::RouteNeedsRebuild:

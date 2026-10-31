@@ -178,7 +178,8 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
                            names:(NSArray<NSString *> *)names
                        distances:(NSArray<NSNumber *> *)distances
                             pick:(NSInteger * _Nullable)pick
-                            none:(BOOL * _Nullable)none;
+                            none:(BOOL * _Nullable)none
+                         confirm:(BOOL * _Nullable)confirm;
 /// "The second one": the result picked (-1 when not understood) and the line to say.
 + (NSString *)pickSearchResult:(NSString *)answer index:(NSInteger *)index confirm:(BOOL *)confirm;
 /// The answer to "Latheron Place? Say yes." Empty when nobody answered. Route only when confirmed.

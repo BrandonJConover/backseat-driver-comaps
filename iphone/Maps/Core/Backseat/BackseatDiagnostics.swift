@@ -35,6 +35,7 @@ final class BackseatDiagnostics: NSObject, MXMetricManagerSubscriber {
       }
     }
     UserDefaults.standard.set(handledUntil, forKey: Self.handledKey)
+    BackseatLogUploader.shared.uploadPending()
   }
 
   private func log(_ event: String, _ diagnostic: MXDiagnostic, _ fields: [String: String], stack: MXCallStackTree) {
