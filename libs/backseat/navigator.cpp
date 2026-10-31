@@ -587,6 +587,8 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackSlowStart(fix);
   if (car)
     TrackCurveAhead(fix, route);
+  else
+    TrackOutdoors(fix, route);
   TrackMusic(fix.tMs, route);
   TrackLeftBuilding(fix);
   TrackTwentyQuestions(fix, route);
@@ -1149,6 +1151,11 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
     ChangeTravelMode(TravelMode::Hike, "route");
     m_modeFound = true;
   }
+  m_mountainBike = m_travelMode == TravelMode::Bike && route.dirtShare >= kHikeDirtShare;
+  m_effortSince.reset();
+  m_inclineSaid = false;
+  m_effortSaid = false;
+  m_outdoorBitsSaid.clear();
   // 500 feet is a few minutes on foot: walks and rides get their turn calls closer in.
   if (m_travelMode == TravelMode::Walk || m_travelMode == TravelMode::Hike)
   {
@@ -1432,8 +1439,9 @@ void Navigator::TrackTravelMode(Fix const & fix, RouteSnapshot const & route)
     }
     return;
   }
-  // A walk on trails for a while is a hike, for the rest of the trip.
-  if (m_travelMode != TravelMode::Walk || !moving || fix.tMs - m_lastTrailCheckT < kTrailCheckEveryMs)
+  // A walk on trails for a while is a hike, for the rest of the trip; a ride, mountain biking.
+  bool const looking = m_travelMode == TravelMode::Walk || (m_travelMode == TravelMode::Bike && !m_mountainBike);
+  if (!looking || !moving || fix.tMs - m_lastTrailCheckT < kTrailCheckEveryMs)
     return;
   m_lastTrailCheckT = fix.tMs;
   bool const trail = route.onDirt || (m_trailLookup && m_trailLookup({fix.lat, fix.lon}));
@@ -1444,6 +1452,12 @@ void Navigator::TrackTravelMode(Fix const & fix, RouteSnapshot const & route)
   }
   if (!m_trailSince)
     m_trailSince = fix.tMs;
+  if (fix.tMs - *m_trailSince >= kHikeAfterMs && m_travelMode == TravelMode::Bike)
+  {
+    m_mountainBike = true;
+    Trace("trip.mountainBike", {{"why", "trail"}});
+    return;
+  }
   if (fix.tMs - *m_trailSince >= kHikeAfterMs)
   {
     ChangeTravelMode(TravelMode::Hike, "trail");
@@ -1617,6 +1631,112 @@ void Navigator::TrackSlowStart(Fix const & fix)
     return;
   m_startedRolling = true;
   SayLine(fix.tMs, Category::LongStop, "start.slow");
+}
+
+namespace
+{
+/// "Watch your step. It looks like we are on an incline." A 10% grade is a proper hill on foot.
+double constexpr kInclineGrade = 0.10;
+/// No heart rate to read, so effort is a jog (on foot) or a climb (on foot or a bike) kept up this long.
+double constexpr kJogMps = 2.3;
+double constexpr kClimbGrade = 0.06;
+double constexpr kEffortForMs = 90000;
+/// Nothing outdoorsy in the first minute: the trip opener has the floor.
+double constexpr kOutdoorsAfterStartMs = 60000;
+/// One-liners skip this many trips after they're said.
+int constexpr kOutdoorRestTrips = 3;
+int constexpr kOutdoorBitsPerTrip = 2;
+double constexpr kOutdoorBitChance = 0.4;
+}  // namespace
+
+bool Navigator::Rested(std::string const & key) const
+{
+  std::string const at = m_said.Value("_rest." + key);
+  return at.empty() || m_said.Counter(kTripsStartedKey) - std::atoi(at.c_str()) >= kOutdoorRestTrips;
+}
+
+void Navigator::MarkSaid(std::string const & key) { m_said.SetCounter("_rest." + key, m_said.Counter(kTripsStartedKey)); }
+
+bool Navigator::InNature() const
+{
+  return m_travelMode == TravelMode::Hike || (m_travelMode == TravelMode::Bike && m_mountainBike);
+}
+
+void Navigator::TrackOutdoors(Fix const & fix, RouteSnapshot const & route)
+{
+  if (fix.speedMps < 0 || route.state != RouteState::OnRoute || fix.tMs - m_tripStartT < kOutdoorsAfterStartMs)
+    return;
+  bool const onFoot = m_travelMode == TravelMode::Walk || m_travelMode == TravelMode::Hike;
+  bool const moving = fix.speedMps >= MovingMps();
+  double const grade = route.gradeAhead.value_or(0);
+  if (onFoot && moving && grade >= kInclineGrade && !m_inclineSaid && Rested("outdoors.incline"))
+  {
+    m_inclineSaid = true;
+    MarkSaid("outdoors.incline");
+    Trace("outdoors", {{"bit", "incline"}});
+    SayLine(fix.tMs, Category::Quiet, "outdoors.incline");
+  }
+  // "It looks like your heart rate is elevated." There's no heart rate, so: a jog or a long climb.
+  bool const effort = (onFoot && fix.speedMps >= kJogMps) || (moving && grade >= kClimbGrade);
+  if (!effort)
+  {
+    m_effortSince.reset();
+    return;
+  }
+  if (!m_effortSince)
+    m_effortSince = fix.tMs;
+  if (m_effortSaid || fix.tMs - *m_effortSince < kEffortForMs || !Rested("outdoors.effort"))
+    return;
+  m_effortSaid = true;
+  MarkSaid("outdoors.effort");
+  Trace("outdoors", {{"bit", "effort"}});
+  SayLine(fix.tMs, Category::Quiet, "outdoors.effort");
+}
+
+std::string Navigator::OutdoorBit(double r) const
+{
+  if (InCar(m_travelMode) || static_cast<int>(m_outdoorBitsSaid.size()) >= kOutdoorBitsPerTrip)
+    return {};
+  std::vector<std::string> keys;
+  auto const add = [&](char const * key, bool rests) {
+    if (!m_outdoorBitsSaid.count(key) && (!rests || Rested(key)))
+      keys.push_back(key);
+  };
+  if (InNature())
+  {
+    add("outdoors.aside", false);
+    add("outdoors.ad", true);
+  }
+  if (m_travelMode == TravelMode::Bike && m_mountainBike)
+    add("outdoors.armstrong", true);
+  add("outdoors.oppressed", true);
+  if (keys.empty())
+    return {};
+  return keys[std::min(keys.size() - 1, static_cast<size_t>(r * keys.size()))];
+}
+
+void Navigator::SayOutdoorBit(double t, std::string const & key)
+{
+  m_outdoorBitsSaid.insert(key);
+  if (key != "outdoors.aside")
+    MarkSaid(key);
+  Trace("quiet", {{"bit", key}});
+  if (key != "outdoors.oppressed")
+  {
+    SayLine(t, Category::Quiet, key);
+    return;
+  }
+  // "Help! help! I'm being oppressed!" in someone else's voice (a woman's), then the GPS's own.
+  double const r = m_config.rng ? m_config.rng() : 0;
+  Commentary c;
+  c.t = t;
+  c.category = Category::Quiet;
+  c.text = m_said.Pick(key, LinesFor(key, Tier()), r);
+  c.frustration = m_engine ? m_engine->Frustration() : 0;
+  c.priority = Priority::Roast;
+  c.voiceSpeed = 1 + c.frustration / 1000.0;
+  c.key = key;
+  PushLine(std::move(c), m_gpsName == "Sarah" ? "af_heart" : "af_sarah");
 }
 
 std::vector<Routine> Navigator::Routines() const
@@ -2141,7 +2261,7 @@ void Navigator::SayLine(double tMs, Category category, std::string const & key, 
   PushLine(std::move(c));
 }
 
-void Navigator::PushLine(Commentary c)
+void Navigator::PushLine(Commentary c, std::string const & setupVoice)
 {
   // "Setup || punchline": the punchline waits out the setup and then an awkward pause.
   auto const pause = c.text.find(" || ");
@@ -2154,6 +2274,7 @@ void Navigator::PushLine(Commentary c)
     auto const at = std::find_if(m_punchlines.begin(), m_punchlines.end(),
                                  [&](Commentary const & p) { return p.t > punchline.t; });
     m_punchlines.insert(at, std::move(punchline));
+    c.voice = setupVoice;
   }
   // Brandon's lines; the rewording model leaves them alone.
   m_gate.Push(std::move(c), false);
@@ -2869,9 +2990,14 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
   // 20 Questions once a trip, and not on top of the plate game.
   bool const roomForTwenty = !m_twenty.OfferedThisTrip() && m_plates.GetState() != PlateGame::State::Offered &&
                              m_plates.GetState() != PlateGame::State::Playing;
-  enum class Bit { None, Call, ISpy, Twenty, Fact, Aside, Trap } bit = Bit::None;
+  enum class Bit { None, Call, ISpy, Twenty, Fact, Aside, Trap, Outdoors } bit = Bit::None;
+  // Out on foot or a bike, Brandon's outdoors bits get the first quiet stretch, then a share of the rest.
+  bool const outdoors = !InCar(m_travelMode);
+  std::string const outdoorBit = outdoors ? OutdoorBit(m_config.rng ? m_config.rng() : 0) : std::string();
   // Each bit's first time comes as soon as there's room for it, the call first.
-  if (roomForCall && !m_said.Said("call.script"))
+  if (!outdoorBit.empty() && m_outdoorBitsSaid.empty())
+    bit = Bit::Outdoors;
+  else if (roomForCall && !m_said.Said("call.script"))
     bit = Bit::Call;
   else if (!m_said.Said("ispy.night") && !m_said.Said("ispy.day"))
     bit = Bit::ISpy;
@@ -2897,7 +3023,9 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
       pick = kCallWeight + pick * (1 - kCallWeight);
     double const twenty = kCallWeight + kISpyWeight + kTwentyWeight;
     double const fact = twenty + kFactWeight;
-    bit = pick < kCallWeight                 ? Bit::Call
+    double const outdoorRoll = outdoorBit.empty() ? 1 : (m_config.rng ? m_config.rng() : 0);
+    bit = outdoorRoll < kOutdoorBitChance    ? Bit::Outdoors
+          : pick < kCallWeight                 ? Bit::Call
           : pick < kCallWeight + kISpyWeight ? Bit::ISpy
           : pick < twenty                    ? (roomForTwenty ? Bit::Twenty : Bit::Fact)
           : pick < fact                      ? Bit::Fact
@@ -2945,6 +3073,7 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
       SayLine(t, Category::Quiet, "quiet.aside");
     break;
   }
+  case Bit::Outdoors: SayOutdoorBit(t, outdoorBit); break;
   case Bit::None: break;
   }
 }
@@ -2964,6 +3093,8 @@ void Navigator::TrackRoadBits(Fix const & fix, RouteSnapshot const & route)
   k.busy = QuietBitBusy() || !m_punchlines.empty();
   k.night = KnowsTheDate(fix.tMs) && SunElevationDeg(fix.lat, fix.lon, fix.tMs) < kSunsetElevationDeg;
   k.localHour = KnowsTheDate(fix.tMs) ? LocalTime(fix.tMs).tm_hour : -1;
+  if (!InCar(m_travelMode))
+    k.signalMinMps = 0.8 * MovingMps();
   double const r = m_config.rng ? m_config.rng() : 0;
   for (auto const & remark : m_road.Tick(k, m_said, r))
   {

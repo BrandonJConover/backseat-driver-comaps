@@ -1841,7 +1841,7 @@ TEST(LinesFollowTheTravelMode)
       {
         auto const & lines = LinesFor(key, tier);
         CHECK(!lines.empty());
-        if (key.rfind("mode.", 0) != 0 && key.rfind("speeding.story", 0) != 0)
+        if (key.rfind("mode.", 0) != 0 && key.rfind("speeding.story", 0) != 0 && key.rfind("outdoors.", 0) != 0)
           for (auto const & line : lines)
             CHECK(LineFitsMode(line, mode));
       }
@@ -2035,5 +2035,80 @@ TEST(TurnCallsComeCloserOnFoot)
   double const drive = firstReminderM(TravelMode::Drive);
   CHECK(walk > 0 && walk <= 50);
   CHECK(drive > 100);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(OnFootTheGpsNoticesHillsAndEffort)
+{
+  Navigator nav(Config());
+  nav.SetTravelMode(TravelMode::Walk);
+  RouteSnapshot r = Walkway();
+  r.gradeAhead = 0.12;
+  int incline = 0, effort = 0;
+  for (int i = 0; i < 400; ++i)
+  {
+    nav.OnFix(Heading(i * 1000.0, 1.4, 90), r);
+    for (auto const & l : nav.TakeLines())
+    {
+      incline += l.text.find("on an incline") != std::string::npos;
+      effort += l.text.find("heart rate is elevated") != std::string::npos;
+    }
+  }
+  // "Watch your step." once, and a long climb is the exercise (there's no heart rate to read).
+  CHECK_EQUAL(incline, 1);
+  CHECK_EQUAL(effort, 1);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(TheOppressedGagIsTwoVoices)
+{
+  Navigator nav(Config());
+  nav.SetTravelMode(TravelMode::Walk);
+  auto const walk = [&](double from)
+  {
+    std::vector<Commentary> said;
+    for (int i = 0; i < 40 * 60; i += 2)
+    {
+      nav.OnFix(Heading(from + i * 1000.0, 1.4, 90), Walkway(4000));
+      for (auto & l : nav.TakeLines())
+        said.push_back(l);
+    }
+    nav.OnFix(Heading(from + 40 * 60000.0, 0, 90), RouteSnapshot{});
+    nav.TakeLines();
+    return said;
+  };
+  auto const first = walk(0);
+  auto const help = std::find_if(first.begin(), first.end(),
+                                 [](Commentary const & l) { return l.text.find("being oppressed") != std::string::npos; });
+  CHECK(help != first.end());
+  // Someone else (a woman) yells it, then the GPS itself denies everything.
+  CHECK(help->voice.rfind("af_", 0) == 0);
+  auto const denial = std::find_if(help, first.end(),
+                                   [](Commentary const & l) { return l.text.find("your phone said it") != std::string::npos; });
+  CHECK(denial != first.end());
+  CHECK(denial->voice.empty());
+  // A one-off: it sits out the next walks.
+  for (auto const & l : walk(3600000))
+    CHECK(l.text.find("being oppressed") == std::string::npos);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(AHikeGetsBrandonsOutdoorsBits)
+{
+  Navigator nav(Config());
+  nav.SetTravelMode(TravelMode::Walk);
+  RouteSnapshot r = Walkway(4000);
+  r.dirtShare = 0.7;
+  int outdoors = 0;
+  for (int i = 0; i < 60 * 60; i += 2)
+  {
+    nav.OnFix(Heading(i * 1000.0, 1.4, 90), r);
+    for (auto const & l : nav.TakeLines())
+      for (char const * key : {"outdoors.aside", "outdoors.ad", "outdoors.oppressed"})
+        outdoors += SaidLineOf(l.text, key) && l.text.find("your phone said it") == std::string::npos;
+  }
+  CHECK(nav.Mode() == TravelMode::Hike);
+  CHECK(outdoors >= 1);
+  CHECK(outdoors <= 2);
   SetLineTravelMode(TravelMode::Drive);
 }

@@ -3091,6 +3091,24 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
     {
       size_t const i = route->GetFollowedPolyline().GetCurrentIter().m_ind;
       snap.onDirt = i < segments.size() && segments[i].GetRoadTypes().Has(routing::RoutingOptions::Dirty);
+      // The climb just ahead, for "Watch your step. It looks like we are on an incline." Each
+      // segment's junction is where it ends, so the climb starts at the previous segment's end.
+      if (route->HaveAltitudes() && i > 0 && i < segments.size())
+      {
+        auto const & from = segments[i - 1];
+        double const fromM = from.GetDistFromBeginningMeters();
+        for (size_t j = i; j < segments.size(); ++j)
+        {
+          double const runM = segments[j].GetDistFromBeginningMeters() - fromM;
+          if (runM < 40)
+            continue;
+          auto const a = from.GetJunction().GetAltitude();
+          auto const b = segments[j].GetJunction().GetAltitude();
+          if (a != geometry::kInvalidAltitude && b != geometry::kInvalidAltitude && runM < 150)
+            snap.gradeAhead = (b - a) / runM;
+          break;
+        }
+      }
     }
   }
   if (route->GetFollowedPolyline().IsValid())

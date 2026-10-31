@@ -108,6 +108,9 @@ struct RouteSnapshot
   bool onDirt = false;
   /// How much of the route (by distance, 0..1) is dirt tracks and unpaved, read when the trip starts.
   double dirtShare = 0;
+  /// Rise over run of the route just ahead (0.1 is a 10% climb, negative downhill), when the map
+  /// has altitudes for it (walking and cycling routes do).
+  std::optional<double> gradeAhead;
 };
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
@@ -354,7 +357,8 @@ private:
   void SayLine(double tMs, Category category, std::string const & key, Vars vars = {},
                Priority priority = Priority::Roast);
   /// Hands a line over; "setup || punchline" is split, the punchline after an awkward pause.
-  void PushLine(Commentary c);
+  /// `setupVoice`: someone else says the setup of a "setup || punchline" line (a Kokoro voice id).
+  void PushLine(Commentary c, std::string const & setupVoice = {});
   /// The running bits' say on one of the engine's lines (running_bits.hpp): it may go out as is,
   /// be swapped for another line, or be dropped (false).
   bool Punch(Commentary & line);
@@ -447,6 +451,16 @@ private:
   std::vector<Commentary> FilterForCall(std::vector<Commentary> lines);
   /// Rest areas, highways, farmland, the dark, the weather, signal and drive-thrus (road_bits.hpp).
   void TrackRoadBits(Fix const & fix, RouteSnapshot const & route);
+  /// Out on foot or a bike: the incline warning and "Are you actually exercising?".
+  void TrackOutdoors(Fix const & fix, RouteSnapshot const & route);
+  /// A hike, or a ride on trails: out in nature, not on a street.
+  bool InNature() const;
+  /// The outdoors quiet-stretch bit to do now (Brandon's), or empty when none is due.
+  std::string OutdoorBit(double r) const;
+  void SayOutdoorBit(double t, std::string const & key);
+  /// One-line bits wait a few trips before coming back, so they stay a surprise.
+  bool Rested(std::string const & key) const;
+  void MarkSaid(std::string const & key);
   /// {name}, {gps} and the driver's pronouns, for lines about the driver.
   Vars DriverVars() const;
   int Tier() const;
@@ -582,6 +596,12 @@ private:
   std::optional<double> m_trailSince;
   /// The off-road trip or the hike is the Navigator's own finding, not the route type or the driver.
   bool m_modeFound = false;
+  /// A bike trip that's been on trails or dirt a while: mountain biking.
+  bool m_mountainBike = false;
+  std::optional<double> m_effortSince;
+  bool m_inclineSaid = false;
+  bool m_effortSaid = false;
+  std::set<std::string> m_outdoorBitsSaid;
   double m_lastOffRoadT = -1e18;
   double m_lastExitLineT = -1e18;
   bool m_onBridge = false;

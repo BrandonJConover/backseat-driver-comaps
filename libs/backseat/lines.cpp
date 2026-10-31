@@ -89,8 +89,9 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
 {
   auto const & raw = LineData().at(key).at(static_cast<size_t>(tier));
   TravelMode const mode = g_travelMode;
-  // Story beats are read by position, and mode lines are written for their mode.
-  if (mode == TravelMode::Drive || key.rfind("mode.", 0) == 0 || key.rfind("speeding.story", 0) == 0)
+  // Story beats are read by position, and mode and outdoors lines are written for their mode.
+  if (mode == TravelMode::Drive || key.rfind("mode.", 0) == 0 || key.rfind("speeding.story", 0) == 0 ||
+      key.rfind("outdoors.", 0) == 0)
     return raw;
   static std::mutex mutex;
   static std::map<std::string, std::vector<std::string>> cache;
