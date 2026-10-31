@@ -254,16 +254,19 @@ final class BackseatOnboardingModel: ObservableObject {
 
   /// The Skip button: it doesn't skip. "Stop that, I'm monologuing right now! Be patient," then
   /// back to the sentence it was on.
-  func skipPressed() {
+  /// A tap while it looks disabled gets called out, and doesn't count as a press.
+  func skipPressed(enabled: Bool) {
     guard !monologueOver, complaint == nil, Date().timeIntervalSince(lastSkip) > 2.5 else { return }
     lastSkip = Date()
     BackseatLog.event("onboarding", ["step": "skip pressed", "sentence": String(piece)])
     KokoroVoice.shared.stop()
     // The sentence comes back only once the complaint is over (checkReading): it's already rendered,
     // so queued now it would play straight away, before the complaint is even rendered.
-    skips += 1
-    if skips == 4 { disclaimerVoice = KokoroVoice.otherVoice(voiceID) }
-    let key = skips == 1 ? "onboard.monologuing.first" : "onboard.monologuing"
+    if enabled {
+      skips += 1
+      if skips == 4 { disclaimerVoice = KokoroVoice.otherVoice(voiceID) }
+    }
+    let key = !enabled ? "onboard.skip.disabled" : skips == 1 ? "onboard.monologuing.first" : "onboard.monologuing"
     let line = MWMBackseatRewriter.line(key, vars: [:]).trimmingCharacters(in: .whitespacesAndNewlines)
     resumeAt = piece
     queuedUpTo = piece
@@ -432,7 +435,7 @@ final class SkipDodger {
   private var enabled = true
   private var enabledUntil = Date.distantPast
 
-  /// It also takes turns being tappable, for no fixed length of time.
+  /// It also takes turns looking disabled, for no fixed length of time.
   func isEnabled(at date: Date) -> Bool {
     if date >= enabledUntil {
       // The first turn starts out enabled: the press that set it moving shouldn't look ignored.
@@ -443,14 +446,14 @@ final class SkipDodger {
   }
 
   /// `jumping` (Reduce Motion): it sits still for a while, then appears somewhere else.
-  func spot(at date: Date, jumping: Bool) -> CGPoint {
-    if date.timeIntervalSince(start) >= duration { nextMove(at: date, jumping: jumping) }
+  func spot(at date: Date, jumping: Bool, quickness: Double) -> CGPoint {
+    if date.timeIntervalSince(start) >= duration { nextMove(at: date, jumping: jumping, quickness: quickness) }
     if jumping { return from }
     let t = CGFloat(date.timeIntervalSince(start) / duration)
     return CGPoint(x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t)
   }
 
-  private func nextMove(at date: Date, jumping: Bool) {
+  private func nextMove(at date: Date, jumping: Bool, quickness: Double) {
     from = to
     moves += 1
     // Across, then up or down, then diagonally, always towards the other side.
@@ -458,7 +461,7 @@ final class SkipDodger {
     let upOrDown = moves % 3 != 1
     to = CGPoint(x: across ? Self.otherSide(of: from.x) : from.x, y: upOrDown ? Self.otherSide(of: from.y) : from.y)
     start = date
-    duration = jumping ? .random(in: 1.2 ... 2.2) : .random(in: 0.35 ... 1.8)
+    duration = (jumping ? .random(in: 1.2 ... 2.2) : .random(in: 0.35 ... 1.8)) / quickness
   }
 
   private static func otherSide(of value: CGFloat) -> CGFloat {
@@ -474,6 +477,7 @@ struct BackseatOnboardingView: View {
   private let card = Color(BackseatTheme.card)
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var dodger = SkipDodger()
+  private static let skipColors: [Color] = [Color(BackseatTheme.accent), .orange, .green, .pink, .cyan, .mint]
 
   var body: some View {
     ZStack {
@@ -522,13 +526,16 @@ struct BackseatOnboardingView: View {
   // MARK: Screen 1
 
   /// It's a Skip button. It doesn't skip.
-  private var skipButton: some View {
-    Button(action: model.skipPressed) {
+  private func skipButton(fill: Color? = nil) -> some View {
+    Button {
+      model.skipPressed(enabled: model.skips == 0 || dodger.isEnabled(at: Date()))
+    } label: {
       Label("Skip", systemImage: "forward.fill")
         .font(.headline)
         .padding(.horizontal, 28)
         .frame(minHeight: 46)
-        .background(Capsule().fill(Color(BackseatTheme.raised)))
+        .foregroundColor(fill == nil ? Color(BackseatTheme.text) : Color(BackseatTheme.ink))
+        .background(Capsule().fill(fill ?? Color(BackseatTheme.raised)))
     }
   }
 
@@ -557,10 +564,17 @@ struct BackseatOnboardingView: View {
         if model.skips > 0, !model.monologueOver {
           GeometryReader { area in
             TimelineView(.animation) { timeline in
-              let spot = dodger.spot(at: timeline.date, jumping: reduceMotion)
+              // A bit quicker with each press after the second, up to twice the speed.
+              let spot = dodger.spot(at: timeline.date, jumping: reduceMotion,
+                                     quickness: min(1 + 0.25 * Double(max(model.skips - 2, 0)), 2))
               let inset = CGSize(width: min(70, area.size.width / 2), height: min(28, area.size.height / 2))
               let enabled = dodger.isEnabled(at: timeline.date)
-              skipButton.disabled(!enabled).opacity(enabled ? 1 : 0.35).position(x: inset.width + spot.x * (area.size.width - 2 * inset.width),
+              let time = timeline.date.timeIntervalSinceReferenceDate
+              // From the second press on it also spins (not with Reduce Motion) and changes color.
+              let wild = model.skips >= 2
+              let fill = wild ? Self.skipColors[Int(time / 0.6) % Self.skipColors.count] : nil
+              let turn = wild && !reduceMotion ? time.truncatingRemainder(dividingBy: 1.5) / 1.5 * 360 : 0
+              skipButton(fill: fill).rotationEffect(.degrees(turn)).opacity(enabled ? 1 : 0.35).position(x: inset.width + spot.x * (area.size.width - 2 * inset.width),
                                   y: inset.height + spot.y * (area.size.height - 2 * inset.height))
             }
           }
@@ -569,7 +583,7 @@ struct BackseatOnboardingView: View {
       speechBubble
       if !model.monologueOver {
         if model.skips == 0 {
-          skipButton.frame(maxWidth: .infinity, alignment: .trailing)
+          skipButton().frame(maxWidth: .infinity, alignment: .trailing)
         }
       } else if !model.termsAnswered {
         HStack(spacing: 10) {
