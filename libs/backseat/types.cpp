@@ -47,7 +47,12 @@ NavEvent NavEvent::WrongTurn(double t, TurnDirection expected, TurnDirection tur
   return e;
 }
 
-NavEvent NavEvent::Rerouted(double t) { return Make(Type::Rerouted, t); }
+NavEvent NavEvent::Rerouted(double t, bool silent)
+{
+  auto e = Make(Type::Rerouted, t);
+  e.silent = silent;
+  return e;
+}
 
 NavEvent NavEvent::HazardAhead(double t, HazardKind kind, double distanceM, std::optional<std::string> id)
 {

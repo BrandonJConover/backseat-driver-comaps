@@ -112,7 +112,9 @@ TEST(NavigatorCallsOffRouteNearTheTurnAMiss)
   nav.OnFix(At(2000, 10), off);
   auto const lines = nav.TakeLines();
   CHECK(Has(lines, Category::MissedTurn));
-  CHECK(Has(lines, Category::Rerouted));
+  // Still off the route a few seconds later: now it's a reroute.
+  nav.OnFix(At(7100, 10), off);
+  CHECK(Has(nav.TakeLines(), Category::Rerouted));
   // The new route's first step isn't a completed turn.
   nav.OnFix(At(9000, 10), OnRoute(7, TurnKind::Right, 300));
   CHECK(!Has(nav.TakeLines(), Category::TurnCompleted));
@@ -600,6 +602,7 @@ TEST(NavigatorSuggestsAutopilotOnTheThirdReroute)
   {
     nav.OnFix(At(i * 20000, 10), Far());
     nav.OnFix(At(i * 20000 + 10000, 10), off);
+    nav.OnFix(At(i * 20000 + 10000 + 6000, 10), off);
     auto const said = LinesOf(nav.TakeLines(), Category::Autopilot);
     CHECK_EQUAL(said.size(), size_t(i == 2 ? 1 : 0));
     if (i == 2)
@@ -614,6 +617,7 @@ TEST(NavigatorSuggestsAutopilotOnTheThirdReroute)
   {
     tesla.OnFix(At(i * 20000, 10), Far());
     tesla.OnFix(At(i * 20000 + 10000, 10), off);
+    tesla.OnFix(At(i * 20000 + 10000 + 6000, 10), off);
     for (auto const & l : LinesOf(tesla.TakeLines(), Category::Autopilot))
       said.push_back(l);
   }
@@ -660,17 +664,20 @@ TEST(NavigatorBlamesALemonWhenAutopilotDrivesThisBadly)
   nav.OnDriverSaid(1000, "relax, it's on autopilot");
   CHECK(LinesOf(nav.TakeLines(), Category::Autopilot).empty());
   nav.OnFix(At(10000, 10), off);
+  nav.OnFix(At(10000 + 6000, 10), off);
   auto said = LinesOf(nav.TakeLines(), Category::Autopilot);
   CHECK_EQUAL(said.size(), size_t(1));
   CHECK_EQUAL(said[0].text, lemon);
   nav.OnFix(At(20000, 10), Far());
   nav.OnFix(At(30000, 10), off);
+  nav.OnFix(At(30000 + 6000, 10), off);
   CHECK(LinesOf(nav.TakeLines(), Category::Autopilot).empty());  // once a trip
 
   // Claimed after getting lost: right away.
   Navigator late(Config());
   late.OnFix(At(0, 10), Far());
   late.OnFix(At(10000, 10), off);
+  late.OnFix(At(10000 + 6000, 10), off);
   late.TakeLines();
   late.OnDriverSaid(11000, "the car is driving itself");
   said = LinesOf(late.TakeLines(), Category::Autopilot);
@@ -814,6 +821,7 @@ TEST(NavigatorWishesThePartnerWereDriving)
   {
     nav.OnFix(At(i * 20000, 10), Far());
     nav.OnFix(At(i * 20000 + 10000, 10), off);
+    nav.OnFix(At(i * 20000 + 10000 + 6000, 10), off);
     for (auto const & l : LinesOf(nav.TakeLines(), Category::Partner))
       said.push_back(l);
   }
@@ -828,6 +836,7 @@ TEST(NavigatorWishesThePartnerWereDriving)
   {
     single.OnFix(At(i * 20000, 10), Far());
     single.OnFix(At(i * 20000 + 10000, 10), off);
+    single.OnFix(At(i * 20000 + 10000 + 6000, 10), off);
     for (auto const & l : LinesOf(single.TakeLines(), Category::Partner))
       said.push_back(l);
   }
@@ -1047,6 +1056,7 @@ TEST(DrawnRoutesGetTheirOwnLines)
   RouteSnapshot off = drawn;
   off.state = RouteState::OffRoute;
   nav.OnFix(At(30000, 10), off);
+  nav.OnFix(At(30000 + 6000, 10), off);
   nav.Poll(off);
   CHECK(SaidKey(nav.TakeLines(), "sketch.offRoute"));
 
@@ -1694,4 +1704,34 @@ TEST(AFirstTurnRightThereIsSaidBeforeTheGreeting)
   CHECK(lines[0].text.find("turn right onto Oak Avenue") != std::string::npos);
   // No rundown on top of it: the greeting and the direction, nothing else that's a direction.
   CHECK(std::count_if(lines.begin(), lines.end(), [](Commentary const & l) { return l.priority == Priority::Nav; }) <= 2);
+}
+
+TEST(NoRerouteJokeForJitterOrAChosenRoute)
+{
+  auto const offRoute = [] {
+    RouteSnapshot off = OnRoute(1, TurnKind::Left, 900);
+    off.state = RouteState::OffRoute;
+    return off;
+  };
+  {
+    Navigator nav(Config());
+    nav.OnFix(At(0, 10), OnRoute(1, TurnKind::Left, 900));
+    nav.OnFix(At(1000, 10), OnRoute(1, TurnKind::Left, 900));
+    nav.TakeLines();
+    nav.OnFix(At(2000, 10), offRoute());
+    nav.OnFix(At(5000, 10), OnRoute(2, TurnKind::Left, 900));
+    CHECK(!Has(nav.TakeLines(), Category::Rerouted));
+    CHECK_EQUAL(nav.Engine()->Stats().reroutes, 1);
+  }
+  {
+    Navigator nav(Config());
+    nav.OnFix(At(0, 10), OnRoute(1, TurnKind::Left, 900));
+    nav.OnFix(At(1000, 10), OnRoute(1, TurnKind::Left, 900));
+    nav.TakeLines();
+    nav.NoteVoiceCommand();
+    nav.OnFix(At(20000, 10), offRoute());
+    nav.OnFix(At(27000, 10), offRoute());
+    CHECK(!Has(nav.TakeLines(), Category::Rerouted));
+    CHECK_EQUAL(nav.Engine()->Stats().reroutes, 1);
+  }
 }

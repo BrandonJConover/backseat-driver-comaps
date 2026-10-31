@@ -295,6 +295,8 @@ public:
   /// A line to open the next trip with, if it starts within kOpenerValidMs of `tMs`
   /// (e.g. "Alright, bossy" when the driver barked the destination).
   void QueueOpener(double tMs, std::string key, Vars vars = {});
+  /// The driver just gave a command, so a route change in the next little while is theirs.
+  void NoteVoiceCommand() { m_lastVoiceCommandT = m_lastT; }
   static double constexpr kOpenerValidMs = 600000;
   std::vector<TripRecord> const & History() const { return m_history; }
   /// Routines learned from past trips (the commute), in local time.
@@ -430,6 +432,8 @@ private:
   RewriteGate m_gate;
 
   double m_lastT = 0;
+  double m_lastVoiceCommandT = -1e12;
+  std::optional<double> m_rerouteRoastDueAt;
   /// About when the phone is done saying everything handed to it so far.
   double m_talkingUntil = 0;
   /// The trip-time prediction, said a little after the start like a direction but held for turns.

@@ -164,6 +164,8 @@ struct NavEvent
   std::optional<Place> place;
   // Traffic
   bool heavy = false;
+  /// Rerouted: counts, but no line.
+  bool silent = false;
   std::optional<std::string> alternate;
 
   static NavEvent Instruction(double t, std::string text, double distanceM,
@@ -172,7 +174,8 @@ struct NavEvent
   static NavEvent Progress(double t, double distanceM);
   static NavEvent MissedTurn(double t);
   static NavEvent WrongTurn(double t, TurnDirection expected, TurnDirection turned);
-  static NavEvent Rerouted(double t);
+  /// With `silent`, it counts but gets no line.
+  static NavEvent Rerouted(double t, bool silent = false);
   static NavEvent HazardAhead(double t, HazardKind kind, double distanceM, std::optional<std::string> id = {});
   static NavEvent PoiAhead(double t, std::string name, StopWish wish);
   static NavEvent StopRequestAnswer(double t, bool accepted);

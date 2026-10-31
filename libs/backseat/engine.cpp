@@ -559,7 +559,8 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
   case NavEvent::Type::Rerouted:
     m_stats.reroutes++;
     Log(MakeIncident(e.t, IncidentKind::Rerouted), e.at);
-    Roast(out, e.t, Category::Rerouted, "rerouted", {}, true);
+    if (!e.silent)
+      Roast(out, e.t, Category::Rerouted, "rerouted", {}, true);
     break;
   case NavEvent::Type::Traffic:
     if (!e.heavy)

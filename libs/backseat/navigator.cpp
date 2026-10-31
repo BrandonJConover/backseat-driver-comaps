@@ -67,6 +67,10 @@ double constexpr kCurveGasEveryMs = 5 * 60000;
 /// Regular bridges are everywhere in a city (every overpass); water is always worth a scream.
 double constexpr kLandBridgeYelpEveryMs = 600000;
 double constexpr kWaterBridgeYelpEveryMs = 60000;
+/// Off the route this long before it's worth a joke: GPS jitter comes back within seconds.
+double constexpr kRerouteRoastAfterMs = 5000;
+/// The driver asked for a new route, so of course it changed.
+double constexpr kNoRerouteRoastAfterCommandMs = 30000;
 /// Off every mapped road: this far from the nearest one...
 double constexpr kOffRoadM = 60;
 /// ...and back on one within this...
@@ -911,11 +915,25 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     {
       if (m_turnId && m_lastDistToTurnM < kMissedTurnWithinM)
         Say(m_engine->OnNav(NavEvent::MissedTurn(t)));
-      Say(m_engine->OnNav(NavEvent::Rerouted(t)));
       m_rerouting = true;
-      ++m_reroutes;
       Trace("nav.offroute", {{"missed", (m_turnId && m_lastDistToTurnM < kMissedTurnWithinM) ? "yes" : "no"},
-                             {"reroutes", std::to_string(m_reroutes)}});
+                             {"reroutes", std::to_string(m_reroutes + 1)}});
+      // Back on the route in a moment, or the route changed because the driver asked: no joke.
+      if (t - m_lastVoiceCommandT < kNoRerouteRoastAfterCommandMs)
+      {
+        ++m_reroutes;
+        Say(m_engine->OnNav(NavEvent::Rerouted(t, true)));
+      }
+      else
+      {
+        m_rerouteRoastDueAt = t + kRerouteRoastAfterMs;
+      }
+    }
+    else if (m_rerouteRoastDueAt && t >= *m_rerouteRoastDueAt)
+    {
+      m_rerouteRoastDueAt.reset();
+      Say(m_engine->OnNav(NavEvent::Rerouted(t)));
+      ++m_reroutes;
       // Missing a route they drew themselves gets its own line, in place of the "lost again" ones.
       if (m_sketched)
         SayLine(t, Category::Rerouted, "sketch.offRoute");
@@ -935,6 +953,13 @@ void Navigator::Update(double t, RouteSnapshot const & route)
         SayLine(t, Category::Autopilot, m_carHasAutopilot ? "autopilot.owned" : "autopilot");
     }
     return;
+  }
+
+  // Back before the joke was due. It still counts, quietly.
+  if (std::exchange(m_rerouteRoastDueAt, std::nullopt))
+  {
+    ++m_reroutes;
+    Say(m_engine->OnNav(NavEvent::Rerouted(t, true)));
   }
 
   if (!route.turnId)
@@ -1523,6 +1548,7 @@ void Navigator::SayVenue(double t, RouteSnapshot const & route)
 
 void Navigator::ResetTrip()
 {
+  m_rerouteRoastDueAt.reset();
   m_turnHeld.clear();
   m_predictionText.clear();
   m_turnId.reset();
