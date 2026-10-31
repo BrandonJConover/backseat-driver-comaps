@@ -285,21 +285,23 @@ final class BackseatOnboardingModel: ObservableObject {
     misses += 1
   }
 
-  /// A tap while it looks disabled gets called out, and doesn't count as a press.
+  /// A tap while it looks disabled gets called out on screen, and the reading carries on.
   func skipPressed(enabled: Bool) {
-    if !enabled { skipMissed() }
+    guard enabled else {
+      skipMissed()
+      showDisabledCallout()
+      return
+    }
     guard !monologueOver, complaint == nil, Date().timeIntervalSince(lastSkip) > 2.5 else { return }
     lastSkip = Date()
     BackseatLog.event("onboarding", ["step": "skip pressed", "sentence": String(piece)])
     KokoroVoice.shared.stop()
     // The sentence comes back only once the complaint is over (checkReading): it's already rendered,
     // so queued now it would play straight away, before the complaint is even rendered.
-    if enabled {
-      skips += 1
-      voiceChangeDue = skips >= 4
-    }
+    skips += 1
+    voiceChangeDue = skips >= 4
     // It only complains once. After that the press just changes how the reading goes.
-    if enabled, skips > 1 {
+    if skips > 1 {
       if voiceChangeDue {
         voiceChangeDue = false
         changeDisclaimerVoice()
@@ -308,8 +310,7 @@ final class BackseatOnboardingModel: ObservableObject {
       read(from: piece)
       return
     }
-    let key = enabled ? "onboard.monologuing.first" : "onboard.skip.disabled"
-    let line = MWMBackseatRewriter.line(key, vars: [:]).trimmingCharacters(in: .whitespacesAndNewlines)
+    let line = MWMBackseatRewriter.line("onboard.monologuing.first", vars: [:]).trimmingCharacters(in: .whitespacesAndNewlines)
     resumeAt = piece
     queuedUpTo = piece
     complaint = line
@@ -317,6 +318,15 @@ final class BackseatOnboardingModel: ObservableObject {
     complaintAt = Date()
     // On screen as well, for anyone who can't hear it.
     reply(line)
+  }
+
+  private func showDisabledCallout() {
+    guard !monologueOver, complaint == nil else { return }
+    let line = MWMBackseatRewriter.line("onboard.skip.disabled", vars: [:])
+    bubble = line
+    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+      if self?.bubble == line { self?.bubble = "" }
+    }
   }
 
   /// 0 yes, 1 no, 2 skip.
