@@ -191,6 +191,27 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 /// What the GPS has worked out about the driver, as label / value pairs ("Works at", "Acme Corp").
 @property(class, nonatomic, readonly) NSArray<NSArray<NSString *> *> * learnedFacts;
 
+/// First launch (Brandon's script): the disclaimer, paragraph by paragraph, as written for the screen.
++ (NSArray<NSString *> *)disclaimerParagraphs:(BOOL)creditCoMaps;
+/// A disclaimer paragraph as the voice reads it ("him slash her slash the officer").
++ (NSString *)spokenDisclaimer:(NSString *)paragraph;
+/// What the GPS says to a disclaimer answer (0 yes, 1 no, 2 skip) at `round` (0 the first ask,
+/// 1 after a no), in order; `done` says whether the menu is over.
++ (NSArray<NSString *> *)termsAnswer:(NSInteger)answer round:(NSInteger)round done:(BOOL *)done;
+/// Any line from the GPS's script ("onboard.monologuing"), with {placeholders} filled from `vars`.
++ (NSString *)line:(NSString *)key vars:(NSDictionary<NSString *, NSString *> *)vars;
+/// Getting to know you: question 0 gender, 1 married, 2 home. The question, its answer choices
+/// ("man", "woman", "skip"...), and the GPS's comment on an answer, which also saves it.
++ (NSString *)aboutYouQuestion:(NSInteger)question;
++ (NSArray<NSString *> *)aboutYouChoices:(NSInteger)question;
++ (NSString *)aboutYouAnswered:(NSInteger)question answer:(NSString *)answer;
+/// What the driver answered before, "" if never.
++ (NSString *)aboutYouAnswer:(NSInteger)question;
+/// Each voice's audition for the voice line-up ("Hi, I'm Echo. ...say Purple Monkey."), in order.
++ (NSArray<NSString *> *)voiceAuditions:(NSArray<NSString *> *)voiceIDs;
+/// Whether `typed` is the code phrase, ignoring case, spaces and punctuation.
++ (BOOL)typed:(NSString *)typed matchesPhrase:(NSString *)phrase;
+
 @end
 
 NS_ASSUME_NONNULL_END

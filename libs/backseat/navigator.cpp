@@ -1324,7 +1324,8 @@ void Navigator::SayIndoorStart(double t, RouteSnapshot const & route)
   bool const atHome = home && DistanceM(*home, here) < kIndoorHomeM;
   auto const verdict = JudgeIndoorStart(m_buildingLookup(here), fresh ? m_hereFix->accuracyM : -1,
                                         fresh ? m_hereFix->speedMps : -1, atHome);
-  if (verdict == IndoorStart::No)
+  // Nobody living on the streets needs reminding to open their garage door.
+  if (verdict == IndoorStart::No || (verdict == IndoorStart::Garage && m_housing == Housing::Streets))
     return;
   std::string const key = verdict == IndoorStart::Garage ? "indoors.garage" : "indoors.building";
   // The first time always; after that, now and then, so leaving home stays a surprise.

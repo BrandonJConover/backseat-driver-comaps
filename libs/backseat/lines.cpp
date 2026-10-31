@@ -18,11 +18,68 @@ namespace backseat
 namespace
 {
 std::atomic<TravelMode> g_travelMode{TravelMode::Drive};
+std::atomic<Housing> g_housing{Housing::Unknown};
+
+/// `text` lowercased with every run of non-word characters turned into one space, padded with
+/// spaces, so " word " finds whole words.
+std::string LineWords(std::string const & text)
+{
+  std::string lower = " ";
+  for (unsigned char const ch : text)
+  {
+    bool const inWord = std::isalnum(ch) || ch == '\'' || ch == '{' || ch == '}';
+    lower += inWord ? static_cast<char>(std::tolower(ch)) : ' ';
+  }
+  lower += ' ';
+  return lower;
+}
 }  // namespace
 
 void SetLineTravelMode(TravelMode mode)
 {
   g_travelMode = mode;
+}
+
+char const * HousingName(Housing housing)
+{
+  switch (housing)
+  {
+  case Housing::Unknown: return "";
+  case Housing::House: return "house";
+  case Housing::Apartment: return "apartment";
+  case Housing::Streets: return "streets";
+  }
+  return "";
+}
+
+Housing HousingFrom(std::string const & name)
+{
+  for (Housing const h : {Housing::House, Housing::Apartment, Housing::Streets})
+    if (name == HousingName(h))
+      return h;
+  return Housing::Unknown;
+}
+
+void SetLineHousing(Housing housing)
+{
+  g_housing = housing;
+}
+
+bool LineFitsHousing(std::string const & text, Housing housing)
+{
+  if (housing == Housing::Unknown || housing == Housing::House)
+    return true;
+  // A yard and a mortgage come with a house, not an apartment.
+  static char const * const kHouseOwner[] = {"driveway", "driveways", "lawn", "lawns", "backyard", "yard", "mortgage",
+                                             "homeowner", "homeowners", "hoa"};
+  // And nothing that brings up a home at all for someone without one.
+  static char const * const kHome[] = {"home", "homes", "house", "houses", "garage", "garages", "rent", "landlord",
+                                       "apartment", "apartments", "couch", "basement", "bedroom", "kitchen", "roof"};
+  std::string const lower = LineWords(text);
+  auto const has = [&lower](char const * word) { return lower.find(" " + std::string(word) + " ") != std::string::npos; };
+  if (std::any_of(std::begin(kHouseOwner), std::end(kHouseOwner), has))
+    return false;
+  return housing != Housing::Streets || std::none_of(std::begin(kHome), std::end(kHome), has);
 }
 
 char const * TravelModeName(TravelMode mode)
@@ -52,13 +109,7 @@ bool LineFitsMode(std::string const & text, TravelMode mode)
   static char const * const kWheels[] = {"brake", "brakes", "braking", "pedal", "pedals", "wheel", "wheels", "lane", "lanes",
                                          "tire", "tires", "park", "parked", "parking", "traffic", "merge", "merging",
                                          "accelerate", "accelerating", "mph", "reverse", "bike", "bicycle", "ride"};
-  std::string lower = " ";
-  for (unsigned char const ch : text)
-  {
-    bool const inWord = std::isalnum(ch) || ch == '\'' || ch == '{' || ch == '}';
-    lower += inWord ? static_cast<char>(std::tolower(ch)) : ' ';
-  }
-  lower += ' ';
+  std::string const lower = LineWords(text);
   auto const has = [&lower](char const * word) { return lower.find(" " + std::string(word) + " ") != std::string::npos; };
   if (mode == TravelMode::OffRoad)
   {
@@ -89,18 +140,42 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
 {
   auto const & raw = LineData().at(key).at(static_cast<size_t>(tier));
   TravelMode const mode = g_travelMode;
+  Housing const housing = g_housing;
   // Story beats are read by position, and mode and outdoors lines are written for their mode.
-  if (mode == TravelMode::Drive || key.rfind("mode.", 0) == 0 || key.rfind("speeding.story", 0) == 0 ||
-      key.rfind("outdoors.", 0) == 0)
+  bool const positional = key.rfind("speeding.story", 0) == 0;
+  bool const anyMode = mode == TravelMode::Drive || positional || key.rfind("mode.", 0) == 0 ||
+                       key.rfind("outdoors.", 0) == 0;
+  // The first-launch script is said word for word, whoever's listening.
+  bool const anyHousing = housing == Housing::Unknown || housing == Housing::House || positional ||
+                          key.rfind("onboard.", 0) == 0 || key.rfind("setup.", 0) == 0;
+  if (anyMode && anyHousing)
     return raw;
   static std::mutex mutex;
   static std::map<std::string, std::vector<std::string>> cache;
   std::string const suffix = std::string(".") + TravelModeName(mode);
   std::lock_guard lock(mutex);
-  auto const [it, added] = cache.try_emplace(key + suffix + std::to_string(tier));
+  auto const [it, added] = cache.try_emplace(key + suffix + "." + HousingName(housing) + std::to_string(tier));
   if (!added)
     return it->second;
   auto & fitting = it->second;
+  auto const fitHousing = [&]
+  {
+    if (anyHousing)
+      return;
+    std::vector<std::string> kept;
+    for (auto const & line : fitting)
+      if (LineFitsHousing(line, housing))
+        kept.push_back(line);
+    // A pool that's all about home (the garage door line) stays: the caller decides whether to say it.
+    if (!kept.empty())
+      fitting = std::move(kept);
+  };
+  if (anyMode)
+  {
+    fitting = raw;
+    fitHousing();
+    return fitting;
+  }
   auto own = LineData().find(key + suffix);
   // A hike borrows the walk's lines where it has none of its own.
   if (own == LineData().end() && mode == TravelMode::Hike)
@@ -112,6 +187,7 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
       fitting.push_back(line);
   if (fitting.empty())
     fitting = LineData().at("mode.generic").at(static_cast<size_t>(tier));
+  fitHousing();
   return fitting;
 }
 

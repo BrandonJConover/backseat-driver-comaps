@@ -251,6 +251,14 @@ public:
   }
   /// The driver's car can drive itself; getting lost is then even less forgivable.
   void SetCarHasAutopilot(bool has) { m_carHasAutopilot = has; }
+  /// Where the driver lives, from the getting-to-know-you questions. On the streets, there are no
+  /// home jokes and no garage door; LinesFor() leaves out lines that don't fit.
+  void SetHousing(Housing housing)
+  {
+    m_housing = housing;
+    SetLineHousing(housing);
+  }
+  Housing GetHousing() const { return m_housing; }
   /// Lets the GPS panic on bridges.
   void SetBridgeLookup(BridgeLookup lookup) { m_bridgeLookup = std::move(lookup); }
   void SetRoadDistanceLookup(RoadDistanceLookup lookup) { m_roadDistanceLookup = std::move(lookup); }
@@ -510,6 +518,7 @@ private:
   std::optional<double> m_lastBadSpeedingT;
   TrafficLightLookup m_lightLookup;
   Pronouns m_pronouns = Pronouns::They;
+  Housing m_housing = Housing::Unknown;
   std::string m_driverName;
 
   VenueLookup m_venueLookup;

@@ -25,6 +25,8 @@ set(
   mileage.hpp
   navigator.cpp
   navigator.hpp
+  onboarding.cpp
+  onboarding.hpp
   plate_game.cpp
   plate_game.hpp
   quiet_bits.cpp

@@ -35,6 +35,10 @@ import UIKit
     }
   }
 
+  /// Posted on the main thread when a line starts playing; the object is the line. The first-launch
+  /// disclaimer follows it to know which paragraph is being read.
+  static let lineStarted = Notification.Name("BackseatLineStarted")
+
   /// A line just started playing (Kokoro or the system voice).
   @objc static func said(_ line: String) {
     let text = line.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -42,6 +46,7 @@ import UIKit
     DispatchQueue.main.async {
       lastLine = text
       view?.show(text)
+      NotificationCenter.default.post(name: lineStarted, object: text)
     }
   }
 
