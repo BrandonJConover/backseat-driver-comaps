@@ -2,8 +2,8 @@ import UIKit
 
 /// The pop quiz on screen (Brandon, 2026-10-31): the question and its three choices while the GPS
 /// asks it, then the right answer in green (and a wrong pick in orange) for a few seconds. On a
-/// drive it's read-only: the driver has to say the answer out loud ("We can't wreck because of your
-/// incompetence at driving"). On a walk the choices take taps too.
+/// drive it's read-only: the driver has to say the answer out loud ("We can't wreck because you
+/// tried to touch your phone screen"). On a walk the choices take taps too.
 /// Reads +[MWMBackseatRewriter popQuiz] twice a second while navigating.
 @objc final class BackseatQuiz: NSObject {
   private static var view: BackseatQuizCardView?

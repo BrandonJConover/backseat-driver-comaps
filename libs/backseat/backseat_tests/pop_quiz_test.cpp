@@ -183,7 +183,7 @@ TEST(PopQuizLinesAreFilled)
   // Brandon's words for a right answer.
   for (auto const & l : LinesFor("quiz.right", 0))
     CHECK(PqHas(l, "brown") || PqHas(l, "teacher's pet") || PqHas(l, "Teacher's pet") || PqHas(l, "sucking up"));
-  CHECK(PqHas(LinesFor("quiz.aloud", 0)[0], "incompetence at driving"));
+  CHECK(PqHas(LinesFor("quiz.aloud", 0)[0], "tried to touch your phone screen"));
   CHECK(FindBadge("teacherspet") != nullptr);
 }
 

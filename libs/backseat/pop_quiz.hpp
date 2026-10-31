@@ -1,7 +1,8 @@
 // Pop quizzes (Brandon, 2026-10-31). Now and then on a quiet stretch the GPS springs a multiple
 // choice question: driver's ed and road rules (it's a driving app, judging your driving) or
 // general trivia. The question and its three choices show on screen, but on a drive the answer has
-// to be said out loud: "We can't wreck because of your incompetence at driving." A right answer
+// to be said out loud: "We can't wreck because you tried to
+// touch your phone screen." A right answer
 // earns a brownie point and gets the driver called a brown noser or a teacher's pet; a wrong one
 // gets mocked. All offline: the questions are hardcoded here.
 #pragma once
