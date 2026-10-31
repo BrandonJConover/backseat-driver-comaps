@@ -98,6 +98,8 @@ final class BackseatOnboardingModel: ObservableObject {
   /// Who reads the rest of the disclaimer after the fourth press (nil: the driver's voice).
   private var disclaimerVoice: String?
   private var voicesHeard = Set<String>()
+  /// The complaint is in the voice that's leaving; the next one takes over after it.
+  private var voiceChangeDue = false
   private var startedReadingAt: Date?
   private var poll: Timer?
   private var observer: NSObjectProtocol?
@@ -239,6 +241,10 @@ final class BackseatOnboardingModel: ObservableObject {
                                          "line": String(pending.prefix(40))])
         complaint = nil
         bubble = ""
+        if voiceChangeDue {
+          voiceChangeDue = false
+          changeDisclaimerVoice()
+        }
         read(from: resumeAt)
       }
       return
@@ -257,15 +263,20 @@ final class BackseatOnboardingModel: ObservableObject {
 
   /// The Skip button: it doesn't skip. "Stop that, I'm monologuing right now! Be patient," then
   /// back to the sentence it was on.
-  /// The fourth press brings in the other gender, and every press after that someone new, until
-  /// they've all had a turn.
+  /// Someone new takes over: the other gender where possible, nobody twice until they've all had
+  /// a turn, and never the driver's own voice.
   private func changeDisclaimerVoice() {
-    let pick = skips == 4 ? KokoroVoice.otherVoice(voiceID) : nil
-    let everyone = KokoroVoice.voiceOptions.map(\.id).filter { $0 != voiceID && $0 != disclaimerVoice }
-    let fresh = everyone.filter { !voicesHeard.contains($0) }
-    if fresh.isEmpty { voicesHeard.removeAll() }
-    disclaimerVoice = pick ?? fresh.randomElement() ?? everyone.randomElement() ?? disclaimerVoice
-    if let disclaimerVoice { voicesHeard.insert(disclaimerVoice) }
+    let current = disclaimerVoice ?? voiceID
+    let others = KokoroVoice.voiceOptions.map(\.id).filter { $0 != voiceID && $0 != current }
+    var fresh = others.filter { !voicesHeard.contains($0) }
+    if fresh.isEmpty {
+      voicesHeard.removeAll()
+      fresh = others
+    }
+    let otherGender = fresh.filter { $0.dropFirst().first != current.dropFirst().first }
+    guard let next = otherGender.randomElement() ?? fresh.randomElement() else { return }
+    disclaimerVoice = next
+    voicesHeard.insert(next)
   }
 
   /// For the scoreboard.
@@ -285,7 +296,7 @@ final class BackseatOnboardingModel: ObservableObject {
     // so queued now it would play straight away, before the complaint is even rendered.
     if enabled {
       skips += 1
-      if skips >= 4 { changeDisclaimerVoice() }
+      voiceChangeDue = skips >= 4
     }
     let key = !enabled ? "onboard.skip.disabled" : skips == 1 ? "onboard.monologuing.first" : "onboard.monologuing"
     let line = MWMBackseatRewriter.line(key, vars: [:]).trimmingCharacters(in: .whitespacesAndNewlines)
