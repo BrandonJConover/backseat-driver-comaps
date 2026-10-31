@@ -173,7 +173,7 @@ TEST(NavigatorRewordsRoastsButNotDirections)
   CHECK(!opening.empty());
   CHECK(model->asked.empty());  // greeting, rundown and directions are never reworded
   f.tMs = 6000;
-  f.speedMps = FromDisplay(51, Units::Mph);
+  f.speedMps = FromDisplay(53, Units::Mph);
   nav.OnFix(f, r);
   CHECK_EQUAL(model->asked.size(), size_t{1});
   CHECK_EQUAL(model->asked[0].category, std::string("speeding"));

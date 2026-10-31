@@ -64,9 +64,11 @@ double constexpr kCurveAheadEveryMs = 8 * 60000;
 double constexpr kCurveGasLateralMps2 = 2;
 double constexpr kCurveGasAccelMps2 = 0.7;
 double constexpr kCurveGasEveryMs = 5 * 60000;
-/// Regular bridges are everywhere in a city (every overpass); water is always worth a scream.
+/// Regular bridges are everywhere in a city (every overpass); water is worth a scream, but not six in
+/// eleven minutes.
 double constexpr kLandBridgeYelpEveryMs = 600000;
-double constexpr kWaterBridgeYelpEveryMs = 60000;
+double constexpr kWaterBridgeYelpEveryMs = 15 * 60000;
+int constexpr kWaterBridgeYelpsPerTrip = 2;
 /// Off the route this long before it's worth a joke: GPS jitter comes back within seconds.
 double constexpr kRerouteRoastAfterMs = 5000;
 /// The driver asked for a new route, so of course it changed.
@@ -181,8 +183,13 @@ double constexpr kLinePauseMs = 350;
 double constexpr kFirstTurnFirstWithinM = 350;
 /// "Still speeding" nags back off to one every 5 minutes on a long stretch over the limit.
 double constexpr kSpeedingRenagMaxMs = 300000;
+int constexpr kSpeedingTolerance = 2;
+int constexpr kSpeedingToleranceFast = 3;
+double constexpr kSpeedingBarelyEveryMs = 5 * 60000;
 /// A remark held back for a turn is dropped after this long...
 double constexpr kTurnHeldMaxMs = 45000;
+/// "56 in a 45" is too good to lose to a turn, and still true half a minute later.
+double constexpr kWaySpeedingHeldMs = 30000;
 /// ...or after this long, or once the turn is done, if it was about that moment ("Nice turn").
 double constexpr kTurnHeldStaleMs = 15000;
 double constexpr kNavDoneBeforeTurnM = 40;
@@ -781,6 +788,14 @@ bool HoldsForTurns(Category c)
 }
 
 /// Remarks about a moment that's gone once the car has made another turn ("Nice turn", "Slow down").
+/// How bad a speeding line's offense is, for choosing which one waits out a turn.
+int SpeedingSeverity(std::string const & key)
+{
+  static char const * const kWorse[] = {"speeding.barely", "speeding.still", "speeding.clearly", "speeding.way"};
+  auto const at = std::find_if(std::begin(kWorse), std::end(kWorse), [&key](char const * k) { return key == k; });
+  return at == std::end(kWorse) ? 0 : static_cast<int>(at - std::begin(kWorse)) + 1;
+}
+
 bool GoesStaleAfterATurn(Category c)
 {
   switch (c)
@@ -812,8 +827,11 @@ std::vector<Commentary> Navigator::KeepTurnsClear(std::vector<Commentary> lines)
   std::vector<TurnHeld> still;
   for (auto & h : m_turnHeld)
   {
-    bool const stale = m_lastT - h.heldAt > kTurnHeldMaxMs ||
-                       (GoesStaleAfterATurn(h.line.category) && (turnsDone > h.turnsDone || m_lastT - h.heldAt > kTurnHeldStaleMs));
+    bool const way = h.line.key == "speeding.way";
+    bool const stale = way ? m_lastT - h.heldAt > kWaySpeedingHeldMs
+                           : m_lastT - h.heldAt > kTurnHeldMaxMs ||
+                                 (GoesStaleAfterATurn(h.line.category) &&
+                                  (turnsDone > h.turnsDone || m_lastT - h.heldAt > kTurnHeldStaleMs));
     if (stale)
     {
       Trace("say.dropped", {{"why", "turn"}, {"text", h.line.text}});
@@ -835,7 +853,13 @@ std::vector<Commentary> Navigator::KeepTurnsClear(std::vector<Commentary> lines)
     if (holdable && (!m_turnHeld.empty() || m_engine->TurnNeedsQuiet(m_lastT, SpeakingMs(l.text, l.voiceSpeed))))
     {
       Trace("say.held", {{"why", "turn"}, {"text", l.text}});
-      m_turnHeld.push_back({std::move(l), m_lastT, turnsDone});
+      // One speeding line waits at a time, and it's the worst one.
+      auto const waiting = l.category != Category::Speeding ? m_turnHeld.end() :
+          std::find_if(m_turnHeld.begin(), m_turnHeld.end(), [](TurnHeld const & h) { return h.line.category == Category::Speeding; });
+      if (waiting == m_turnHeld.end())
+        m_turnHeld.push_back({std::move(l), m_lastT, turnsDone});
+      else if (SpeedingSeverity(l.key) >= SpeedingSeverity(waiting->line.key))
+        *waiting = {std::move(l), m_lastT, turnsDone};
     }
     else
       out.push_back(std::move(l));
@@ -1036,6 +1060,14 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   config.speechAware = true;
   if (config.speedingRenagMaxMs == 0)
     config.speedingRenagMaxMs = kSpeedingRenagMaxMs;
+  // 1 over is GPS noise, and "70, not 71" isn't funny four times a drive.
+  if (config.speedingTolerance == 0)
+  {
+    config.speedingTolerance = kSpeedingTolerance;
+    config.speedingToleranceFast = kSpeedingToleranceFast;
+  }
+  if (config.speedingBarelyEveryMs == 0)
+    config.speedingBarelyEveryMs = kSpeedingBarelyEveryMs;
   m_engine = std::make_unique<CritiqueEngine>(config, t);
   m_engine->SetTalkingUntil(m_talkingUntil);
   m_plan = {};
@@ -1549,6 +1581,9 @@ void Navigator::SayVenue(double t, RouteSnapshot const & route)
 void Navigator::ResetTrip()
 {
   m_rerouteRoastDueAt.reset();
+  m_waterYelps = 0;
+  m_lastWaterYelpT = -1e18;
+  m_tagsSaid.clear();
   m_turnHeld.clear();
   m_predictionText.clear();
   m_turnId.reset();
@@ -1871,7 +1906,7 @@ void Navigator::SayLine(double tMs, Category category, std::string const & key, 
   Commentary c;
   c.t = tMs;
   c.category = category;
-  c.text = Fill(m_said.Pick(key, options, r), vars);
+  c.text = DropRepeatedTags(Fill(m_said.Pick(key, options, r), vars), m_tagsSaid);
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = priority;
   c.voiceSpeed = 1 + c.frustration / 1000.0;
@@ -1987,10 +2022,13 @@ void Navigator::TrackFear(Fix const & fix, RouteSnapshot const & route)
     else if (!m_onBridge)
     {
       m_onBridge = true;
-      double const every = bridge == Bridge::Water ? kWaterBridgeYelpEveryMs : kLandBridgeYelpEveryMs;
-      if (fix.tMs - m_lastBridgeYelpT >= every)
+      bool const water = bridge == Bridge::Water;
+      double & last = water ? m_lastWaterYelpT : m_lastBridgeYelpT;
+      if (fix.tMs - last >= (water ? kWaterBridgeYelpEveryMs : kLandBridgeYelpEveryMs) &&
+          (!water || m_waterYelps < kWaterBridgeYelpsPerTrip))
       {
-        m_lastBridgeYelpT = fix.tMs;
+        last = fix.tMs;
+        m_waterYelps += water ? 1 : 0;
         SayLine(fix.tMs, Category::Fear, BridgeLinesKey(bridge), weight);
       }
     }

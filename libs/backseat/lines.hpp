@@ -5,6 +5,7 @@
 
 #include <cstdlib>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -23,6 +24,10 @@ std::string Fill(std::string const & tmpl, Vars const & vars);
 /// voice reads a capitalized word as letters ("W-H-O"), so shouted words go back to normal case
 /// (the exclamation marks carry the shouting). Real abbreviations (GPS, ETA, NASCAR) stay.
 std::string SpeakableText(std::string const & text);
+
+/// The running gags that wear out fastest ("There is valuable cargo aboard this car."): the first time
+/// in `said` they stay and get remembered, after that they come out of `text`.
+std::string DropRepeatedTags(std::string text, std::set<std::string> & said);
 
 /// What the GPS said lately, per key, kept across trips so it keeps the driver guessing: a line
 /// doesn't come back until the others for its key have had a turn.

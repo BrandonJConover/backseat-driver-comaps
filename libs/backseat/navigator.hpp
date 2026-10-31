@@ -548,6 +548,9 @@ private:
   double m_lastExitLineT = -1e18;
   bool m_onBridge = false;
   double m_lastBridgeYelpT = -1e18;
+  double m_lastWaterYelpT = -1e18;
+  int m_waterYelps = 0;
+  std::set<std::string> m_tagsSaid;
   double m_lastCurveYelpT = -1e18;
   int m_hardCurveSamples = 0;
   double m_lastCurveAheadT = -1e18;

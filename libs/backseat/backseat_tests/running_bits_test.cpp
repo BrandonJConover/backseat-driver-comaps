@@ -189,6 +189,9 @@ TEST(RunningBitsSoakCommuteJokesDontPileUp)
   {
     EngineConfig c;
     c.rng = SeededRng(100 + i);
+    // The simulated driver stays within the usual allowance; this is about the stories.
+    c.speedingTolerance = 1;
+    c.speedingBarelyEveryMs = 1;
     Navigator nav(c, history, [&](TripRecord const & r, TripReport const &) { history.push_back(r); });
     nav.SetSaidLog(said, [&](SaidLog const & s) { said = s; });
     auto const r = SimulateTrip(nav, {TripShape::Town, 7}, t0);

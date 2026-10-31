@@ -56,6 +56,28 @@ std::string SpeakableText(std::string const & text)
   return out;
 }
 
+std::string DropRepeatedTags(std::string text, std::set<std::string> & said)
+{
+  for (std::string const tag : {"There is valuable cargo aboard this car.", "Phones don't like being wet."})
+  {
+    auto const at = text.find(tag);
+    if (at == std::string::npos)
+      continue;
+    if (said.insert(tag).second)
+      continue;
+    auto end = at + tag.size();
+    while (end < text.size() && text[end] == ' ')
+      ++end;
+    text.erase(at, end - at);
+    while (!text.empty() && text.back() == ' ')
+      text.pop_back();
+    // What followed the wet phones was about phones.
+    if (auto const they = text.find("They also don't like"); they == at)
+      text.replace(they, 20, "Phones don't like");
+  }
+  return text;
+}
+
 std::string Fill(std::string const & tmpl, Vars const & vars)
 {
   std::string out;

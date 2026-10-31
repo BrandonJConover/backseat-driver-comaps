@@ -37,6 +37,10 @@ struct EngineConfig
   Units units = Units::Mph;
   /// Display units over the limit before it counts as speeding. 0 means 51 in a 50 is a crime.
   int speedingTolerance = 0;
+  /// The same, where the limit is 55 mph or more. Below 0: speedingTolerance. Not in the TS engine.
+  int speedingToleranceFast = -1;
+  /// "Barely" lines at most this often. 0: no limit (the TS engine's behavior).
+  double speedingBarelyEveryMs = 0;
   /// Deceleration (m/s²) that counts as a hard brake. ~0.35 g.
   double hardBrakeMps2 = 3.5;
   /// Acceleration (m/s²) that counts as a jackrabbit start.
@@ -224,6 +228,7 @@ private:
   std::optional<double> m_speedingSince;
   std::optional<SpeedBand> m_speedingBand;
   double m_lastSpeedingLineAt;
+  double m_lastBarelyLineAt = -1e18;
   /// "Still speeding" nags since the driver was last under the limit for a while.
   int m_speedingRenags = 0;
   std::optional<double> m_underLimitSince;

@@ -897,7 +897,11 @@ void CritiqueEngine::CheckSpeeding(TelemetrySample const & s, TelemetrySample co
   int const over = s.speedLimitMps ? static_cast<int>(JsRound(ToDisplay(s.speedMps, units))) -
                                          static_cast<int>(JsRound(ToDisplay(*s.speedLimitMps, units)))
                                    : 0;
-  if (!s.speedLimitMps || over <= m_config.speedingTolerance)
+  double constexpr kFastLimitMps = 24.5;  // 55 mph
+  int const tolerance = s.speedLimitMps && *s.speedLimitMps >= kFastLimitMps && m_config.speedingToleranceFast >= 0
+                            ? m_config.speedingToleranceFast
+                            : m_config.speedingTolerance;
+  if (!s.speedLimitMps || over <= tolerance)
   {
     m_speedingSince.reset();
     if (!m_underLimitSince)
@@ -934,11 +938,19 @@ void CritiqueEngine::CheckSpeeding(TelemetrySample const & s, TelemetrySample co
     m_speedingSince = s.t;
   if (escalated)
   {
-    // New offense or it got worse: say something now (if the speaker is free).
-    if (Roast(out, s.t, Category::Speeding, kBandKeys[static_cast<int>(band)], vars))
+    // Barely over, again, so soon: it's noted, not said.
+    if (band == SpeedBand::Barely && s.t - m_lastBarelyLineAt < m_config.speedingBarelyEveryMs)
     {
       m_speedingBand = band;
       m_lastSpeedingLineAt = s.t;
+    }
+    // New offense or it got worse: say something now (if the speaker is free).
+    else if (Roast(out, s.t, Category::Speeding, kBandKeys[static_cast<int>(band)], vars))
+    {
+      m_speedingBand = band;
+      m_lastSpeedingLineAt = s.t;
+      if (band == SpeedBand::Barely)
+        m_lastBarelyLineAt = s.t;
     }
   }
   else

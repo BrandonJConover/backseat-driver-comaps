@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <set>
 
 using namespace backseat;
 
@@ -127,9 +128,9 @@ TEST(NavigatorRoastsSpeedingFromTheFix)
   nav.OnFix(At(0, FromDisplay(50, Units::Mph), FromDisplay(50, Units::Mph)), OnRoute(1, TurnKind::Left, 900));
   nav.TakeLines();
   // A few seconds after the direction: right on top of it, the roast waits its turn.
-  nav.OnFix(At(1000, FromDisplay(51, Units::Mph), FromDisplay(50, Units::Mph)), OnRoute(1, TurnKind::Left, 880));
+  nav.OnFix(At(1000, FromDisplay(53, Units::Mph), FromDisplay(50, Units::Mph)), OnRoute(1, TurnKind::Left, 880));
   CHECK(!Has(nav.TakeLines(), Category::Speeding));
-  nav.OnFix(At(6000, FromDisplay(51, Units::Mph), FromDisplay(50, Units::Mph)), OnRoute(1, TurnKind::Left, 800));
+  nav.OnFix(At(6000, FromDisplay(53, Units::Mph), FromDisplay(50, Units::Mph)), OnRoute(1, TurnKind::Left, 800));
   CHECK(Has(nav.TakeLines(), Category::Speeding));
 }
 
@@ -1734,4 +1735,84 @@ TEST(NoRerouteJokeForJitterOrAChosenRoute)
     CHECK(!Has(nav.TakeLines(), Category::Rerouted));
     CHECK_EQUAL(nav.Engine()->Stats().reroutes, 1);
   }
+}
+
+TEST(RunningGagsOncePerTrip)
+{
+  std::set<std::string> said;
+  std::string const cargo = "Bridge! There is valuable cargo aboard this car.";
+  CHECK_EQUAL(DropRepeatedTags(cargo, said), cargo);
+  CHECK_EQUAL(DropRepeatedTags(cargo, said), std::string("Bridge!"));
+  std::string const wet = "Water. Under us. Phones don't like being wet. They also don't like 2 tons of force.";
+  CHECK_EQUAL(DropRepeatedTags(wet, said), wet);
+  CHECK_EQUAL(DropRepeatedTags(wet, said), std::string("Water. Under us. Phones don't like 2 tons of force."));
+  CHECK_EQUAL(DropRepeatedTags("No tags here.", said), std::string("No tags here."));
+}
+
+TEST(WaterBridgesAreRationed)
+{
+  Navigator nav(Config());
+  bool bridge = false;
+  nav.SetBridgeLookup([&](LatLon const &, double) { return bridge ? Bridge::Water : Bridge::None; });
+  int yelps = 0;
+  double t = 0;
+  auto cross = [&](double at)
+  {
+    t = at;
+    Fix f = At(t, 20);
+    f.bearingDeg = 90;
+    bridge = false;
+    nav.OnFix(f, Far());
+    f.tMs = t + 3000;
+    bridge = true;
+    nav.OnFix(f, Far());
+    for (auto const & l : LinesOf(nav.TakeLines(), Category::Fear))
+      yelps += SaidLineOf(l.text, "fear.bridgeWater") ? 1 : 0;
+  };
+  cross(0);
+  cross(5 * 60000);
+  CHECK_EQUAL(yelps, 1);
+  cross(16 * 60000);
+  CHECK_EQUAL(yelps, 2);
+  cross(32 * 60000);
+  CHECK_EQUAL(yelps, 2);
+}
+
+TEST(SpeedingAllowsForTheGps)
+{
+  double const limit35 = FromDisplay(35, Units::Mph), limit70 = FromDisplay(70, Units::Mph);
+  auto const speedingLines = [&](double limit, int over)
+  {
+    Navigator nav(Config());
+    nav.OnFix(At(0, 0), Far());
+    int count = 0;
+    double const speed = limit + FromDisplay(over, Units::Mph);
+    for (int i = 1; i < 20; ++i)
+    {
+      nav.OnFix(At(i * 5000, speed, limit), Far());
+      count += static_cast<int>(LinesOf(nav.TakeLines(), Category::Speeding).size());
+    }
+    return count;
+  };
+  CHECK_EQUAL(speedingLines(limit35, 2), 0);
+  CHECK(speedingLines(limit35, 3) > 0);
+  CHECK_EQUAL(speedingLines(limit70, 3), 0);
+  CHECK(speedingLines(limit70, 4) > 0);
+}
+
+TEST(BarelySpeedingOnceInAWhile)
+{
+  double const limit = FromDisplay(35, Units::Mph);
+  Navigator nav(Config());
+  nav.OnFix(At(0, 0), Far());
+  int barely = 0;
+  // Over for a minute, under for a minute, three times in five minutes.
+  for (int i = 1; i < 60; ++i)
+  {
+    bool const over = (i / 12) % 2 == 0;
+    nav.OnFix(At(i * 5000, over ? limit + FromDisplay(3, Units::Mph) : limit, limit), Far());
+    for (auto const & l : LinesOf(nav.TakeLines(), Category::Speeding))
+      barely += l.key == "speeding.barely" ? 1 : 0;
+  }
+  CHECK_EQUAL(barely, 1);
 }
