@@ -161,6 +161,13 @@ void Perform(backseat::AppCommand const & command)
     }
     break;
   }
+  case AppAction::SetTravelMode:
+    [MWMRouter setType:command.argument == "walk"   ? MWMRouterTypePedestrian
+                        : command.argument == "bike" ? MWMRouterTypeBicycle
+                                                     : MWMRouterTypeVehicle];
+    if ([MWMRouter isRoutingActive])
+      [MWMRouter rebuildWithBestRouter:NO];
+    break;
   case AppAction::DifferentRoute:
     // The router gives one best route, so another way means another kind of road.
     SetRoutingOption(^(MWMRoutingOptions * o) { o.avoidMotorway = !o.avoidMotorway; });

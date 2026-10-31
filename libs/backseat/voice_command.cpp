@@ -146,6 +146,7 @@ std::vector<AppTool> const & AppTools()
       {AppAction::BlameGps, "blame_gps", "The driver says the GPS was wrong or at fault.", nullptr},
       {AppAction::WhatDoYouKnow, "what_do_you_know", "Read out what's saved about the driver.", nullptr},
       {AppAction::ForgetThat, "forget_that", "Delete something saved about the driver.", "What to forget; empty for the last thing read out."},
+      {AppAction::SetTravelMode, "set_travel_mode", "Change how the trip is being made: walking, biking or driving.", "walk, bike or drive."},
   };
   return tools;
 }
@@ -337,6 +338,15 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   for (char const * cue : {" forget my ", " forget what i said about ", " delete my "})
     if (auto const at = words.find(cue); anOrder(at) && !heardAction(AppAction::ForgetThat))
       found.push_back({at, AppCommand{AppAction::ForgetThat, ParseTarget(words.substr(at + std::string(cue).size()))}});
+  for (auto const & mode : {std::pair<char const *, char const *>{" walking directions ", "walk"}, {" i'm walking ", "walk"},
+                            {" im walking ", "walk"}, {" on foot ", "walk"}, {" switch to walking ", "walk"},
+                            {" going for a hike ", "walk"}, {" i'm hiking ", "walk"}, {" im hiking ", "walk"},
+                            {" biking directions ", "bike"}, {" bike directions ", "bike"}, {" i'm biking ", "bike"},
+                            {" im biking ", "bike"}, {" switch to biking ", "bike"}, {" on my bike ", "bike"},
+                            {" driving directions ", "drive"}, {" i'm driving ", "drive"}, {" im driving ", "drive"},
+                            {" switch to driving ", "drive"}})
+    if (auto const at = words.find(mode.first); at != std::string::npos && !heardAction(AppAction::SetTravelMode))
+      found.push_back({at, AppCommand{AppAction::SetTravelMode, mode.second}});
   auto const stop = StopSearch(words);
   if (!stop.second.empty())
     found.push_back({stop.first, AppCommand{AppAction::FindAlongRoute, stop.second}});
@@ -563,6 +573,8 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::BlameGps: return saidAny({"fault", "wrong", "blame", "messed"}) || saidAny({"on"}) && saidAny({"you"});
   case AppAction::WhatDoYouKnow: return saidAny({"know", "remember", "file", "saved"});
   case AppAction::ForgetThat: return saidAny({"forget", "delete"});
+  case AppAction::SetTravelMode:
+    return saidAny({"walk", "walking", "foot", "hike", "hiking", "bike", "biking", "cycling", "drive", "driving"});
   case AppAction::Count: break;
   }
   return false;

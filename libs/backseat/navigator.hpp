@@ -7,6 +7,7 @@
 
 #include "backseat/achievements.hpp"
 #include "backseat/engine.hpp"
+#include "backseat/lines.hpp"
 #include "backseat/history.hpp"
 #include "backseat/indoors.hpp"
 #include "backseat/plate_game.hpp"
@@ -297,6 +298,9 @@ public:
   void QueueOpener(double tMs, std::string key, Vars vars = {});
   /// The driver just gave a command, so a route change in the next little while is theirs.
   void NoteVoiceCommand() { m_lastVoiceCommandT = m_lastT; }
+  /// How this trip is being made. Lines and checks follow it; no speeding on foot.
+  void SetTravelMode(TravelMode mode);
+  TravelMode GetTravelMode() const { return m_travelMode; }
   /// The plain direction for the current maneuver, with no jokes on it. Empty with no route.
   std::string const & LastInstructionText() const { return m_lastInstructionText; }
   static double constexpr kOpenerValidMs = 600000;
@@ -435,6 +439,7 @@ private:
 
   double m_lastT = 0;
   double m_lastVoiceCommandT = -1e12;
+  TravelMode m_travelMode = TravelMode::Drive;
   std::string m_lastInstructionText;
   std::optional<double> m_rerouteRoastDueAt;
   /// About when the phone is done saying everything handed to it so far.

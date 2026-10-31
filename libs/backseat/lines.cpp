@@ -5,16 +5,80 @@
 #include "backseat/lines_data.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <map>
+#include <mutex>
 #include <sstream>
 
 namespace backseat
 {
+namespace
+{
+std::atomic<TravelMode> g_travelMode{TravelMode::Drive};
+}  // namespace
+
+void SetLineTravelMode(TravelMode mode)
+{
+  g_travelMode = mode;
+}
+
+bool LineFitsMode(std::string const & text, TravelMode mode)
+{
+  if (mode == TravelMode::Drive)
+    return true;
+  // No line about these works without a car, on foot or on a bike.
+  static char const * const kCar[] = {
+      "drive", "drives", "driver", "drivers", "driver's", "driving", "drove", "driven", "car", "cars", "car's", "gas",
+      "steering", "highway", "highways", "freeway", "freeways", "horn", "honk", "engine", "tank", "passenger", "toll",
+      "tolls", "blinker", "windshield", "cupholder", "seatbelt", "trunk", "dashboard", "mirror", "mirrors", "{weight}",
+      "speedometer", "parallel", "motorway", "backseat", "pedestrian", "cyclist"};
+  // And these only work on foot.
+  static char const * const kWheels[] = {"brake", "brakes", "braking", "pedal", "pedals", "wheel", "wheels", "lane", "lanes",
+                                         "tire", "tires", "park", "parked", "parking", "traffic", "merge", "merging",
+                                         "accelerate", "accelerating", "mph", "reverse", "bike", "bicycle", "ride"};
+  std::string lower = " ";
+  for (unsigned char const ch : text)
+  {
+    bool const inWord = std::isalnum(ch) || ch == '\'' || ch == '{' || ch == '}';
+    lower += inWord ? static_cast<char>(std::tolower(ch)) : ' ';
+  }
+  lower += ' ';
+  auto const has = [&lower](char const * word) { return lower.find(" " + std::string(word) + " ") != std::string::npos; };
+  for (char const * phrase : {" speed limit ", " turn signal ", " turn signals ", " road trip ", " seat belt ", " pull over "})
+    if (lower.find(phrase) != std::string::npos)
+      return false;
+  if (std::any_of(std::begin(kCar), std::end(kCar), has))
+    return false;
+  return mode != TravelMode::Walk || std::none_of(std::begin(kWheels), std::end(kWheels), has);
+}
+
 std::vector<std::string> const & LinesFor(std::string const & key, int tier)
 {
-  return LineData().at(key).at(static_cast<size_t>(tier));
+  auto const & raw = LineData().at(key).at(static_cast<size_t>(tier));
+  TravelMode const mode = g_travelMode;
+  // Story beats are read by position, and mode lines are written for their mode.
+  if (mode == TravelMode::Drive || key.rfind("mode.", 0) == 0 || key.rfind("speeding.story", 0) == 0)
+    return raw;
+  static std::mutex mutex;
+  static std::map<std::string, std::vector<std::string>> cache;
+  std::string const suffix = mode == TravelMode::Walk ? ".walk" : ".bike";
+  std::lock_guard lock(mutex);
+  auto const [it, added] = cache.try_emplace(key + suffix + std::to_string(tier));
+  if (!added)
+    return it->second;
+  auto & fitting = it->second;
+  auto const own = LineData().find(key + suffix);
+  if (own != LineData().end())
+    fitting = own->second.at(static_cast<size_t>(tier));
+  for (auto const & line : raw)
+    if (LineFitsMode(line, mode))
+      fitting.push_back(line);
+  if (fitting.empty())
+    fitting = LineData().at("mode.generic").at(static_cast<size_t>(tier));
+  return fitting;
 }
 
 std::string SpeakableText(std::string const & text)

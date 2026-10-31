@@ -2,6 +2,8 @@
 
 #include "backseat/navigator.hpp"
 #include "backseat/lines.hpp"
+#include "backseat/lines_data.hpp"
+#include "sim_drive.hpp"
 #include "backseat/units.hpp"
 
 #include <algorithm>
@@ -1815,4 +1817,51 @@ TEST(BarelySpeedingOnceInAWhile)
       barely += l.key == "speeding.barely" ? 1 : 0;
   }
   CHECK_EQUAL(barely, 1);
+}
+
+TEST(LinesFollowTheTravelMode)
+{
+  CHECK(LineFitsMode("Please remember the brake is the other pedal.", TravelMode::Drive));
+  CHECK(!LineFitsMode("Please remember the brake is the other pedal.", TravelMode::Walk));
+  CHECK(LineFitsMode("Please remember the brake is the other pedal.", TravelMode::Bike));
+  CHECK(!LineFitsMode("You drive like this?", TravelMode::Bike));
+  CHECK(LineFitsMode("Turn left. Try it.", TravelMode::Walk));
+
+  for (TravelMode const mode : {TravelMode::Walk, TravelMode::Bike})
+  {
+    SetLineTravelMode(mode);
+    for (auto const & [key, tiers] : LineData())
+    {
+      for (int tier = 0; tier < 3; ++tier)
+      {
+        auto const & lines = LinesFor(key, tier);
+        CHECK(!lines.empty());
+        if (key.rfind("mode.", 0) != 0 && key.rfind("speeding.story", 0) != 0)
+          for (auto const & line : lines)
+            CHECK(LineFitsMode(line, mode));
+      }
+    }
+  }
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(AWalkHasNoCarTalk)
+{
+  for (TravelMode const mode : {TravelMode::Walk, TravelMode::Bike})
+  {
+    EngineConfig c;
+    c.rng = [] { return 0.3; };
+    Navigator nav(c);
+    nav.SetTravelMode(mode);
+    auto const r = backseat_tests::SimulateTrip(nav, {backseat_tests::TripShape::Town, 7}, 1.7e12);
+    for (auto const & s : r.spoken)
+    {
+      // Winesap Drive is a street, not a suggestion.
+      if (s.line.text.find(" Drive") == std::string::npos)
+        CHECK(LineFitsMode(s.line.text, mode));
+      CHECK(s.line.category != Category::Speeding);
+      CHECK(s.line.category != Category::HardBraking);
+    }
+    SetLineTravelMode(TravelMode::Drive);
+  }
 }

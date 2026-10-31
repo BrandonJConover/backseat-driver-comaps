@@ -1144,7 +1144,7 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
   fix.speedMps = info.m_speed;
   fix.bearingDeg = info.m_bearing;
   fix.accuracyM = info.m_horizontalAccuracy > 0 ? info.m_horizontalAccuracy : -1;
-  if (route.state != backseat::RouteState::Inactive)
+  if (route.state != backseat::RouteState::Inactive && m_navigator.GetTravelMode() == backseat::TravelMode::Drive)
   {
     double const limit = session.GetCurrentSpeedLimit();
     if (limit > 0)
@@ -2180,6 +2180,13 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
   backseat::Trace("command", {{"tool", backseat::ToolFor(command.action).name},
                               {"arg", command.argument},
                               {"polite", polite ? "yes" : "no"}});
+  // Tolls, highways and gas don't come up on a walk.
+  if (m_navigator.GetTravelMode() != backseat::TravelMode::Drive &&
+      (command.action == AppAction::AvoidTolls || command.action == AppAction::AllowTolls ||
+       command.action == AppAction::AvoidHighways || command.action == AppAction::AllowHighways ||
+       command.action == AppAction::SpeedLimit || command.action == AppAction::DifferentRoute ||
+       (command.action == AppAction::FindAlongRoute && command.argument == "gas station")))
+    return m_navigator.Reply("mode.carOnly");
   switch (command.action)
   {
   case AppAction::NavigateTo:
@@ -2274,6 +2281,9 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     heard.query = command.argument;
     return m_navigator.Reply("cmd.findStop", {{"place", command.argument}});
   }
+  case AppAction::SetTravelMode:
+    heard.actions.push_back(command);
+    return m_navigator.Reply(command.argument == "walk" ? "mode.walk" : command.argument == "bike" ? "mode.bike" : "mode.drive");
   case AppAction::WhatDoYouKnow:
   {
     // Its own bookkeeping isn't something it knows about the driver.

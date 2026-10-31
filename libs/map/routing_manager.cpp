@@ -499,6 +499,12 @@ void RoutingManager::OnRoutePointPassed(RouteMarkType type, size_t intermediateI
 void RoutingManager::OnLocationUpdate(location::GpsInfo const & info)
 {
   m_extrapolator.OnLocationUpdate(info);
+  m_backseat.SetTravelMode(m_currentRouterType == routing::RouterType::Bicycle ? backseat::TravelMode::Bike
+                           : m_currentRouterType == routing::RouterType::Pedestrian ||
+                                   m_currentRouterType == routing::RouterType::Transit ||
+                                   m_currentRouterType == routing::RouterType::Ruler
+                               ? backseat::TravelMode::Walk
+                               : backseat::TravelMode::Drive);
   // Only real fixes go to Backseat Driver: extrapolated ones would fake hard braking.
   m_backseat.OnLocationUpdate(info, m_routingSession, GetBackseatDestinationName());
 }

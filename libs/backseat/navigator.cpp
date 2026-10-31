@@ -722,6 +722,25 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
   }
 }
 
+namespace
+{
+/// What a car's checks and games say: nothing for someone walking or biking.
+bool OnlyInACar(Category c)
+{
+  switch (c)
+  {
+  case Category::Speeding:
+  case Category::TooSlow:
+  case Category::Traffic:
+  case Category::HardBraking:
+  case Category::HardAccel:
+  case Category::PlateGame: return true;
+  default: return false;
+  }
+}
+
+}  // namespace
+
 std::vector<Commentary> Navigator::TakeLines()
 {
   if (m_said.Dirty())
@@ -737,6 +756,8 @@ std::vector<Commentary> Navigator::TakeLines()
     m_punchlines.erase(m_punchlines.begin());
   }
   auto lines = KeepTurnsClear(FilterForCall(m_gate.Take()));
+  if (m_travelMode != TravelMode::Drive)
+    lines.erase(std::remove_if(lines.begin(), lines.end(), [](Commentary const & l) { return OnlyInACar(l.category); }), lines.end());
   if (!lines.empty())
     m_lastSpokeT = m_lastT;
   // What the phone will be busy saying, so the next turn call and the roasts can plan around it.
@@ -1061,6 +1082,12 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   config.speechAware = true;
   if (config.speedingRenagMaxMs == 0)
     config.speedingRenagMaxMs = kSpeedingRenagMaxMs;
+  // A phone in a pocket jolts and jumps, and that's not hard braking.
+  if (m_travelMode != TravelMode::Drive)
+  {
+    config.hardBrakeMps2 = 1e9;
+    config.hardAccelMps2 = 1e9;
+  }
   // 1 over is GPS noise, and "70, not 71" isn't funny four times a drive.
   if (config.speedingTolerance == 0)
   {
@@ -1134,7 +1161,11 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
     m_turnKind = route.turn;
     SayInstruction(t, route);
   }
-  SayNav(t, TripGreeting(m_history, m_config.rng, tripsBefore));
+  std::string greeting = TripGreeting(m_history, m_config.rng, tripsBefore);
+  // The greetings are written for a car; a walk gets a hello of its own.
+  if (!LineFitsMode(greeting, m_travelMode))
+    greeting = Reply(m_travelMode == TravelMode::Walk ? "mode.walk" : "mode.bike");
+  SayNav(t, greeting);
   SayIndoorStart(t, route);
   // Before 5 am: "Are we off to make the donuts?"
   if (KnowsTheDate(t) && LocalTime(t).tm_hour < 5)
@@ -1158,12 +1189,19 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   if (m_sketched && tripsBefore > 0)
     SayLine(t, Category::Instruction, "sketch.start");
   else if (!turnFirst || tripsBefore == 0)
-    SayNav(t, RouteRundown(steps, m_history, m_config.rng, tripsBefore), tripsBefore == 0 ? kRattleSpeed : 1.0);
+  {
+    std::string const rundown = RouteRundown(steps, m_history, m_config.rng, tripsBefore);
+    if (LineFitsMode(rundown, m_travelMode))
+      SayNav(t, rundown, tripsBefore == 0 ? kRattleSpeed : 1.0);
+  }
   // The time prediction waits until the car is rolling, so the start isn't five lines in a row.
   if (m_plan.expectedMinutes > 0)
   {
     m_predictionText = PredictTrip(m_history, m_plan, m_config.rng, &m_said).text;
-    SayNavLater(t + kPredictionDelayMs, m_predictionText);
+    if (LineFitsMode(m_predictionText, m_travelMode))
+      SayNavLater(t + kPredictionDelayMs, m_predictionText);
+    else
+      m_predictionText.clear();
   }
   Say(m_engine->OnNav(NavEvent::DestinationSet(t, route.destination)));
   SayVenue(t, route);
@@ -1226,6 +1264,12 @@ void Navigator::TrackLeftBuilding(Fix const & fix)
     return;
   SayLine(fix.tMs, Category::LongStop, m_indoorOutKey);
   m_indoorOutKey.clear();
+}
+
+void Navigator::SetTravelMode(TravelMode mode)
+{
+  m_travelMode = mode;
+  SetLineTravelMode(mode);
 }
 
 void Navigator::QueueOpener(double tMs, std::string key, Vars vars)

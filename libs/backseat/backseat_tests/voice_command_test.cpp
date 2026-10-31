@@ -565,6 +565,15 @@ TEST(YourFileCanBeReadAndCleaned)
   CHECK(LinesFor("cmd.forgot", 0).size() >= 6);
 }
 
+TEST(TravelModeCanBeSaid)
+{
+  auto const walk = ParseAppCommands("give me walking directions");
+  CHECK(walk.size() == 1 && walk[0].action == AppAction::SetTravelMode && walk[0].argument == "walk");
+  CHECK(ParseAppCommands("I'm biking")[0].argument == "bike");
+  CHECK(ParseAppCommands("switch to driving")[0].argument == "drive");
+  CHECK(ParseAppCommands("I was walking the dog").empty());
+}
+
 TEST(DrivingChatterIsntACommand)
 {
   for (char const * chatter : {"I'm skipping lunch", "next time we should stop", "what a joke", "the speed limit here is silly",

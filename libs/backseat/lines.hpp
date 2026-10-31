@@ -13,7 +13,21 @@ namespace backseat
 {
 using Vars = std::map<std::string, std::string>;
 
-/// Templates for `key` at `tier` (0..2). Throws std::out_of_range for an unknown key.
+/// How the trip is being made. Decides which lines fit: nobody on foot has a brake pedal.
+enum class TravelMode
+{
+  Drive,
+  Walk,
+  Bike
+};
+
+/// The mode LinesFor() answers for. Driving until told otherwise.
+void SetLineTravelMode(TravelMode mode);
+/// Whether `text` makes sense for `mode`: no cars, gas or brake pedals for someone on foot.
+bool LineFitsMode(std::string const & text, TravelMode mode);
+
+/// Templates for `key` at `tier` (0..2), for the current travel mode: what fits it, plus `key`.walk or
+/// `key`.bike if there are any, or mode.generic when nothing fits. Throws std::out_of_range for an unknown key.
 std::vector<std::string> const & LinesFor(std::string const & key, int tier);
 
 /// Fills {placeholders} from vars. {NAME} in capitals inserts the value in capitals.

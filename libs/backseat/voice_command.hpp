@@ -77,6 +77,7 @@ enum class AppAction
   BlameGps,
   WhatDoYouKnow,
   ForgetThat,
+  SetTravelMode,
   Count
 };
 
@@ -100,6 +101,7 @@ struct AppCommand
 {
   AppAction action;
   /// NavigateTo: the place. ChangeVoice: the voice, or empty to just open the voice list.
+  /// SetTravelMode: "walk", "bike" or "drive".
   /// FindAlongRoute: what to find. ForgetThat: what to forget, or empty for the last thing read out.
   std::string argument;
 };
