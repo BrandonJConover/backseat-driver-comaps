@@ -91,7 +91,10 @@ final class BackseatOnboardingModel: ObservableObject {
   private var complaintAt = Date.distantPast
   private var resumeAt = 0
   private var lastSkip = Date.distantPast
-  private var skips = 0
+  /// Presses of Skip that counted. From the first one on, the button runs away.
+  @Published private(set) var skips = 0
+  /// Who reads the rest of the disclaimer after the fourth press (nil: the driver's voice).
+  private var disclaimerVoice: String?
   private var startedReadingAt: Date?
   private var poll: Timer?
   private var observer: NSObjectProtocol?
@@ -125,9 +128,23 @@ final class BackseatOnboardingModel: ObservableObject {
 
   private func say(_ line: String, in voice: String? = nil) {
     guard !line.isEmpty else { return }
-    // Every press of Skip hurries the disclaimer along. The later screens go back to the first pace.
-    let step = screen == .disclaimer ? skips : 0
-    KokoroVoice.shared.sayReplyBriskly(line, step: step, voiceID: voice) { MWMTextToSpeech.tts().play(line) }
+    // Skip changes how the disclaimer is read. The later screens go back to the first pace and voice.
+    let onDisclaimer = screen == .disclaimer
+    KokoroVoice.shared.sayReply(line, tempo: onDisclaimer ? Self.tempo(afterSkips: skips) : .brisk,
+                                voiceID: voice ?? (onDisclaimer ? disclaimerVoice : nil)) {
+      MWMTextToSpeech.tts().play(line)
+    }
+  }
+
+  /// Faster, faster, half speed, then normal speed from the fourth press on.
+  private static func tempo(afterSkips skips: Int) -> FirstLaunchTempo {
+    switch skips {
+    case 0: return .brisk
+    case 1: return .faster
+    case 2: return .fastest
+    case 3: return .half
+    default: return .normal
+    }
   }
 
   /// Says it and shows it in the bubble.
@@ -227,7 +244,7 @@ final class BackseatOnboardingModel: ObservableObject {
     let readToTheEnd = piece == pieces.count - 1 && queuedUpTo == pieces.count - 1 && !KokoroVoice.shared.anyVoiceSpeaking
     // However the voice is doing, the buttons come after about as long as reading it takes.
     let words = paragraphs.joined(separator: " ").split(separator: " ").count
-    let tooLong = startedReadingAt.map { Date().timeIntervalSince($0) > Double(words) / 2.2 + 45 } ?? false
+    let tooLong = startedReadingAt.map { Date().timeIntervalSince($0) > Double(words) / (skips >= 3 ? 1.1 : 2.2) + 45 } ?? false
     if readToTheEnd || tooLong {
       monologueOver = true
       reading = last
@@ -245,6 +262,7 @@ final class BackseatOnboardingModel: ObservableObject {
     // The sentence comes back only once the complaint is over (checkReading): it's already rendered,
     // so queued now it would play straight away, before the complaint is even rendered.
     skips += 1
+    if skips == 4 { disclaimerVoice = KokoroVoice.otherVoice(voiceID) }
     let key = skips == 1 ? "onboard.monologuing.first" : "onboard.monologuing"
     let line = MWMBackseatRewriter.line(key, vars: [:]).trimmingCharacters(in: .whitespacesAndNewlines)
     resumeAt = piece
@@ -402,12 +420,60 @@ final class BackseatOnboardingModel: ObservableObject {
   }
 }
 
+/// Where the Skip button is running to. It changes direction and speed on every move, and works
+/// out its position frame by frame: tapping needs the real spot, which an animated offset hides.
+/// Spots run from 0 to 1 across the area it moves in.
+final class SkipDodger {
+  private var from = CGPoint(x: 1, y: 1)
+  private var to = CGPoint(x: 1, y: 1)
+  private var start = Date.distantPast
+  private var duration: TimeInterval = 0
+  private var moves = 0
+  private var enabled = true
+  private var enabledUntil = Date.distantPast
+
+  /// It also takes turns being tappable, for no fixed length of time.
+  func isEnabled(at date: Date) -> Bool {
+    if date >= enabledUntil {
+      // The first turn starts out enabled: the press that set it moving shouldn't look ignored.
+      enabled = enabledUntil == .distantPast || !enabled
+      enabledUntil = date.addingTimeInterval(enabled ? .random(in: 0.6 ... 1.4) : .random(in: 0.5 ... 1.2))
+    }
+    return enabled
+  }
+
+  /// `jumping` (Reduce Motion): it sits still for a while, then appears somewhere else.
+  func spot(at date: Date, jumping: Bool) -> CGPoint {
+    if date.timeIntervalSince(start) >= duration { nextMove(at: date, jumping: jumping) }
+    if jumping { return from }
+    let t = CGFloat(date.timeIntervalSince(start) / duration)
+    return CGPoint(x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t)
+  }
+
+  private func nextMove(at date: Date, jumping: Bool) {
+    from = to
+    moves += 1
+    // Across, then up or down, then diagonally, always towards the other side.
+    let across = moves % 3 != 2
+    let upOrDown = moves % 3 != 1
+    to = CGPoint(x: across ? Self.otherSide(of: from.x) : from.x, y: upOrDown ? Self.otherSide(of: from.y) : from.y)
+    start = date
+    duration = jumping ? .random(in: 1.2 ... 2.2) : .random(in: 0.35 ... 1.8)
+  }
+
+  private static func otherSide(of value: CGFloat) -> CGFloat {
+    value < 0.5 ? .random(in: 0.6 ... 1) : .random(in: 0 ... 0.4)
+  }
+}
+
 struct BackseatOnboardingView: View {
   @ObservedObject var model: BackseatOnboardingModel
 
   private let accent = Color(BackseatTheme.accent)
   private let muted = Color(BackseatTheme.muted)
   private let card = Color(BackseatTheme.card)
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var dodger = SkipDodger()
 
   var body: some View {
     ZStack {
@@ -455,6 +521,17 @@ struct BackseatOnboardingView: View {
 
   // MARK: Screen 1
 
+  /// It's a Skip button. It doesn't skip.
+  private var skipButton: some View {
+    Button(action: model.skipPressed) {
+      Label("Skip", systemImage: "forward.fill")
+        .font(.headline)
+        .padding(.horizontal, 28)
+        .frame(minHeight: 46)
+        .background(Capsule().fill(Color(BackseatTheme.raised)))
+    }
+  }
+
   private var disclaimer: some View {
     VStack(spacing: 16) {
       title("Before you go anywhere", step: 1)
@@ -475,17 +552,25 @@ struct BackseatOnboardingView: View {
         }
         .onChange(of: model.reading) { i in withAnimation { proxy.scrollTo(i, anchor: .center) } }
       }
+      // It stays over the text, clear of the speech bubble and the answer buttons.
+      .overlay {
+        if model.skips > 0, !model.monologueOver {
+          GeometryReader { area in
+            TimelineView(.animation) { timeline in
+              let spot = dodger.spot(at: timeline.date, jumping: reduceMotion)
+              let inset = CGSize(width: min(70, area.size.width / 2), height: min(28, area.size.height / 2))
+              let enabled = dodger.isEnabled(at: timeline.date)
+              skipButton.disabled(!enabled).opacity(enabled ? 1 : 0.35).position(x: inset.width + spot.x * (area.size.width - 2 * inset.width),
+                                  y: inset.height + spot.y * (area.size.height - 2 * inset.height))
+            }
+          }
+        }
+      }
       speechBubble
       if !model.monologueOver {
-        // It's a Skip button. It doesn't skip.
-        Button(action: model.skipPressed) {
-          Label("Skip", systemImage: "forward.fill")
-            .font(.headline)
-            .padding(.horizontal, 28)
-            .frame(minHeight: 46)
-            .background(Capsule().fill(Color(BackseatTheme.raised)))
+        if model.skips == 0 {
+          skipButton.frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .frame(maxWidth: .infinity, alignment: .trailing)
       } else if !model.termsAnswered {
         HStack(spacing: 10) {
           choiceButton("Yes", primary: true) { model.answerTerms(0) }

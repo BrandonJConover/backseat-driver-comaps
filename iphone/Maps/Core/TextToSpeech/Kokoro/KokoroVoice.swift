@@ -559,11 +559,10 @@ final class KokoroVoice: NSObject {
     enqueue(text, nav: false, speed: 1, voice: voiceID, keep: true, fallback: fallback)
   }
 
-  /// Like sayReply(_:voiceID:fallback:), at a step of the first launch's pace: 1.2x the usual pace,
-  /// then 0.15x faster for each step, up to 1.8x.
-  func sayReplyBriskly(_ text: String, step: Int, voiceID: String?, fallback: @escaping () -> Void) {
-    let speed = Self.briskPaces[min(max(step, 0), Self.briskPaces.count - 1)]
-    enqueue(text, nav: false, speed: speed, voice: voiceID, keep: true, fallback: fallback)
+  /// Like sayReply(_:voiceID:fallback:), at one of the first launch's tempos: a multiple of the
+  /// usual pace.
+  func sayReply(_ text: String, tempo: FirstLaunchTempo, voiceID: String?, fallback: @escaping () -> Void) {
+    enqueue(text, nav: false, speed: Self.basePace * tempo.rawValue, voice: voiceID, keep: true, fallback: fallback)
   }
 
   /// Picks a voice without cutting off what's queued: the old voice finishes its goodbye.
@@ -786,13 +785,13 @@ final class KokoroVoice: NSObject {
   private static let paceCap: Float = 1.02
   /// Faster than this (the first trip's speed run) is on purpose and keeps its speed.
   private static let deliberatelyFast: Float = 1.3
-  /// The first launch's script, 1.2x to 1.8x the base pace. Past the cap on purpose: nobody's driving.
-  private static let briskPaces: [Float] = [1.2, 1.35, 1.5, 1.65, 1.8].map { basePace * $0 }
+  /// The first launch's script ignores the cap on purpose: nobody's driving.
+  private static let firstLaunchPaces = FirstLaunchTempo.allCases.map { basePace * $0.rawValue }
 
   private func render(_ text: String, speed: Float, voice: String, nav: Bool,
                       with engine: KokoroAneManager) async throws -> Data {
     let fast = speed >= Self.deliberatelyFast
-    var pace = fast || Self.briskPaces.contains(speed) ? speed : min(Self.basePace + (speed - 1) * 0.5, Self.paceCap)
+    var pace = fast || Self.firstLaunchPaces.contains(speed) ? speed : min(Self.basePace + (speed - 1) * 0.5, Self.paceCap)
     // Directions are never hurried: frustration speeds up the roasts, not the turn you need.
     if nav && !fast { pace = min(pace, Self.basePace) }
     var sampleRate = KokoroAneConstants.sampleRate
@@ -1353,6 +1352,15 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
       }
     }
   }
+}
+
+/// How fast the first launch talks, as a multiple of the usual pace.
+enum FirstLaunchTempo: Float, CaseIterable {
+  case half = 0.5
+  case normal = 1
+  case brisk = 1.2
+  case faster = 1.35
+  case fastest = 1.5
 }
 
 /// A Core ML crash can't be caught, so a marker file is written right before Kokoro loads its
