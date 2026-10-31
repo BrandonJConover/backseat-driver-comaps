@@ -341,7 +341,17 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
                                                        type:MWMRoutePointTypeFinish
                                           intermediateIndex:0];
   if (![MWMRouter isRoutingActive])
+  {
     [MWMRouter removePoints];
+    // The starting mode (walking, on a new install) applies here too, not only to tapped routes.
+    auto const saved = routing::GetLastUsedRouter();
+    if (saved != GetFramework().GetRoutingManager().GetRouter())
+      [MWMRouter setType:saved == routing::RouterType::Pedestrian ? MWMRouterTypePedestrian
+                         : saved == routing::RouterType::Bicycle  ? MWMRouterTypeBicycle
+                         : saved == routing::RouterType::Transit  ? MWMRouterTypePublicTransport
+                         : saved == routing::RouterType::Ruler    ? MWMRouterTypeRuler
+                                                                  : MWMRouterTypeVehicle];
+  }
   // Said or tapped from the "Where to?" card: drive there now, no preview.
   [MWMRouter startWhenReady];
   [MWMRouter buildToPoint:to bestRouter:NO];
@@ -441,6 +451,69 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   GetFramework().GetRoutingManager().SetBackseatVoices(std::move(voices));
   // This app can rebuild a route as a drive, so the GPS may ask "Are we actually walking there?".
   GetFramework().GetRoutingManager().GetBackseat().SetCanSwitchTravelMode(true);
+}
+
+static BOOL gDrivingHighlighted = NO;
+static __weak UIAlertController * gWalkQuestion = nil;
+NSString * const kBackseatDrivingHighlightChanged = @"BackseatDrivingHighlightChanged";
+
++ (BOOL)drivingHighlighted
+{
+  return gDrivingHighlighted;
+}
+
++ (void)showWalkQuestion
+{
+  if (gWalkQuestion)
+    return;
+  UIAlertController * alert = [UIAlertController alertControllerWithTitle:@"Are you actually intending to walk there?"
+                                                                  message:nil
+                                                           preferredStyle:UIAlertControllerStyleAlert];
+  [alert addAction:[UIAlertAction actionWithTitle:@"No" style:UIAlertActionStyleDefault handler:^(UIAlertAction *) {
+    GetFramework().GetRoutingManager().GetBackseat().AnswerModeQuestion(false);
+  }]];
+  [alert addAction:[UIAlertAction actionWithTitle:@"Yes" style:UIAlertActionStyleDefault handler:^(UIAlertAction *) {
+    GetFramework().GetRoutingManager().GetBackseat().AnswerModeQuestion(true);
+  }]];
+  UIViewController * top = [MapViewController sharedController];
+  while (top.presentedViewController)
+    top = top.presentedViewController;
+  gWalkQuestion = alert;
+  [top presentViewController:alert animated:YES completion:nil];
+}
+
++ (void)closeWalkQuestionIfAnswered
+{
+  UIAlertController * alert = gWalkQuestion;
+  if (alert && !GetFramework().GetRoutingManager().GetBackseat().ModeQuestionOpen())
+  {
+    gWalkQuestion = nil;
+    [alert dismissViewControllerAnimated:YES completion:nil];
+  }
+}
+
++ (void)highlightDrivingButton
+{
+  [self closeWalkQuestionIfAnswered];
+  auto & rm = GetFramework().GetRoutingManager();
+  // Back to the route preview, still walking: the driver has to tap Driving themselves.
+  if ([MWMRouter isOnRoute] && rm.GetRoutePoints().size() >= 2)
+  {
+    rm.CloseRouting(false /* remove route points */);
+    [MWMRouter rebuildWithBestRouter:NO];
+  }
+  gDrivingHighlighted = YES;
+  [[NSNotificationCenter defaultCenter] postNotificationName:kBackseatDrivingHighlightChanged object:nil];
+}
+
++ (void)drivingButtonTapped
+{
+  if (!gDrivingHighlighted)
+    return;
+  gDrivingHighlighted = NO;
+  [[NSNotificationCenter defaultCenter] postNotificationName:kBackseatDrivingHighlightChanged object:nil];
+  // Tapped: the drive starts by itself once it's built.
+  [MWMRouter startWhenReady];
 }
 
 + (void)switchTravelMode:(NSString *)mode

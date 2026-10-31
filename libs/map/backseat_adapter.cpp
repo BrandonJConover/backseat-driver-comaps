@@ -3068,7 +3068,7 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
                             {"speed", backseat::LogNum(c.voiceSpeed, 2)},
                             {"text", c.text}});
     out.push_back(c.text);
-    // 20 Questions and "Are we actually walking there?" want an answer out loud.
+    // 20 Questions and "Are you actually intending to walk there?" want an answer out loud.
     m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed, c.maxWaitMs, c.voice,
                             c.category == backseat::Category::TwentyQuestions || c.key == "mode.ask.walk"});
     if (c.priority == backseat::Priority::Nav)
@@ -3127,6 +3127,7 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
   if (poly.GetSize() > 0)
   {
     snap.origin = ToBackseatLatLon(poly.Front());
+    snap.routeLengthM = route->GetTotalDistanceMeters();
     snap.destinationPoint = ToBackseatLatLon(poly.Back());
     snap.sketched = m_routeSketched;
     if (m_routeSketched && m_fastestTo && mercator::DistanceOnEarth(*m_fastestTo, poly.Back()) < 250)

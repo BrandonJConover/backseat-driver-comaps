@@ -2119,25 +2119,43 @@ int CountKey(std::vector<Commentary> const & lines, std::string const & key)
 {
   return static_cast<int>(std::count_if(lines.begin(), lines.end(), [&](Commentary const & l) { return SaidLineOf(l.text, key); }));
 }
+
+/// Three and a half miles on foot.
+RouteSnapshot LongWalk()
+{
+  RouteSnapshot r = Walkway();
+  r.routeLengthM = 5600;
+  return r;
+}
 }  // namespace
 
-TEST(AWalkingRouteAsksAndNoAnswerMeansDriving)
+TEST(ALongWalkAsksAndNoMeansTapDriving)
 {
   Navigator nav(Config());
   nav.SetCanAskTravelMode(true);
   nav.SetTravelMode(TravelMode::Walk);
+  nav.OnFix(Heading(0, 0, 90), LongWalk());
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk"), 1);
+  CHECK(nav.TakeModeAskToShow());
+  CHECK(!nav.TakeModeAskToShow());
+  CHECK(nav.ModeAskOpen());
+  // Nobody answers: it waits, and doesn't decide for them.
   std::vector<Commentary> said;
-  for (int i = 0; i < 30; ++i)
+  for (int i = 1; i < 30; ++i)
   {
-    nav.OnFix(Heading(i * 1000.0, 0, 90), Walkway());
+    nav.OnFix(Heading(i * 1000.0, 0, 90), LongWalk());
     for (auto & l : nav.TakeLines())
       said.push_back(l);
   }
-  CHECK_EQUAL(CountKey(said, "mode.ask.walk"), 1);
-  CHECK_EQUAL(CountKey(said, "mode.ask.timeout"), 1);
+  CHECK(nav.ModeAskOpen());
+  CHECK(!nav.TakeModeSwitch());
+  // No on screen: "I'm going to need you to click the driving button."
+  CHECK(nav.AnswerModeAsk(false));
+  CHECK(!nav.AnswerModeAsk(true));
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk.no"), 1);
   CHECK(nav.TakeModeSwitch() == TravelMode::Drive);
   CHECK(!nav.TakeModeSwitch());
-  // The host rebuilds the route as a drive: a fresh start, with no "so now we're driving?".
+  // The driver taps Driving: a fresh start, with no "so now we're driving?".
   nav.OnFix(Heading(31000, 0, 90), RouteSnapshot{});
   nav.SetTravelMode(TravelMode::Drive);
   said.clear();
@@ -2150,32 +2168,39 @@ TEST(AWalkingRouteAsksAndNoAnswerMeansDriving)
   CHECK(!said.empty());
   CHECK_EQUAL(CountKey(said, "mode.switch.drive"), 0);
   CHECK_EQUAL(CountKey(said, "mode.ask.walk"), 0);
+  CHECK_EQUAL(CountKey(said, "mode.ask.watch"), 1);
   SetLineTravelMode(TravelMode::Drive);
 }
 
-TEST(YesWeAreWalkingStopsTheAsking)
+TEST(EveryLongWalkAsksAndShortOnesDont)
 {
   Navigator nav(Config());
   nav.SetCanAskTravelMode(true);
   nav.SetTravelMode(TravelMode::Walk);
-  nav.OnFix(Heading(0, 0, 90), Walkway());
+  nav.OnFix(Heading(0, 0, 90), LongWalk());
   CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk"), 1);
   nav.OnDriverSaid(2000, "yes");
   std::vector<Commentary> said;
   for (int i = 3; i < 30; ++i)
   {
-    nav.OnFix(Heading(i * 1000.0, 1.4, 90), Walkway());
+    nav.OnFix(Heading(i * 1000.0, 1.4, 90), LongWalk());
     for (auto & l : nav.TakeLines())
       said.push_back(l);
   }
-  CHECK_EQUAL(CountKey(said, "mode.ask.yes"), 1);
-  CHECK_EQUAL(CountKey(said, "mode.ask.timeout"), 0);
+  CHECK_EQUAL(CountKey(said, "mode.ask.walk.yes"), 1);
+  CHECK(!nav.ModeAskOpen());
   CHECK(!nav.TakeModeSwitch());
   CHECK(nav.Mode() == TravelMode::Walk);
-  // The next walk just starts.
+  // A walk around the block: no question.
   nav.OnFix(Heading(31000, 0, 90), RouteSnapshot{});
-  nav.OnFix(Heading(40000, 0, 90), Walkway());
+  RouteSnapshot shortWalk = Walkway();
+  shortWalk.routeLengthM = 1500;
+  nav.OnFix(Heading(40000, 0, 90), shortWalk);
   CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk"), 0);
+  // The next long walk asks again.
+  nav.OnFix(Heading(50000, 0, 90), RouteSnapshot{});
+  nav.OnFix(Heading(60000, 0, 90), LongWalk());
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk"), 1);
   SetLineTravelMode(TravelMode::Drive);
 }
 
