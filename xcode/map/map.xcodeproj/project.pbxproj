@@ -19,6 +19,7 @@
 		BD5EA7000000000000000091 /* indoors.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000090 /* indoors.cpp */; };
 		BD5EA70000000000000000A9 /* quiet_bits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000A8 /* quiet_bits.cpp */; };
 		BD5EA7000000000000000E11 /* onboarding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000E10 /* onboarding.cpp */; };
+		BD5EA7000000000000000E14 /* pop_quiz.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000E13 /* pop_quiz.cpp */; };
 		BD5EA70000000000000000B9 /* twenty_questions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000B8 /* twenty_questions.cpp */; };
 		BD5EA70000000000000000C9 /* road_bits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000C8 /* road_bits.cpp */; };
 		BD5EA70000000000000000D9 /* running_bits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000D8 /* running_bits.cpp */; };
@@ -196,6 +197,8 @@
 		BD5EA70000000000000000AA /* quiet_bits.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = quiet_bits.hpp; path = ../backseat/quiet_bits.hpp; sourceTree = "<group>"; };
 		BD5EA7000000000000000E10 /* onboarding.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = onboarding.cpp; path = ../backseat/onboarding.cpp; sourceTree = "<group>"; };
 		BD5EA7000000000000000E12 /* onboarding.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = onboarding.hpp; path = ../backseat/onboarding.hpp; sourceTree = "<group>"; };
+		BD5EA7000000000000000E13 /* pop_quiz.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = pop_quiz.cpp; path = ../backseat/pop_quiz.cpp; sourceTree = "<group>"; };
+		BD5EA7000000000000000E15 /* pop_quiz.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = pop_quiz.hpp; path = ../backseat/pop_quiz.hpp; sourceTree = "<group>"; };
 		BD5EA70000000000000000B8 /* twenty_questions.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = twenty_questions.cpp; path = ../backseat/twenty_questions.cpp; sourceTree = "<group>"; };
 		BD5EA70000000000000000BA /* twenty_questions.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = twenty_questions.hpp; path = ../backseat/twenty_questions.hpp; sourceTree = "<group>"; };
 		BD5EA70000000000000000C8 /* road_bits.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = road_bits.cpp; path = ../backseat/road_bits.cpp; sourceTree = "<group>"; };
@@ -519,6 +522,8 @@
 				BD5EA70000000000000000AA /* quiet_bits.hpp */,
 				BD5EA7000000000000000E10 /* onboarding.cpp */,
 				BD5EA7000000000000000E12 /* onboarding.hpp */,
+				BD5EA7000000000000000E13 /* pop_quiz.cpp */,
+				BD5EA7000000000000000E15 /* pop_quiz.hpp */,
 				BD5EA70000000000000000B8 /* twenty_questions.cpp */,
 				BD5EA70000000000000000BA /* twenty_questions.hpp */,
 				BD5EA70000000000000000C8 /* road_bits.cpp */,
@@ -813,6 +818,7 @@
 				BD5EA7000000000000000091 /* indoors.cpp in Sources */,
 				BD5EA70000000000000000A9 /* quiet_bits.cpp in Sources */,
 				BD5EA7000000000000000E11 /* onboarding.cpp in Sources */,
+				BD5EA7000000000000000E14 /* pop_quiz.cpp in Sources */,
 				BD5EA70000000000000000B9 /* twenty_questions.cpp in Sources */,
 				BD5EA70000000000000000C9 /* road_bits.cpp in Sources */,
 				BD5EA70000000000000000D9 /* running_bits.cpp in Sources */,
