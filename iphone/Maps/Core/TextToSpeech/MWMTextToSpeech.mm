@@ -420,15 +420,17 @@ using Observers = NSHashTable<Observer>;
         [weakSelf speakOneString:notification];
       }];
     }
-    // "No answer. Switching us to driving.": the GPS decided the walk is a drive.
-    auto const modeSwitch = backseat.TakeTravelModeSwitch();
-    if (!modeSwitch.empty())
-    {
-      NSString * mode = @(modeSwitch.c_str());
-      dispatch_async(dispatch_get_main_queue(), ^{
-        [MWMBackseatRewriter switchTravelMode:mode];
-      });
-    }
+    // "Are you actually intending to walk there?": Yes / No on screen too.
+    BOOL const askWalk = backseat.TakeModeQuestion();
+    // "No": "I'm going to need you to click the driving button."
+    BOOL const highlightDriving = !backseat.TakeTravelModeSwitch().empty();
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (askWalk)
+        [MWMBackseatRewriter showWalkQuestion];
+      [MWMBackseatRewriter closeWalkQuestionIfAnswered];
+      if (highlightDriving)
+        [MWMBackseatRewriter highlightDrivingButton];
+    });
     // 20 Questions: the driver answers out loud, so listen once the GPS has said its piece.
     for (NSUInteger i = 0; hinted && i < voices.size(); ++i)
     {

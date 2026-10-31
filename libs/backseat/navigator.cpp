@@ -180,10 +180,11 @@ double constexpr kNightMovedMps = 2.5;
 char const * const kTripsStartedKey = "_trips.started";
 /// The route type (drive, walk or bike) of the last trip, for "Oh, we're walking now?".
 char const * const kLastModeKey = "_mode.last";
-/// Set once the driver says yes, we really are walking: the GPS stops asking.
-char const * const kWalkConfirmedKey = "_mode.walkConfirmed";
-/// How long the GPS waits for "yes, we're walking" before it decides it's a drive.
-double constexpr kModeAskWaitMs = 10000;
+/// "Are we actually walking there?" is for walks longer than a couple of miles (Brandon), every time.
+double constexpr kAskWalkOverM = 3200;
+/// Walking pace, for the route's length when the host doesn't give it.
+double constexpr kAskWalkPaceMps = 1.4;
+
 /// SaidLog values: the trip under way (destination, last seen in s since the epoch), so a relaunch in
 /// the middle of it (a crash, or iOS closing the app in the background) picks it back up instead
 /// of opening a brand new trip with the greeting and rundown all over again.
@@ -961,9 +962,6 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   if (m_arrived)
     return;
 
-  if (m_modeAskUntil && t >= *m_modeAskUntil)
-    ResolveModeAsk(false, "mode.ask.timeout");
-
   RouteState const prev = m_lastState;
   m_lastState = route.state;
   if (route.state != prev)
@@ -1258,16 +1256,19 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
     m_turnKind = route.turn;
     SayInstruction(t, route);
   }
-  // The app starts on walking: "Are we actually walking there?" until the driver says yes.
+  // The app starts on walking: a walk of more than a couple of miles gets "Are you actually intending to walk there?".
   TravelMode const base = BaseMode(m_travelMode);
   std::string const lastMode = m_said.Value(kLastModeKey);
   m_said.SetValue(kLastModeKey, TravelModeName(base));
-  bool const askWalk = m_canAskMode && base == TravelMode::Walk && m_said.Value(kWalkConfirmedKey).empty();
-  m_modeAskUntil.reset();
+  double const lengthM = route.routeLengthM > 0 ? route.routeLengthM : route.etaSeconds * kAskWalkPaceMps;
+  bool const askWalk = m_canAskMode && base == TravelMode::Walk && lengthM > kAskWalkOverM;
+  m_modeAskOpen = false;
   if (askWalk)
   {
+    // Asked out loud and on screen (Yes / No); the answer is AnswerModeAsk() or a spoken yes or no.
     SayLine(t, Category::Instruction, "mode.ask.walk", {}, Priority::Nav);
-    m_modeAskUntil = t + kModeAskWaitMs + 6000;
+    m_modeAskOpen = true;
+    m_modeAskShow = true;
     Trace("trip.modeAsk", {{"answer", "asked"}});
   }
   std::string greeting = TripGreeting(m_history, m_config.rng, tripsBefore);
@@ -1278,6 +1279,12 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   // Asking takes the greeting's place, and the rundown and prediction wait for the real trip.
   if (!askWalk)
     SayNav(t, greeting);
+  // The driver tapped Driving after "No": "check it now and then, I may swap it on you."
+  if (m_modeWarnNextDrive && base != TravelMode::Walk)
+  {
+    m_modeWarnNextDrive = false;
+    SayLine(t, Category::Instruction, "mode.ask.watch");
+  }
   // Walking last time, driving now: "Oh, so now we're driving?"
   if (!askWalk && !lastMode.empty() && lastMode != TravelModeName(base))
   {
@@ -1412,31 +1419,31 @@ void Navigator::DriverSetTravelMode(TravelMode mode)
   ChangeTravelMode(mode, "driver");
   // The driver said it: no need to ask, or to remark on the switch when the route comes back.
   m_said.SetValue(kLastModeKey, TravelModeName(BaseMode(mode)));
-  if (m_modeAskUntil)
+  if (m_modeAskOpen)
   {
-    m_modeAskUntil.reset();
-    if (BaseMode(mode) == TravelMode::Walk)
-      m_said.SetValue(kWalkConfirmedKey, "yes");
-    else
+    m_modeAskOpen = false;
+    if (BaseMode(mode) != TravelMode::Walk)
       m_said.SetCounter(kTripsStartedKey, m_tripsBeforeThis);
   }
 }
 
-void Navigator::ResolveModeAsk(bool walking, char const * key)
+bool Navigator::AnswerModeAsk(bool walking)
 {
-  m_modeAskUntil.reset();
-  Trace("trip.modeAsk", {{"answer", walking ? "walk" : "drive"}, {"key", key}});
-  SayLine(m_lastT, Category::Instruction, key, {}, Priority::Nav);
+  if (!m_modeAskOpen)
+    return false;
+  m_modeAskOpen = false;
+  Trace("trip.modeAsk", {{"answer", walking ? "walk" : "drive"}});
+  SayLine(m_lastT, Category::Instruction, walking ? "mode.ask.walk.yes" : "mode.ask.walk.no", {}, Priority::Nav);
   if (walking)
-  {
-    m_said.SetValue(kWalkConfirmedKey, "yes");
-    return;
-  }
-  // The route comes back as a drive: that's this trip still, so it gets the first trip's rundown.
+    return true;
+  // The GPS won't do it for them: "I'm going to need you to click the driving button." The host
+  // shows the route types with Driving highlighted. The drive that follows is this trip still, so
+  // it gets the first trip's rundown, and no "so now we're driving?".
   m_said.SetCounter(kTripsStartedKey, m_tripsBeforeThis);
-  ChangeTravelMode(TravelMode::Drive, "asked");
   m_said.SetValue(kLastModeKey, TravelModeName(TravelMode::Drive));
   m_modeSwitch = TravelMode::Drive;
+  m_modeWarnNextDrive = true;
+  return true;
 }
 
 void Navigator::ChangeTravelMode(TravelMode mode, char const * why)
@@ -2194,15 +2201,10 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
       SayTwenty(m_lastT, *reply);
       return;
     }
-  // "Are we actually walking there?"
-  if (m_modeAskUntil && SaidYes(text))
+  // "Are you actually intending to walk there?" can be answered out loud too.
+  if (m_modeAskOpen && (SaidYes(text) || SaidNo(text)))
   {
-    ResolveModeAsk(true, "mode.ask.yes");
-    return;
-  }
-  if (m_modeAskUntil && SaidNo(text))
-  {
-    ResolveModeAsk(false, "mode.ask.no");
+    AnswerModeAsk(SaidYes(text));
     return;
   }
   // "We're getting pulled over": the GPS knows exactly whose fault that is.

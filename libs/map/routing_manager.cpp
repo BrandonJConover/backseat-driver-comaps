@@ -70,6 +70,8 @@ using namespace std;
 namespace
 {
 char constexpr kRouterTypeKey[] = "router";
+// Backseat Driver: set once walking has been made the starting mode on this install.
+char constexpr kBackseatWalkDefaultKey[] = "BackseatWalkDefault";
 
 double constexpr kRouteScaleMultiplier = 1.5;
 
@@ -526,7 +528,15 @@ RouterType RoutingManager::GetBestRouter(m2::PointD const & startPoint, m2::Poin
 RouterType routing::GetLastUsedRouter()
 {
   string routerTypeStr;
-  // Backseat Driver starts on walking (Brandon: "it's funnier"); the GPS asks if we really are.
+  // Backseat Driver starts on walking (Brandon: "it's funnier"), installs that came before this
+  // too, once; a long walk gets "Are we actually walking there?".
+  bool walkDefault = false;
+  if (!settings::Get(kBackseatWalkDefaultKey, walkDefault) || !walkDefault)
+  {
+    settings::Set(kBackseatWalkDefaultKey, true);
+    settings::Set(kRouterTypeKey, ToString(RouterType::Pedestrian));
+    return RouterType::Pedestrian;
+  }
   if (!settings::Get(kRouterTypeKey, routerTypeStr))
     return RouterType::Pedestrian;
 

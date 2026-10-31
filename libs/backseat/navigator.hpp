@@ -87,6 +87,8 @@ struct RouteSnapshot
   double thenGapM = -1;
   /// What the router estimates for the whole trip, read when the trip starts.
   double etaSeconds = 0;
+  /// The whole route's length in meters, read when the trip starts; 0 if unknown.
+  double routeLengthM = 0;
   std::string destination;
   /// Every maneuver on the route, for the opening rundown.
   std::vector<TurnKind> plannedTurns;
@@ -322,11 +324,18 @@ public:
   void DriverSetTravelMode(TravelMode mode);
   TravelMode GetTravelMode() const { return m_travelMode; }
   TravelMode Mode() const { return m_travelMode; }
-  /// The host can switch the route type when asked (TakeModeSwitch()), so on a walking route the GPS
-  /// asks "Are we actually walking there?" until the driver says yes.
+  /// The host can show the question and the route types (TakeModeAskToShow(), TakeModeSwitch()), so
+  /// on a walking route of more than a couple of miles the GPS asks "Are you actually intending to
+  /// walk there?".
   void SetCanAskTravelMode(bool can) { m_canAskMode = can; }
-  /// The route type the GPS decided on (no answer, or "no, we're driving"); the host rebuilds the
-  /// route with it. Empty when there's nothing to switch.
+  /// True once when the question was just asked: the host puts up Yes / No buttons.
+  bool TakeModeAskToShow() { return std::exchange(m_modeAskShow, false); }
+  /// Whether the question still waits for an answer (a spoken one closes it too).
+  bool ModeAskOpen() const { return m_modeAskOpen; }
+  /// Yes, we really are walking (or no: then it's a drive). False if there was no question open.
+  bool AnswerModeAsk(bool walking);
+  /// Not walking after all: the route type the driver has to pick by hand ("I'm going to need you to
+  /// click the driving button"). The host shows the route types with it highlighted. Empty otherwise.
   std::optional<TravelMode> TakeModeSwitch() { return std::exchange(m_modeSwitch, std::nullopt); }
   /// The plain direction for the current maneuver, with no jokes on it. Empty with no route.
   std::string const & LastInstructionText() const { return m_lastInstructionText; }
@@ -468,8 +477,7 @@ private:
   /// One-line bits wait a few trips before coming back, so they stay a surprise.
   bool Rested(std::string const & key) const;
   void MarkSaid(std::string const & key);
-  /// The answer to "Are we actually walking there?" (or the lack of one).
-  void ResolveModeAsk(bool walking, char const * key);
+
   /// {name}, {gps} and the driver's pronouns, for lines about the driver.
   Vars DriverVars() const;
   int Tier() const;
@@ -609,7 +617,10 @@ private:
   bool m_mountainBike = false;
   /// "Are we actually walking there?": asked, and switching to driving at this time if no answer.
   bool m_canAskMode = false;
-  std::optional<double> m_modeAskUntil;
+  bool m_modeAskOpen = false;
+  /// "No" to the walking question: the drive the driver picks gets "check the mode now and then".
+  bool m_modeWarnNextDrive = false;
+  bool m_modeAskShow = false;
   std::optional<TravelMode> m_modeSwitch;
   /// The trip count before this trip, given back when the asked-about walk turns into a drive.
   int m_tripsBeforeThis = 0;

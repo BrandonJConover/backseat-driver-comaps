@@ -361,11 +361,17 @@ public:
   void SetGpsName(std::string const & name) { m_navigator.SetGpsName(name); }
   /// A caller's voice to warm up, once, when a call that will put them on starts. Empty otherwise.
   std::string TakeCallerVoiceToWarm() { return std::exchange(m_callerVoiceToWarm, std::string()); }
-  /// The host can rebuild the route as another type when the GPS asks it to (see
-  /// TakeTravelModeSwitch()); until it says so, the GPS doesn't ask "Are we actually walking there?".
+  /// The host can show "Are you actually intending to walk there?" with Yes / No and highlight a route type
+  /// (TakeModeQuestion(), TakeTravelModeSwitch()); until it says so, the GPS doesn't ask.
   void SetCanSwitchTravelMode(bool can) { m_navigator.SetCanAskTravelMode(can); }
-  /// "drive" when the GPS decided the walk is a drive after all (a "no", or no answer): the host
-  /// switches the route type and rebuilds the route. Empty otherwise.
+  /// True once when the GPS just asked "Are you actually intending to walk there?": show Yes / No.
+  bool TakeModeQuestion() { return m_navigator.TakeModeAskToShow(); }
+  /// False once it's been answered, out loud or on screen: the Yes / No can go away.
+  bool ModeQuestionOpen() const { return m_navigator.ModeAskOpen(); }
+  /// The driver tapped Yes (walking) or No (not walking: Driving gets highlighted).
+  void AnswerModeQuestion(bool walking) { m_navigator.AnswerModeAsk(walking); }
+  /// "drive" when it isn't a walk after all: the host stops navigating, shows the route types and
+  /// highlights Driving for the driver to tap. Empty otherwise.
   std::string TakeTravelModeSwitch()
   {
     auto const mode = m_navigator.TakeModeSwitch();
