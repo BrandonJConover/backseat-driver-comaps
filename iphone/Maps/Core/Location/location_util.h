@@ -1,5 +1,9 @@
 #pragma once
 
+#include "platform/location.hpp"
+
+#include "base/math.hpp"
+
 namespace location_util {
 
 static location::GpsInfo gpsInfoFromLocation(CLLocation * l, location::TLocationSource source)
