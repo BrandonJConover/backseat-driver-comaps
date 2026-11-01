@@ -121,6 +121,17 @@ jobs:
             shot "$(printf %02d $n)-$screen"
             n=$((n + 1))
           done
+          # The map up close (and a place card) through the app's own map link.
+          xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
+          sleep 2
+          xcrun simctl launch "$DEVICE" "$BUNDLE" -BackseatUITour home -backseat.onboardingDone YES
+          sleep 12
+          xcrun simctl openurl "$DEVICE" "cm://map?v=1&ll=39.7392,-104.9849&z=15&n=Civic%20Center%20Park" || true
+          sleep 10
+          shot 80-map-place
+          xcrun simctl openurl "$DEVICE" "cm://map?v=1&ll=39.7505,-104.9995&z=13&n=Union%20Station" || true
+          sleep 10
+          shot 81-map-wide
           # Navigation: the test destination starts a trip by itself.
           xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
           sleep 2
