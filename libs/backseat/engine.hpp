@@ -184,6 +184,8 @@ private:
     bool turned = false;
     /// "Your other left" was already said for this maneuver.
     bool wrongSaid = false;
+    /// How long after atTurnSince "you are still turning" is due: 3 s past the corner.
+    double stillAfterMs = 3000;
   };
 
   /// "Please continue straight." ... "You should still be going straight." ... "I'm serious."
