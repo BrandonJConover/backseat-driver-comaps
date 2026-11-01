@@ -1,0 +1,185 @@
+name: Backseat iOS UI tour
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'claude/ui-**'
+    paths:
+      - .github/workflows/backseat-ui-tour.yaml
+      - iphone/**
+      - data/styles/**
+
+permissions:
+  contents: write
+
+jobs:
+  tour:
+    name: Screenshot every Backseat screen in the simulator
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
+      LANG: en_US.UTF-8
+      LANGUAGE: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+      BUNDLE: com.brandonjconover.backseatdriver.debug
+      MAP_VERSION: '261004'
+      MAP_SERIES: '2026.06.28'
+      MAP_FILE: US_Colorado_Denver.mwm
+      # East on Colfax from Broadway to Colorado Blvd, then north a few blocks. The destination sits
+      # on the northbound side so the route doesn't send us around to the far carriageway.
+      START: '39.74010,-104.98720'
+      DESTINATION: '39.74600,-104.94075'
+      OUT: ${{ github.workspace }}/uitour
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Install dependencies
+        run: |
+          brew install qt optipng
+          pip3 install "protobuf<3.21" --break-system-packages
+          # Apple's component downloads fail now and then; retry before giving up.
+          retry() { for i in 1 2 3; do "$@" && return 0; echo "Attempt $i failed: $*"; sleep 30; done; return 1; }
+          retry xcodebuild -downloadComponent metalToolchain
+          retry xcodebuild -downloadPlatform iOS
+
+      - uses: actions/checkout@v6
+
+      - name: Parallel submodules checkout
+        run: git submodule update --depth 1 --init --recursive --jobs=$(($(sysctl -n hw.logicalcpu) * 20))
+
+      - name: Configure repository
+        run: ./configure.sh
+
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          mkdir -p "$OUT"
+          xcodebuild build \
+            -workspace xcode/CoMaps.xcworkspace \
+            -scheme CoMaps \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/dd \
+            -quiet \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$OUT/build.log" | grep -E "error:" || true
+          ls -d build/dd/Build/Products/Debug-iphonesimulator/*.app
+
+      - name: Download the Denver map
+        run: |
+          for server in https://cdn-us-2.comaps.tech https://cdn-fi-1.comaps.app https://comaps.openstreetmap.fr \
+                        https://comaps.firewall-gateway.de https://mapgen-fi-1.comaps.app; do
+            # Same layout the app uses: maps/<series>/<version>/<file> (defines.hpp, downloader_utils.cpp).
+            if curl -fL --retry 2 -o "$MAP_FILE" "$server/maps/$MAP_SERIES/$MAP_VERSION/$MAP_FILE" &&
+               [ "$(stat -f%z "$MAP_FILE")" -gt 1000000 ]; then
+              echo "Got the map from $server"; ls -la "$MAP_FILE"; exit 0
+            fi
+            echo "$server: no usable map ($(stat -f%z "$MAP_FILE" 2>/dev/null || echo 0) bytes)"
+          done
+          echo "::error title=Map download::No mirror served $MAP_FILE for $MAP_VERSION"; exit 1
+
+      - name: Boot a simulator and install
+        run: |
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c '
+          import json,sys
+          d=json.load(sys.stdin)["devices"]
+          ids=[x["udid"] for rt,devs in d.items() if "iOS" in rt for x in devs if x["name"].startswith("iPhone")]
+          print(ids[-1])')
+          echo "DEVICE=$DEVICE" >> "$GITHUB_ENV"
+          xcrun simctl boot "$DEVICE"
+          xcrun simctl bootstatus "$DEVICE" -b
+          APP=$(ls -d build/dd/Build/Products/Debug-iphonesimulator/*.app | head -1)
+          xcrun simctl install "$DEVICE" "$APP"
+          xcrun simctl privacy "$DEVICE" grant location-always "$BUNDLE"
+          xcrun simctl privacy "$DEVICE" grant microphone "$BUNDLE" || true
+          DATA=$(xcrun simctl get_app_container "$DEVICE" "$BUNDLE" data)
+          mkdir -p "$DATA/Documents/$MAP_VERSION"
+          cp "$MAP_FILE" "$DATA/Documents/$MAP_VERSION/"
+          xcrun simctl location "$DEVICE" set "$START"
+
+      - name: Tour the screens
+        run: |
+          shot() { xcrun simctl io "$DEVICE" screenshot "$OUT/$1.png" || true; }
+          xcrun simctl spawn "$DEVICE" log stream --level debug --style compact \
+            --predicate 'process BEGINSWITH "CoMaps"' > "$OUT/app.log" 2>&1 &
+          LOGPID=$!
+          sleep 3
+          # The real first launch, untouched (the tour flag only keeps permission prompts away).
+          xcrun simctl launch "$DEVICE" "$BUNDLE" -BackseatUITour onboarding1
+          sleep 25
+          shot 01-onboarding-disclaimer
+          sleep 20
+          shot 02-onboarding-disclaimer-later
+          n=3
+          for screen in onboarding2 onboarding3 home search place settings backseatSettings arrival arrivalGood quiz quizAnswered walk; do
+            xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
+            sleep 2
+            xcrun simctl launch "$DEVICE" "$BUNDLE" -BackseatUITour "$screen" -backseat.onboardingDone YES
+            sleep 14
+            shot "$(printf %02d $n)-$screen"
+            n=$((n + 1))
+          done
+          # The map up close (and a place card) through the app's own map link.
+          xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
+          sleep 2
+          xcrun simctl launch "$DEVICE" "$BUNDLE" -BackseatUITour home -backseat.onboardingDone YES
+          sleep 12
+          xcrun simctl openurl "$DEVICE" "cm://map?v=1&ll=39.7392,-104.9849&z=15&n=Civic%20Center%20Park" || true
+          sleep 10
+          shot 80-map-place
+          xcrun simctl openurl "$DEVICE" "cm://map?v=1&ll=39.7505,-104.9995&z=13&n=Union%20Station" || true
+          sleep 10
+          shot 81-map-wide
+          # Navigation: the test destination starts a trip by itself.
+          xcrun simctl terminate "$DEVICE" "$BUNDLE" || true
+          sleep 2
+          xcrun simctl launch "$DEVICE" "$BUNDLE" -BackseatUITour drive -backseat.onboardingDone YES \
+            -BackseatTestDestination "$DESTINATION"
+          sleep 40
+          shot 90-drive-start
+          xcrun simctl location "$DEVICE" start --speed=20 \
+            39.74010,-104.98720 39.74010,-104.97500 39.74010,-104.96000 39.74010,-104.94090
+          sleep 45
+          shot 91-drive-moving
+          sleep 30
+          shot 92-drive-later
+          kill $LOGPID || true
+
+      - name: Summarize
+        if: always()
+        run: |
+          mkdir -p "$OUT"
+          grep -h "Backseat" "$OUT/app.log" > "$OUT/backseat.log" 2>/dev/null || true
+          grep -hiE "crash|fatal|assert|terminat" "$OUT/app.log" | tail -40 > "$OUT/problems.log" 2>/dev/null || true
+          # Crash reports from the simulator land in the host's DiagnosticReports.
+          mkdir -p "$OUT/crashes"
+          find ~/Library/Logs/DiagnosticReports -name 'CoMaps*' -newer "$OUT/01-onboarding-disclaimer.png" \
+            -exec cp {} "$OUT/crashes/" \; 2>/dev/null || true
+          ls -la "$OUT/crashes"
+          grep -E "error:" "$OUT/build.log" 2>/dev/null | head -30 > "$OUT/build-errors.log" || true
+          if [ -s "$OUT/build-errors.log" ]; then
+            msg=$(sed -e 's/%/%25/g' "$OUT/build-errors.log" | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Build errors::${msg}"
+          fi
+
+      # Artifacts can't be fetched from the dev container, so results go to a branch.
+      - name: Publish screenshots to claude/ui-tour-results
+        if: always()
+        run: |
+          rm -f "$OUT/build.log"
+          gzip -9 "$OUT/app.log" || true
+          git config --global user.name "backseat-ci"
+          git config --global user.email "backseat-ci@users.noreply.github.com"
+          git clone --depth 1 --no-checkout "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" results
+          cd results
+          git checkout --orphan claude/ui-tour-results
+          git rm -rfq --cached . >/dev/null 2>&1 || true
+          rm -rf ./*
+          mkdir -p "tour/${{ github.run_number }}"
+          cp -R "$OUT"/. "tour/${{ github.run_number }}/"
+          git add tour
+          git commit -qm "UI tour ${{ github.run_number }} at ${GITHUB_SHA::7}"
+          git push -f origin claude/ui-tour-results

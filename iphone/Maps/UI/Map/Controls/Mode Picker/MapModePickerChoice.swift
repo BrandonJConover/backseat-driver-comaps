@@ -35,6 +35,9 @@ extension MapModePicker {
         
         /// The foreground color (for animations)
         @State private var foregroundColor: Color = .primary
+
+        /// Backseat: the picked mode's icon is dark on the road-sign yellow pill.
+        private static let selectedColor = Color(uiColor: BackseatTheme.ink)
         
         
         /// The actual view
@@ -75,19 +78,19 @@ extension MapModePicker {
                 }
                 .accessibilityHidden(isPresentingModeOptions)
                 .onAppear {
-                    foregroundColor = (draggedMode == mode ? .white : .primary)
+                    foregroundColor = (draggedMode == mode ? Self.selectedColor : .primary)
                 }
                 .onChange(of: draggedMode) { changedDraggedMode in
                     if changedDraggedMode == mode, foregroundColor == .primary {
                         withAnimation(.spring.speed(3.2).delay(0.1)) {
-                            foregroundColor = .white
+                            foregroundColor = Self.selectedColor
                         }
-                    } else if changedDraggedMode != mode, foregroundColor == .white {
+                    } else if changedDraggedMode != mode, foregroundColor == Self.selectedColor {
                         withAnimation(.spring.speed(4)) {
                             foregroundColor = .primary
                         }
                     } else {
-                        foregroundColor = (changedDraggedMode == mode ? .white : .primary)
+                        foregroundColor = (changedDraggedMode == mode ? Self.selectedColor : .primary)
                     }
                 }
         }

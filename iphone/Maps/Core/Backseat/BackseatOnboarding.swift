@@ -1,3 +1,5 @@
+import AVFAudio
+import Speech
 import SwiftUI
 import UIKit
 
@@ -22,6 +24,7 @@ import UIKit
 
   /// From the map screen: the first launch shows the onboarding, after that the usual spoken check-in.
   @objc static func startIfNeeded(from host: UIViewController) {
+    if BackseatUITour.run(from: host) { return }
     if isDone {
       BackseatSetup.startIfNeeded()
     } else {
@@ -39,9 +42,23 @@ import UIKit
     present(from: top)
   }
 
-  private static func present(from host: UIViewController) {
+  #if DEBUG
+  /// The UI tour (BackseatUITour): straight to a later screen, with a line in the bubble.
+  static func presentForTour(from host: UIViewController, screen: BackseatOnboardingModel.Screen) {
+    present(from: host) { model in
+      model.screen = screen
+      model.monologueOver = true
+      model.bubble = screen == .voices ? "Pick whoever you like. I'll still be the one judging you."
+        : "Brandon. Interesting. I thought it would have been Gary. Can I call you Gary?"
+      if screen == .aboutYou { model.aboutStep = .question(1) }
+    }
+  }
+  #endif
+
+  private static func present(from host: UIViewController, configure: ((BackseatOnboardingModel) -> Void)? = nil) {
     guard presented == nil else { return }
     let model = BackseatOnboardingModel()
+    configure?(model)
     let controller = UIHostingController(rootView: BackseatOnboardingView(model: model))
     controller.modalPresentationStyle = .fullScreen
     controller.isModalInPresentation = true
@@ -363,6 +380,41 @@ final class BackseatOnboardingModel: ObservableObject {
     screen = .voices
     bubble = ""
     reply(MWMBackseatRewriter.line("onboard.voices.intro", vars: [:]))
+    // The line-up listens for the phrases. Rather than iOS's speech prompt landing cold in the
+    // middle of it, ask first and say why; the line-up starts once that's answered.
+    if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
+      askToListen = true
+    } else {
+      startLineUp()
+    }
+  }
+
+  /// The listening primer on the voices screen: iOS hasn't been asked yet.
+  @Published var askToListen = false
+
+  /// "Sure, listen": the speech and mic prompts, then the line-up. Tapping a voice works either way.
+  func allowListening() {
+    BackseatLog.event("onboarding", ["step": "listen primer", "answer": "yes"])
+    SFSpeechRecognizer.requestAuthorization { status in
+      DispatchQueue.main.async {
+        guard status == .authorized else { return self.listeningAnswered() }
+        AVAudioApplication.requestRecordPermission { _ in
+          DispatchQueue.main.async { self.listeningAnswered() }
+        }
+      }
+    }
+  }
+
+  func declineListening() {
+    BackseatLog.event("onboarding", ["step": "listen primer", "answer": "not now"])
+    askToListen = false
+    reply(["Fine. Tap one, then. Like it's 2009.", "Not listening. Noted. I'll talk anyway.",
+           "Suit yourself. Fingers it is."].randomElement() ?? "")
+  }
+
+  private func listeningAnswered() {
+    askToListen = false
+    guard screen == .voices else { return }
     startLineUp()
   }
 
@@ -558,22 +610,61 @@ struct BackseatOnboardingView: View {
   }
 
   private func title(_ text: String, step: Int) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text("STEP \(step) OF 3").font(.caption.weight(.heavy)).foregroundColor(accent)
-      Text(text).font(.system(size: 30, weight: .heavy, design: .default).width(.condensed))
+    VStack(alignment: .leading, spacing: 10) {
+      // Three road-sign segments: how far through setup this is.
+      HStack(spacing: 6) {
+        ForEach(1 ... 3, id: \.self) { i in
+          Capsule()
+            .fill(i <= step ? accent : Color(BackseatTheme.raised))
+            .frame(height: 5)
+        }
+      }
+      .accessibilityElement()
+      .accessibilityLabel(Text("Step \(step) of 3"))
+      Text("STEP \(step) OF 3").font(.caption.weight(.heavy)).tracking(1.2).foregroundColor(accent)
+        .accessibilityHidden(true)
+      Text(text).font(.system(size: 34, weight: .heavy, design: .default).width(.condensed))
+        .fixedSize(horizontal: false, vertical: true)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
+  /// The GPS's face with what it just said, like the driving screen: a warm white bubble whose
+  /// square corner points at the face. The face gets crankier as setup goes on.
   @ViewBuilder private var speechBubble: some View {
     if !model.bubble.isEmpty {
-      Text(model.bubble)
-        .font(.body.weight(.medium))
-        .foregroundColor(Color(BackseatTheme.ink))
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white))
-        .transition(.opacity)
+      HStack(alignment: .bottom, spacing: 10) {
+        BackseatFaceRepresentable(mood: faceMood, size: 44)
+          .frame(width: 44, height: 44)
+          .accessibilityHidden(true)
+        Text(model.bubble)
+          .font(.body.weight(.medium))
+          .foregroundColor(Color(BackseatTheme.ink))
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(.horizontal, 14)
+          .padding(.vertical, 11)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(
+            UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 4, bottomTrailingRadius: 18,
+                                   topTrailingRadius: 18, style: .continuous)
+              .fill(Color(BackseatTheme.text))
+              .shadow(color: .black.opacity(0.35), radius: 10, y: 5)
+          )
+          .id(model.bubble)
+          .transition(.asymmetric(insertion: .scale(scale: 0.85, anchor: .bottomLeading).combined(with: .opacity),
+                                  removal: .opacity))
+      }
+      .animation(.spring(response: 0.35, dampingFraction: 0.7), value: model.bubble)
+      .transition(.opacity)
+    }
+  }
+
+  /// Calm on the disclaimer, less so once Skip has been pressed, resigned by the questions.
+  private var faceMood: Int {
+    switch model.screen {
+    case .disclaimer: return model.skips == 0 ? 8 : model.skips < 3 ? 5 : 2
+    case .voices: return 6
+    case .aboutYou: return 4
     }
   }
 
@@ -586,6 +677,7 @@ struct BackseatOnboardingView: View {
         .background(RoundedRectangle(cornerRadius: BackseatTheme.buttonRadius, style: .continuous)
           .fill(primary ? accent : Color(BackseatTheme.raised)))
     }
+    .buttonStyle(BackseatPressStyle())
   }
 
   // MARK: Screen 1
@@ -698,6 +790,9 @@ struct BackseatOnboardingView: View {
       Text("Each voice gives you a phrase. Say it out loud to pick that voice, or tap one.")
         .font(.subheadline).foregroundColor(muted)
         .frame(maxWidth: .infinity, alignment: .leading)
+      if model.askToListen {
+        listenPrimer.transition(.move(edge: .top).combined(with: .opacity))
+      }
       ScrollView {
         LazyVStack(spacing: 8) {
           ForEach(KokoroVoice.voiceOptions) { option in
@@ -715,7 +810,11 @@ struct BackseatOnboardingView: View {
               }
               .padding(14)
               .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(card))
+              .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(option.id == model.voiceID ? accent : Color(BackseatTheme.line),
+                              lineWidth: option.id == model.voiceID ? 2 : 1))
             }
+            .buttonStyle(BackseatPressStyle())
             .foregroundColor(Color(BackseatTheme.text))
           }
         }
@@ -737,6 +836,33 @@ struct BackseatOnboardingView: View {
     }
   }
 
+  /// Before iOS asks for the mic: why, in the GPS's own voice, with the answer one tap away.
+  private var listenPrimer: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(alignment: .top, spacing: 12) {
+        Image(systemName: "mic.fill")
+          .font(.system(size: 18, weight: .bold))
+          .foregroundColor(Color(BackseatTheme.ink))
+          .frame(width: 40, height: 40)
+          .background(Circle().fill(accent))
+          .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Can I listen?").font(.system(size: 22, weight: .heavy).width(.condensed))
+          Text("Say a phrase to pick a voice. On the road you can just talk to me: \u{201C}take me home,\u{201D} \u{201C}report police.\u{201D} Your iPhone will ask next.")
+            .font(.subheadline).foregroundColor(muted)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      HStack(spacing: 10) {
+        choiceButton("Sure, listen", primary: true, action: model.allowListening)
+        choiceButton("Not now", action: model.declineListening)
+      }
+    }
+    .padding(16)
+    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(card))
+    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(accent.opacity(0.5), lineWidth: 1))
+  }
+
   // MARK: Screen 3
 
   private var aboutYou: some View {
@@ -751,6 +877,8 @@ struct BackseatOnboardingView: View {
             .font(.title3)
             .padding(14)
             .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(card))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(accent.opacity(0.6), lineWidth: 1.5))
+            .tint(accent)
             .textContentType(.givenName)
             .submitLabel(.next)
             .onSubmit(model.nameEntered)
@@ -763,7 +891,7 @@ struct BackseatOnboardingView: View {
         }
       case .question(let q):
         VStack(spacing: 10) {
-          Text(BackseatOnboardingModel.question(q)).font(.title3.weight(.semibold))
+          Text(BackseatOnboardingModel.question(q)).font(.system(size: 24, weight: .heavy).width(.condensed))
             .frame(maxWidth: .infinity, alignment: .leading)
           ForEach(MWMBackseatRewriter.aboutYouChoices(q), id: \.self) { choice in
             choiceButton(BackseatOnboardingModel.label(choice)) { model.answered(q, choice) }

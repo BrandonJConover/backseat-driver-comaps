@@ -73,7 +73,7 @@ struct SettingsBackseatView: View {
                     SettingsBackseatFileView()
                 } label: {
                     HStack {
-                        Image(systemName: "folder")
+                        BackseatRowIcon(symbol: "folder")
 
                         Text(verbatim: "Your file")
 
@@ -106,7 +106,7 @@ struct SettingsBackseatView: View {
                     voiceStatus = KokoroVoice.shared.status
                 } label: {
                     HStack {
-                        Image(systemName: "play.circle")
+                        BackseatRowIcon(symbol: "play.circle")
 
                         Text("pref_tts_test_voice_title")
                     }
@@ -215,7 +215,7 @@ struct SettingsBackseatView: View {
                     SettingsBackseatMileageView()
                 } label: {
                     HStack {
-                        Image(systemName: "car.rear.road.lane")
+                        BackseatRowIcon(symbol: "car.rear.road.lane")
 
                         Text(verbatim: "Mileage log")
                     }
@@ -229,7 +229,7 @@ struct SettingsBackseatView: View {
                     BackseatOnboarding.replay()
                 } label: {
                     HStack {
-                        Image(systemName: "doc.text.magnifyingglass")
+                        BackseatRowIcon(symbol: "doc.text.magnifyingglass")
 
                         Text(verbatim: "Replay the first launch")
                     }
@@ -251,7 +251,7 @@ struct SettingsBackseatView: View {
                     Slider(value: $niceness, in: 0...1) { editing in
                         if !editing && niceness > 0 { mockNiceness() }
                     }
-                    .tint(.red)
+                    .tint(Color(uiColor: BackseatTheme.hot))
                     .disabled(isMockingNiceness)
 
                     HStack {
@@ -429,7 +429,7 @@ struct SettingsBackseatVoiceView: View {
                     voiceStatus = KokoroVoice.shared.status
                 } label: {
                     HStack {
-                        Image(systemName: "play.circle")
+                        BackseatRowIcon(symbol: "play.circle")
 
                         Text("pref_tts_test_voice_title")
                     }

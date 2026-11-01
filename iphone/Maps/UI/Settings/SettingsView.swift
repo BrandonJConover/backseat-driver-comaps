@@ -88,7 +88,7 @@ struct SettingsView: View {
                         SettingsBackseatView()
                     } label: {
                         HStack {
-                            Image(systemName: "car.side")
+                            BackseatRowIcon(symbol: "car.side")
 
                             Text(verbatim: "Backseat Driver")
                                 .lineLimit(1)
@@ -107,7 +107,7 @@ struct SettingsView: View {
                         ProfileView()
                     } label: {
                         HStack {
-                            Image(systemName: "person.fill")
+                            BackseatRowIcon(symbol: "person.fill", stock: true)
                             
                             Text("osm_profile")
                                 .lineLimit(1)
@@ -247,7 +247,7 @@ struct SettingsView: View {
                 
                 NavigationLink(destination: SettingsNavigationView()) {
                     HStack {
-                        Image(systemName: "arrow.up.right.diamond")
+                        BackseatRowIcon(symbol: "arrow.up.right.diamond", stock: true)
                         
                         Text("prefs_group_route")
                             .lineLimit(1)
@@ -258,7 +258,7 @@ struct SettingsView: View {
                     Toggle(isOn: $shouldSync) {
                         VStack(alignment: .leading) {
                             HStack {
-                                Image(systemName: "icloud")
+                                BackseatRowIcon(symbol: "icloud", stock: true)
                                 
                                 Text("icloud_sync")
                             }

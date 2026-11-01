@@ -91,14 +91,18 @@ struct BackseatSettingsHero: View {
   }
 }
 
-/// The driving screen's face, scaled up for the Settings header.
-private struct BackseatFaceRepresentable: UIViewRepresentable {
+/// The driving screen's face at any size, for SwiftUI screens (Settings, onboarding, the walk question).
+struct BackseatFaceRepresentable: UIViewRepresentable {
+  /// Patience left, 0-10: 10 is calm, 0 is fed up.
+  var mood = 4
+  var size: CGFloat = 56
+
   func makeUIView(context: Context) -> UIView {
     let holder = UIView()
     let face = BackseatFaceView()
     face.translatesAutoresizingMaskIntoConstraints = false
-    face.transform = CGAffineTransform(scaleX: 56.0 / 44.0, y: 56.0 / 44.0)
-    face.setMood(4)
+    face.transform = CGAffineTransform(scaleX: size / 44.0, y: size / 44.0)
+    face.setMood(mood)
     holder.addSubview(face)
     NSLayoutConstraint.activate([
       face.centerXAnchor.constraint(equalTo: holder.centerXAnchor),
@@ -107,5 +111,24 @@ private struct BackseatFaceRepresentable: UIViewRepresentable {
     return holder
   }
 
-  func updateUIView(_ view: UIView, context: Context) {}
+  func updateUIView(_ view: UIView, context: Context) {
+    (view.subviews.first as? BackseatFaceView)?.setMood(mood)
+  }
+}
+
+/// A settings-row icon on a little rounded tile, like the system Settings app: road-sign yellow for
+/// Backseat Driver's own rows, a raised grey for the stock ones.
+struct BackseatRowIcon: View {
+  let symbol: String
+  var stock = false
+
+  var body: some View {
+    Image(systemName: symbol)
+      .font(.system(size: 14, weight: .bold))
+      .foregroundStyle(Color(uiColor: stock ? BackseatTheme.text : BackseatTheme.ink))
+      .frame(width: 30, height: 30)
+      .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .fill(Color(uiColor: stock ? BackseatTheme.raised : BackseatTheme.accent)))
+      .accessibilityHidden(true)
+  }
 }

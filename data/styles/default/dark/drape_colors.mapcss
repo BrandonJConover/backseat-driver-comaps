@@ -113,8 +113,8 @@ colors
   SearchmarkSelectedNotAvailable-color: #F06432;
   RatingBad-color: #F06432;
   RatingGood-color: #3C8C3C;
-  RatingNone-color: #249CF2;
-  SearchmarkDefault-color: #249CF2;
+  RatingNone-color: #FFC933;
+  SearchmarkDefault-color: #FFC933;
   RatingText-color: #FFFFFF;
   UGCRatingText-color: #B8B8B8;
   SpeedCameraMarkText-color: #FFFFFF;

@@ -87,7 +87,7 @@ static CGFloat const kDrivingOptionsHeight = 48;
 - (void)updateBackseatHighlight {
   CALayer * layer = self.vehicle.layer;
   if (MWMBackseatRewriter.drivingHighlighted) {
-    layer.borderColor = [UIColor colorWithRed:1 green:0.8 blue:0 alpha:1].CGColor;
+    layer.borderColor = MWMBackseatTheme.accent.CGColor;
     layer.borderWidth = 3;
     layer.cornerRadius = MIN(self.vehicle.bounds.size.width, self.vehicle.bounds.size.height) / 2;
     if (![layer animationForKey:@"backseatPulse"]) {
