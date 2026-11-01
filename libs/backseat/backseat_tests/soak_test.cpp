@@ -133,3 +133,72 @@ TEST(SoakTripStartsDontBuryTheFirstTurn)
   CHECK(trips > 40);
   CHECK(late * 100 <= trips * 8);
 }
+
+// "Hold on tight." is for a bend in the road. In town it used to go off a second or two after
+// ordinary turns: CoMaps moves on to the next maneuver mid-turn, so the end of the turn's own swing
+// was counted as a curve (228 times over 200 town trips).
+TEST(SoakTurnsArentCurves)
+{
+  int afterTurns = 0;
+  for (uint32_t seed = 1; seed <= 40; ++seed)
+  {
+    auto const r = Drive(TripShape::Town, seed);
+    for (auto const & s : r.spoken)
+    {
+      if (s.line.key.rfind("curve.bend", 0) != 0)
+        continue;
+      for (auto const & m : r.maneuvers)
+        if (m.reachedMs >= 0 && s.queuedMs >= m.reachedMs && s.queuedMs - m.reachedMs < 15000)
+        {
+          ++afterTurns;
+          break;
+        }
+    }
+  }
+  CHECK_EQUAL(afterTurns, 0);
+}
+
+namespace
+{
+SimResult Outing(TravelMode mode, uint32_t seed)
+{
+  EngineConfig c;
+  c.rng = SeededRng(seed);
+  Navigator nav(c);
+  nav.SetTravelMode(mode);
+  SimOptions o;
+  o.seed = seed;
+  o.capMps = mode == TravelMode::Walk ? 1.4 : 5;
+  o.legScale = mode == TravelMode::Walk ? 0.3 : 0.6;
+  auto r = SimulateTrip(nav, o);
+  SetLineTravelMode(TravelMode::Drive);
+  return r;
+}
+}  // namespace
+
+// Walks and bike rides: a bit with nothing that fits on foot or on a bike ("No gas stations for the
+// next 49 miles", the NASCAR badge, "Autopilot. Look into it.") used to come out as a bare "Noted.",
+// and walkers were told "You are still turning right" on nearly every turn, before the corner.
+TEST(SoakWalksAndRidesStayOnTopic)
+{
+  for (TravelMode mode : {TravelMode::Walk, TravelMode::Bike})
+  {
+    int turns = 0;
+    int still = 0;
+    int generic = 0;
+    for (uint32_t seed = 1; seed <= 20; ++seed)
+    {
+      auto const r = Outing(mode, seed);
+      CHECK(r.arrived);
+      turns += static_cast<int>(r.maneuvers.size());
+      for (auto const & s : r.spoken)
+      {
+        still += s.line.key.rfind("countdown.still", 0) == 0;
+        generic += s.line.text == "Noted.";
+      }
+    }
+    CHECK(turns > 100);
+    CHECK_EQUAL(generic, 0);
+    CHECK(still * 20 <= turns);
+  }
+}
