@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <map>
 #include <mutex>
@@ -257,6 +258,30 @@ bool LinesFitTravelMode(std::string const & key, int tier)
   return LinesFor(key, tier) != table.at("mode.generic").at(static_cast<size_t>(tier));
 }
 
+namespace
+{
+/// A lone capital letter ending at `end` is a letter grade ("Grade: A.", "an A minus"), not the
+/// word "a" shouted.
+bool IsGradeLetter(std::string const & text, size_t end)
+{
+  if (end >= text.size())
+    return true;
+  char const next = text[end];
+  return next == '.' || next == ',' || next == '!' || next == '?' || text.compare(end, 5, " plus") == 0 ||
+         text.compare(end, 6, " minus") == 0;
+}
+
+/// The word at `at` follows "a " or "an ": "a A" is never the article twice, it's a grade.
+bool AfterArticle(std::string const & text, size_t at)
+{
+  for (std::string_view const article : {"a ", "an "})
+    if (at >= article.size() && text.compare(at - article.size(), article.size(), article) == 0 &&
+        (at == article.size() || !std::isalpha(static_cast<unsigned char>(text[at - article.size() - 1]))))
+      return true;
+  return false;
+}
+}  // namespace
+
 std::string SpeakableText(std::string const & text)
 {
   static char const * const kKeep[] = {"GPS", "ETA", "NASCAR", "OK", "TV", "AI", "ID", "USA", "SUV", "DMV", "DUI", "MPH",
@@ -279,7 +304,7 @@ std::string SpeakableText(std::string const & text)
     std::string const word = out.substr(i, j - i);
     bool const allCaps = std::none_of(word.begin(), word.end(), [](char c) { return std::islower(static_cast<unsigned char>(c)); });
     bool const keep = std::any_of(std::begin(kKeep), std::end(kKeep), [&](char const * k) { return word == k; });
-    if (allCaps && !keep && (word.size() >= 2 || (word == "A" && !sentenceStart)))
+    if (allCaps && !keep && (word.size() >= 2 || (word == "A" && !sentenceStart && !IsGradeLetter(out, j) && !AfterArticle(out, i))))
     {
       for (size_t k = i + (sentenceStart ? 1 : 0); k < j; ++k)
         out[k] = static_cast<char>(std::tolower(static_cast<unsigned char>(out[k])));
@@ -292,6 +317,14 @@ std::string SpeakableText(std::string const & text)
     }
     sentenceStart = false;
     i = j;
+  }
+  // "It would have been a {better}": an A, an F.
+  for (size_t at = out.find(" a "); at != std::string::npos; at = out.find(" a ", at + 1))
+  {
+    size_t const letter = at + 3;
+    bool const lone = letter + 1 >= out.size() || !std::isalpha(static_cast<unsigned char>(out[letter + 1]));
+    if (letter < out.size() && (out[letter] == 'A' || out[letter] == 'F') && lone)
+      out.insert(at + 2, "n");
   }
   return out;
 }

@@ -61,3 +61,15 @@ TEST(CarOnlyBitsDontFitWalksOrRides)
   CHECK(LinesFitTravelMode("idle", 0));
   SetLineTravelMode(TravelMode::Drive);
 }
+
+// A is a grade, not a shouted "a": "Grade: a." was said "Grade: uh."
+TEST(GradeAIsSaidAsALetter)
+{
+  CHECK_EQUAL(SpeakableText("Trip grade: A."), std::string("Trip grade: A."));
+  CHECK_EQUAL(SpeakableText("Grade: A minus. It would have been a A if it weren't for Elm Street."),
+              std::string("Grade: A minus. It would have been an A if it weren't for Elm Street."));
+  CHECK_EQUAL(SpeakableText("Without Elm Street, that's a A plus."), std::string("Without Elm Street, that's an A plus."));
+  CHECK_EQUAL(SpeakableText("That's a F, honestly."), std::string("That's an F, honestly."));
+  CHECK_EQUAL(SpeakableText("That's a B minus."), std::string("That's a B minus."));
+  CHECK_EQUAL(SpeakableText("I'M NOT CRYING, I'M A PHONE!"), std::string("I'm not crying, I'm a phone!"));
+}
