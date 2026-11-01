@@ -7,6 +7,8 @@
 #include "map/transit/transit_reader.hpp"
 #include "map/user_mark.hpp"
 
+#include "backseat/route_sketch.hpp"
+
 #include "routing/absent_regions_finder.hpp"
 #include "routing/checkpoint_predictor.hpp"
 #include "routing/checkpoints.hpp"
@@ -56,6 +58,7 @@
 #include "base/stl_helpers.hpp"
 #include "base/string_utils.hpp"
 
+#include <algorithm>
 #include <ios>
 #include <map>
 
@@ -138,6 +141,7 @@ void SerializeRoutePoint(json_t * node, RouteMarkData const & data)
   ToJSONObject(*node, "x", data.m_position.x);
   ToJSONObject(*node, "y", data.m_position.y);
   ToJSONObject(*node, "replaceWithMyPosition", data.m_replaceWithMyPositionAfterRestart);
+  ToJSONObject(*node, "shaping", data.m_isShaping);
 }
 
 RouteMarkData DeserializeRoutePoint(json_t * node)
@@ -156,6 +160,7 @@ RouteMarkData DeserializeRoutePoint(json_t * node)
   FromJSONObject(node, "y", data.m_position.y);
 
   FromJSONObject(node, "replaceWithMyPosition", data.m_replaceWithMyPositionAfterRestart);
+  FromJSONObjectOptionalField(node, "shaping", data.m_isShaping);
 
   return data;
 }
@@ -334,6 +339,8 @@ RoutingManager::RoutingManager(Callbacks && callbacks, Delegate & delegate)
   , m_extrapolator([this](location::GpsInfo const & gpsInfo) { this->OnExtrapolatedLocationUpdate(gpsInfo); })
 {
   m_extrapolator.Enable(true);  // Keeps smooth arrow movement whether routing or not
+  m_backseat.SetDataSource(m_callbacks.m_dataSourceGetter);
+  m_backseat.SetCountryInfoGetter(m_callbacks.m_countryInfoGetter);
   m_routingSession.Init(
 #ifdef SHOW_ROUTE_DEBUG_MARKS
       [this](m2::PointD const & pt)
@@ -429,11 +436,14 @@ void RoutingManager::OnBuildRouteReady(Route const & route, RouterResultCode cod
 
   auto const hasWarnings = InsertRoute(route);
   m_drapeEngine.SafeCall(&df::DrapeEngine::StopLocationFollow);
+  if (route.IsValid() && route.GetPoly().GetSize() > 0)
+    m_backseat.OnRouteBuilt(route.GetTotalTimeSec(), route.GetPoly().Back(), HasRouteSketch());
 
   // Validate route (in case of bicycle routing it can be invalid).
   ASSERT(route.IsValid(), ());
   // Do not show the full route if one or more stops were added, for easier multi-stop trip planning.
-  if (route.IsValid() && route.GetSubrouteCount() < 2 && m_currentRouterType != routing::RouterType::Ruler)
+  if (route.IsValid() && route.GetSubrouteCount() < 2 && m_currentRouterType != routing::RouterType::Ruler &&
+      !m_backseatKeepViewport)
   {
     m2::RectD routeRect = route.GetPoly().GetLimitRect();
     routeRect.Scale(kRouteScaleMultiplier);
@@ -489,6 +499,16 @@ void RoutingManager::OnRoutePointPassed(RouteMarkType type, size_t intermediateI
 void RoutingManager::OnLocationUpdate(location::GpsInfo const & info)
 {
   m_extrapolator.OnLocationUpdate(info);
+  // Only real fixes go to Backseat Driver: extrapolated ones would fake hard braking.
+  m_backseat.OnLocationUpdate(info, m_routingSession, GetBackseatDestinationName());
+}
+
+std::string RoutingManager::GetBackseatDestinationName() const
+{
+  for (auto const & point : GetRoutePoints())
+    if (point.m_pointType == RouteMarkType::Finish)
+      return point.m_title;
+  return {};
 }
 
 RouterType RoutingManager::GetBestRouter(m2::PointD const & startPoint, m2::PointD const & finalPoint) const
@@ -881,6 +901,14 @@ bool RoutingManager::InsertRoute(Route const & route)
   if (hasWarnings && m_currentRouterType == RouterType::Vehicle)
     CreateRoadWarningMarks(std::move(roadWarnings));
 
+  if (m_currentRouterType == RouterType::Vehicle)
+  {
+    std::vector<m2::PointD> lights;
+    for (auto const & light : trafficLights)
+      lights.push_back(light.first);
+    m_backseat.SetTrafficLights(std::move(lights));
+  }
+
   if (!trafficLights.empty() && m_currentRouterType == RouterType::Vehicle)
     CreateTrafficLightMarks(std::move(trafficLights));
 
@@ -999,11 +1027,119 @@ void RoutingManager::AddRoutePoint(RouteMarkData && markData, bool reorderInterm
       routePoints.RemoveRoutePoint(mark->GetRoutePointType(), mark->GetIntermediateIndex());
   }
 
-  markData.m_isVisible = !markData.m_isMyPosition;
+  markData.m_isVisible = !markData.m_isMyPosition && !markData.m_isShaping;
   routePoints.AddRoutePoint(std::move(markData));
 
   if (reorderIntermediatePoints)
     ReorderIntermediatePoints();
+}
+
+namespace
+{
+backseat::LatLon ToSketchLatLon(m2::PointD const & p)
+{
+  auto const ll = mercator::ToLatLon(p);
+  return {ll.m_lat, ll.m_lon};
+}
+
+// Replaces all route points with `points`, keeping their order exactly.
+void ResetRoutePoints(RoutingManager & manager, vector<RouteMarkData> points)
+{
+  manager.RemoveRoutePoints();
+  for (size_t i = 0; i < points.size(); ++i)
+  {
+    auto & p = points[i];
+    p.m_pointType = i == 0 ? RouteMarkType::Start
+                  : i + 1 == points.size() ? RouteMarkType::Finish
+                                           : RouteMarkType::Intermediate;
+    p.m_intermediateIndex = p.m_pointType == RouteMarkType::Intermediate ? i - 1 : 0;
+    manager.AddRoutePoint(std::move(p), false /* reorderIntermediatePoints */);
+  }
+}
+}  // namespace
+
+RoutingManager::RouteSketchResult RoutingManager::ApplyRouteSketch(vector<m2::PointD> const & stroke,
+                                                                   double metersPerPixel)
+{
+  ASSERT(m_bmManager != nullptr, ());
+  RouteSketchResult result;
+  if (stroke.size() < 2)
+    return result;
+
+  auto points = GetRoutePoints();
+  // Mid-drive, the passed points are behind us: start from where we are, like a reroute does.
+  size_t lastPassed = 0;
+  for (size_t i = 0; i < points.size(); ++i)
+    if (points[i].m_isPassed)
+      lastPassed = i + 1;
+  if (points.empty() || lastPassed > 0)
+  {
+    auto const & myPosition = m_bmManager->MyPositionMark();
+    if (!myPosition.HasPosition())
+      return result;
+    RouteMarkData start;
+    start.m_isMyPosition = true;
+    start.m_position = myPosition.GetPivot();
+    points.erase(points.begin(), points.begin() + lastPassed);
+    points.insert(points.begin(), std::move(start));
+  }
+
+  vector<backseat::LatLon> strokeLatLon;
+  strokeLatLon.reserve(stroke.size());
+  for (auto const & p : stroke)
+    strokeLatLon.push_back(ToSketchLatLon(p));
+  vector<backseat::SketchRoutePoint> route;
+  for (auto const & p : points)
+    route.push_back({ToSketchLatLon(p.m_position), p.m_isShaping});
+
+  size_t const maxPoints = RoutePointsLayout::kMaxIntermediatePointsCount + 2;
+  size_t const freeSlots = maxPoints > points.size() ? maxPoints - points.size() : 0;
+  backseat::SketchOptions options;
+  options.toleranceM = max(25.0, 10 * metersPerPixel);
+  double const snapRadiusM = max(80.0, 40 * metersPerPixel);
+  auto const plan = backseat::PlanSketch(strokeLatLon, route, snapRadiusM, freeSlots, options);
+  if (plan.shaping.empty() && !plan.newStop)
+    return result;
+
+  vector<RouteMarkData> next(points.begin(), points.begin() + plan.from + 1);
+  for (auto const & ll : plan.shaping)
+  {
+    RouteMarkData shaping;
+    shaping.m_isShaping = true;
+    shaping.m_position = mercator::FromLatLon(ll.lat, ll.lon);
+    next.push_back(std::move(shaping));
+  }
+  if (plan.newStop)
+  {
+    RouteMarkData stop;
+    stop.m_position = mercator::FromLatLon(plan.newStopAt.lat, plan.newStopAt.lon);
+    next.push_back(std::move(stop));
+  }
+  next.insert(next.end(), points.begin() + min(plan.to, points.size()), points.end());
+
+  ResetRoutePoints(*this, std::move(next));
+  result.applied = true;
+  result.addedStop = plan.newStop;
+  result.trimmed = plan.trimmed;
+  result.shapingPoints = plan.shaping.size();
+  return result;
+}
+
+bool RoutingManager::ClearRouteSketch()
+{
+  auto points = GetRoutePoints();
+  auto const end = remove_if(points.begin(), points.end(), [](RouteMarkData const & p) { return p.m_isShaping; });
+  if (end == points.end())
+    return false;
+  points.erase(end, points.end());
+  ResetRoutePoints(*this, std::move(points));
+  return true;
+}
+
+bool RoutingManager::HasRouteSketch() const
+{
+  auto const points = GetRoutePoints();
+  return any_of(points.begin(), points.end(), [](RouteMarkData const & p) { return p.m_isShaping; });
 }
 
 void RoutingManager::ContinueRouteToPoint(RouteMarkData && markData)
@@ -1148,7 +1284,13 @@ void RoutingManager::ReorderIntermediatePoints()
 
 void RoutingManager::GenerateNotifications(vector<string> & turnNotifications, bool announceStreets)
 {
-  m_routingSession.GenerateNotifications(turnNotifications, announceStreets);
+  // Keep the stock notification state moving, but say Backseat Driver's lines instead.
+  vector<string> stock;
+  m_routingSession.GenerateNotifications(stock, announceStreets);
+  if (m_currentRouterType == RouterType::Vehicle)
+    turnNotifications = m_backseat.TakeNotifications(m_routingSession, GetBackseatDestinationName());
+  else
+    turnNotifications = std::move(stock);
 }
 
 void RoutingManager::BuildRoute(uint32_t timeoutSec)
@@ -1583,8 +1725,13 @@ void RoutingManager::LoadRoutePoints(LoadRouteHandler const & handler)
       auto const & myPosMark = m_bmManager->MyPositionMark();
       auto editSession = m_bmManager->GetEditSession();
       editSession.ClearGroup(UserMark::Type::ROUTING);
+      // Saved points are already in driving order. Reordering would scramble a drawn route.
+      size_t intermediateIndex = 0;
       for (auto & p : points)
       {
+        if (p.m_pointType == RouteMarkType::Intermediate)
+          p.m_intermediateIndex = intermediateIndex++;
+
         // Check if the saved route used the user's position
         if (p.m_replaceWithMyPositionAfterRestart && p.m_pointType == RouteMarkType::Start)
           routeUsedPosition = true;
@@ -1595,11 +1742,11 @@ void RoutingManager::LoadRoutePoints(LoadRouteHandler const & handler)
           startPt.m_pointType = RouteMarkType::Start;
           startPt.m_isMyPosition = true;
           startPt.m_position = myPosMark.GetPivot();
-          AddRoutePoint(std::move(startPt));
+          AddRoutePoint(std::move(startPt), false /* reorderIntermediatePoints */);
         }
         else
         {
-          AddRoutePoint(std::move(p));
+          AddRoutePoint(std::move(p), false /* reorderIntermediatePoints */);
         }
       }
 

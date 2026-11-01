@@ -35,6 +35,19 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
     })
   }()
 
+  /// Backseat Driver: tap to talk back (license plate game answers, for now).
+  private lazy var talkButton: UIButton = {
+    let button = UIButton(configuration: .filled())
+    BackseatTheme.styleTalkButton(button)
+    button.accessibilityLabel = "Talk to Backseat Driver"
+    button.addTarget(self, action: #selector(talkButtonAction), for: .touchUpInside)
+    return button
+  }()
+
+  @objc private func talkButtonAction() {
+    BackseatListener.shared.toggle()
+  }
+
   @objc weak var ownerView: UIView!
   @IBOutlet private weak var extendedView: UIView!
 
@@ -45,6 +58,8 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
   @objc var isVisible = false {
     didSet {
       guard isVisible != oldValue else { return }
+      // The map's own mic button steps aside while this one is on screen.
+      NotificationCenter.default.post(name: BackseatTalkButton.navigationVisibilityChanged, object: isVisible)
       if isVisible {
         addView()
       } else {
@@ -65,6 +80,7 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
       dimBackground.setVisible(isExtended, completion: nil)
       extendedView.isHidden = !isExtended
       mapPositionButton.isHidden = isExtended
+      talkButton.isHidden = isExtended
       superview!.animateConstraints(animations: {
         if (self.isExtended) {
           self.notExtendedConstraint.isActive = false
@@ -129,6 +145,18 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
       trackRecordingController.view.bottomAnchor.constraint(equalTo: activeTrackRecordingButton.bottomAnchor),
     ])
 
+    addSubview(talkButton)
+    talkButton.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([
+      talkButton.widthAnchor.constraint(equalTo: mapPositionButton.widthAnchor),
+      talkButton.heightAnchor.constraint(equalTo: mapPositionButton.heightAnchor),
+      talkButton.centerXAnchor.constraint(equalTo: mapPositionButton.centerXAnchor),
+      talkButton.bottomAnchor.constraint(equalTo: mapPositionButton.topAnchor, constant: -12),
+    ])
+    BackseatTalkButton.followListening(talkButton)
+
+    backseatRestyle()
+
     trackRecordingButton.accessibilityLabel = L("record_track")
     TrackRecordingManager.shared.addObserver(self) { [weak self] state, _, _ in
       DispatchQueue.main.async {
@@ -142,7 +170,7 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
       return true
     }
 
-    return [mapPositionButton, activeTrackRecordingButton].contains { control in
+    return [mapPositionButton, activeTrackRecordingButton, talkButton].contains { control in
       guard let control, !control.isHidden, control.alpha > 0 else { return false }
       return control.point(inside: convert(point, to: control), with: event)
     }
@@ -170,13 +198,13 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
     navigationInfo = info
     let routingNumberAttributes: [NSAttributedString.Key: Any] =
       [
-        NSAttributedString.Key.foregroundColor: UIColor.blackPrimaryText(),
-        NSAttributedString.Key.font: UIFont.bold24()
+        NSAttributedString.Key.foregroundColor: BackseatTheme.text,
+        NSAttributedString.Key.font: BackseatTheme.number(26, weight: .bold)
       ]
     let routingLegendAttributes: [NSAttributedString.Key: Any] =
       [
-        NSAttributedString.Key.foregroundColor: UIColor.blackSecondaryText(),
-        NSAttributedString.Key.font: UIFont.bold14()
+        NSAttributedString.Key.foregroundColor: BackseatTheme.muted,
+        NSAttributedString.Key.font: BackseatTheme.body(14, weight: .semibold)
       ]
 
     if timePageControl.currentPage == 0 {
@@ -222,11 +250,11 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
     speedWithLegendLabel.attributedText = speedWithLegend
 
     if MWMRouter.isSpeedCamLimitExceeded() {
-      speedLabel.textColor = UIColor.white()
-      speedBackground.backgroundColor = UIColor.buttonRed()
+      speedLabel.textColor = BackseatTheme.ink
+      speedBackground.backgroundColor = BackseatTheme.hot
     } else {
       let isSpeedLimitExceeded = info.speedLimitMps > 0 && speedMps > info.speedLimitMps
-      speedLabel.textColor = isSpeedLimitExceeded ? UIColor.buttonRed() : UIColor.blackPrimaryText()
+      speedLabel.textColor = isSpeedLimitExceeded ? BackseatTheme.hot : BackseatTheme.text
       speedBackground.backgroundColor = UIColor.clear
     }
     speedLegendLabel.textColor = speedLabel.textColor
@@ -333,7 +361,42 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
 
   override func applyTheme() {
     super.applyTheme()
+    backseatRestyle()
     onTTSStatusUpdated()
+  }
+
+  /// Backseat Driver's night-drive panel: a dark card with rounded top corners, light condensed
+  /// numbers and a yellow progress bar, whatever the app theme. Runs after the stock style sheets,
+  /// so it wins over the xib's styleNames.
+  private func backseatRestyle() {
+    func walk(_ view: UIView) {
+      switch view.styleName {
+      case "Background":
+        view.backgroundColor = BackseatTheme.card
+        view.layer.cornerRadius = 28
+        view.layer.cornerCurve = .continuous
+        view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+      case "BlueBackground":
+        view.backgroundColor = BackseatTheme.accent
+      default:
+        break
+      }
+      if let label = view as? UILabel {
+        if label.styleName == "blackPrimaryText" { label.textColor = BackseatTheme.text }
+        if label.styleName == "blackSecondaryText" { label.textColor = BackseatTheme.muted }
+      }
+      if let button = view as? UIButton, button.styleName == "MWMBlack" {
+        button.tintColor = BackseatTheme.text
+      }
+      view.subviews.forEach(walk)
+    }
+    walk(self)
+    if styleName != "Background" { backgroundColor = .clear }
+    timeLabel.font = BackseatTheme.number(30, weight: .bold)
+    distanceLabel.font = BackseatTheme.number(26, weight: .bold)
+    speedLabel.font = BackseatTheme.number(26, weight: .bold)
+    timePageControl.currentPageIndicatorTintColor = BackseatTheme.accent
+    timePageControl.pageIndicatorTintColor = BackseatTheme.line
   }
 
   override var sideButtonsAreaAffectDirections: MWMAvailableAreaAffectDirections {

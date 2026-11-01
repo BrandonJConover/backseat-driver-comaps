@@ -120,6 +120,13 @@ using Observers = NSHashTable<Observer>;
     [NSUserDefaults.standardUserDefaults registerDefaults:dictionary];
 
     [MWMRouter enableTurnNotifications:self.allowsTurnInstructions];
+
+    // Backseat Driver: the Kokoro voice, with the system voice as fallback.
+    __weak MWMTextToSpeech * weakSelf = self;
+    BackseatKokoroVoice.shared.systemIsSpeaking = ^BOOL {
+      return weakSelf.speechSynthesizer.isSpeaking;
+    };
+    [BackseatKokoroVoice.shared start];
   }
   return self;
 }
@@ -327,15 +334,33 @@ using Observers = NSHashTable<Observer>;
 
 
 - (void)speakOneString:(NSString *)textToSpeak {
-  AVSpeechUtterance * utterance = [AVSpeechUtterance speechUtteranceWithString:textToSpeak];
-  utterance.voice = self.speechVoice;
-  utterance.rate = AVSpeechUtteranceDefaultSpeechRate;
-  [self.speechSynthesizer speakUtterance:utterance];
+  // Backseat: one utterance per sentence with a breath between them; run together, the system
+  // voice barely pauses and sounds rushed.
+  NSString * text = [textToSpeak stringByReplacingOccurrencesOfString:@" || " withString:@". "];
+  NSMutableArray<NSString *> * sentences = [NSMutableArray array];
+  [text enumerateSubstringsInRange:NSMakeRange(0, text.length)
+                           options:NSStringEnumerationBySentences
+                        usingBlock:^(NSString * sentence, NSRange, NSRange, BOOL *) {
+    NSString * trimmed = [sentence stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if (trimmed.length > 0)
+      [sentences addObject:trimmed];
+  }];
+  if (sentences.count == 0)
+    [sentences addObject:text];
+  for (NSString * sentence in sentences)
+  {
+    AVSpeechUtterance * utterance = [AVSpeechUtterance speechUtteranceWithString:sentence];
+    utterance.voice = self.speechVoice;
+    utterance.rate = AVSpeechUtteranceDefaultSpeechRate;
+    utterance.preUtteranceDelay = 0.1;
+    utterance.postUtteranceDelay = 0.4;
+    [self.speechSynthesizer speakUtterance:utterance];
+  }
 }
 
 - (void)playRouteNotifications:(NSArray<NSString *> *)routeNotifications {
   auto stopSession = ^{
-    if (self.speechSynthesizer.isSpeaking)
+    if (self.speechSynthesizer.isSpeaking || BackseatKokoroVoice.shared.isBusy || BackseatListener.shared.isListening)
       return;
     [[AVAudioSession sharedInstance]
           setActive:NO
@@ -366,8 +391,43 @@ using Observers = NSHashTable<Observer>;
       return;
     }
 
-    for (NSString * notification in routeNotifications)
-      [self speakOneString:notification];
+    // Backseat Driver: Kokoro says the lines when it's ready. Navigation lines never wait on it:
+    // if Kokoro can't start one quickly, the system voice says it.
+    auto & backseat = GetFramework().GetRoutingManager().GetBackseat();
+    auto const & voices = backseat.LastLineVoices();
+    BOOL const hinted = self.allowsTurnInstructions && voices.size() == routeNotifications.count;
+    BackseatKokoroVoice * kokoro = BackseatKokoroVoice.shared;
+    // A fake phone call that will put someone on just started: get their voice ready.
+    auto const callerVoice = backseat.TakeCallerVoiceToWarm();
+    if (!callerVoice.empty())
+      [kokoro prepareVoice:@(callerVoice.c_str())];
+    for (NSUInteger i = 0; i < routeNotifications.count; ++i)
+    {
+      // While Kokoro loads, roasts wait for it and turn instructions go to the system voice.
+      NSString * notification = routeNotifications[i];
+      // Someone else talking (the caller on the phone): only ever Kokoro, never the system voice.
+      if (hinted && !voices[i].voice.empty())
+      {
+        [kokoro speak:notification voice:@(voices[i].voice.c_str()) speed:static_cast<float>(voices[i].speed)];
+        continue;
+      }
+      BOOL const nav = hinted ? voices[i].nav : YES;
+      float const speed = hinted ? static_cast<float>(voices[i].speed) : 1.0f;
+      double const maxWaitMs = hinted ? voices[i].maxWaitMs : 0;
+      __weak MWMTextToSpeech * weakSelf = self;
+      [kokoro speak:notification nav:nav speed:speed maxWaitMs:maxWaitMs fallback:^{
+        [weakSelf speakOneString:notification];
+      }];
+    }
+    // 20 Questions: the driver answers out loud, so listen once the GPS has said its piece.
+    for (NSUInteger i = 0; hinted && i < voices.size(); ++i)
+    {
+      if (voices[i].listen)
+      {
+        [BackseatListener.shared listenForGameAnswer];
+        break;
+      }
+    }
   }
 }
 

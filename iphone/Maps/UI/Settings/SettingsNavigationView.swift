@@ -85,26 +85,18 @@ struct SettingsNavigationView: View {
                         Text("pref_tts_language_title")
                     }
                     
-                    HStack {
-                        VStack(alignment: .leading) {
+                    NavigationLink {
+                        SettingsBackseatVoiceView()
+                    } label: {
+                        HStack {
                             Text("voice")
-                            
-                            if #available(iOS 26, *) {
-                                Text("voice_explanation")
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text("voice_explanation_before_version26")
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            }
+
+                            Spacer()
+
+                            Text(verbatim: KokoroVoice.selectedVoiceName)
+                                .foregroundStyle(.secondary)
+                                .id(UUID())
                         }
-                        
-                        Spacer()
-                        
-                        Text(Settings.voiceForVoiceRouting ?? "unknown")
-                            .foregroundStyle(.secondary)
-                            .id(UUID())
                     }
                     
                     Toggle(isOn: $shouldAnnounceStreetnamesWhileVoiceRouting) {
@@ -136,7 +128,9 @@ struct SettingsNavigationView: View {
             } footer: {
                 if shouldProvideVoiceRouting {
                     Button {
-                        Settings.playVoiceRoutingTest()
+                        KokoroVoice.shared.test("In five hundred feet, turn right. Try to keep up.") {
+                            Settings.playVoiceRoutingTest()
+                        }
                     } label: {
                         Text("pref_tts_test_voice_title")
                             .bold()
@@ -225,6 +219,7 @@ struct SettingsNavigationView: View {
         }
         .accentColor(.accent)
         .navigationViewStyle(StackNavigationViewStyle())
+        .backseatList()
         .navigationTitle("prefs_group_route")
         .onAppear {
             hasPerspectiveViewWhileRouting = Settings.hasPerspectiveViewWhileRouting

@@ -85,7 +85,16 @@ public enum TtsPlayer
 
   private LocaleListCompat mInstalledSystemLocales;
 
+  // Backseat Driver: a neural voice (Kokoro) the app can plug in. The system voice stays the fallback.
+  @Nullable
+  private NeuralVoice mNeuralVoice;
+
   TtsPlayer() {}
+
+  public void setNeuralVoice(@Nullable NeuralVoice voice)
+  {
+    mNeuralVoice = voice;
+  }
 
   private static @Nullable LanguageData findSupportedLanguage(String internalCode, List<LanguageData> langs)
   {
@@ -275,6 +284,19 @@ public enum TtsPlayer
     }
   }
 
+  /** True while the system voice is talking. */
+  public boolean isSpeaking()
+  {
+    try
+    {
+      return mTts != null && mTts.isSpeaking();
+    }
+    catch (IllegalArgumentException e)
+    {
+      return false;
+    }
+  }
+
   public static boolean isReady()
   {
     return (INSTANCE.mTts != null && !INSTANCE.mUnavailable && !INSTANCE.mInitializing);
@@ -317,8 +339,38 @@ public enum TtsPlayer
         speak(textToSpeak);
   }
 
+  /**
+   * Speaks Backseat Driver's lines. {@code nav} and {@code speeds} describe each line and may be shorter
+   * than {@code turnNotifications} (e.g. speed camera warnings): lines without a hint count as navigation.
+   * Navigation lines never wait on the neural voice; if it can't start one quickly it hands it back to
+   * the system voice.
+   */
+  public void playTurnNotifications(@NonNull String[] turnNotifications, @Nullable boolean[] nav,
+                                    @Nullable float[] speeds)
+  {
+    if (!isReady())
+      return;
+    final NeuralVoice neural = mNeuralVoice;
+    final boolean hinted = nav != null && speeds != null && nav.length == turnNotifications.length
+                        && speeds.length == turnNotifications.length;
+    for (int i = 0; i < turnNotifications.length; i++)
+    {
+      final String text = turnNotifications[i];
+      if (neural == null || !Config.TTS.isEnabled() || !neural.isReady())
+      {
+        speak(text);
+        continue;
+      }
+      final boolean isNav = !hinted || nav[i];
+      final float speed = hinted ? speeds[i] : 1.0f;
+      neural.speak(text, isNav, speed, Config.TTS.getVolume(), () -> UiThread.run(() -> speak(text)));
+    }
+  }
+
   public void stop()
   {
+    if (mNeuralVoice != null)
+      mNeuralVoice.stop();
     if (isReady())
       try
       {

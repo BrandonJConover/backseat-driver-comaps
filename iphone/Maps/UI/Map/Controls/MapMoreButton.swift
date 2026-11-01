@@ -33,7 +33,7 @@ struct MapMoreButton: View {
         .accessibilityHidden(true)
         .overlay {
             Menu {
-                ForEach(MapCustomButton.Kind.allCases) { kind in
+                ForEach(MapCustomButton.Kind.offered) { kind in
                     if kind != customButtonKind {
                         Button {
                             kind.action

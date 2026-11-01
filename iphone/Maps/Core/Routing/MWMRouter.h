@@ -30,6 +30,9 @@ typedef void (^MWMImageHeightBlock)(UIImage *, NSString *, NSString *);
 
 + (void)startRouting;
 + (void)stopRouting;
+/// Backseat: start navigating as soon as the route being built is ready (from my position, no
+/// warnings), so "Start" on a place is one tap instead of route preview and Start again.
++ (void)startWhenReady;
 
 + (NSArray<MWMRoutePoint *> *)points;
 + (NSInteger)pointsCount;

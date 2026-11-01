@@ -17,6 +17,11 @@ extension MapCustomButton {
         
         /// The id
         var id: Self { self }
+
+
+        /// The kinds offered in menus. Backseat Driver leaves out track recording: it kept the app
+        /// opening into the recording sheet, and a GPS that roasts you doesn't need it.
+        static var offered: [Self] { allCases.filter { $0 != .recordTrack } }
         
         
         /// The description text
