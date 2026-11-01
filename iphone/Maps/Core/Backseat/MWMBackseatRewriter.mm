@@ -477,7 +477,6 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
 }
 
 static BOOL gDrivingHighlighted = NO;
-static __weak UIAlertController * gWalkQuestion = nil;
 NSString * const kBackseatDrivingHighlightChanged = @"BackseatDrivingHighlightChanged";
 
 + (BOOL)drivingHighlighted
@@ -506,36 +505,28 @@ static m2::PointD gWalkConfirmedTo{1e9, 1e9};
   double const lengthM = info.IsValid() ? info.m_distToTarget.To(platform::Distance::Units::Meters).GetDistance() : 0;
   if (lengthM <= kWalkQuestionOverM)
     return YES;
-  if (!gWalkQuestion)
-    [self askWalkQuestionTo:to];
+  if (!BackseatWalkQuestion.isShowing)
+    [self askWalkQuestionTo:to meters:lengthM];
   return NO;
 }
 
-+ (void)askWalkQuestionTo:(m2::PointD)to
++ (void)askWalkQuestionTo:(m2::PointD)to meters:(double)meters
 {
   auto & rm = GetFramework().GetRoutingManager();
   SayReply(rm.BackseatReply("mode.ask.walk"), {});
-  UIAlertController * alert = [UIAlertController alertControllerWithTitle:@"Are you actually intending to walk there?"
-                                                                  message:nil
-                                                           preferredStyle:UIAlertControllerStyleAlert];
-  [alert addAction:[UIAlertAction actionWithTitle:@"No" style:UIAlertActionStyleDefault handler:^(UIAlertAction *) {
-    gWalkQuestion = nil;
-    // "I'm going to need you to click the driving button." Nothing starts until it's tapped.
-    SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.no"), {});
-    gDrivingHighlighted = YES;
-    [[NSNotificationCenter defaultCenter] postNotificationName:kBackseatDrivingHighlightChanged object:nil];
-  }]];
-  [alert addAction:[UIAlertAction actionWithTitle:@"Yes" style:UIAlertActionStyleDefault handler:^(UIAlertAction *) {
-    gWalkQuestion = nil;
-    SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.yes"), {});
-    gWalkConfirmedTo = to;
-    [MWMRouter startRouting];
-  }]];
-  UIViewController * top = [MapViewController sharedController];
-  while (top.presentedViewController)
-    top = top.presentedViewController;
-  gWalkQuestion = alert;
-  [top presentViewController:alert animated:YES completion:nil];
+  // A Backseat card rather than a stock alert (BackseatWalkQuestion.swift). It waits for an answer.
+  [BackseatWalkQuestion presentWithMeters:meters
+      onYes:^{
+        SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.yes"), {});
+        gWalkConfirmedTo = to;
+        [MWMRouter startRouting];
+      }
+      onNo:^{
+        // "I'm going to need you to click the driving button." Nothing starts until it's tapped.
+        SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.no"), {});
+        gDrivingHighlighted = YES;
+        [[NSNotificationCenter defaultCenter] postNotificationName:kBackseatDrivingHighlightChanged object:nil];
+      }];
 }
 
 + (void)drivingButtonTapped

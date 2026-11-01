@@ -22,6 +22,7 @@ import UIKit
 
   /// From the map screen: the first launch shows the onboarding, after that the usual spoken check-in.
   @objc static func startIfNeeded(from host: UIViewController) {
+    if BackseatUITour.run(from: host) { return }
     if isDone {
       BackseatSetup.startIfNeeded()
     } else {
@@ -39,9 +40,23 @@ import UIKit
     present(from: top)
   }
 
-  private static func present(from host: UIViewController) {
+  #if DEBUG
+  /// The UI tour (BackseatUITour): straight to a later screen, with a line in the bubble.
+  static func presentForTour(from host: UIViewController, screen: BackseatOnboardingModel.Screen) {
+    present(from: host) { model in
+      model.screen = screen
+      model.monologueOver = true
+      model.bubble = screen == .voices ? "Pick whoever you like. I'll still be the one judging you."
+        : "Brandon. Interesting. I thought it would have been Gary. Can I call you Gary?"
+      if screen == .aboutYou { model.aboutStep = .question(1) }
+    }
+  }
+  #endif
+
+  private static func present(from host: UIViewController, configure: ((BackseatOnboardingModel) -> Void)? = nil) {
     guard presented == nil else { return }
     let model = BackseatOnboardingModel()
+    configure?(model)
     let controller = UIHostingController(rootView: BackseatOnboardingView(model: model))
     controller.modalPresentationStyle = .fullScreen
     controller.isModalInPresentation = true

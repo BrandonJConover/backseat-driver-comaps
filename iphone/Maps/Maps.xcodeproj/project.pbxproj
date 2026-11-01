@@ -157,6 +157,8 @@
 		BD5EA70000000000000000D1 /* BackseatReturnTrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000D0 /* BackseatReturnTrip.swift */; };
 		BD5EA7000000000000000E21 /* BackseatOnboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000E20 /* BackseatOnboarding.swift */; };
 		BD5EA70000000000000A0E31 /* BackseatQuizCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000A0E30 /* BackseatQuizCard.swift */; };
+		BD5EA70000000000000A0F33 /* BackseatWalkQuestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000A0F32 /* BackseatWalkQuestion.swift */; };
+		BD5EA70000000000000A0F31 /* BackseatUITour.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000A0F30 /* BackseatUITour.swift */; };
 		BD5EA70000000000000000E1 /* BackseatTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000E0 /* BackseatTheme.swift */; };
 		BD5EA70000000000000000E3 /* BackseatCaptionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000E2 /* BackseatCaptionView.swift */; };
 		BD5EA70000000000000000F1 /* BackseatArrivalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000F0 /* BackseatArrivalCard.swift */; };
@@ -1009,6 +1011,8 @@
 		BD5EA70000000000000000B0 /* BackseatHooks.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatHooks.swift; sourceTree = "<group>"; };
 		BD5EA70000000000000000D0 /* BackseatReturnTrip.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatReturnTrip.swift; sourceTree = "<group>"; };
 		BD5EA7000000000000000E20 /* BackseatOnboarding.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatOnboarding.swift; sourceTree = "<group>"; };
+		BD5EA70000000000000A0F30 /* BackseatUITour.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatUITour.swift; sourceTree = "<group>"; };
+		BD5EA70000000000000A0F32 /* BackseatWalkQuestion.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatWalkQuestion.swift; sourceTree = "<group>"; };
 		BD5EA70000000000000A0E30 /* BackseatQuizCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatQuizCard.swift; sourceTree = "<group>"; };
 		BD5EA70000000000000000E0 /* BackseatTheme.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatTheme.swift; sourceTree = "<group>"; };
 		BD5EA70000000000000000E2 /* BackseatCaptionView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackseatCaptionView.swift; sourceTree = "<group>"; };
@@ -2628,6 +2632,8 @@
 				BD5EA70000000000000000D0 /* BackseatReturnTrip.swift */,
 				BD5EA7000000000000000E20 /* BackseatOnboarding.swift */,
 				BD5EA70000000000000A0E30 /* BackseatQuizCard.swift */,
+				BD5EA70000000000000A0F32 /* BackseatWalkQuestion.swift */,
+				BD5EA70000000000000A0F30 /* BackseatUITour.swift */,
 				BD5EA70000000000000000E0 /* BackseatTheme.swift */,
 				BD5EA70000000000000000E2 /* BackseatCaptionView.swift */,
 				BD5EA70000000000000000F0 /* BackseatArrivalCard.swift */,
@@ -4941,6 +4947,8 @@
 				BD5EA70000000000000000D1 /* BackseatReturnTrip.swift in Sources */,
 				BD5EA7000000000000000E21 /* BackseatOnboarding.swift in Sources */,
 				BD5EA70000000000000A0E31 /* BackseatQuizCard.swift in Sources */,
+				BD5EA70000000000000A0F33 /* BackseatWalkQuestion.swift in Sources */,
+				BD5EA70000000000000A0F31 /* BackseatUITour.swift in Sources */,
 				BD5EA70000000000000000E1 /* BackseatTheme.swift in Sources */,
 				BD5EA70000000000000000E3 /* BackseatCaptionView.swift in Sources */,
 				BD5EA70000000000000000F1 /* BackseatArrivalCard.swift in Sources */,

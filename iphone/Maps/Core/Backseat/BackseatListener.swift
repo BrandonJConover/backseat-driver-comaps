@@ -193,6 +193,8 @@ import Speech
   }
 
   private func withPermission(_ then: @escaping () -> Void) {
+    // The simulator UI tour can't answer the permission prompt, and it would cover the screen.
+    guard !BackseatUITour.active else { return }
     SFSpeechRecognizer.requestAuthorization { status in
       DispatchQueue.main.async {
         guard status == .authorized else {

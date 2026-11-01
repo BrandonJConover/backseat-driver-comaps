@@ -39,6 +39,16 @@ import UIKit
     }
   }
 
+  #if DEBUG
+  /// The UI tour (BackseatUITour): a sample quiz, asked or answered wrong.
+  static func showSample(answered: Bool) {
+    view?.update(Quiz(["question": "Which state has the most miles of interstate?",
+                       "choices": ["Texas", "California", "Alaska"],
+                       "picked": answered ? 1 : -1, "correct": answered ? 0 : -1,
+                       "tappable": false, "brownies": 3]))
+  }
+  #endif
+
   private static func refresh() {
     view?.update(Quiz(MWMBackseatRewriter.popQuiz))
   }
