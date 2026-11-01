@@ -30,15 +30,16 @@
   [self.openLabel setHidden:result.openStatusText.length == 0];
   [self setStyleNameAndApply:@"Background"];
   if (result.iconImageName != nil) {
-    self.iconImageView.image = [[UIImage imageNamed:result.iconImageName] imageWithTintColor:UIColor.white];
+    self.iconImageView.image = [[UIImage imageNamed:result.iconImageName] imageWithTintColor:MWMBackseatTheme.accent];
   }
-  self.iconImageView.backgroundColor = [UIColor colorNamed:@"Base Colors/Blue Color"];
+  // Backseat: a yellow glyph on a raised dark disc instead of CoMaps blue.
+  self.iconImageView.backgroundColor = MWMBackseatTheme.raised;
   self.separatorInset = UIEdgeInsetsMake(0, kSearchCellSeparatorInset, 0, 0);
 }
 
 - (void)layoutSubviews {
   [super layoutSubviews];
-  self.iconImageView.image = [self.iconImageView.image imageWithTintColor:UIColor.white];
+  self.iconImageView.image = [self.iconImageView.image imageWithTintColor:MWMBackseatTheme.accent];
   [self.iconImageView.layer setCornerRadius:self.iconImageView.height / 2];
 }
 

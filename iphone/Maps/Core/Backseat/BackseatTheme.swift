@@ -245,6 +245,7 @@ final class BackseatSpeedLimitSign: UIView {
 @objc(MWMBackseatTheme) final class BackseatThemeObjC: NSObject {
   @objc static var accent: UIColor { BackseatTheme.accent }
   @objc static var card: UIColor { BackseatTheme.card }
+  @objc static var raised: UIColor { BackseatTheme.raised }
   @objc static var text: UIColor { BackseatTheme.text }
   @objc static var muted: UIColor { BackseatTheme.muted }
   @objc static var ink: UIColor { BackseatTheme.ink }
