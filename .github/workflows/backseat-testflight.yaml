@@ -25,7 +25,8 @@ jobs:
       LC_ALL: en_US.UTF-8
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: true
+      # An upload cut off halfway leaves a broken build in App Store Connect, so let it finish.
+      cancel-in-progress: false
     steps:
       # Secrets can't gate a job directly, so check them first and skip the rest when absent.
       - name: Check signing secrets
