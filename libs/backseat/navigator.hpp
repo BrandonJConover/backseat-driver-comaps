@@ -779,6 +779,8 @@ private:
   /// Recent headings while moving, for Bending().
   std::deque<std::pair<double, double>> m_bendHeadings;
   double m_curveAheadM = -1;
+  /// When the route last moved on to a new maneuver (a turn done, or a new route).
+  double m_turnDoneT = -1e18;
   double m_lastBendT = -1e18;
   /// Last known air temperature, and the cold-morning bit's progress this trip (0 = not yet).
   std::optional<double> m_tempC;

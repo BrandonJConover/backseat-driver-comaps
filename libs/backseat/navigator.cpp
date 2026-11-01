@@ -142,6 +142,8 @@ double constexpr kReminderRecentMs = 45000;
 /// Bending(): this much heading change within the window, or a sharp bend this close.
 double constexpr kBendDeg = 20;
 double constexpr kBendWindowMs = 12000;
+/// Headings this soon after moving on to the next maneuver are still the last one's swing.
+double constexpr kBendAfterManeuverMs = 8000;
 double constexpr kBendAheadM = 300;
 /// Curve jokes: moving at least this fast, this long after a maneuver (its swing isn't a bend),
 /// this far apart, at most this many a trip.
@@ -607,7 +609,9 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackFear(fix, route);
   TrackSights(fix, route);
   m_curveAheadM = route.curveAheadM;
-  if (fix.bearingDeg >= 0 && fix.speedMps >= MovingMps())
+  // The swing of a maneuver isn't a bend in the road. CoMaps moves on to the next maneuver mid-turn,
+  // so the end of the swing is left out too.
+  if (fix.bearingDeg >= 0 && fix.speedMps >= MovingMps() && fix.tMs - m_turnDoneT >= kBendAfterManeuverMs)
     m_bendHeadings.emplace_back(fix.tMs, fix.bearingDeg);
   while (!m_bendHeadings.empty() && fix.tMs - m_bendHeadings.front().first > kBendWindowMs)
     m_bendHeadings.pop_front();
@@ -1105,6 +1109,8 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   {
     // Moving on to a new maneuver means the last one was done, unless a reroute got us here.
     bool const justTurned = m_turnId && !m_rerouting;
+    m_turnDoneT = t;
+    m_bendHeadings.clear();
     if (justTurned)
     {
       Say(m_engine->OnNav(NavEvent::TurnCompleted(t, true)));

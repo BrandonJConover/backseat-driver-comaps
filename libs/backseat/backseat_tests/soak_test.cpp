@@ -133,3 +133,27 @@ TEST(SoakTripStartsDontBuryTheFirstTurn)
   CHECK(trips > 40);
   CHECK(late * 100 <= trips * 8);
 }
+
+// "Hold on tight." is for a bend in the road. In town it used to go off a second or two after
+// ordinary turns: CoMaps moves on to the next maneuver mid-turn, so the end of the turn's own swing
+// was counted as a curve (228 times over 200 town trips).
+TEST(SoakTurnsArentCurves)
+{
+  int afterTurns = 0;
+  for (uint32_t seed = 1; seed <= 40; ++seed)
+  {
+    auto const r = Drive(TripShape::Town, seed);
+    for (auto const & s : r.spoken)
+    {
+      if (s.line.key.rfind("curve.bend", 0) != 0)
+        continue;
+      for (auto const & m : r.maneuvers)
+        if (m.reachedMs >= 0 && s.queuedMs >= m.reachedMs && s.queuedMs - m.reachedMs < 15000)
+        {
+          ++afterTurns;
+          break;
+        }
+    }
+  }
+  CHECK_EQUAL(afterTurns, 0);
+}
