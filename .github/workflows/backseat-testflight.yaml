@@ -1,17 +1,10 @@
 name: Backseat Driver TestFlight
 on:
   workflow_dispatch:
+  # Only the stage branch ships to TestFlight, so testers get a build when we move stage on purpose.
   push:
     branches:
-      - 'backseat/**'
-    paths:
-      - 3party/**
-      - iphone/**
-      - xcode/**
-      - libs/**
-      - configure.sh
-      - .gitmodules
-      - .github/workflows/backseat-testflight.yaml
+      - stage
 
 jobs:
   testflight:
