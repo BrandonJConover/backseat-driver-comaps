@@ -152,6 +152,7 @@ final class BackseatQuizCardView: UIView {
   func update(_ quiz: BackseatQuiz.Quiz?) {
     guard quiz != shown else { return }
     let wasShowing = shown != nil
+    let justAnswered = (shown?.answered == false) && (quiz?.answered ?? false)
     shown = quiz
     guard let quiz else {
       UIView.animate(withDuration: 0.25, animations: { self.alpha = 0 }) { _ in
@@ -191,7 +192,14 @@ final class BackseatQuizCardView: UIView {
     }
     layer.borderColor = (quiz.answered ? (quiz.picked == quiz.correct ? BackseatTheme.calm : BackseatTheme.hot)
       : BackseatTheme.accent).cgColor
+    if justAnswered {
+      // The verdict lands: a knock for right or wrong, and the right answer pops.
+      BackseatHaptics.stamp(good: quiz.picked == quiz.correct)
+      if rows.indices.contains(quiz.correct) { BackseatMotion.pop(rows[quiz.correct]) }
+      if quiz.picked != quiz.correct { BackseatMotion.shake(self) }
+    }
     if !wasShowing {
+      BackseatHaptics.tap()
       isHidden = false
       superview?.bringSubviewToFront(self)
       transform = CGAffineTransform(translationX: 0, y: -20)

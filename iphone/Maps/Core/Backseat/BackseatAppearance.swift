@@ -115,3 +115,20 @@ struct BackseatFaceRepresentable: UIViewRepresentable {
     (view.subviews.first as? BackseatFaceView)?.setMood(mood)
   }
 }
+
+/// A settings-row icon on a little rounded tile, like the system Settings app: road-sign yellow for
+/// Backseat Driver's own rows, a raised grey for the stock ones.
+struct BackseatRowIcon: View {
+  let symbol: String
+  var stock = false
+
+  var body: some View {
+    Image(systemName: symbol)
+      .font(.system(size: 14, weight: .bold))
+      .foregroundStyle(Color(uiColor: stock ? BackseatTheme.text : BackseatTheme.ink))
+      .frame(width: 30, height: 30)
+      .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .fill(Color(uiColor: stock ? BackseatTheme.raised : BackseatTheme.accent)))
+      .accessibilityHidden(true)
+  }
+}

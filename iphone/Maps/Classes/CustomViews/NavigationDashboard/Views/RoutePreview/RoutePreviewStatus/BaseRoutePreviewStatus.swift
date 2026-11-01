@@ -192,6 +192,8 @@ final class BaseRoutePreviewStatus: SolidTouchView {
     guard let info = navigationInfo else { return }
 
     if let result = info.estimate().mutableCopy() as? NSMutableAttributedString {
+      // Backseat: the time and distance in the big condensed sign font, colors kept.
+      result.addAttribute(.font, value: BackseatTheme.number(26), range: NSRange(location: 0, length: result.length))
       if let elevation = self.elevation {
         result.append(MWMNavigationDashboardEntity.estimateDot())
         result.append(elevation)
