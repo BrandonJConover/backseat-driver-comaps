@@ -199,12 +199,12 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
     let routingNumberAttributes: [NSAttributedString.Key: Any] =
       [
         NSAttributedString.Key.foregroundColor: BackseatTheme.text,
-        NSAttributedString.Key.font: BackseatTheme.number(26, weight: .bold)
+        NSAttributedString.Key.font: BackseatTheme.number(24, weight: .bold)
       ]
     let routingLegendAttributes: [NSAttributedString.Key: Any] =
       [
         NSAttributedString.Key.foregroundColor: BackseatTheme.muted,
-        NSAttributedString.Key.font: BackseatTheme.body(14, weight: .semibold)
+        NSAttributedString.Key.font: BackseatTheme.body(12, weight: .semibold)
       ]
 
     if timePageControl.currentPage == 0 {
@@ -392,9 +392,10 @@ final class NavigationControlView: SolidTouchView, MWMTextToSpeechObserver {
     }
     walk(self)
     if styleName != "Background" { backgroundColor = .clear }
-    timeLabel.font = BackseatTheme.number(30, weight: .bold)
-    distanceLabel.font = BackseatTheme.number(26, weight: .bold)
-    speedLabel.font = BackseatTheme.number(26, weight: .bold)
+    // Sized so the unit labels under them stay clear of the progress bar.
+    timeLabel.font = BackseatTheme.number(26, weight: .bold)
+    distanceLabel.font = BackseatTheme.number(22, weight: .bold)
+    speedLabel.font = BackseatTheme.number(22, weight: .bold)
     timePageControl.currentPageIndicatorTintColor = BackseatTheme.accent
     timePageControl.pageIndicatorTintColor = BackseatTheme.line
   }

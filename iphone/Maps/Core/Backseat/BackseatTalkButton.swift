@@ -113,16 +113,26 @@ final class BackseatDriveOverlay: NSObject {
     BackseatMotion.addPress(to: draw)
     draw.addAction(UIAction { _ in BackseatSketch.open() }, for: .touchUpInside)
 
-    let stack = UIStackView(arrangedSubviews: [speedCard, report, draw])
+    // CoMaps keeps its search and bookmarks buttons halfway down the leading edge while navigating,
+    // so the speed card sits low on that side, just above the GPS's face, and Report and Draw join
+    // the mic in the trailing column, above it.
+    speedCard.translatesAutoresizingMaskIntoConstraints = false
+    speedCard.isHidden = true
+    view.addSubview(speedCard)
+    let stack = UIStackView(arrangedSubviews: [draw, report])
     stack.axis = .vertical
     stack.spacing = 10
-    stack.alignment = .leading
+    stack.alignment = .trailing
     stack.translatesAutoresizingMaskIntoConstraints = false
     stack.isHidden = true
     view.addSubview(stack)
+    let guide = view.safeAreaLayoutGuide
     NSLayoutConstraint.activate([
-      stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
-      stack.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
+      speedCard.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 12),
+      speedCard.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -(BackseatCaption.bottomInset + 72)),
+      // Lined up with the mic, which is the map-position button's width and sits right above it.
+      stack.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -16),
+      stack.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -196),
     ])
     self.stack = stack
     self.sign = sign
@@ -135,6 +145,7 @@ final class BackseatDriveOverlay: NSObject {
                                            queue: .main) { note in
       let navigating = (note.object as? Bool) ?? false
       stack.isHidden = !navigating
+      speedCard.isHidden = !navigating
       timer?.invalidate()
       timer = nil
       if navigating {

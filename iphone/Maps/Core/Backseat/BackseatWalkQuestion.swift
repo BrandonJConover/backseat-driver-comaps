@@ -24,7 +24,7 @@ import UIKit
     host.overrideUserInterfaceStyle = .dark
     host.isModalInPresentation = true
     if let sheet = host.sheetPresentationController {
-      sheet.detents = [.custom { _ in 340 }]
+      sheet.detents = [.custom { _ in 290 }]
       sheet.preferredCornerRadius = 28
     }
     shown = host

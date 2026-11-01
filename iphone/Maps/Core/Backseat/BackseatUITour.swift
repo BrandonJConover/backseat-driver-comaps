@@ -24,7 +24,12 @@ import UIKit
     guard let screen, screen != "onboarding1", !ran else { return false }
     ran = true
     BackseatLog.event("uitour", ["screen": screen])
-    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { open(screen, from: host) }
+    // A fresh install opens on the whole world; go to the simulator's location first, so search has
+    // results and the map looks like it does on a phone.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+      if FrameworkHelper.currentZoomLevel() < 10 { FrameworkHelper.switchMyPositionMode() }
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 4) { open(screen, from: host) }
     return true
     #else
     return false

@@ -75,7 +75,7 @@ struct MapModePicker: View {
                         Text(selectedMode.description)
                             .font(.title2)
                             .bold()
-                            .foregroundStyle(Color.white)
+                            .foregroundStyle(Color(uiColor: BackseatTheme.ink))
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityFocused($accessibilityFocus, equals: .optionsHeading)
 
@@ -92,7 +92,7 @@ struct MapModePicker: View {
                         .buttonStyle(.plain)
                         .font(.title2)
                         .dynamicTypeSize(.large)
-                        .foregroundStyle(Color.white.opacity(0.5))
+                        .foregroundStyle(Color(uiColor: BackseatTheme.ink).opacity(0.55))
                     }
                 }
                 .padding(isPresentingModeOptions ? 4 : 0)
