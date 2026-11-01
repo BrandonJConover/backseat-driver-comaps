@@ -92,12 +92,17 @@ struct BackseatWhereToCard: View {
                 Button {
                     BackseatSketch.open()
                 } label: {
-                    Image(systemName: "hand.tap")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Palette.text)
-                        .frame(width: 44, height: 44)
-                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.raised))
-                        .contentShape(Rectangle())
+                    // Labeled: an icon alone didn't say what it does.
+                    VStack(spacing: 2) {
+                        Image(systemName: "hand.tap")
+                            .font(.body.weight(.semibold))
+                        Text(verbatim: "Plan")
+                            .font(.caption2.weight(.bold))
+                    }
+                    .foregroundStyle(Palette.text)
+                    .frame(width: 52, height: 48)
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.raised))
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(BackseatPressStyle())
                 .accessibilityLabel(Text(verbatim: "Plan route"))
@@ -213,6 +218,20 @@ struct BackseatWhereToCard: View {
                 }
             }
 
+            // Road-trip basics, one tap from a list of what's nearby.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Self.quickSearches, id: \.key) { quick in
+                        Button {
+                            Self.search(category: quick.key)
+                        } label: {
+                            capsule(symbol: quick.symbol, text: L(quick.key))
+                        }
+                        .buttonStyle(BackseatPressStyle())
+                    }
+                }
+            }
+
             if places.isEmpty {
                 Text(verbatim: "No trips yet. I'm sure you'll get lost somewhere memorable.")
                     .font(.footnote)
@@ -268,6 +287,24 @@ struct BackseatWhereToCard: View {
         .onReceive(NotificationCenter.default.publisher(for: BackseatListener.listeningChanged)) { _ in
             isListening = BackseatListener.shared.isListening
         }
+    }
+
+
+    /// Nearby searches offered on the card: the stock category keys, so the names are translated.
+    private static let quickSearches: [(key: String, symbol: String)] = [
+        ("category_fuel", "fuelpump.fill"),
+        ("category_eat", "fork.knife"),
+        ("category_toilet", "toilet.fill"),
+        ("category_parking", "parkingsign"),
+    ]
+
+
+    /// The same search as tapping that category in the search screen.
+    private static func search(category key: String) {
+        let preferred = AppInfo.shared().languageId
+        let language = MWMSearchFrameworkHelper.isLanguageSupported(preferred) ? preferred : "en"
+        let query = SearchQuery(L(key, languageCode: language), locale: language, source: .category)
+        MWMMapViewControlsManager.manager()?.search(query)
     }
 
 

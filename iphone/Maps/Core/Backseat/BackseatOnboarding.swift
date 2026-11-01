@@ -1,3 +1,5 @@
+import AVFAudio
+import Speech
 import SwiftUI
 import UIKit
 
@@ -378,6 +380,41 @@ final class BackseatOnboardingModel: ObservableObject {
     screen = .voices
     bubble = ""
     reply(MWMBackseatRewriter.line("onboard.voices.intro", vars: [:]))
+    // The line-up listens for the phrases. Rather than iOS's speech prompt landing cold in the
+    // middle of it, ask first and say why; the line-up starts once that's answered.
+    if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
+      askToListen = true
+    } else {
+      startLineUp()
+    }
+  }
+
+  /// The listening primer on the voices screen: iOS hasn't been asked yet.
+  @Published var askToListen = false
+
+  /// "Sure, listen": the speech and mic prompts, then the line-up. Tapping a voice works either way.
+  func allowListening() {
+    BackseatLog.event("onboarding", ["step": "listen primer", "answer": "yes"])
+    SFSpeechRecognizer.requestAuthorization { status in
+      DispatchQueue.main.async {
+        guard status == .authorized else { return self.listeningAnswered() }
+        AVAudioApplication.requestRecordPermission { _ in
+          DispatchQueue.main.async { self.listeningAnswered() }
+        }
+      }
+    }
+  }
+
+  func declineListening() {
+    BackseatLog.event("onboarding", ["step": "listen primer", "answer": "not now"])
+    askToListen = false
+    reply(["Fine. Tap one, then. Like it's 2009.", "Not listening. Noted. I'll talk anyway.",
+           "Suit yourself. Fingers it is."].randomElement() ?? "")
+  }
+
+  private func listeningAnswered() {
+    askToListen = false
+    guard screen == .voices else { return }
     startLineUp()
   }
 
@@ -753,6 +790,9 @@ struct BackseatOnboardingView: View {
       Text("Each voice gives you a phrase. Say it out loud to pick that voice, or tap one.")
         .font(.subheadline).foregroundColor(muted)
         .frame(maxWidth: .infinity, alignment: .leading)
+      if model.askToListen {
+        listenPrimer.transition(.move(edge: .top).combined(with: .opacity))
+      }
       ScrollView {
         LazyVStack(spacing: 8) {
           ForEach(KokoroVoice.voiceOptions) { option in
@@ -794,6 +834,33 @@ struct BackseatOnboardingView: View {
         Text("Type \u{201C}\(BackseatOnboardingModel.phrase(id))\u{201D} to switch to \(BackseatOnboardingModel.spokenName(id)).")
       }
     }
+  }
+
+  /// Before iOS asks for the mic: why, in the GPS's own voice, with the answer one tap away.
+  private var listenPrimer: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(alignment: .top, spacing: 12) {
+        Image(systemName: "mic.fill")
+          .font(.system(size: 18, weight: .bold))
+          .foregroundColor(Color(BackseatTheme.ink))
+          .frame(width: 40, height: 40)
+          .background(Circle().fill(accent))
+          .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Can I listen?").font(.system(size: 22, weight: .heavy).width(.condensed))
+          Text("Say a phrase to pick a voice. On the road you can just talk to me: \u{201C}take me home,\u{201D} \u{201C}report police.\u{201D} Your iPhone will ask next.")
+            .font(.subheadline).foregroundColor(muted)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      HStack(spacing: 10) {
+        choiceButton("Sure, listen", primary: true, action: model.allowListening)
+        choiceButton("Not now", action: model.declineListening)
+      }
+    }
+    .padding(16)
+    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(card))
+    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(accent.opacity(0.5), lineWidth: 1))
   }
 
   // MARK: Screen 3
