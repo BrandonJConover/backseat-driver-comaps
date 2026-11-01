@@ -249,6 +249,14 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
   return fitting;
 }
 
+bool LinesFitTravelMode(std::string const & key, int tier)
+{
+  if (g_travelMode == TravelMode::Drive || key.rfind("mode.", 0) == 0 || key.rfind("cmd.", 0) == 0)
+    return true;
+  LineTable const & table = g_metric ? MetricLineData() : LineData();
+  return LinesFor(key, tier) != table.at("mode.generic").at(static_cast<size_t>(tier));
+}
+
 std::string SpeakableText(std::string const & text)
 {
   static char const * const kKeep[] = {"GPS", "ETA", "NASCAR", "OK", "TV", "AI", "ID", "USA", "SUV", "DMV", "DUI", "MPH",

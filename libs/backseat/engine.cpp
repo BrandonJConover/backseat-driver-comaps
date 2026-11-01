@@ -1078,6 +1078,11 @@ bool CritiqueEngine::Roast(std::vector<Commentary> & out, double t, Category cat
     return false;
   }
 
+  if (!LinesFitTravelMode(key, Tier()))
+  {
+    TraceThrottled("roast.held", key + "/mode", {{"key", key}, {"why", "mode"}});
+    return false;
+  }
   if (category != Category::TurnCompleted)
     Bump(category);
   std::string const text = Fill(Pick(key, Tier()), vars);

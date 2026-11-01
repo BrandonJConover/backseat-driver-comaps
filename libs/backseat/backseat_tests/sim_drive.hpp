@@ -174,6 +174,9 @@ struct SimOptions
   bool lookups = true;
   /// The driver blows a turn now and then (a reroute follows).
   bool missTurns = true;
+  /// On foot or on a bike: top speed (m/s, 0 = the limit) and how much shorter the blocks are.
+  double capMps = 0;
+  double legScale = 1;
 };
 
 inline SimResult SimulateTrip(backseat::Navigator & nav, SimOptions const & o, double startMs = 1.7e12)
@@ -184,6 +187,9 @@ inline SimResult SimulateTrip(backseat::Navigator & nav, SimOptions const & o, d
   auto chance = [&](double p) { return uni(0, 1) < p; };
 
   std::vector<SimLeg> legs = MakeRoute(o.shape, rng);
+  if (o.legScale != 1)
+    for (auto & l : legs)
+      l.lengthM *= o.legScale;
   SimResult res;
   for (auto const & l : legs)
   {
@@ -310,6 +316,8 @@ inline SimResult SimulateTrip(backseat::Navigator & nav, SimOptions const & o, d
     SimLeg const & L = legs[leg];
     // The driver: a bit over the limit, slowing for the turn, waiting at red lights.
     double target = L.limitMps * 1.06;
+    if (o.capMps > 0)
+      target = std::min(target, o.capMps * uni(0.9, 1.1));
     double const turnSpeed = L.turn == TurnKind::Destination ? 3 : L.turn == TurnKind::ExitRight ? 15 : 7;
     if (left < 120)
       target = std::min(target, turnSpeed + (left / 120) * (target - turnSpeed));

@@ -49,3 +49,15 @@ TEST(MetricWordingSaysMetersAndLeavesFeetAlone)
   }
   SetLineMetric(false);
 }
+
+TEST(CarOnlyBitsDontFitWalksOrRides)
+{
+  CHECK(LinesFitTravelMode("gas.none", 0));
+  SetLineTravelMode(TravelMode::Bike);
+  CHECK(!LinesFitTravelMode("gas.none", 0));
+  CHECK(!LinesFitTravelMode("autopilot", 0));
+  // A reply to the driver still gets its "Noted.".
+  CHECK(LinesFitTravelMode("cmd.avoidTolls", 0));
+  CHECK(LinesFitTravelMode("idle", 0));
+  SetLineTravelMode(TravelMode::Drive);
+}

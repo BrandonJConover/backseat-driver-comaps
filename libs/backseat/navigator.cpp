@@ -2398,6 +2398,11 @@ bool Navigator::Parked() const
 
 void Navigator::SayLine(double tMs, Category category, std::string const & key, Vars vars, Priority priority)
 {
+  if (category != Category::Instruction && !LinesFitTravelMode(key, Tier()))
+  {
+    TraceThrottled("say.skipped", key + "/mode", {{"key", key}, {"why", "mode"}});
+    return;
+  }
   auto const & options = LinesFor(key, Tier());
   double const r = m_config.rng ? m_config.rng() : 0;
   Commentary c;
