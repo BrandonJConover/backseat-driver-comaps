@@ -25,6 +25,19 @@ void SetLineTravelMode(TravelMode mode)
   g_travelMode = mode;
 }
 
+char const * TravelModeName(TravelMode mode)
+{
+  switch (mode)
+  {
+  case TravelMode::Drive: return "drive";
+  case TravelMode::Walk: return "walk";
+  case TravelMode::Bike: return "bike";
+  case TravelMode::OffRoad: return "offroad";
+  case TravelMode::Hike: return "hike";
+  }
+  return "drive";
+}
+
 bool LineFitsMode(std::string const & text, TravelMode mode)
 {
   if (mode == TravelMode::Drive)
@@ -61,25 +74,37 @@ bool LineFitsMode(std::string const & text, TravelMode mode)
       return false;
   if (std::any_of(std::begin(kCar), std::end(kCar), has))
     return false;
-  return mode != TravelMode::Walk || std::none_of(std::begin(kWheels), std::end(kWheels), has);
+  if (mode == TravelMode::Bike)
+    return true;
+  if (std::any_of(std::begin(kWheels), std::end(kWheels), has))
+    return false;
+  // A trail has no streets, crosswalks or stoplights either.
+  static char const * const kStreets[] = {"street", "streets", "sidewalk", "sidewalks", "crosswalk", "crosswalks",
+                                          "intersection", "intersections", "stoplight", "stoplights", "block", "blocks",
+                                          "downtown", "curb", "curbs"};
+  return mode != TravelMode::Hike || std::none_of(std::begin(kStreets), std::end(kStreets), has);
 }
 
 std::vector<std::string> const & LinesFor(std::string const & key, int tier)
 {
   auto const & raw = LineData().at(key).at(static_cast<size_t>(tier));
   TravelMode const mode = g_travelMode;
-  // Story beats are read by position, and mode lines are written for their mode.
-  if (mode == TravelMode::Drive || key.rfind("mode.", 0) == 0 || key.rfind("speeding.story", 0) == 0)
+  // Story beats are read by position, and mode and outdoors lines are written for their mode.
+  if (mode == TravelMode::Drive || key.rfind("mode.", 0) == 0 || key.rfind("speeding.story", 0) == 0 ||
+      key.rfind("outdoors.", 0) == 0)
     return raw;
   static std::mutex mutex;
   static std::map<std::string, std::vector<std::string>> cache;
-  std::string const suffix = mode == TravelMode::Walk ? ".walk" : mode == TravelMode::Bike ? ".bike" : ".offroad";
+  std::string const suffix = std::string(".") + TravelModeName(mode);
   std::lock_guard lock(mutex);
   auto const [it, added] = cache.try_emplace(key + suffix + std::to_string(tier));
   if (!added)
     return it->second;
   auto & fitting = it->second;
-  auto const own = LineData().find(key + suffix);
+  auto own = LineData().find(key + suffix);
+  // A hike borrows the walk's lines where it has none of its own.
+  if (own == LineData().end() && mode == TravelMode::Hike)
+    own = LineData().find(key + ".walk");
   if (own != LineData().end())
     fitting = own->second.at(static_cast<size_t>(tier));
   for (auto const & line : raw)

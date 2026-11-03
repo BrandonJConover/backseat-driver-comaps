@@ -361,6 +361,25 @@ public:
   void SetGpsName(std::string const & name) { m_navigator.SetGpsName(name); }
   /// A caller's voice to warm up, once, when a call that will put them on starts. Empty otherwise.
   std::string TakeCallerVoiceToWarm() { return std::exchange(m_callerVoiceToWarm, std::string()); }
+  /// The host can show "Are you actually intending to walk there?" with Yes / No and highlight a route type
+  /// (TakeModeQuestion(), TakeTravelModeSwitch()); until it says so, the GPS doesn't ask.
+  void SetCanSwitchTravelMode(bool can) { m_navigator.SetCanAskTravelMode(can); }
+  /// True once when the GPS just asked "Are you actually intending to walk there?": show Yes / No.
+  bool TakeModeQuestion() { return m_navigator.TakeModeAskToShow(); }
+  /// False once it's been answered, out loud or on screen: the Yes / No can go away.
+  bool ModeQuestionOpen() const { return m_navigator.ModeAskOpen(); }
+  /// The driver tapped Yes (walking) or No (not walking: Driving gets highlighted).
+  void AnswerModeQuestion(bool walking) { m_navigator.AnswerModeAsk(walking); }
+  /// The driver tapped Driving after saying they're not walking: that drive's start gets "check the
+  /// mode now and then, I may swap it on you".
+  void WarnModeOnNextDrive() { m_navigator.WarnModeOnNextDrive(); }
+  /// "drive" when it isn't a walk after all: the host stops navigating, shows the route types and
+  /// highlights Driving for the driver to tap. Empty otherwise.
+  std::string TakeTravelModeSwitch()
+  {
+    auto const mode = m_navigator.TakeModeSwitch();
+    return mode ? backseat::TravelModeName(*mode) : std::string();
+  }
 
 private:
   backseat::RouteSnapshot Snapshot(routing::RoutingSession const & session, std::string const & destinationName) const;
@@ -400,6 +419,9 @@ private:
   backseat::Bridge BridgeAt(backseat::LatLon const & at, double bearingDeg) const;
   /// Meters to the nearest mapped car road, up to kRoadSearchM; that far if none, -1 with no map.
   double RoadDistanceAt(backseat::LatLon const & at) const;
+  /// Whether the nearest way within a few meters of `at` is a trail: a path, track, bridleway, or
+  /// anything unpaved. A sidewalk (footway) isn't one.
+  bool TrailAt(backseat::LatLon const & at) const;
   /// Right after the car drives past a highway exit (staying on the highway): how far along the
   /// route the next exit is, -1 if the trip ends first. Nothing on every other update.
   std::optional<double> PassedExitNextM(routing::RoutingSession const & session, double speedMps);

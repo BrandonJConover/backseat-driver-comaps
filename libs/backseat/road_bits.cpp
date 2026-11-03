@@ -334,7 +334,8 @@ std::vector<RoadRemark> RoadBits::Tick(RoadTick const & k, SaidLog & said, doubl
   }
 
   // Signal gone for a while.
-  if (m_offlineSince && !m_signalLostSaid && k.tMs - *m_offlineSince >= kSignalLostAfterMs && k.speedMps >= kAmbientMinMps)
+  if (m_offlineSince && !m_signalLostSaid && k.tMs - *m_offlineSince >= kSignalLostAfterMs &&
+      k.speedMps >= std::min(kAmbientMinMps, k.signalMinMps))
   {
     m_signalLostSaid = true;
     Queue(k.tMs, {"signal.lost", {}}, 60000);

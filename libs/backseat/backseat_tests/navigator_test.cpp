@@ -1621,12 +1621,17 @@ TEST(DrivingWhereTheMapHasNoRoad)
   // Crawling through a big parking lot doesn't count.
   roadM = 90;
   CHECK_EQUAL(offRoadLines(30, 60, 3), 0);
-  // Really out there: once, then not again for a while.
-  CHECK_EQUAL(offRoadLines(60, 90, 15), 1);
+  // Really out there: the GPS takes the hint, it's an off-road trip now. Then quiet for a while.
+  CHECK(nav.Mode() == TravelMode::Drive);
+  CHECK_EQUAL(offRoadLines(60, 90, 15), 0);
+  CHECK(nav.Mode() == TravelMode::OffRoad);
   CHECK_EQUAL(offRoadLines(90, 200, 15), 0);
+  // Off-roading, no road is the point: no more complaints about it.
+  CHECK_EQUAL(offRoadLines(400, 430, 15), 0);
   // No map for this area: no opinion.
   roadM = -1;
   CHECK_EQUAL(offRoadLines(600, 700, 15), 0);
+  SetLineTravelMode(TravelMode::Drive);
 }
 
 TEST(SpeedingNagsBackOffOnALongStretch)
@@ -1827,7 +1832,7 @@ TEST(LinesFollowTheTravelMode)
   CHECK(!LineFitsMode("You drive like this?", TravelMode::Bike));
   CHECK(LineFitsMode("Turn left. Try it.", TravelMode::Walk));
 
-  for (TravelMode const mode : {TravelMode::Walk, TravelMode::Bike, TravelMode::OffRoad})
+  for (TravelMode const mode : {TravelMode::Walk, TravelMode::Bike, TravelMode::OffRoad, TravelMode::Hike})
   {
     SetLineTravelMode(mode);
     for (auto const & [key, tiers] : LineData())
@@ -1836,7 +1841,7 @@ TEST(LinesFollowTheTravelMode)
       {
         auto const & lines = LinesFor(key, tier);
         CHECK(!lines.empty());
-        if (key.rfind("mode.", 0) != 0 && key.rfind("speeding.story", 0) != 0)
+        if (key.rfind("mode.", 0) != 0 && key.rfind("speeding.story", 0) != 0 && key.rfind("outdoors.", 0) != 0)
           for (auto const & line : lines)
             CHECK(LineFitsMode(line, mode));
       }
@@ -1889,5 +1894,330 @@ TEST(OffRoadSaysWhichWayInsteadOfRoasting)
   // Not every two seconds.
   nav.OnFix(At(12000, 10), off);
   CHECK(nav.TakeLines().empty());
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+namespace
+{
+RouteSnapshot Walkway(double distToTurnM = 2000)
+{
+  RouteSnapshot r = OnRoute(1, TurnKind::Left, distToTurnM);
+  r.destinationPoint = {39.8, -105};
+  return r;
+}
+}  // namespace
+
+TEST(AWalkOnTrailsBecomesAHike)
+{
+  Navigator nav(Config());
+  nav.SetTravelMode(TravelMode::Walk);
+  bool trail = false;
+  nav.SetTrailLookup([&](LatLon const &) { return trail; });
+  for (int i = 0; i < 60; ++i)
+    nav.OnFix(Heading(i * 1000.0, 1.4, 90), Walkway());
+  nav.TakeLines();
+  CHECK(nav.Mode() == TravelMode::Walk);
+  // A minute and a half on a trail: it's a hike now, and the GPS says so once.
+  trail = true;
+  int entered = 0;
+  for (int i = 60; i < 260; ++i)
+  {
+    nav.OnFix(Heading(i * 1000.0, 1.4, 90), Walkway());
+    for (auto const & l : nav.TakeLines())
+      entered += SaidLineOf(l.text, "hike.enter");
+  }
+  CHECK(nav.Mode() == TravelMode::Hike);
+  CHECK_EQUAL(entered, 1);
+  // The host keeps saying it's a walking route; it stays a hike for the rest of the trip.
+  nav.SetTravelMode(TravelMode::Walk);
+  CHECK(nav.Mode() == TravelMode::Hike);
+  // Trip over: the next walk starts as a walk.
+  nav.OnFix(Heading(300000, 0, 90), RouteSnapshot{});
+  CHECK(nav.Mode() == TravelMode::Walk);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(AMostlyDirtWalkIsAHikeFromTheStart)
+{
+  Navigator nav(Config());
+  nav.SetTravelMode(TravelMode::Walk);
+  RouteSnapshot r = Walkway();
+  r.dirtShare = 0.7;
+  nav.OnFix(Heading(0, 1.4, 90), r);
+  CHECK(nav.Mode() == TravelMode::Hike);
+  bool greeted = false;
+  for (auto const & l : nav.TakeLines())
+    greeted = greeted || SaidLineOf(l.text, "mode.hike");
+  CHECK(greeted);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(DirtTracksMakeItAnOffRoadTrip)
+{
+  Navigator nav(Config());
+  RouteSnapshot r = Far();
+  int entered = 0, left = 0;
+  auto const drive = [&](int from, int to)
+  {
+    for (int i = from; i < to; ++i)
+    {
+      nav.OnFix(Heading(i * 1000.0, 12, 90), r);
+      for (auto const & l : nav.TakeLines())
+      {
+        entered += SaidLineOf(l.text, "offroad.enter");
+        left += SaidLineOf(l.text, "offroad.exit");
+      }
+    }
+  };
+  drive(0, 60);
+  CHECK(nav.Mode() == TravelMode::Drive);
+  // A short gravel stretch is still a drive.
+  r.onDirt = true;
+  drive(60, 80);
+  CHECK(nav.Mode() == TravelMode::Drive);
+  // Dirt for a while: off-roading.
+  drive(80, 140);
+  CHECK(nav.Mode() == TravelMode::OffRoad);
+  CHECK_EQUAL(entered, 1);
+  // Speed limits don't come up in the dirt.
+  for (int i = 140; i < 200; ++i)
+  {
+    Fix f = Heading(i * 1000.0, 30, 90);
+    f.speedLimitMps = 15;
+    nav.OnFix(f, r);
+    CHECK(!Has(nav.TakeLines(), Category::Speeding));
+  }
+  // Two minutes back on pavement: a drive again.
+  r.onDirt = false;
+  drive(200, 260);
+  CHECK(nav.Mode() == TravelMode::OffRoad);
+  drive(260, 340);
+  CHECK(nav.Mode() == TravelMode::Drive);
+  CHECK_EQUAL(left, 1);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(OffRoadingTheDriverAskedForStaysOn)
+{
+  Navigator nav(Config());
+  nav.DriverSetTravelMode(TravelMode::OffRoad);
+  RouteSnapshot r = Far();
+  for (int i = 0; i < 400; ++i)
+    nav.OnFix(Heading(i * 1000.0, 12, 90), r);
+  CHECK(nav.Mode() == TravelMode::OffRoad);
+  // "Back on the road."
+  nav.DriverSetTravelMode(TravelMode::Drive);
+  CHECK(nav.Mode() == TravelMode::Drive);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(TurnCallsComeCloserOnFoot)
+{
+  // How far out the first reminder after the instruction comes, walking up to a left turn.
+  auto const firstReminderM = [](TravelMode mode)
+  {
+    Navigator nav(Config());
+    nav.SetTravelMode(mode);
+    double first = -1;
+    for (int i = 0; i < 1000 && first < 0; ++i)
+    {
+      double const dist = 300 - i * 0.7;
+      if (dist < 0)
+        break;
+      nav.OnFix(Heading(i * 500.0, 1.4, 90), Walkway(dist));
+      for (auto const & l : nav.TakeLines())
+        if (first < 0 && (l.key == "countdown.far" || l.key == "countdown.mention"))
+          first = dist;
+    }
+    return first;
+  };
+  double const walk = firstReminderM(TravelMode::Walk);
+  double const drive = firstReminderM(TravelMode::Drive);
+  CHECK(walk > 0 && walk <= 50);
+  CHECK(drive > 100);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(OnFootTheGpsNoticesHillsAndEffort)
+{
+  Navigator nav(Config());
+  nav.SetTravelMode(TravelMode::Walk);
+  RouteSnapshot r = Walkway();
+  r.gradeAhead = 0.12;
+  int incline = 0, effort = 0;
+  for (int i = 0; i < 400; ++i)
+  {
+    nav.OnFix(Heading(i * 1000.0, 1.4, 90), r);
+    for (auto const & l : nav.TakeLines())
+    {
+      incline += l.text.find("on an incline") != std::string::npos;
+      effort += l.text.find("heart rate is elevated") != std::string::npos;
+    }
+  }
+  // "Watch your step." once, and a long climb is the exercise (there's no heart rate to read).
+  CHECK_EQUAL(incline, 1);
+  CHECK_EQUAL(effort, 1);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(TheOppressedGagIsTwoVoices)
+{
+  Navigator nav(Config());
+  nav.SetTravelMode(TravelMode::Walk);
+  auto const walk = [&](double from)
+  {
+    std::vector<Commentary> said;
+    for (int i = 0; i < 40 * 60; i += 2)
+    {
+      nav.OnFix(Heading(from + i * 1000.0, 1.4, 90), Walkway(4000));
+      for (auto & l : nav.TakeLines())
+        said.push_back(l);
+    }
+    nav.OnFix(Heading(from + 40 * 60000.0, 0, 90), RouteSnapshot{});
+    nav.TakeLines();
+    return said;
+  };
+  auto const first = walk(0);
+  auto const help = std::find_if(first.begin(), first.end(),
+                                 [](Commentary const & l) { return l.text.find("being oppressed") != std::string::npos; });
+  CHECK(help != first.end());
+  // Someone else (a woman) yells it, then the GPS itself denies everything.
+  CHECK(help->voice.rfind("af_", 0) == 0);
+  auto const denial = std::find_if(help, first.end(),
+                                   [](Commentary const & l) { return l.text.find("your phone said it") != std::string::npos; });
+  CHECK(denial != first.end());
+  CHECK(denial->voice.empty());
+  // A one-off: it sits out the next walks.
+  for (auto const & l : walk(3600000))
+    CHECK(l.text.find("being oppressed") == std::string::npos);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(AHikeGetsBrandonsOutdoorsBits)
+{
+  Navigator nav(Config());
+  nav.SetTravelMode(TravelMode::Walk);
+  RouteSnapshot r = Walkway(4000);
+  r.dirtShare = 0.7;
+  int outdoors = 0;
+  for (int i = 0; i < 60 * 60; i += 2)
+  {
+    nav.OnFix(Heading(i * 1000.0, 1.4, 90), r);
+    for (auto const & l : nav.TakeLines())
+      for (char const * key : {"outdoors.aside", "outdoors.ad", "outdoors.oppressed"})
+        outdoors += SaidLineOf(l.text, key) && l.text.find("your phone said it") == std::string::npos;
+  }
+  CHECK(nav.Mode() == TravelMode::Hike);
+  CHECK(outdoors >= 1);
+  CHECK(outdoors <= 2);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+namespace
+{
+int CountKey(std::vector<Commentary> const & lines, std::string const & key)
+{
+  return static_cast<int>(std::count_if(lines.begin(), lines.end(), [&](Commentary const & l) { return SaidLineOf(l.text, key); }));
+}
+
+/// Three and a half miles on foot.
+RouteSnapshot LongWalk()
+{
+  RouteSnapshot r = Walkway();
+  r.routeLengthM = 5600;
+  return r;
+}
+}  // namespace
+
+TEST(ALongWalkAsksAndNoMeansTapDriving)
+{
+  Navigator nav(Config());
+  nav.SetCanAskTravelMode(true);
+  nav.SetTravelMode(TravelMode::Walk);
+  nav.OnFix(Heading(0, 0, 90), LongWalk());
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk"), 1);
+  CHECK(nav.TakeModeAskToShow());
+  CHECK(!nav.TakeModeAskToShow());
+  CHECK(nav.ModeAskOpen());
+  // Nobody answers: it waits, and doesn't decide for them.
+  std::vector<Commentary> said;
+  for (int i = 1; i < 30; ++i)
+  {
+    nav.OnFix(Heading(i * 1000.0, 0, 90), LongWalk());
+    for (auto & l : nav.TakeLines())
+      said.push_back(l);
+  }
+  CHECK(nav.ModeAskOpen());
+  CHECK(!nav.TakeModeSwitch());
+  // No on screen: "I'm going to need you to click the driving button."
+  CHECK(nav.AnswerModeAsk(false));
+  CHECK(!nav.AnswerModeAsk(true));
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk.no"), 1);
+  CHECK(nav.TakeModeSwitch() == TravelMode::Drive);
+  CHECK(!nav.TakeModeSwitch());
+  // The driver taps Driving: a fresh start, with no "so now we're driving?".
+  nav.OnFix(Heading(31000, 0, 90), RouteSnapshot{});
+  nav.SetTravelMode(TravelMode::Drive);
+  said.clear();
+  for (int i = 32; i < 40; ++i)
+  {
+    nav.OnFix(Heading(i * 1000.0, 0, 90), Far());
+    for (auto & l : nav.TakeLines())
+      said.push_back(l);
+  }
+  CHECK(!said.empty());
+  CHECK_EQUAL(CountKey(said, "mode.switch.drive"), 0);
+  CHECK_EQUAL(CountKey(said, "mode.ask.walk"), 0);
+  CHECK_EQUAL(CountKey(said, "mode.ask.watch"), 1);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(EveryLongWalkAsksAndShortOnesDont)
+{
+  Navigator nav(Config());
+  nav.SetCanAskTravelMode(true);
+  nav.SetTravelMode(TravelMode::Walk);
+  nav.OnFix(Heading(0, 0, 90), LongWalk());
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk"), 1);
+  nav.OnDriverSaid(2000, "yes");
+  std::vector<Commentary> said;
+  for (int i = 3; i < 30; ++i)
+  {
+    nav.OnFix(Heading(i * 1000.0, 1.4, 90), LongWalk());
+    for (auto & l : nav.TakeLines())
+      said.push_back(l);
+  }
+  CHECK_EQUAL(CountKey(said, "mode.ask.walk.yes"), 1);
+  CHECK(!nav.ModeAskOpen());
+  CHECK(!nav.TakeModeSwitch());
+  CHECK(nav.Mode() == TravelMode::Walk);
+  // A walk around the block: no question.
+  nav.OnFix(Heading(31000, 0, 90), RouteSnapshot{});
+  RouteSnapshot shortWalk = Walkway();
+  shortWalk.routeLengthM = 1500;
+  nav.OnFix(Heading(40000, 0, 90), shortWalk);
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk"), 0);
+  // The next long walk asks again.
+  nav.OnFix(Heading(50000, 0, 90), RouteSnapshot{});
+  nav.OnFix(Heading(60000, 0, 90), LongWalk());
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk"), 1);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(SwitchingTravelModesGetsARemark)
+{
+  Navigator nav(Config());
+  nav.OnFix(Heading(0, 0, 90), Far());
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.switch.drive"), 0);
+  nav.OnFix(Heading(1000, 0, 90), RouteSnapshot{});
+  // Walking now, after a drive.
+  nav.SetTravelMode(TravelMode::Walk);
+  nav.OnFix(Heading(5000, 0, 90), Walkway());
+  auto const lines = nav.TakeLines();
+  CHECK_EQUAL(CountKey(lines, "mode.switch.walk"), 1);
+  // Same mode again: nothing to remark on.
+  nav.OnFix(Heading(6000, 0, 90), RouteSnapshot{});
+  nav.OnFix(Heading(9000, 0, 90), Walkway());
+  CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.switch.walk"), 0);
   SetLineTravelMode(TravelMode::Drive);
 }
