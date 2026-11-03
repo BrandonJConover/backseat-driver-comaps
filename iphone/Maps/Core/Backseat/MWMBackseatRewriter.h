@@ -51,6 +51,8 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 @property(class, nonatomic, readonly) BOOL drivingHighlighted;
 /// The highlighted Driving button was tapped: the highlight goes, and the drive starts once built.
 + (void)drivingButtonTapped;
+/// Another route type was tapped while Driving is highlighted: "I said the car, rule breaker."
++ (void)wrongButtonTapped;
 /// How far the next turn is while following a route, in meters; -1 without a route.
 @property(class, nonatomic, readonly) double metersToNextTurn;
 /// The speed limit here while following a route, m/s: -1 unknown, 0 unlimited.

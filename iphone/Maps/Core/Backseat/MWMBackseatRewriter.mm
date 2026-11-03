@@ -538,6 +538,11 @@ static m2::PointD gWalkConfirmedTo{1e9, 1e9};
   });
 }
 
++ (void)wrongButtonTapped
+{
+  SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.wrongButton"), {});
+}
+
 + (void)drivingButtonTapped
 {
   if (!gDrivingHighlighted)

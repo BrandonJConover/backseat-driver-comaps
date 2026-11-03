@@ -8207,6 +8207,16 @@ LineTable const & LineData()
         "Not walking. Shocking. Car mode."},
        {"DRIVING! OF COURSE! SWITCHING!"},
      }}},
+    {"mode.ask.walk.wrongButton",
+     {{
+       {"I said the car, rule breaker.",
+        "I said the car, rule breaker. That's not a car. I'd know. I've seen a car.",
+        "Rule breaker. I said the car. The one with the arrow.",
+        "That's not the car, rule breaker. Try again."},
+       {"I said the car, rule breaker.",
+        "The car. Not that. Rule breaker."},
+       {"I SAID THE CAR, RULE BREAKER!"},
+     }}},
   };
   return table;
 }
