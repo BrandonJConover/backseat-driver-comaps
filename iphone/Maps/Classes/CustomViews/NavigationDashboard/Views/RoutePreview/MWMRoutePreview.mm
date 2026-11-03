@@ -32,6 +32,8 @@ static CGFloat const kDrivingOptionsHeight = 48;
 @implementation MWMRoutePreview
 {
   std::map<MWMRouterType, MWMCircularProgress *> m_progresses;
+  /// Backseat: a floating arrow and "Tap the car to continue" under the highlighted car icon.
+  UIView * m_backseatPointer;
 }
 
 - (void)awakeFromNib
@@ -81,6 +83,65 @@ static CGFloat const kDrivingOptionsHeight = 48;
   [super layoutSubviews];
   [self.vehicle setNeedsLayout];
   [self resizeShadow];
+  [self placeBackseatPointer];
+}
+
+- (UIView *)backseatPointer {
+  if (m_backseatPointer)
+    return m_backseatPointer;
+  UIColor * yellow = [UIColor colorWithRed:1 green:0.8 blue:0 alpha:1];
+  UIImageSymbolConfiguration * config = [UIImageSymbolConfiguration configurationWithPointSize:34
+                                                                                       weight:UIImageSymbolWeightBlack];
+  UIImageView * arrow = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"arrow.up" withConfiguration:config]];
+  arrow.tintColor = yellow;
+  arrow.layer.shadowColor = UIColor.blackColor.CGColor;
+  arrow.layer.shadowOpacity = 0.6;
+  arrow.layer.shadowRadius = 3;
+  arrow.layer.shadowOffset = CGSizeZero;
+  UILabel * label = [[UILabel alloc] init];
+  label.text = @"Tap the car to continue";
+  label.font = [UIFont boldSystemFontOfSize:15];
+  label.textColor = UIColor.blackColor;
+  label.textAlignment = NSTextAlignmentCenter;
+  label.backgroundColor = yellow;
+  label.layer.cornerRadius = 8;
+  label.layer.masksToBounds = YES;
+  [label sizeToFit];
+  label.bounds = CGRectMake(0, 0, label.bounds.size.width + 20, label.bounds.size.height + 10);
+  CGFloat const width = MAX(label.bounds.size.width, arrow.bounds.size.width);
+  UIView * pointer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, width, arrow.bounds.size.height + 4 + label.bounds.size.height)];
+  pointer.userInteractionEnabled = NO;
+  arrow.center = CGPointMake(width / 2, arrow.bounds.size.height / 2);
+  label.center = CGPointMake(width / 2, arrow.bounds.size.height + 4 + label.bounds.size.height / 2);
+  [pointer addSubview:arrow];
+  [pointer addSubview:label];
+  // Floats up and down, pointing at the car.
+  CABasicAnimation * bob = [CABasicAnimation animationWithKeyPath:@"transform.translation.y"];
+  bob.fromValue = @0;
+  bob.toValue = @8;
+  bob.duration = 0.5;
+  bob.autoreverses = YES;
+  bob.repeatCount = HUGE_VALF;
+  [arrow.layer addAnimation:bob forKey:@"backseatBob"];
+  m_backseatPointer = pointer;
+  return pointer;
+}
+
+/// Just under the car icon, inside the screen.
+- (void)placeBackseatPointer {
+  if (!MWMBackseatRewriter.drivingHighlighted || !self.vehicle.window) {
+    [m_backseatPointer removeFromSuperview];
+    return;
+  }
+  UIView * pointer = [self backseatPointer];
+  UIView * host = self.superview ?: self;
+  if (pointer.superview != host)
+    [host addSubview:pointer];
+  [host bringSubviewToFront:pointer];
+  CGRect const car = [self.vehicle convertRect:self.vehicle.bounds toView:host];
+  CGFloat const half = pointer.bounds.size.width / 2;
+  CGFloat const x = MIN(MAX(CGRectGetMidX(car), half + 8), host.bounds.size.width - half - 8);
+  pointer.center = CGPointMake(x, CGRectGetMaxY(car) + 6 + pointer.bounds.size.height / 2);
 }
 
 // Backseat: "I've highlighted it on screen to make it easy for you." A pulsing ring on Driving.
@@ -103,6 +164,7 @@ static CGFloat const kDrivingOptionsHeight = 48;
     layer.borderWidth = 0;
     [layer removeAnimationForKey:@"backseatPulse"];
   }
+  [self placeBackseatPointer];
 }
 
 - (void)resizeShadow {
@@ -216,6 +278,7 @@ static CGFloat const kDrivingOptionsHeight = 48;
 }
 
 - (void)remove {
+  [m_backseatPointer removeFromSuperview];
   self.actualVisibilityValue = NO;
   self.isVisible = NO;
 }
