@@ -255,6 +255,11 @@ static CGFloat const kDrivingOptionsHeight = 48;
     auto const routerType = prg.first;
     if ([MWMRouter type] == routerType)
       return;
+    // Backseat: told to tap the car, tapped something else: "I said the car, rule breaker."
+    if (MWMBackseatRewriter.drivingHighlighted && routerType != MWMRouterTypeVehicle) {
+      [MWMBackseatRewriter wrongButtonTapped];
+      return;
+    }
     if (routerType == MWMRouterTypeVehicle)
       [MWMBackseatRewriter drivingButtonTapped];
     [self selectRouter:routerType];
