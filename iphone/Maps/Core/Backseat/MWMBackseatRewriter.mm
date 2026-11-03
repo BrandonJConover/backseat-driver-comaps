@@ -450,6 +450,8 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
 }
 
 static BOOL gDrivingHighlighted = NO;
+/// Set once the driver has been made to tap Driving themselves: the gag runs once.
+static char const kBackseatCarTapGagKey[] = "BackseatCarTapGagDone";
 static __weak UIAlertController * gWalkQuestion = nil;
 NSString * const kBackseatDrivingHighlightChanged = @"BackseatDrivingHighlightChanged";
 
@@ -493,10 +495,22 @@ static m2::PointD gWalkConfirmedTo{1e9, 1e9};
                                                            preferredStyle:UIAlertControllerStyleAlert];
   [alert addAction:[UIAlertAction actionWithTitle:@"No" style:UIAlertActionStyleDefault handler:^(UIAlertAction *) {
     gWalkQuestion = nil;
+    // The "click the driving button" gag is a one-time thing (Brandon); after that, No just drives.
+    bool tapGagDone = false;
+    if (settings::Get(kBackseatCarTapGagKey, tapGagDone) && tapGagDone)
+    {
+      SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.switched"), {});
+      [MWMRouter setType:MWMRouterTypeVehicle];
+      [MWMRouter startWhenReady];
+      [MWMRouter rebuildWithBestRouter:NO];
+      return;
+    }
+    settings::Set(kBackseatCarTapGagKey, true);
     // "I'm going to need you to click the driving button." Nothing starts until it's tapped.
     SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.no"), {});
     gDrivingHighlighted = YES;
     [[NSNotificationCenter defaultCenter] postNotificationName:kBackseatDrivingHighlightChanged object:nil];
+    [MWMBackseatRewriter nudgeDrivingButton:0];
   }]];
   [alert addAction:[UIAlertAction actionWithTitle:@"Yes" style:UIAlertActionStyleDefault handler:^(UIAlertAction *) {
     gWalkQuestion = nil;
@@ -509,6 +523,19 @@ static m2::PointD gWalkConfirmedTo{1e9, 1e9};
     top = top.presentedViewController;
   gWalkQuestion = alert;
   [top presentViewController:alert animated:YES completion:nil];
+}
+
+/// Not tapped yet: "You need to click on the car icon to continue." A few times, further apart.
++ (void)nudgeDrivingButton:(int)count
+{
+  if (count >= 3)
+    return;
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((12 + count * 10) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    if (!gDrivingHighlighted)
+      return;
+    SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.nudge"), {});
+    [MWMBackseatRewriter nudgeDrivingButton:count + 1];
+  });
 }
 
 + (void)drivingButtonTapped

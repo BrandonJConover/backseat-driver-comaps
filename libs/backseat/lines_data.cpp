@@ -8185,6 +8185,28 @@ LineTable const & LineData()
         "Keep checking it says driving. I might change it. On purpose."},
        {"CHECK THE MODE NOW AND THEN! I MAY SWAP IT ON YOU!"},
      }}},
+    {"mode.ask.walk.nudge",
+     {{
+       {"You need to click on the car icon to continue. The one with the arrow pointing at it.",
+        "Still waiting. You need to click on the car icon to continue. There's a big yellow arrow. You can't miss it. Well, you can. You just did.",
+        "The car icon. Click it. That's how we continue. I drew you an arrow.",
+        "We're not going anywhere until you click on the car icon. I've got all day. You don't.",
+        "Hint: the car icon. The one I put an arrow next to. Click it to continue."},
+       {"Click the car icon to continue. The arrow is pointing right at it.",
+        "Car icon. Arrow. Click. That's it. That's the whole job."},
+       {"CLICK THE CAR ICON! THERE'S AN ARROW! I DREW YOU AN ARROW!"},
+     }}},
+    {"mode.ask.walk.switched",
+     {{
+       {"Not walking. I figured. Switching us to driving.",
+        "Of course not. Driving it is. I'll switch it for you this time. Don't get used to it.",
+        "No? Then we're driving. Switching now.",
+        "I knew it. Car mode. Let's go.",
+        "Not on foot. Good. Your legs thank me. Switching to driving."},
+       {"Driving. Obviously. Switching.",
+        "Not walking. Shocking. Car mode."},
+       {"DRIVING! OF COURSE! SWITCHING!"},
+     }}},
   };
   return table;
 }
