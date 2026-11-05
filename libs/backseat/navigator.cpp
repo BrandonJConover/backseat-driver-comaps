@@ -28,6 +28,8 @@ double constexpr kPredictionDelayMs = 25000;
 double constexpr kLaneAfterDirectionMs = 6000;
 /// How long a GPS speed dropout (tunnel) keeps the last known speed before it reads as stopped.
 double constexpr kUnknownSpeedCarryMs = 10000;
+/// A fix at most this much older than the newest one is a replay and is dropped; more is a clock reset.
+double constexpr kStaleFixWindowMs = 60000;
 double constexpr kLaneSayMaxM = 1500;
 /// Two maneuvers this close together are said as one: "turn left onto X, then right onto Y".
 double constexpr kChainWithinM = 150;
@@ -577,8 +579,37 @@ void Navigator::SetUnits(Units units)
     m_engine->SetUnits(units);
 }
 
-void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
+std::optional<Fix> CleanFix(Fix const & raw, double newestTMs)
 {
+  // No place or no time: nothing downstream can use it, and NaN poisons every timer and distance.
+  if (!std::isfinite(raw.tMs) || !std::isfinite(raw.lat) || !std::isfinite(raw.lon) || std::abs(raw.lat) > 90 ||
+      std::abs(raw.lon) > 180)
+    return std::nullopt;
+  // A fix older than one already handled (a stack replaying its queue). The same moment again is fine
+  // (the route state may have changed); a bigger step back is a clock reset the timers live with.
+  if (raw.tMs < newestTMs && newestTMs - raw.tMs <= kStaleFixWindowMs)
+    return std::nullopt;
+  Fix f = raw;
+  // Junk measurements are unknown ones, never zero or infinity: an infinite speed was a launch roast.
+  if (!std::isfinite(f.speedMps))
+    f.speedMps = -1;
+  // A bearing past 360 is out of contract, not a direction: wrapped, 725 read as a U-turn.
+  if (!std::isfinite(f.bearingDeg) || f.bearingDeg >= 360)
+    f.bearingDeg = -1;
+  if (std::isnan(f.accuracyM))
+    f.accuracyM = -1;
+  if (f.speedLimitMps && (!std::isfinite(*f.speedLimitMps) || *f.speedLimitMps <= 0))
+    f.speedLimitMps.reset();
+  return f;
+}
+
+void Navigator::OnFix(Fix const & raw, RouteSnapshot const & route)
+{
+  auto const clean = CleanFix(raw, m_lastFixT);
+  if (!clean)
+    return;
+  Fix const & fix = *clean;
+  m_lastFixT = std::max(m_lastFixT, fix.tMs);
   // Clocks can step backwards (GPS vs. system time); the engine ignores those samples.
   m_lastT = std::max(m_lastT, fix.tMs);
   m_hereFix = fix;

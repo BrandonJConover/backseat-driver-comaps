@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <set>
 
@@ -2408,4 +2409,99 @@ TEST(RoughFixesDontYelpAboutCurves)
       nav.OnFix(Rough(Heading(i * 1000, 25, 10.0 * i), accuracy), Far());
     CHECK_EQUAL(FearLines(nav.TakeLines()).size(), size_t(accuracy < 50 ? 1 : 0));
   }
+}
+
+// Junk from the GPS stack is read as unknown or dropped, never passed on as a number.
+TEST(CleanFixReadsJunkAsUnknown)
+{
+  static constexpr double nan = std::numeric_limits<double>::quiet_NaN();
+  static constexpr double inf = std::numeric_limits<double>::infinity();
+  Fix good;
+  good.tMs = 100000;
+  good.lat = 36.37;
+  good.lon = -94.2;
+  good.speedMps = 20;
+  good.bearingDeg = 90;
+  good.speedLimitMps = 25;
+  good.accuracyM = 5;
+
+  auto const same = CleanFix(good, 99000);
+  CHECK(same.has_value());
+  CHECK_EQUAL(same->speedMps, 20.0);
+  CHECK_EQUAL(same->bearingDeg, 90.0);
+  CHECK_EQUAL(same->accuracyM, 5.0);
+  CHECK(same->speedLimitMps && *same->speedLimitMps == 25.0);
+
+  // No time or place: dropped.
+  for (auto mangle : {+[](Fix & f) { f.tMs = nan; }, +[](Fix & f) { f.lat = nan; }, +[](Fix & f) { f.lon = -inf; },
+                      +[](Fix & f) { f.lat = 91; }, +[](Fix & f) { f.lon = 181; }})
+  {
+    Fix f = good;
+    mangle(f);
+    CHECK(!CleanFix(f, 99000));
+  }
+  // Replayed: dropped within a minute of the newest; the same moment again and a clock reset are kept.
+  CHECK(!CleanFix(good, 130000));
+  CHECK(CleanFix(good, 100000).has_value());
+  CHECK(CleanFix(good, 100000 + 61000).has_value());
+
+  Fix f = good;
+  f.speedMps = inf;
+  f.bearingDeg = 725;
+  f.accuracyM = nan;
+  f.speedLimitMps = nan;
+  auto const c = CleanFix(f, 99000);
+  CHECK(c.has_value());
+  CHECK_EQUAL(c->speedMps, -1.0);
+  CHECK_EQUAL(c->bearingDeg, -1.0);
+  CHECK_EQUAL(c->accuracyM, -1.0);
+  CHECK(!c->speedLimitMps);
+  f.speedMps = nan;
+  f.bearingDeg = -inf;
+  f.speedLimitMps = 0;
+  auto const d = CleanFix(f, 99000);
+  CHECK(d && d->speedMps == -1 && d->bearingDeg == -1 && !d->speedLimitMps);
+  // A huge accuracy is a real (rough) reading, kept for the accuracy gate.
+  f.accuracyM = 1e9;
+  CHECK_EQUAL(CleanFix(f, 99000)->accuracyM, 1e9);
+}
+
+// An infinite speed handed over mid-drive is not a launch, and a NaN position doesn't stop the trip.
+TEST(HostileFixMidDriveIsNotJudged)
+{
+  Navigator nav;
+  RouteSnapshot far;
+  far.state = RouteState::OnRoute;
+  far.turnId = 1;
+  far.turn = TurnKind::Left;
+  far.distToTurnM = 5000;
+  double lat = 36.37;
+  for (int i = 0; i < 40; ++i)
+  {
+    Fix f;
+    f.tMs = 1.7e12 + i * 1000.0;
+    f.lat = lat += 20.0 / 111320;
+    f.lon = -94.2;
+    f.speedMps = 20;
+    f.bearingDeg = 0;
+    f.accuracyM = 5;
+    if (i == 20)
+    {
+      Fix junk = f;
+      junk.speedMps = std::numeric_limits<double>::infinity();
+      junk.bearingDeg = 900;
+      nav.OnFix(junk, far);
+      junk = f;
+      junk.lat = std::numeric_limits<double>::quiet_NaN();
+      nav.OnFix(junk, far);
+    }
+    nav.OnFix(f, far);
+  }
+  for (auto const & l : nav.TakeLines())
+  {
+    CHECK(l.key.rfind("hardAccel", 0) != 0);
+    CHECK(l.key.rfind("uturn", 0) != 0);
+  }
+  CHECK(nav.Engine());
+  CHECK_EQUAL(nav.Engine()->Report().hardAccels, 0);
 }

@@ -5,7 +5,9 @@
 #include "backseat/lines.hpp"
 #include "backseat/navigator.hpp"
 
+#include <cctype>
 #include <cstdio>
+#include <cstring>
 #include <map>
 
 using namespace backseat;
@@ -182,5 +184,97 @@ TEST(SoakNoUnfilledPlaceholdersInSpokenLines)
     CHECK(lines - before > 100);
   }
   CHECK(lines > 5000);
+  CHECK(bad == 0);
+}
+
+namespace
+{
+bool HasNonFiniteWord(std::string text)
+{
+  for (auto & c : text)
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  for (char const * w : {"nan", "inf"})
+    for (size_t at = text.find(w); at != std::string::npos; at = text.find(w, at + 1))
+    {
+      size_t const end = at + std::strlen(w);
+      bool const startOk = at == 0 || !std::isalpha(static_cast<unsigned char>(text[at - 1]));
+      bool const endOk = end == text.size() || !std::isalpha(static_cast<unsigned char>(text[end]));
+      if (startOk && endOk)
+        return true;
+    }
+  return false;
+}
+
+// The driving judgements a broken fix could fake: a hard stop or launch, leaving the road, going the
+// wrong way, a U-turn.
+bool IsJudgement(std::string const & key)
+{
+  for (char const * k : {"hardBraking", "hardAccel", "offroad.enter", "wrongWay", "uturn"})
+    if (key.rfind(k, 0) == 0)
+      return true;
+  return false;
+}
+}  // namespace
+
+// GPS stacks hand over junk now and then: NaN or infinite fields, bearings past 360, stale or repeated
+// timestamps, absurd accuracy. None of it may crash the trip, reach the voice as "nan"/"inf", or fake a
+// judgement the same trip without the junk doesn't make.
+TEST(SoakHostileFixesAreHarmless)
+{
+  int lines = 0;
+  int bad = 0;
+  for (TravelMode const mode : {TravelMode::Drive, TravelMode::Walk})
+    for (TripShape const shape : {TripShape::Town, TripShape::RoadTrip})
+    {
+      if (mode == TravelMode::Walk && shape == TripShape::RoadTrip)
+        continue;
+      uint32_t const seeds = shape == TripShape::RoadTrip ? 4 : 20;
+      for (uint32_t seed = 1; seed <= seeds; ++seed)
+      {
+        auto run = [&](bool hostile, TripReport & report)
+        {
+          EngineConfig c;
+          c.rng = SeededRng(seed);
+          Navigator nav(c);
+          nav.SetTravelMode(mode);
+          SimOptions o{shape, seed};
+          o.missTurns = false;
+          o.hostileFixes = hostile;
+          auto r = SimulateTrip(nav, o);
+          if (nav.Engine())
+            report = nav.Engine()->Report();
+          return r;
+        };
+        TripReport cleanReport, hostileReport;
+        auto const clean = run(false, cleanReport);
+        auto const hostile = run(true, hostileReport);
+        CHECK(hostile.arrived);
+        int cleanJudged = 0, hostileJudged = 0;
+        for (auto const & s : clean.spoken)
+          cleanJudged += IsJudgement(s.line.key);
+        for (auto const & s : hostile.spoken)
+        {
+          ++lines;
+          hostileJudged += IsJudgement(s.line.key);
+          if (HasNonFiniteWord(s.line.text) || s.line.text.find_first_not_of(" \t\n") == std::string::npos)
+          {
+            if (++bad <= 10)
+              std::fprintf(stderr, "  junk [%s]: %s\n", s.line.key.c_str(), s.line.text.c_str());
+          }
+          else if (IsJudgement(s.line.key) && hostileJudged > cleanJudged)
+          {
+            if (++bad <= 10)
+              std::fprintf(stderr, "  faked [%s] seed %u: %s\n", s.line.key.c_str(), seed, s.line.text.c_str());
+          }
+        }
+        CHECK(hostileReport.hardBrakes == cleanReport.hardBrakes);
+        CHECK(hostileReport.hardAccels == cleanReport.hardAccels);
+        CHECK(hostileReport.wrongWay == cleanReport.wrongWay);
+        if (hostileReport.hardBrakes != cleanReport.hardBrakes || hostileReport.hardAccels != cleanReport.hardAccels)
+          std::fprintf(stderr, "  seed %u brakes %d/%d accels %d/%d\n", seed, cleanReport.hardBrakes,
+                       hostileReport.hardBrakes, cleanReport.hardAccels, hostileReport.hardAccels);
+      }
+    }
+  CHECK(lines > 1000);
   CHECK(bad == 0);
 }

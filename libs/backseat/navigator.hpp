@@ -201,6 +201,11 @@ struct Fix
   double accuracyM = -1;
 };
 
+/// The fix with junk measurements (NaN/inf speed, a bearing that isn't finite or is past 360, NaN
+/// accuracy, a bad limit) read as unknown, or nothing when it has no usable time or place, or replays a moment
+/// before `newestTMs` (within a minute of it).
+std::optional<Fix> CleanFix(Fix const & raw, double newestTMs);
+
 /// Distance along `ahead` (the route from the car onward) to the first sharp bend: where the heading
 /// has turned at least `minDeg` within 80 m. Negative if none starts within `maxM`.
 double CurveAheadM(std::vector<LatLon> const & ahead, double maxM, double minDeg = 50);
@@ -549,6 +554,8 @@ private:
   RewriteGate m_gate;
 
   double m_lastT = 0;
+  /// The newest fix timestamp OnFix took, for dropping replayed fixes.
+  double m_lastFixT = -1e18;
   double m_lastVoiceCommandT = -1e12;
   TravelMode m_travelMode = TravelMode::Drive;
   double m_lastHeadingT = -1e18;

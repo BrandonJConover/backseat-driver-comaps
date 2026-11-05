@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <deque>
+#include <limits>
 #include <optional>
 #include <random>
 #include <string>
@@ -174,7 +175,34 @@ struct SimOptions
   bool lookups = true;
   /// The driver blows a turn now and then (a reroute follows).
   bool missTurns = true;
+  /// Every few seconds the phone also hands over a broken fix (NaN/inf fields, a bearing past 360,
+  /// a stale or repeated timestamp, absurd accuracy) right before the real one, as GPS stacks do.
+  bool hostileFixes = false;
 };
+
+/// The broken fix the sim slips in before the real one when SimOptions::hostileFixes is set.
+inline backseat::Fix HostileFix(backseat::Fix const & good, backseat::Fix const & last, int kind)
+{
+  double const nan = std::numeric_limits<double>::quiet_NaN();
+  double const inf = std::numeric_limits<double>::infinity();
+  backseat::Fix f = good;
+  switch (kind % 12)
+  {
+  case 0: f.lat = nan; f.lon = nan; break;
+  case 1: f.speedMps = nan; break;
+  case 2: f.speedMps = inf; break;
+  case 3: f.bearingDeg = nan; break;
+  case 4: f.bearingDeg = 725; break;
+  case 5: f.accuracyM = nan; break;
+  case 6: f.accuracyM = 1e9; break;
+  case 7: f = last; f.tMs = good.tMs - 30000; break;  // a stale fix from half a minute ago
+  case 8: f = last; break;                            // the last fix again, same timestamp
+  case 9: f.tMs = nan; break;
+  case 10: f.lon = -inf; break;
+  case 11: f.speedLimitMps = nan; f.speedMps = -inf; break;
+  }
+  return f;
+}
 
 inline SimResult SimulateTrip(backseat::Navigator & nav, SimOptions const & o, double startMs = 1.7e12)
 {
@@ -267,6 +295,7 @@ inline SimResult SimulateTrip(backseat::Navigator & nav, SimOptions const & o, d
   double offSince = 0;
   bool finished = false;
   double finishedAt = 0;
+  Fix lastFix;
 
   auto snapshot = [&]()
   {
@@ -374,7 +403,10 @@ inline SimResult SimulateTrip(backseat::Navigator & nav, SimOptions const & o, d
     f.speedLimitMps = legs[leg].limitMps;
     f.accuracyM = 5;
     RouteSnapshot const snap = snapshot();
+    if (o.hostileFixes && step % 5 == 2)
+      nav.OnFix(HostileFix(f, lastFix, step / 5), snap);
     nav.OnFix(f, snap);
+    lastFix = f;
     take();
     // Directions also go out between fixes, right before the phone speaks.
     nav.Poll(snap);
