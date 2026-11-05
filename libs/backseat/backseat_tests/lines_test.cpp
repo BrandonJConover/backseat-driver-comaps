@@ -257,3 +257,31 @@ TEST(SafetyNoTouchPromptsWhileDriving)
   CHECK(tapTheMic);
   SetLineTravelMode(TravelMode::Drive);
 }
+
+TEST(ThinPoolsHaveVariety)
+{
+  // Situations that used to have the same two lines in every tier (loop B8): each needs enough
+  // lines that a long trip doesn't repeat itself, and the angry tier must actually sound different.
+  SetLineTravelMode(TravelMode::Drive);
+  for (char const * key :
+       {"signal.lost", "signal.back", "night.late", "night.sunset", "road.farm", "road.gravel", "road.nature",
+        "road.smallTown", "gas.none", "rest.passed", "rest.back", "rest.quick", "coffee.far", "driveThru.in",
+        "driveThru.long"})
+  {
+    std::vector<std::string> unique;
+    for (int tier = 0; tier < 3; ++tier)
+      for (auto const & line : LinesFor(key, tier))
+      {
+        bool seen = false;
+        for (auto const & u : unique)
+          seen = seen || u == line;
+        if (!seen)
+          unique.push_back(line);
+      }
+    if (unique.size() < 6)
+      std::printf("    thin pool: %s has %zu unique lines\n", key, unique.size());
+    CHECK(unique.size() >= 6);
+    CHECK(LinesFor(key, 2) != LinesFor(key, 0));
+    CHECK(LinesFor(key, 1) != LinesFor(key, 0));
+  }
+}
