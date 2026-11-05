@@ -80,7 +80,7 @@ object KokoroVoice : NeuralVoice
   @Volatile private var installed = false
   @Volatile private var player: ClipPlayer? = null
 
-  /** Plugs the voice into [TtsPlayer] and loads (or first downloads) the model in the background. */
+  /** Plugs the voice into [TtsPlayer] and loads the bundled model (unpacking it once) in the background. */
   @JvmStatic
   fun install(context: Context)
   {

@@ -1,0 +1,15 @@
+# Kokoro-82M weights Backseat Driver bundles (iOS Core ML + Android sherpa-onnx).
+#
+# id stock   upstream Kokoro v1.0: builds fetch FluidAudio's Core ML models (iOS) and
+#            sherpa-onnx's kokoro-int8-multi-lang-v1_0 (Android) from their pinned releases.
+# any other  a fine-tune exported by EpubToM4B's tools/voices/kokoro_export (same graphs,
+#            new numbers). Model files never go on GitHub, so builds copy them from the
+#            local build-deps folder $BOOKLYRE_BUILD_DEPS_DIR/<id>/ (default
+#            ~/Library/Caches/BookLyre/build-deps on macOS, ~/.cache/booklyre/build-deps
+#            elsewhere) and check each sha256 below. GitHub Actions can't see that folder,
+#            so a fine-tune build has to run on the Mac or the laptop.
+#            Project files keep a copy in kokoro-finetune/ship/<id>/.
+#
+# To ship a new fine-tune (same id as BookLyre):
+#   python <EpubToM4B>/tools/voices/kokoro_export/pin.py --tsv kokoro_weights.tsv <build-deps>/<id>
+id	stock

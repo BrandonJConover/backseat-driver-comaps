@@ -195,8 +195,8 @@ final class KokoroVoice: NSObject {
       return "Kokoro paused after a crash, retrying next launch. The iPhone voice fills in until then."
     }
     lock.lock(); defer { lock.unlock() }
-    if primary != nil { return "A voice you haven't used yet downloads the first time it speaks." }
-    return "The voices are still downloading or loading (the download waits for Wi-Fi). Until then the iPhone voice fills in."
+    if primary != nil { return "Every voice comes with the app." }
+    return "The voice is still loading. Until then the iPhone voice fills in."
   }
 
   /// Switches voices and forgets queued and cached lines, so the old voice doesn't come back.
@@ -275,7 +275,7 @@ final class KokoroVoice: NSObject {
     return queued || player.isPlaying
   }
 
-  /// Downloads the Core ML models once (on Wi-Fi) and loads Kokoro in the background.
+  /// Loads Kokoro in the background from the models bundled with the app.
   @objc func start() {
     lock.lock()
     if started { lock.unlock(); return }
@@ -312,12 +312,13 @@ final class KokoroVoice: NSObject {
     case .normal:
       break
     }
-    if UserDefaults.standard.bool(forKey: Self.installedKey) {
+    if KokoroBundle.isBundled || UserDefaults.standard.bool(forKey: Self.installedKey) {
       // Not during launch itself: give the first screen a moment, then load in the background.
       DispatchQueue.main.asyncAfter(deadline: .now() + Self.warmUpDelay) { [self] in load() }
       return
     }
-    // The first download is a few hundred MB: wait for a network that isn't cellular or Low Data.
+    // Builds without the bundled files (none ship that way) download once: a few hundred MB, so
+    // wait for a network that isn't cellular or Low Data.
     let monitor = NWPathMonitor()
     monitor.pathUpdateHandler = { [weak self] path in
       guard let self, path.status == .satisfied, !path.isExpensive, !path.isConstrained else { return }
@@ -350,6 +351,10 @@ final class KokoroVoice: NSObject {
     Task.detached(priority: .userInitiated) { [self] in
       defer { lock.lock(); loading = false; lock.unlock() }
       let began = Date()
+      // The bundled models (or a fine-tune of them) go where FluidAudio looks, so it downloads nothing.
+      if KokoroBundle.install() {
+        BackseatLog.event("voice.bundle", ["ms": String(Int(Date().timeIntervalSince(began) * 1000))])
+      }
       let voice = Self.voice ?? Self.defaultVoice
       // The CPU first: after an install or update the Neural Engine recompiles the models, which
       // took a minute on an iPhone 15 Pro. The CPU is ready in seconds.

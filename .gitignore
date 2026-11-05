@@ -221,3 +221,7 @@ tools/unix/maps/settings.sh
 
 # Zed
 .zed
+
+# Backseat Driver: generated Kokoro asset pack (built from pinned releases / local build-deps)
+android/kokoro_pack/src/main/assets/
+iphone/Maps/Core/TextToSpeech/Kokoro/CoreMLKokoro/

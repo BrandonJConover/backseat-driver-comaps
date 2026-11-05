@@ -149,6 +149,14 @@ android {
         isUniversalApk = true
     }
 
+    // Backseat Driver: the Kokoro voice ships with the app; it is never downloaded. Play installs it
+    // as the :kokoro_pack install-time asset pack. Sideloaded APKs (web, fdroid, huawei and every
+    // debug build) get no asset packs, so they carry the same files in the base.
+    assetPacks += ":kokoro_pack"
+    listOf("web", "fdroid", "huawei", "debug").forEach { set ->
+        sourceSets.getByName(set).assets.srcDir(rootDir.resolve("kokoro_pack/src/main/assets"))
+    }
+
     // Only bundle wrap.sh when arm64-v8a is actually compiled.
     val buildsArm64 = project.hasProperty("arm64") || project.hasProperty("arm64-v8a") ||
         !(project.hasProperty("arm32") || project.hasProperty("armeabi-v7a") ||
@@ -366,6 +374,9 @@ configurations.configureEach {
     exclude(group = "com.google.android.gms", module = "play-services-base")
 }
 
+// Backseat Driver: the bundled Kokoro files have to exist before any variant merges its assets.
+tasks.named("preBuild") { dependsOn(":kokoro_pack:prepareKokoroAssets") }
+
 // Backseat Driver: sherpa-onnx runs the Kokoro voice. Its AAR isn't on Maven, so it's fetched from
 // the project's GitHub release once and checked against a pinned SHA-256.
 val sherpaOnnxVersion = "1.13.8"
@@ -386,7 +397,6 @@ if (!sherpaOnnxAar.exists() || sha256Of(sherpaOnnxAar) != sherpaOnnxSha256) {
 dependencies {
     implementation(project(":sdk"))
     implementation(files(sherpaOnnxAar))
-    implementation(libs.apache.commons.compress)
     coreLibraryDesugaring(libs.android.tools.desugar)
 
     // Google Play Location Services
