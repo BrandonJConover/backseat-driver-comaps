@@ -855,6 +855,7 @@ bool HoldsForTurns(Category c)
   case Category::PhoneCall:
   case Category::Quiet:
   case Category::TwentyQuestions:
+  case Category::PopQuiz:
   case Category::Bossy:
   case Category::Thanked:
   case Category::Title: return false;

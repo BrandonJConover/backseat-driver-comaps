@@ -357,6 +357,9 @@ public:
     std::string voice;
     /// A 20 Questions line: the driver answers out loud, so the platform listens after it.
     bool listen = false;
+    /// A pop quiz line: the question and its choices are read out, so it never goes stale in the
+    /// queue (the driver isn't supposed to read them off the screen).
+    bool keep = false;
   };
 
   /// One entry per line of the last TakeNotifications() batch, in the same order.

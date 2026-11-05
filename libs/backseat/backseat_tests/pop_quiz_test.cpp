@@ -168,6 +168,7 @@ TEST(PopQuizEveryQuestionAnswersToItsOwnWords)
 
 TEST(PopQuizLinesAreFilled)
 {
+  SetLineTravelMode(TravelMode::Drive);
   Vars const vars = {{"question", "Q?"}, {"a", "x"}, {"b", "y"}, {"c", "z"}, {"answer", "x"},
                      {"brownies", "2 brownie points"}, {"name", "Brandon"}};
   for (char const * key : {"quiz.open", "quiz.asked", "quiz.aloud", "quiz.aloud.walk", "quiz.ask", "quiz.right.first",
@@ -184,6 +185,12 @@ TEST(PopQuizLinesAreFilled)
   for (auto const & l : LinesFor("quiz.right", 0))
     CHECK(PqHas(l, "brown") || PqHas(l, "teacher's pet") || PqHas(l, "Teacher's pet") || PqHas(l, "sucking up"));
   CHECK(PqHas(LinesFor("quiz.aloud", 0)[0], "tried to touch your phone screen"));
+  // Brandon: it reads the question out and says not to look at the phone.
+  for (int tier = 0; tier < 3; ++tier)
+    for (auto const & l : LinesFor("quiz.aloud", tier))
+      CHECK(PqHas(l, "phone") || PqHas(l, "PHONE"));
+  for (auto const & l : LinesFor("quiz.ask", 0))
+    CHECK(PqHas(l, "{question}") && PqHas(l, "{a}") && PqHas(l, "{b}") && PqHas(l, "{c}"));
   CHECK(FindBadge("teacherspet") != nullptr);
 }
 

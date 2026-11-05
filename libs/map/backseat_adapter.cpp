@@ -3077,7 +3077,8 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
     // 20 Questions, "Are you actually intending to walk there?" and a pop quiz want an answer out loud.
     m_lastVoices.push_back({c.priority == backseat::Priority::Nav, c.voiceSpeed, c.maxWaitMs, c.voice,
                             c.category == backseat::Category::TwentyQuestions || c.key == "mode.ask.walk" ||
-                                c.key == "quiz.ask"});
+                                c.key == "quiz.ask",
+                            c.category == backseat::Category::PopQuiz});
     if (c.priority == backseat::Priority::Nav)
       m_lastDirection = c.text;
   }

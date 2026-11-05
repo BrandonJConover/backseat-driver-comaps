@@ -170,7 +170,7 @@ final class BackseatQuizCardView: UIView {
       row.accessibilityTraits = row.isUserInteractionEnabled ? .button : .staticText
     }
     if !quiz.answered {
-      footer.text = quiz.tappable ? "Say it out loud or tap it." : "Say your answer out loud. Hands on the wheel."
+      footer.text = quiz.tappable ? "Say it out loud or tap it." : "Don't look at this. Listen, then say your answer out loud."
       footer.textColor = BackseatTheme.muted
     } else if quiz.picked == quiz.correct {
       footer.text = "Brownie point earned. Brown noser."

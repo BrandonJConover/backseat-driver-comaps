@@ -411,6 +411,16 @@ using Observers = NSHashTable<Observer>;
         [kokoro speak:notification voice:@(voices[i].voice.c_str()) speed:static_cast<float>(voices[i].speed)];
         continue;
       }
+      // A pop quiz is read out in full, question and choices, however long the queue: the driver
+      // must not have to look at the screen.
+      if (hinted && voices[i].keep)
+      {
+        __weak MWMTextToSpeech * weakSelf = self;
+        [kokoro sayReply:notification voiceID:nil fallback:^{
+          [weakSelf speakOneString:notification];
+        }];
+        continue;
+      }
       BOOL const nav = hinted ? voices[i].nav : YES;
       float const speed = hinted ? static_cast<float>(voices[i].speed) : 1.0f;
       double const maxWaitMs = hinted ? voices[i].maxWaitMs : 0;
