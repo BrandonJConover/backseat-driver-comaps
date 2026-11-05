@@ -284,6 +284,22 @@ TEST(ClockTimesAreSaidWithAmAndPm)
   CHECK(peeem);
 }
 
+TEST(CyrillicIsSaidNotSkipped)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_CYRILLIC_PATH);
+  CHECK(cases.size() >= 20);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  CHECK_EQUAL(Cyrillic("СССР"), std::string("S-S-S-R"));
+  CHECK_EQUAL(Cyrillic("моё"), std::string("moyo"));
+  CHECK_EQUAL(Cyrillic("no Cyrillic here"), std::string("no Cyrillic here"));
+  // Phrases the lines quote keep their hand-made respellings: Foreign() runs first.
+  CHECK(ForSpeech("Поверните налево").find("Povernite") == std::string::npos);
+}
+
 TEST(YearsAreSaidAsYears)
 {
   auto const cases = GoldenCases(BACKSEAT_SPOKEN_YEARS_PATH);

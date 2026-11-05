@@ -1173,6 +1173,122 @@ std::string Foreign(std::string const & text)
   return s;
 }
 
+// MARK: - Cyrillic
+
+namespace
+{
+std::u32string Decode(std::string const & s);
+std::string Encode(std::u32string const & s);
+bool Letter(char32_t c);
+
+bool CyrillicLetter(char32_t c)
+{
+  return c >= U'Ѐ' && c <= U'ӿ';
+}
+
+char32_t CyrillicLower(char32_t c)
+{
+  if (c >= U'А' && c <= U'Я')
+    return c + 0x20;
+  if (c >= U'Ѐ' && c <= U'Џ')
+    return c + 0x50;
+  if (c >= U'Ѡ' && c <= U'ӿ' && (c % 2) == 0)
+    return c + 1;
+  return c;
+}
+
+/// Reader-style romanisation, the same table as BookLyre's text/spoken_foreign_scripts.py (Russian,
+/// Ukrainian, Belarusian), plus the Serbian and Macedonian letters map names use.
+char const * CyrillicRoman(char32_t lower)
+{
+  switch (lower)
+  {
+  case U'а': return "a";   case U'б': return "b";  case U'в': return "v";  case U'г': return "g";
+  case U'д': return "d";   case U'е': return "e";  case U'ё': return "yo"; case U'ж': return "zh";
+  case U'з': return "z";   case U'и': return "i";  case U'й': return "y";  case U'к': return "k";
+  case U'л': return "l";   case U'м': return "m";  case U'н': return "n";  case U'о': return "o";
+  case U'п': return "p";   case U'р': return "r";  case U'с': return "s";  case U'т': return "t";
+  case U'у': return "u";   case U'ф': return "f";  case U'х': return "kh"; case U'ц': return "ts";
+  case U'ч': return "ch";  case U'ш': return "sh"; case U'щ': return "shch";
+  case U'ы': return "y";   case U'э': return "e";  case U'ю': return "yu"; case U'я': return "ya";
+  case U'і': return "i";   case U'ї': return "yi"; case U'є': return "ye"; case U'ґ': return "g";
+  case U'ў': return "w";
+  case U'ј': return "y";   case U'љ': return "ly"; case U'њ': return "ny"; case U'ћ': return "ch";
+  case U'ђ': return "j";   case U'џ': return "j";  case U'ѓ': return "gy"; case U'ќ': return "ky";
+  case U'ѕ': return "dz";
+  default: return "";
+  }
+}
+
+bool CyrillicVowel(char32_t lower)
+{
+  return std::u32string_view(U"аеёиоуыэюяіїє").find(lower) != std::u32string_view::npos;
+}
+
+std::string CyrillicWord(std::u32string const & word)
+{
+  std::string out;
+  bool upper = true;
+  char32_t prev = 0;
+  for (char32_t c : word)
+  {
+    char32_t const low = CyrillicLower(c);
+    upper = upper && low != c;
+    // "е" starting a word or after a vowel or sign is "ye": Елена Yelena, моё moyo.
+    if (low == U'е' && (!prev || CyrillicVowel(prev) || prev == U'ъ' || prev == U'ь'))
+      out += "ye";
+    else
+      out += CyrillicRoman(low);
+    prev = low;
+  }
+  if (out.empty())
+    return out;
+  // A vowelless acronym in capitals is spelled ("СССР" is "S, S, S, R"); a shouted word reads as a word.
+  if (upper && word.size() > 1 && out.find_first_of("aeiouy") == std::string::npos)
+  {
+    std::string spelled;
+    for (char c : out)
+      spelled += std::string(spelled.empty() ? "" : "-") + static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    return spelled;
+  }
+  if (CyrillicLower(word[0]) != word[0])
+    out[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(out[0])));
+  return out;
+}
+}  // namespace
+
+std::string Cyrillic(std::string const & text)
+{
+  std::u32string const in = Decode(text);
+  bool any = false;
+  for (char32_t c : in)
+    any = any || CyrillicLetter(c);
+  if (!any)
+    return text;
+  std::u32string out;
+  for (size_t i = 0; i < in.size();)
+  {
+    if (!CyrillicLetter(in[i]))
+    {
+      out += in[i++];
+      continue;
+    }
+    size_t end = i;
+    std::u32string word;
+    for (; end < in.size() && (CyrillicLetter(in[end]) || in[end] == U'́'); ++end)
+      if (in[end] != U'́')
+        word += in[end];
+    // A token that mixes Latin and Cyrillic letters ("Мoscow") is a look-alike spelling: leave it.
+    bool const mixed = (i > 0 && Letter(in[i - 1])) || (end < in.size() && Letter(in[end]));
+    if (mixed)
+      out.append(in, i, end - i);
+    else
+      out += Decode(CyrillicWord(word));
+    i = end;
+  }
+  return Encode(out);
+}
+
 std::string RouteNumber(std::string const & digits)
 {
   if (digits.empty() || digits.size() > 4 ||
@@ -1460,6 +1576,8 @@ std::string ForSpeech(std::string const & text)
   std::string s = ReplaceAll(text, "\xC2\xA0", " ");
   // Foreign phrases first, before anything reads their letters as English abbreviations.
   s = Foreign(s);
+  // Cyrillic map names and quotes the English voice would skip: "улица Ленина" is "ulitsa Lenina".
+  s = Cyrillic(s);
   // Ranges before dashes become pauses: "3–5" is "3 to 5", not "3, 5".
   s = Ranges(s);
   // Clock times before the dash pass can split "9am-5pm".

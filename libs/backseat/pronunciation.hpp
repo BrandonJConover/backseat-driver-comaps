@@ -40,6 +40,11 @@ std::string Ranges(std::string const & text);
 /// ignoring case on word boundaries. Part of ForSpeech.
 std::string Foreign(std::string const & text);
 
+/// Cyrillic romanised the way a reader says it, for street names and quotes the English voice
+/// would skip: "улица Ленина" is "ulitsa Lenina", "Київ" "Kiyiv", "Ёлка" "Yolka"; a vowelless
+/// acronym in capitals is spelled ("СССР" "S-S-S-R"); a token mixing Latin letters ("Мoscow") is left.
+std::string Cyrillic(std::string const & text);
+
 /// Every foreign phrase Foreign() knows, with the stand-ins it swaps in (space-separated).
 std::vector<std::pair<std::string, std::string>> const & ForeignPhrases();
 
