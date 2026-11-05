@@ -1,0 +1,165 @@
+{
+ "about": "Shared expectations for highway, route and exit numbers said the way drivers say them. Backseat Driver: backseat::pronunciation::ForSpeech (libs/backseat/backseat_tests/spoken_roads.json). EpubToM4B can port the route-number rules (books quote I-95, Route 66); keep both copies in sync.",
+ "cases": [
+  {
+   "input": "Take I-405 N",
+   "language": "en",
+   "expected": "Take I four oh five North"
+  },
+  {
+   "input": "Merge onto I-35",
+   "language": "en",
+   "expected": "Merge onto I thirty five"
+  },
+  {
+   "input": "Merge onto US-183",
+   "language": "en",
+   "expected": "Merge onto yooess one eighty three"
+  },
+  {
+   "input": "Merge onto US-36",
+   "language": "en",
+   "expected": "Merge onto yooess thirty six"
+  },
+  {
+   "input": "Turn left onto FM 1431",
+   "language": "en",
+   "expected": "Turn left onto F M fourteen thirty one"
+  },
+  {
+   "input": "Take CR-3502",
+   "language": "en",
+   "expected": "Take County Road thirty five oh two"
+  },
+  {
+   "input": "Take RM 620",
+   "language": "en",
+   "expected": "Take R M six twenty"
+  },
+  {
+   "input": "Stay on SH 71",
+   "language": "en",
+   "expected": "Stay on State Highway seventy one"
+  },
+  {
+   "input": "Take SR 71",
+   "language": "en",
+   "expected": "Take State Route seventy one"
+  },
+  {
+   "input": "Merge onto TX-71",
+   "language": "en",
+   "expected": "Merge onto Texas seventy one"
+  },
+  {
+   "input": "Take CA-1 S",
+   "language": "en",
+   "expected": "Take California one South"
+  },
+  {
+   "input": "Take M-14",
+   "language": "en",
+   "expected": "Take M fourteen"
+  },
+  {
+   "input": "Take IN-46",
+   "language": "en",
+   "expected": "Take Indiana forty six"
+  },
+  {
+   "input": "Take Exit 238B",
+   "language": "en",
+   "expected": "Take Exit two thirty eight B"
+  },
+  {
+   "input": "Take exit 12A toward Dallas",
+   "language": "en",
+   "expected": "Take exit twelve A toward Dallas"
+  },
+  {
+   "input": "Take Hwy 290",
+   "language": "en",
+   "expected": "Take Highway two ninety"
+  },
+  {
+   "input": "Take Highway 200",
+   "language": "en",
+   "expected": "Take Highway two hundred"
+  },
+  {
+   "input": "Stay on Route 66",
+   "language": "en",
+   "expected": "Stay on Route sixty six"
+  },
+  {
+   "input": "Follow Loop 360",
+   "language": "en",
+   "expected": "Follow Loop three sixty"
+  },
+  {
+   "input": "Take Interstate 405",
+   "language": "en",
+   "expected": "Take Interstate four oh five"
+  },
+  {
+   "input": "Merge onto the 101 Fwy.",
+   "language": "en",
+   "expected": "Merge onto the one oh one Freeway."
+  },
+  {
+   "input": "Take I-35E",
+   "language": "en",
+   "expected": "Take I thirty five E"
+  },
+  {
+   "input": "Take FM 1400",
+   "language": "en",
+   "expected": "Take F M fourteen hundred"
+  },
+  {
+   "input": "Take FM 2000",
+   "language": "en",
+   "expected": "Take F M two thousand"
+  },
+  {
+   "input": "Only 405 miles to go",
+   "language": "en",
+   "expected": "Only four hundred five miles to go"
+  },
+  {
+   "input": "That's 1,234 miles",
+   "language": "en",
+   "expected": "That's one thousand two hundred thirty four miles"
+  },
+  {
+   "input": "Exit in 2 mi",
+   "language": "en",
+   "expected": "Exit in two miles"
+  },
+  {
+   "input": "I 5 times told you",
+   "language": "en",
+   "expected": "I five times told you"
+  },
+  {
+   "input": "Turn left IN 500 FT",
+   "language": "en",
+   "expected": "Turn left IN five hundred FT"
+  },
+  {
+   "input": "Watch TV 2 nights",
+   "language": "en",
+   "expected": "Watch TV two nights"
+  },
+  {
+   "input": "Exits 12-14 closed",
+   "language": "en",
+   "expected": "Exits twelve to fourteen closed"
+  },
+  {
+   "input": "Arrive at 2:05",
+   "language": "en",
+   "expected": "Arrive at two oh five"
+  }
+ ]
+}

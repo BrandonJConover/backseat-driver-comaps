@@ -232,6 +232,36 @@ TEST(RangesMatchTheGoldenCasesSharedWithBookLyre)
   }
 }
 
+TEST(RoadsMatchTheGoldenCases)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_ROADS_PATH);
+  CHECK(cases.size() >= 20);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+}
+
+TEST(RouteNumbersAreSaidTheWayDriversSayThem)
+{
+  CHECK_EQUAL(RouteNumber("5"), std::string("five"));
+  CHECK_EQUAL(RouteNumber("66"), std::string("sixty six"));
+  CHECK_EQUAL(RouteNumber("405"), std::string("four oh five"));
+  CHECK_EQUAL(RouteNumber("183"), std::string("one eighty three"));
+  CHECK_EQUAL(RouteNumber("200"), std::string("two hundred"));
+  CHECK_EQUAL(RouteNumber("1431"), std::string("fourteen thirty one"));
+  CHECK_EQUAL(RouteNumber("3502"), std::string("thirty five oh two"));
+  CHECK_EQUAL(RouteNumber("1400"), std::string("fourteen hundred"));
+  CHECK_EQUAL(RouteNumber("3000"), std::string("three thousand"));
+  CHECK_EQUAL(RouteNumber("12345"), std::string("12345"));
+  CHECK_EQUAL(RouteNumber("07"), std::string("zero seven"));
+  CHECK_EQUAL(Roads("Take I-405"), std::string("Take I four oh five"));
+  CHECK_EQUAL(Roads("Drive 405 miles"), std::string("Drive 405 miles"));
+  CHECK_EQUAL(Roads("Take OR 3 now"), std::string("Take OR 3 now"));
+  CHECK_EQUAL(Roads("Take OR-99"), std::string("Take Oregon ninety nine"));
+}
+
 TEST(RangesSymbolsAndTemperaturesAreSaid)
 {
   // Ranges, the way the voice hears them after ForSpeech.
@@ -336,8 +366,8 @@ TEST(SaintsDoctorsAndJuniorsInStreetNames)
   CHECK_EQUAL(ForSpeech("Turn onto 5th St. Johnson is waiting."), std::string("Turn onto fifth Street. Johnson is waiting."));
   CHECK_EQUAL(ForSpeech("Elm Dr. Keep going."), std::string("Elm Drive. Keep going."));
   // Road types next to a route number.
-  CHECK_EQUAL(ForSpeech("Take Hwy 290"), std::string("Take Highway two hundred ninety"));
-  CHECK_EQUAL(ForSpeech("Merge onto the 101 Fwy."), std::string("Merge onto the one hundred one Freeway."));
+  CHECK_EQUAL(ForSpeech("Take Hwy 290"), std::string("Take Highway two ninety"));
+  CHECK_EQUAL(ForSpeech("Merge onto the 101 Fwy."), std::string("Merge onto the one oh one Freeway."));
   CHECK_EQUAL(ForSpeech("Stay on Rte. 66"), std::string("Stay on Route sixty six"));
   // Not titles: all caps, lowercase, no name after.
   CHECK_EQUAL(ForSpeech("Take SR 71"), std::string("Take State Route seventy one"));

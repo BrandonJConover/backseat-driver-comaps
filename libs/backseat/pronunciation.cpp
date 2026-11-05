@@ -1168,6 +1168,80 @@ std::string Foreign(std::string const & text)
   return s;
 }
 
+std::string RouteNumber(std::string const & digits)
+{
+  if (digits.empty() || digits.size() > 4 ||
+      !std::all_of(digits.begin(), digits.end(), [](char ch) { return std::isdigit(static_cast<unsigned char>(ch)); }))
+    return digits;
+  if (digits.size() > 1 && digits.front() == '0')
+    return Digits(digits);
+  auto const n = ToNumber(digits);
+  if (n < 100)
+    return SpellNumber(n);
+  // "405" is "four oh five", "183" "one eighty three", "1431" "fourteen thirty one".
+  auto const high = n / 100, low = n % 100;
+  if (low == 0)
+    return (digits.size() == 4 && high % 10 == 0) ? SpellNumber(n) : SpellNumber(high) + " hundred";
+  return SpellNumber(high) + (low < 10 ? " oh " : " ") + SpellNumber(low);
+}
+
+std::string Roads(std::string const & text)
+{
+  // Two-letter state codes in front of a route number. Ones that are also words ("IN 5", "OR 3")
+  // only count with a hyphen ("IN-46").
+  static std::map<std::string, std::pair<char const *, bool>> const states = {
+      {"AK", {"Alaska", false}},        {"AL", {"Alabama", true}},        {"AR", {"Arkansas", false}},
+      {"AZ", {"Arizona", false}},       {"CA", {"California", false}},    {"CO", {"Colorado", true}},
+      {"CT", {"Connecticut", false}},   {"DE", {"Delaware", true}},       {"FL", {"Florida", false}},
+      {"GA", {"Georgia", false}},       {"HI", {"Hawaii", true}},         {"IA", {"Iowa", false}},
+      {"ID", {"Idaho", true}},          {"IL", {"Illinois", false}},      {"IN", {"Indiana", true}},
+      {"KS", {"Kansas", false}},        {"KY", {"Kentucky", false}},      {"LA", {"Louisiana", true}},
+      {"MA", {"Massachusetts", true}},  {"MD", {"Maryland", false}},      {"ME", {"Maine", true}},
+      {"MI", {"Michigan", false}},      {"MN", {"Minnesota", false}},     {"MO", {"Missouri", false}},
+      {"MS", {"Mississippi", false}},   {"MT", {"Montana", false}},       {"NC", {"North Carolina", false}},
+      {"ND", {"North Dakota", false}},  {"NE", {"Nebraska", true}},       {"NH", {"New Hampshire", false}},
+      {"NJ", {"New Jersey", false}},    {"NM", {"New Mexico", false}},    {"NV", {"Nevada", false}},
+      {"NY", {"New York", false}},      {"OH", {"Ohio", true}},           {"OK", {"Oklahoma", true}},
+      {"OR", {"Oregon", true}},         {"PA", {"Pennsylvania", true}},   {"RI", {"Rhode Island", false}},
+      {"SC", {"South Carolina", false}}, {"SD", {"South Dakota", false}}, {"TN", {"Tennessee", false}},
+      {"TX", {"Texas", false}},         {"UT", {"Utah", false}},          {"VA", {"Virginia", false}},
+      {"VT", {"Vermont", false}},       {"WA", {"Washington", false}},    {"WI", {"Wisconsin", false}},
+      {"WV", {"West Virginia", false}}, {"WY", {"Wyoming", false}}};
+  static std::map<std::string, std::string> const names = {
+      {"I", "I"},         {"US", "yooess"},      {"SR", "State Route"}, {"CR", "County Road"},
+      {"FM", "F M"},      {"RM", "R M"},         {"SH", "State Highway"}, {"M", "M"}};
+  static std::regex const road(
+      "\\b(Interstate|Highway|Route|Loop|[Ee]xit|I|US|SR|CR|FM|RM|SH|M|[A-Z]{2})(-| )(\\d{1,4})([A-Z]?)"
+      "(?![A-Za-z0-9]|[.,:/]\\d| ?(?:ft|mi|mph|km|m|yd)\\b)");
+  auto s = Replace(text, road, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    auto const prefix = m.str(1);
+    bool const hyphen = m.str(2) == "-";
+    std::string name;
+    if (auto const it = names.find(prefix); it != names.end())
+    {
+      if (prefix == "M" && !hyphen)
+        return std::nullopt;
+      name = it->second;
+    }
+    else if (auto const st = states.find(prefix); st != states.end())
+    {
+      if (st->second.second && !hyphen)
+        return std::nullopt;
+      name = st->second.first;
+    }
+    else if (prefix.size() == 2 && std::isupper(static_cast<unsigned char>(prefix[1])))
+      return std::nullopt;  // Some other two capitals ("PO 5", "TV 2").
+    else
+      name = prefix;
+    return name + " " + RouteNumber(m.str(3)) + (m[4].length() > 0 ? " " + m.str(4) : "");
+  });
+  // "the 101 Freeway", "the 405 Expressway".
+  static std::regex const after("\\b(\\d{3,4}) (Freeway|Highway|Expressway|Parkway)\\b");
+  return Replace(s, after, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return RouteNumber(m.str(1)) + " " + m.str(2);
+  });
+}
+
 std::string ForSpeech(std::string const & text)
 {
   std::string s = ReplaceAll(text, "\xC2\xA0", " ");
@@ -1224,13 +1298,9 @@ std::string ForSpeech(std::string const & text)
       return std::nullopt;
     return Compass(m.str(1));
   });
-  // Highways: "I-25" is "I twenty five", "US-36" is "U S thirty six".
-  static std::regex const highway("\\b(I|US|SR|CR)[- ](\\d+)\\b");
-  s = Replace(s, highway, [](std::smatch const & m, size_t) -> std::optional<std::string> {
-    static std::map<std::string, std::string> const names = {
-        {"I", "I"}, {"US", "yooess"}, {"SR", "State Route"}, {"CR", "County Road"}};
-    return names.at(m.str(1)) + " " + m.str(2);
-  });
+  // Highways, routes and exits the way drivers say them: "I-405" is "I four oh five", "FM 1431"
+  // "F M fourteen thirty one", "TX-71" "Texas seventy one", "Exit 238B" "Exit two thirty eight B".
+  s = Roads(s);
   // Money and percentages.
   static std::regex const money("\\$(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d{2}))?\\b");
   s = Replace(s, money, [](std::smatch const & m, size_t) -> std::optional<std::string> {

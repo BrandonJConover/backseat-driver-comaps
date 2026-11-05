@@ -31,5 +31,6 @@ add_executable(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
 target_compile_definitions(${PROJECT_NAME} PRIVATE
   BACKSEAT_TRACE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/parity_trace.txt"
-  BACKSEAT_SPOKEN_RANGES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_ranges.json")
+  BACKSEAT_SPOKEN_RANGES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_ranges.json"
+  BACKSEAT_SPOKEN_ROADS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_roads.json")
 add_test(NAME ${PROJECT_NAME} COMMAND ${PROJECT_NAME})

@@ -58,6 +58,18 @@ void SetUserWords(std::string const & lines);
 /// Ported from EpubToM4B's RespellingPhonemizer.
 std::optional<std::string> RespellingPhonemes(std::string const & respelling);
 
+/// A route or exit number the way drivers say it: up to two digits as a count ("sixty six"), three
+/// as one and a pair ("four oh five", "one eighty three", "two hundred"), four as pairs ("fourteen
+/// thirty one", "thirty five oh two", "fourteen hundred"). Longer ones come back as written.
+std::string RouteNumber(std::string const & digits);
+
+/// Highways, routes and exits written out: "I-405" reads "I four oh five", "US-183" "yooess one
+/// eighty three", "FM 1431" "F M fourteen thirty one", "SH 71" "State Highway seventy one",
+/// "TX-71" "Texas seventy one", "Exit 238B" "Exit two thirty eight B", "the 101 Freeway" "the one
+/// oh one Freeway". Plain counts ("405 miles") are left for the number pass. Part of ForSpeech;
+/// golden cases in backseat_tests/spoken_roads.json.
+std::string Roads(std::string const & text);
+
 /// A whole number in words, without hyphens ("one hundred twenty one").
 std::string SpellNumber(long long n);
 }  // namespace backseat::pronunciation
