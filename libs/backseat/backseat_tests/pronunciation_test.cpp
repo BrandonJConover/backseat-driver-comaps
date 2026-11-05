@@ -284,6 +284,29 @@ TEST(ClockTimesAreSaidWithAmAndPm)
   CHECK(peeem);
 }
 
+TEST(YearsAreSaidAsYears)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_YEARS_PATH);
+  CHECK(cases.size() >= 20);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  CHECK_EQUAL(Years("in 1868"), std::string("in eighteen sixty eight"));
+  CHECK_EQUAL(Years("since 1000"), std::string("since one thousand"));
+  CHECK_EQUAL(Years("in 1066"), std::string("in ten sixty six"));
+  CHECK_EQUAL(Years("the 1900s"), std::string("the nineteen hundreds"));
+  CHECK_EQUAL(Years("the 1870s"), std::string("the eighteen seventies"));
+  CHECK_EQUAL(Years("by 2100"), std::string("by 2100"));
+  // Navigation distances are never years, whatever the word before them.
+  for (auto const * unit : {"feet", "ft", "m", "meters", "miles", "yards", "km"})
+  {
+    auto const said = Years(std::string("In 1500 ") + unit + ", turn left.");
+    CHECK_EQUAL(said, std::string("In 1500 ") + unit + ", turn left.");
+  }
+}
+
 TEST(RouteNumbersAreSaidTheWayDriversSayThem)
 {
   CHECK_EQUAL(RouteNumber("5"), std::string("five"));

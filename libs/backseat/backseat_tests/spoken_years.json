@@ -1,0 +1,165 @@
+{
+ "about": "Shared expectations for years said as years ('in 1868' eighteen sixty eight, '1905' nineteen oh five, '2005' two thousand five, '2026' twenty twenty six, 'the 1990s' nineteen nineties) while counts and distances stay numbers ('In 1500 feet'). Backseat Driver: backseat::pronunciation::ForSpeech / Years (libs/backseat/backseat_tests/spoken_years.json). EpubToM4B can port the rule (books are full of years); keep both copies in sync.",
+ "cases": [
+  {
+   "input": "The first traffic light was put up in London in 1868, and it exploded.",
+   "language": "en",
+   "expected": "The first traffic light was put up in London in eighteen sixty eight, and it exploded."
+  },
+  {
+   "input": "This road has been here since 1905.",
+   "language": "en",
+   "expected": "This road has been here since nineteen oh five."
+  },
+  {
+   "input": "Built in 1900, repaved never.",
+   "language": "en",
+   "expected": "Built in nineteen hundred, repaved never."
+  },
+  {
+   "input": "I was installed in 2005.",
+   "language": "en",
+   "expected": "I was installed in two thousand five."
+  },
+  {
+   "input": "Updated in 2026, still lost.",
+   "language": "en",
+   "expected": "Updated in twenty twenty six, still lost."
+  },
+  {
+   "input": "A car from 2010 with a map from 2009.",
+   "language": "en",
+   "expected": "A car from twenty ten with a map from two thousand nine."
+  },
+  {
+   "input": "Maps haven't changed since the 1990s.",
+   "language": "en",
+   "expected": "Maps haven't changed since the nineteen nineties."
+  },
+  {
+   "input": "a road from the 1800s",
+   "language": "en",
+   "expected": "a road from the eighteen hundreds"
+  },
+  {
+   "input": "music of the 2000s",
+   "language": "en",
+   "expected": "music of the two thousands"
+  },
+  {
+   "input": "the 2010s were rough",
+   "language": "en",
+   "expected": "the twenty tens were rough"
+  },
+  {
+   "input": "The war lasted from 1914 to 1918.",
+   "language": "en",
+   "expected": "The war lasted from nineteen fourteen to nineteen eighteen."
+  },
+  {
+   "input": "between 1914 and 1918",
+   "language": "en",
+   "expected": "between nineteen fourteen and nineteen eighteen"
+  },
+  {
+   "input": "It was 1914 to 1918 all over again.",
+   "language": "en",
+   "expected": "It was nineteen fourteen to nineteen eighteen all over again."
+  },
+  {
+   "input": "The war lasted from 1914–1918.",
+   "language": "en",
+   "expected": "The war lasted from nineteen fourteen to nineteen eighteen."
+  },
+  {
+   "input": "Opened on May 5, 1868 and closed in June 1869.",
+   "language": "en",
+   "expected": "Opened on May five, eighteen sixty eight and closed in June eighteen sixty nine."
+  },
+  {
+   "input": "the summer of 1969",
+   "language": "en",
+   "expected": "the summer of nineteen sixty nine"
+  },
+  {
+   "input": "William crossed in 1066 AD",
+   "language": "en",
+   "expected": "William crossed in ten sixty six AD"
+  },
+  {
+   "input": "Built circa 1150 AD by monks.",
+   "language": "en",
+   "expected": "Built circa eleven fifty AD by monks."
+  },
+  {
+   "input": "In 1500 feet, turn left.",
+   "language": "en",
+   "expected": "In one thousand five hundred feet, turn left."
+  },
+  {
+   "input": "In 1200 ft, keep right.",
+   "language": "en",
+   "expected": "In one thousand two hundred feet, keep right."
+  },
+  {
+   "input": "In 2000 m, take the exit.",
+   "language": "en",
+   "expected": "In two thousand meters, take the exit."
+  },
+  {
+   "input": "about 1868 people drive here",
+   "language": "en",
+   "expected": "about one thousand eight hundred sixty eight people drive here"
+  },
+  {
+   "input": "a population of 1500",
+   "language": "en",
+   "expected": "a population of one thousand five hundred"
+  },
+  {
+   "input": "Go 1,868 miles",
+   "language": "en",
+   "expected": "Go one thousand eight hundred sixty eight miles"
+  },
+  {
+   "input": "Only $1999 at the dealer",
+   "language": "en",
+   "expected": "Only one thousand nine hundred ninety nine dollars at the dealer"
+  },
+  {
+   "input": "Take I-1868 north",
+   "language": "en",
+   "expected": "Take I eighteen sixty eight north"
+  },
+  {
+   "input": "Call extension 1868 now",
+   "language": "en",
+   "expected": "Call extension one thousand eight hundred sixty eight now"
+  },
+  {
+   "input": "from 1500 to 2000 feet",
+   "language": "en",
+   "expected": "from one thousand five hundred to two thousand feet"
+  },
+  {
+   "input": "Room 2026 is on the left",
+   "language": "en",
+   "expected": "Room two thousand twenty six is on the left"
+  },
+  {
+   "input": "in 1995s",
+   "language": "en",
+   "expected": "in 1995s"
+  },
+  {
+   "input": "between 1500 and 2000 meters",
+   "language": "en",
+   "expected": "between one thousand five hundred and two thousand meters"
+  },
+  {
+   "input": "Dec. 1868 was cold",
+   "language": "en",
+   "expected": "Dec. eighteen sixty eight was cold"
+  }
+ ]
+}

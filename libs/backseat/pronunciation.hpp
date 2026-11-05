@@ -84,6 +84,15 @@ std::string HouseNumbers(std::string const & text);
 /// backseat_tests/spoken_times.json.
 std::string Clock(std::string const & text);
 
+/// Years said as years: "in 1868" is "in eighteen sixty eight", "1905" "nineteen oh five", "1066" "ten sixty six", "2005"
+/// "two thousand five", "2026" "twenty twenty six", "the 1990s" "the nineteen nineties". Only a
+/// number 1000-2099 with a year cue: a decade "s", AD/BC/BCE/CE, a word before it (in, since, from,
+/// until, by, before, after, during, between, circa, a month, a season, "summer of"), a month and
+/// day ("May 5, 1868"), or next to another year ("1914 to 1918"). Counts and distances ("in 1500
+/// feet", "1868 people") stay numbers. Part of ForSpeech; golden cases in
+/// backseat_tests/spoken_years.json.
+std::string Years(std::string const & text);
+
 /// A whole number in words, without hyphens ("one hundred twenty one").
 std::string SpellNumber(long long n);
 }  // namespace backseat::pronunciation

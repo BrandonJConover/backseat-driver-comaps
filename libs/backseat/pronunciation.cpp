@@ -1335,6 +1335,126 @@ std::string Clock(std::string const & text)
   });
 }
 
+std::string YearWords(long long year, bool decade)
+{
+  // "1868" eighteen sixty eight, "1905" nineteen oh five, "1900" nineteen hundred, "2005" two
+  // thousand five, "2026" twenty twenty six; decades "1990s" nineteen nineties, "1800s" eighteen
+  // hundreds, "2000s" two thousands, "2010s" twenty tens.
+  auto const high = year / 100, low = year % 100;
+  std::string said;
+  if (year % 1000 < 10)  // 1000-1009 and 2000-2009: "two thousand five".
+    said = SpellNumber(year / 1000) + " thousand" + (low == 0 ? "" : " " + SpellNumber(low));
+  else if (low == 0)
+    said = SpellNumber(high) + " hundred";
+  else
+    said = SpellNumber(high) + (low < 10 ? " oh " : " ") + SpellNumber(low);
+  if (!decade)
+    return said;
+  if (said.size() > 1 && said.back() == 'y')
+    return said.substr(0, said.size() - 1) + "ies";
+  return said + "s";
+}
+
+std::string Years(std::string const & text)
+{
+  static std::regex const yearRe("\\b(1\\d\\d\\d|20\\d\\d)(s)?(?![A-Za-z0-9])");
+  // Words that put a year after them: "in 1868", "since 1999", "the summer of 1969" (of only after
+  // a season or "class"). Not "around"/"about"/"of" on their own: "around 1500 people".
+  static std::set<std::string> const before = {
+      "in", "since", "from", "until", "till", "by", "circa", "ca", "c", "before", "after", "during",
+      "between", "year", "january", "february", "march", "april", "may", "june", "july", "august",
+      "september", "october", "november", "december", "jan", "feb", "mar", "apr", "jun", "jul", "aug",
+      "sep", "sept", "oct", "nov", "dec", "spring", "summer", "fall", "autumn", "winter"};
+  static std::set<std::string> const seasonOf = {"spring", "summer", "fall", "autumn", "winter", "class"};
+  // Counts and units after the number: "in 1500 feet" is a distance, never a year.
+  static std::set<std::string> const counted = {
+      "mi", "mile", "miles", "ft", "feet", "foot", "km", "kilometers", "kilometres", "m", "meters", "metres",
+      "yd", "yds", "yard", "yards", "mph", "kph", "minute", "minutes", "min", "mins", "hour", "hours", "hrs",
+      "second", "seconds", "day", "days", "weeks", "years", "times", "people", "cars", "dollars", "bucks",
+      "pounds", "lbs", "kg", "calories", "steps", "blocks", "exits", "lanes", "stops", "points", "rpm"};
+  static std::set<std::string> const era = {"ad", "bc", "bce", "ce"};
+  static std::regex const monthDay(
+      "\\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\\.? \\d{1,2}(?:st|nd|rd|th)?, $");
+  static std::regex const joined("^ (?:to|and|through|or) $");
+  auto const isNumberGlue = [&](size_t i) { return i < text.size() && Digit(text[i]); };
+  size_t lastYearEnd = std::string::npos;
+  std::string out;
+  size_t last = 0;
+  for (std::sregex_iterator it(text.begin(), text.end(), yearRe), end; it != end; ++it)
+  {
+    auto const & m = *it;
+    auto const pos = static_cast<size_t>(m.position(0));
+    auto const after = pos + static_cast<size_t>(m.length(0));
+    out.append(text, last, pos - last);
+    last = after;
+    auto const keep = [&] { out += m.str(0); };
+    // Part of something bigger: "1,868", "$1868", "#1868", "I-1868", "18:68", "1868.5", "1868/9".
+    if (pos > 0 && std::string_view(",.-#$/:'").find(text[pos - 1]) != std::string_view::npos)
+    {
+      keep();
+      continue;
+    }
+    if (after < text.size() && (text[after] == '%' || text[after] == '\xC2' ||
+                                (std::string_view(",.:/-").find(text[after]) != std::string_view::npos &&
+                                 isNumberGlue(after + 1))))
+    {
+      keep();
+      continue;
+    }
+    auto const year = ToNumber(m.str(1));
+    bool const decade = m[2].matched;
+    if (decade && year % 10 != 0)
+    {
+      keep();
+      continue;
+    }
+    size_t wordStart = 0;
+    auto const prev = WordBefore(text, pos, wordStart);
+    auto const next = WordAfter(text, after);
+    // "from 1500 to 2000 feet": the unit after the second number counts the first one too.
+    std::string unitAfter = next;
+    static std::regex const pairedNumber("^ (?:to|and|through|or) [\\d,.]+");
+    std::smatch pn;
+    if (auto const rest = text.substr(after); std::regex_search(rest, pn, pairedNumber))
+      unitAfter = WordAfter(rest, static_cast<size_t>(pn.length(0)));
+    bool isYear = decade || era.count(next) > 0;
+    if (!isYear && !counted.count(next) && !counted.count(unitAfter))
+    {
+      if (before.count(prev))
+        isYear = true;
+      else if (prev == "of")
+      {
+        size_t ofStart = 0;
+        isYear = seasonOf.count(WordBefore(text, wordStart, ofStart)) > 0;
+      }
+      else if (std::regex_search(text.begin(), text.begin() + static_cast<std::ptrdiff_t>(pos), monthDay))
+        isYear = true;
+      else if (lastYearEnd != std::string::npos && lastYearEnd <= pos &&
+               std::regex_match(text.substr(lastYearEnd, pos - lastYearEnd), joined))
+        isYear = true;  // "from 1914 to 1918", "between 1914 and 1918".
+      else
+      {
+        // "It was 1914 to 1918": the second year says the first is one too.
+        static std::regex const pairRe("^ (?:to|through) (1\\d\\d\\d|20\\d\\d)(?![A-Za-z0-9])");
+        std::smatch pm;
+        auto const rest = text.substr(after);
+        if (std::regex_search(rest, pm, pairRe) && ToNumber(pm.str(1)) > year &&
+            !counted.count(WordAfter(rest, static_cast<size_t>(pm.length(0)))))
+          isYear = true;
+      }
+    }
+    if (!isYear)
+    {
+      keep();
+      continue;
+    }
+    out += YearWords(year, decade);
+    lastYearEnd = after;
+  }
+  out.append(text, last, std::string::npos);
+  return out;
+}
+
 std::string ForSpeech(std::string const & text)
 {
   std::string s = ReplaceAll(text, "\xC2\xA0", " ");
@@ -1344,6 +1464,8 @@ std::string ForSpeech(std::string const & text)
   s = Ranges(s);
   // Clock times before the dash pass can split "9am-5pm".
   s = Clock(s);
+  // Years as years: "in 1868" is "in eighteen sixty eight", "the 1990s" "the nineteen nineties".
+  s = Years(s);
   // Temperatures and approximations: "-5°F" is "minus 5 degrees Fahrenheit", "~5" "about 5".
   static std::regex const degrees("(^|[\\s(])-(?=\\d+(?:\\.\\d+)? ?\xC2\xB0)");
   s = std::regex_replace(s, degrees, "$1minus ");
