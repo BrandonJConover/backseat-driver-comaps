@@ -379,3 +379,18 @@ TEST(KilometerThresholdsMatchTheMileOnes)
   CHECK_EQUAL(back.wayOver, 10);
   CHECK_EQUAL(back.tooSlowMargin, 15.0);
 }
+
+TEST(StandInSpeedsAreNotJudgedForBrakingOrLaunching)
+{
+  auto engine = MakeEngine();
+  engine.OnTelemetry(Sample(0, 60, std::nullopt));
+  auto stand = Sample(1000, 0, std::nullopt);
+  stand.speedKnown = false;
+  engine.OnTelemetry(stand);
+  engine.OnTelemetry(Sample(2000, 60, std::nullopt));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 0);
+  CHECK_EQUAL(engine.Stats().hardAccels, 0);
+  // Measured speeds on both sides still count.
+  engine.OnTelemetry(Sample(3000, 30, std::nullopt));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 1);
+}

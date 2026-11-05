@@ -723,6 +723,9 @@ private:
   std::optional<Fix> m_lastFix;
   /// The last fix, trip or not: where the car is when a trip starts.
   std::optional<Fix> m_hereFix;
+  /// Last speed the GPS actually reported, and when; carried through short dropouts (see OnFix).
+  std::optional<double> m_knownSpeedMps;
+  double m_knownSpeedT = 0;
   BuildingLookup m_buildingLookup;
   /// This trip started indoors; the "made it out" line is still to come (key, empty if not).
   std::string m_indoorOutKey;

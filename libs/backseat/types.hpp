@@ -26,6 +26,9 @@ struct TelemetrySample
 {
   double t = 0;
   double speedMps = 0;
+  /// False when the GPS gave no speed and `speedMps` is a stand-in (the last known speed carried
+  /// through a tunnel, or 0). The engine doesn't judge braking or acceleration across such samples.
+  bool speedKnown = true;
   /// Posted limit for the current road, if the map knows it.
   std::optional<double> speedLimitMps;
   std::optional<double> lat;

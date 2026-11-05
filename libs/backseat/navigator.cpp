@@ -26,6 +26,8 @@ double constexpr kLaneSayMinM = 150;
 /// The trip-time prediction comes this long after the trip starts.
 double constexpr kPredictionDelayMs = 25000;
 double constexpr kLaneAfterDirectionMs = 6000;
+/// How long a GPS speed dropout (tunnel) keeps the last known speed before it reads as stopped.
+double constexpr kUnknownSpeedCarryMs = 10000;
 double constexpr kLaneSayMaxM = 1500;
 /// Two maneuvers this close together are said as one: "turn left onto X, then right onto Y".
 double constexpr kChainWithinM = 150;
@@ -578,7 +580,20 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
     return;
   TelemetrySample s;
   s.t = fix.tMs;
-  s.speedMps = fix.speedMps < 0 ? 0 : fix.speedMps;
+  // GPS speed drops out in tunnels and garages (negative = unknown). Read as 0 it was a hard brake going
+  // in and a hard launch coming out, and the miles stopped counting. Carry the last known speed for a
+  // short dropout; after that (or with none known yet) call it stopped. Either way it's not measured.
+  if (fix.speedMps >= 0)
+  {
+    s.speedMps = fix.speedMps;
+    m_knownSpeedMps = fix.speedMps;
+    m_knownSpeedT = fix.tMs;
+  }
+  else
+  {
+    s.speedKnown = false;
+    s.speedMps = m_knownSpeedMps && fix.tMs - m_knownSpeedT <= kUnknownSpeedCarryMs ? *m_knownSpeedMps : 0;
+  }
   s.speedLimitMps = fix.speedLimitMps;
   s.lat = fix.lat;
   s.lon = fix.lon;
@@ -2056,6 +2071,7 @@ void Navigator::ResetTrip()
   m_heldTwentyLines.clear();
   m_twentyCutInT.reset();
   m_lastFix.reset();
+  m_knownSpeedMps.reset();
   m_pullOverSaid = false;
   m_policeSaid = false;
   m_lastBadSpeedingT.reset();

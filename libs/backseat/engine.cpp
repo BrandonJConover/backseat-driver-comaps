@@ -329,7 +329,9 @@ std::vector<Commentary> CritiqueEngine::OnTelemetry(TelemetrySample const & s)
 
     // Ignore gaps (tunnels, app backgrounded): a 30 s gap isn't a hard brake.
     // One continuous hard stop counts once, however many samples it spans.
-    double const accel = dt <= 3 ? (s.speedMps - prev->speedMps) / dt : 0;
+    // A made-up speed (GPS said "unknown") on either side isn't a measurement: a tunnel isn't a stop.
+    bool const measured = s.speedKnown && prev->speedKnown;
+    double const accel = dt <= 3 && measured ? (s.speedMps - prev->speedMps) / dt : 0;
     bool const braking = accel <= -m_config.hardBrakeMps2;
     bool const accelerating = accel >= m_config.hardAccelMps2;
     if (braking && !m_braking)

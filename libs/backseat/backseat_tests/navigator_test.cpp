@@ -2278,3 +2278,44 @@ TEST(SwitchingTravelModesGetsARemark)
   CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.switch.walk"), 0);
   SetLineTravelMode(TravelMode::Drive);
 }
+
+// GPS speed drops out in a tunnel (negative = unknown). That isn't a stop: no hard brake going in,
+// no hard launch coming out, and the miles keep counting.
+TEST(UnknownSpeedInATunnelIsNotAStop)
+{
+  for (int gap : {1, 2, 3, 12})
+  {
+    Navigator nav(Config());
+    double const mps = 30;
+    int const n = 60;
+    for (int i = 0; i < n; ++i)
+    {
+      bool const inTunnel = i >= 30 && i < 30 + gap;
+      nav.OnFix(At(i * 1000.0, inTunnel ? -1 : mps), OnRoute(1, TurnKind::Left, 20000 - i * mps));
+      nav.TakeLines();
+    }
+    auto const & stats = nav.Engine()->Stats();
+    CHECK_EQUAL(stats.hardBrakes, 0);
+    CHECK_EQUAL(stats.hardAccels, 0);
+    if (gap <= 3)
+    {
+      // Short dropouts carry the last speed, so the distance stays right.
+      double const expected = mps * (n - 1);
+      CHECK(std::abs(stats.distanceM - expected) <= 0.05 * expected);
+    }
+  }
+}
+
+// A real stop, with the GPS reporting every second, still counts.
+TEST(RealHardStopStillRoastsWithKnownSpeeds)
+{
+  Navigator nav(Config());
+  for (int i = 0; i < 30; ++i)
+  {
+    nav.OnFix(At(i * 1000.0, 30), OnRoute(1, TurnKind::Left, 20000 - i * 30.0));
+    nav.TakeLines();
+  }
+  nav.OnFix(At(30000, 15), OnRoute(1, TurnKind::Left, 19100));
+  nav.OnFix(At(31000, 0), OnRoute(1, TurnKind::Left, 19095));
+  CHECK_EQUAL(nav.Engine()->Stats().hardBrakes, 1);
+}
