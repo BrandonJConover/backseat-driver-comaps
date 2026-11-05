@@ -28,6 +28,13 @@ std::string ForSpeech(std::string const & text);
 /// ("Where do you live?" reads "liv"). Part of ForSpeech.
 std::string PickSenses(std::string const & text);
 
+/// Number ranges said as ranges, digits left as digits ("3–5" and "pages 3-5" read "3 to 5",
+/// "between 3-5" reads "3 and 5", "1914–18" reads "1914 to 1918", "3-1/2" reads "3 and a half").
+/// A hyphen only counts next to a counting word or between years, so phone numbers, scores,
+/// dates and "I-35" stay as written. Part of ForSpeech; golden cases in
+/// backseat_tests/spoken_ranges.json, shared with EpubToM4B's tests/fixtures/spoken_ranges.json.
+std::string Ranges(std::string const & text);
+
 /// Every entry of the pronunciation dictionary: lowercase word, Misaki phonemes (UTF-8 IPA).
 std::vector<std::pair<std::string, std::string>> const & Lexicon();
 

@@ -2,7 +2,10 @@
 
 #include "backseat/pronunciation.hpp"
 
+#include <fstream>
+#include <sstream>
 #include <string>
+#include <vector>
 
 using namespace backseat::pronunciation;
 
@@ -14,6 +17,47 @@ std::string Lex(std::string const & word)
     if (w == word)
       return ph;
   return "";
+}
+
+// The "input"/"language"/"expected" strings of each case in a golden JSON file (flat objects,
+// UTF-8, only \" and \\ escapes), in order.
+struct Case
+{
+  std::string input, language, expected;
+};
+
+std::string JsonString(std::string const & json, std::string const & key, size_t & at, size_t stop)
+{
+  auto const k = json.find("\"" + key + "\"", at);
+  if (k == std::string::npos || k > stop)
+    return "";
+  auto i = json.find('"', json.find(':', k) + 1) + 1;
+  std::string out;
+  for (; i < json.size() && json[i] != '"'; ++i)
+  {
+    if (json[i] == '\\')
+      ++i;
+    out += json[i];
+  }
+  return out;
+}
+
+std::vector<Case> GoldenCases(char const * path)
+{
+  std::ifstream in(path);
+  std::stringstream buffer;
+  buffer << in.rdbuf();
+  auto const json = buffer.str();
+  std::vector<Case> cases;
+  for (size_t open = json.find('{', json.find("\"cases\"")); open != std::string::npos; open = json.find('{', open + 1))
+  {
+    auto const close = json.find('}', open);
+    size_t at = open;
+    cases.push_back({JsonString(json, "input", at, close), JsonString(json, "language", at, close),
+                     JsonString(json, "expected", at, close)});
+    open = close;
+  }
+  return cases;
 }
 }  // namespace
 
@@ -126,4 +170,50 @@ TEST(RespellingsBecomePhonemes)
   CHECK_EQUAL(RespellingPhonemes("EE-fa").value_or(""), std::string("ˈifə"));
   CHECK(!RespellingPhonemes("hello").has_value());
   CHECK(!RespellingPhonemes("two words").has_value());
+}
+
+TEST(RangesMatchTheGoldenCasesSharedWithBookLyre)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_RANGES_PATH);
+  CHECK(cases.size() >= 40);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    if (c.language != "en")
+      continue;  // Backseat Driver only speaks English.
+    CHECK_EQUAL(Ranges(c.input), c.expected);
+  }
+}
+
+TEST(RangesSymbolsAndTemperaturesAreSaid)
+{
+  // Ranges, the way the voice hears them after ForSpeech.
+  CHECK_EQUAL(ForSpeech("In 3-5 miles"), std::string("In three to five miles"));
+  CHECK_EQUAL(ForSpeech("In 3–5 miles"), std::string("In three to five miles"));
+  CHECK_EQUAL(ForSpeech("between 3 and 5 miles"), std::string("between three and five miles"));
+  CHECK_EQUAL(ForSpeech("between 3-5 miles"), std::string("between three and five miles"));
+  CHECK_EQUAL(ForSpeech("Delays of 10–15 min"), std::string("Delays of ten to fifteen min"));
+  CHECK_EQUAL(ForSpeech("Exits 12-14 closed"), std::string("Exits twelve to fourteen closed"));
+  CHECK_EQUAL(ForSpeech("a 3-1/2 mile detour"), std::string("a three and a half mile detour"));
+  CHECK_EQUAL(ForSpeech("10–15% slower"), std::string("ten to fifteen percent slower"));
+  // Temperatures, approximations, plus or minus.
+  CHECK_EQUAL(ForSpeech("It's 72°F out."), std::string("It's seventy two degrees Fahrenheit out."));
+  CHECK_EQUAL(ForSpeech("It's 22 °C."), std::string("It's twenty two degrees Celsius."));
+  CHECK_EQUAL(ForSpeech("A balmy -5°F."), std::string("A balmy minus five degrees Fahrenheit."));
+  CHECK_EQUAL(ForSpeech("Turn 90°."), std::string("Turn ninety degrees."));
+  CHECK_EQUAL(ForSpeech("Up 1° today"), std::string("Up one degree today"));
+  CHECK_EQUAL(ForSpeech("~5 mi to go"), std::string("about five miles to go"));
+  CHECK_EQUAL(ForSpeech("±2 mph"), std::string("plus or minus two miles an hour"));
+  // Left alone: highways, phone numbers, scores, times, a tilde with no number.
+  CHECK_EQUAL(ForSpeech("Take I-35 N"), std::string("Take I thirty five North"));
+  CHECK_EQUAL(ForSpeech("Merge onto US-36"), std::string("Merge onto yooess thirty six"));
+  CHECK_EQUAL(Ranges("Call 555-1234"), std::string("Call 555-1234"));
+  CHECK_EQUAL(Ranges("Call 800-555-1234"), std::string("Call 800-555-1234"));
+  CHECK_EQUAL(Ranges("We lost 3–2."), std::string("We lost 3–2."));
+  CHECK_EQUAL(Ranges("We lost 2–3."), std::string("We lost 2–3."));
+  CHECK_EQUAL(Ranges("the 9-5 grind"), std::string("the 9-5 grind"));
+  CHECK_EQUAL(Ranges("Arrive 2:05-2:30"), std::string("Arrive 2:05-2:30"));
+  CHECK_EQUAL(ForSpeech("Arrive at 2:05"), std::string("Arrive at two oh five"));
+  CHECK_EQUAL(ForSpeech("Left — no, right."), std::string("Left, no, right."));
+  CHECK_EQUAL(ForSpeech("Meh ~ whatever"), std::string("Meh ~ whatever"));
 }

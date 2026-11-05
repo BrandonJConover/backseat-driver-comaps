@@ -530,6 +530,86 @@ std::string Ellipses(std::string s)
   }
   return s;
 }
+// MARK: - Ranges
+
+// Words a hyphen between two numbers can only mean "to" after ("pages 3-5", "from 10-20") or
+// before ("3-5 miles"). Anything else with a hyphen (phone numbers, scores, "the 9-5 grind")
+// stays as written. Lowercase, no trailing period.
+bool CountingWordBefore(std::string const & w)
+{
+  static std::array<std::string_view, 22> const words = {
+      "page", "pages", "pp", "p", "age", "ages", "aged", "verse", "verses", "chapter", "chapters",
+      "from", "between", "year", "years", "exit", "exits", "lane", "lanes", "mile", "miles", "step"};
+  return std::find(words.begin(), words.end(), w) != words.end();
+}
+
+bool CountingWordAfter(std::string const & w)
+{
+  static std::array<std::string_view, 24> const words = {
+      "mi", "mile", "miles", "ft", "feet", "km", "kilometers", "minute", "minutes", "min", "hour", "hours",
+      "hrs", "day", "days", "mph", "blocks", "exits", "lanes", "stops", "seconds", "weeks", "years", "times"};
+  return std::find(words.begin(), words.end(), w) != words.end();
+}
+
+bool Digit(char ch)
+{
+  return std::isdigit(static_cast<unsigned char>(ch)) != 0;
+}
+
+// The lowercase word that ends just before `pos` (skipping spaces and one trailing period), and
+// where it starts.
+// Words before a score: "lost 2–3" is a score, not a range.
+bool ScoreWordBefore(std::string const & w)
+{
+  static std::array<std::string_view, 9> const words = {"won", "lost", "beat", "drew", "tied", "score",
+                                                         "scored", "trailing", "leading"};
+  return std::find(words.begin(), words.end(), w) != words.end();
+}
+
+std::string WordBefore(std::string const & s, size_t pos, size_t & start)
+{
+  size_t end = pos;
+  while (end > 0 && s[end - 1] == ' ')
+    --end;
+  if (end > 0 && s[end - 1] == '.')
+    --end;
+  start = end;
+  while (start > 0 && IsAsciiLetter(s[start - 1]))
+    --start;
+  return Lower(std::string_view(s).substr(start, end - start));
+}
+
+std::string WordAfter(std::string const & s, size_t pos)
+{
+  if (pos < s.size() && s[pos] == '%')
+    return "percent";
+  while (pos < s.size() && s[pos] == ' ')
+    ++pos;
+  size_t end = pos;
+  while (end < s.size() && IsAsciiLetter(s[end]))
+    ++end;
+  return Lower(std::string_view(s).substr(pos, end - pos));
+}
+
+double Value(std::string const & number)
+{
+  std::string plain;
+  for (char ch : number)
+    if (ch != ',')
+      plain += ch;
+  return std::stod(plain);
+}
+
+std::string FractionWords(std::string const & a, std::string const & b)
+{
+  if (a == "1" && b == "2")
+    return "a half";
+  if (a == "1" && b == "4")
+    return "a quarter";
+  if (a == "3" && b == "4")
+    return "three quarters";
+  return a + "/" + b;
+}
 }  // namespace
 
 // MARK: - Public
@@ -628,9 +708,82 @@ std::string PickSenses(std::string const & text)
   return out;
 }
 
+std::string Ranges(std::string const & text)
+{
+  // A number, a hyphen, en dash or unspaced em dash, a number; "3-1/2" too.
+  static std::regex const range(
+      "(\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?)(-|\xE2\x80\x93|\xE2\x80\x94)"
+      "(\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?)(?:/(\\d+))?");
+  auto const & s = text;
+  std::string out;
+  size_t last = 0;
+  for (std::sregex_iterator it(s.begin(), s.end(), range), end; it != end; ++it)
+  {
+    auto const & m = *it;
+    auto const pos = static_cast<size_t>(m.position(0));
+    auto const after = pos + static_cast<size_t>(m.length(0));
+    std::string prefix = s.substr(last, pos - last);
+    std::optional<std::string> said;
+    // Part of something longer: "I-35-40", "-5", "800-555-1234", "2024-01-15", "66-A", "3-5x".
+    bool const glued =
+        (pos > 0 && (IsAsciiLetter(s[pos - 1]) || std::string_view("-./,").find(s[pos - 1]) != std::string_view::npos)) ||
+        (after < s.size() && (IsAsciiLetter(s[after]) || Digit(s[after]) ||
+                              std::string_view("-/:").find(s[after]) != std::string_view::npos)) ||
+        s.compare(after, 3, "\xE2\x80\x93") == 0 || s.compare(after, 3, "\xE2\x80\x94") == 0;
+    bool const hyphen = m.str(2) == "-";
+    if (!glued && m[4].matched)
+    {
+      // "a 3-1/2 inch nail": three and a half.
+      if (hyphen)
+        said = m.str(1) + " and " + FractionWords(m.str(3), m.str(4));
+    }
+    else if (!glued)
+    {
+      auto const a = m.str(1);
+      auto b = m.str(3);
+      bool const yearA = a.size() == 4 && a[0] >= '1' && a[0] <= '2';
+      // "1914–18", "1905-06": the end year keeps the start's century.
+      if (yearA && b.size() == 2)
+        b = std::to_string(ToNumber(a) / 100 * 100 + ToNumber(b));
+      bool const yearB = b.size() == 4 && b[0] >= '1' && b[0] <= '2';
+      size_t wordStart = 0;
+      auto const before = WordBefore(s, pos, wordStart);
+      bool const counting = CountingWordBefore(before) || CountingWordAfter(WordAfter(s, after));
+      // Scores and "the 9-5 grind" count down; ranges go up.
+      if (Value(b) > Value(a) && !ScoreWordBefore(before) && (!hyphen || (yearA && yearB) || counting))
+      {
+        said = a + (before == "between" ? " and " : " to ") + b;
+        if ((before == "pp" || before == "p") && wordStart >= last)
+          prefix = s.substr(last, wordStart - last) + (before == "pp" ? "pages " : "page ");
+      }
+    }
+    out += prefix;
+    out += said ? *said : m.str(0);
+    last = after;
+  }
+  out.append(s, last, std::string::npos);
+  return out;
+}
+
 std::string ForSpeech(std::string const & text)
 {
   std::string s = ReplaceAll(text, "\xC2\xA0", " ");
+  // Ranges before dashes become pauses: "3–5" is "3 to 5", not "3, 5".
+  s = Ranges(s);
+  // Temperatures and approximations: "-5°F" is "minus 5 degrees Fahrenheit", "~5" "about 5".
+  static std::regex const degrees("(^|[\\s(])-(?=\\d+(?:\\.\\d+)? ?\xC2\xB0)");
+  s = std::regex_replace(s, degrees, "$1minus ");
+  static std::regex const degree("(\\d+(?:\\.\\d+)?) ?\xC2\xB0(?: ?([FC])\\b)?");
+  s = Replace(s, degree, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    std::string out = m.str(1) + (m.str(1) == "1" ? " degree" : " degrees");
+    if (m[2].matched)
+      out += m.str(2) == "F" ? " Fahrenheit" : " Celsius";
+    return out;
+  });
+  static std::regex const about("~ ?(?=\\d)");
+  s = std::regex_replace(s, about, "about ");
+  static std::regex const plusMinus("\xC2\xB1 ?(?=\\d)");
+  s = std::regex_replace(s, plusMinus, "plus or minus ");
   static std::regex const dash("\\s*(?:\xE2\x80\x94|\xE2\x80\x93)\\s*");
   s = std::regex_replace(s, dash, ", ");
   s = ReplaceAll(s, " & ", " and ");
