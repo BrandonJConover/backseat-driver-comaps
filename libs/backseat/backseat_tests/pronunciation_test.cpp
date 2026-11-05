@@ -217,3 +217,50 @@ TEST(RangesSymbolsAndTemperaturesAreSaid)
   CHECK_EQUAL(ForSpeech("Left — no, right."), std::string("Left, no, right."));
   CHECK_EQUAL(ForSpeech("Meh ~ whatever"), std::string("Meh ~ whatever"));
 }
+
+TEST(ForeignPhrasesAreSaidInTheirOwnSounds)
+{
+  // Brandon's template: "X means 'turn left' in Y." Spanish, French, German, Japanese.
+  CHECK_EQUAL(ForSpeech("Gire a la izquierda means 'turn left' in Spanish."),
+              std::string("fxheereh fxah fxlah fxeeskeeairdah means 'turn left' in Spanish."));
+  CHECK_EQUAL(ForSpeech("Tournez à gauche means 'turn left' in French."),
+              std::string("fxtoornay fxah fxgohsh means 'turn left' in French."));
+  CHECK_EQUAL(ForSpeech("Biegen Sie links ab means 'turn left' in German."),
+              std::string("fxbeegen fxzee fxlinks fxahp means 'turn left' in German."));
+  CHECK_EQUAL(ForSpeech("左に曲がってください means 'please turn left' in Japanese."),
+              std::string("fxheedahree fxnee fxmahgahtteh fxkoodahsigh means 'please turn left' in Japanese."));
+  CHECK_EQUAL(ForSpeech("Aprende a conducir means 'learn to drive' in Spanish."),
+              std::string("fxahprendeh fxah fxkohndooseer means 'learn to drive' in Spanish."));
+  CHECK_EQUAL(ForSpeech("Apprends à conduire."), std::string("fxahprahn fxah fxkohndweer."));
+  CHECK_EQUAL(ForSpeech("Lern Auto fahren."), std::string("fxlairn fxowtoh fxfahren."));
+  CHECK_EQUAL(ForSpeech("運転を習ってください."), std::string("fxoontehn fxoh fxnahrahtteh fxkoodahsigh."));
+  CHECK_EQUAL(ForSpeech("\"Soy un conductor excelente.\""),
+              std::string("\"fxsoy fxoon fxkohndooktor fxehksehlenteh.\""));
+  CHECK_EQUAL(ForSpeech("Je suis un excellent conducteur. Trust me."),
+              std::string("fxzhuh fxswee fxuhn fxehksehlahn fxkohndooktur. Trust me."));
+  CHECK_EQUAL(ForSpeech("Ich bin ein ausgezeichneter Fahrer!"),
+              std::string("fxish fxbin fxeyen fxowsgehtsighshnehter fxfahrer!"));
+  CHECK_EQUAL(ForSpeech("私は運転がとても上手です"),
+              std::string("fxwahtahshee fxwah fxoontehn fxgah fxtohtehmoh fxjohzoo fxdess"));
+  CHECK_EQUAL(ForSpeech("Te lo dije. Recalculando."), std::string("fxteh fxloh fxdeeheh. fxrehkahlkoolahndoh."));
+  // Case doesn't matter; word boundaries do; English look-alikes are left alone.
+  CHECK_EQUAL(Foreign("GIRE A LA IZQUIERDA!"), std::string("fxheereh fxah fxlah fxeeskeeairdah!"));
+  CHECK_EQUAL(Foreign("Click the links above"), std::string("Click the links above"));
+  CHECK_EQUAL(Foreign("Recalculandos"), std::string("Recalculandos"));
+  CHECK_EQUAL(Foreign("Tournez a gauche"), std::string("Tournez a gauche"));
+  CHECK_EQUAL(Foreign("Turn left in 300 ft"), std::string("Turn left in 300 ft"));
+  // Each stand-in is in the dictionary, as the respelling says it.
+  for (auto const & [phrase, standIns] : ForeignPhrases())
+  {
+    CHECK_EQUAL(Foreign(phrase), standIns);
+    std::istringstream words(standIns);
+    for (std::string w; words >> w;)
+      CHECK(!Lex(w).empty());
+  }
+  CHECK_EQUAL(Lex("fxgohsh"), std::string("ɡˈOʃ"));
+  CHECK_EQUAL(Lex("fxah"), std::string("ɑ"));
+  CHECK_EQUAL(Lex("fxheereh"), std::string("hˈiɹɛ"));
+  CHECK_EQUAL(Lex("fxkoodahsigh"), std::string("kudɑsˈI"));
+  CHECK_EQUAL(Lex("fxeeskeeairdah"), std::string("iskiˈɛɹdɑ"));
+  CHECK_EQUAL(Lex("liv"), std::string("lˈɪv"));
+}

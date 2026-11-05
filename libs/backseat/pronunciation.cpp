@@ -7,6 +7,8 @@
 #include <initializer_list>
 #include <map>
 #include <regex>
+#include <set>
+#include <sstream>
 #include <string_view>
 
 namespace backseat::pronunciation
@@ -765,9 +767,151 @@ std::string Ranges(std::string const & text)
   return out;
 }
 
+// MARK: - Foreign phrases
+
+namespace
+{
+struct Phrase
+{
+  char const * text;
+  /// One reader-style respelling per word, stressed syllable in capitals.
+  char const * said;
+};
+
+// Phrases the lines quote in another language ("Gire a la izquierda means 'turn left' in Spanish",
+// the template in gps-comments.md). Kokoro's English frontend reads them as English ("jire a la
+// iz-kwer-da", and nothing at all for Japanese), so ForSpeech swaps each word for a stand-in
+// ("fx" + the respelling's letters) that the dictionary says the way the respelling does.
+// Latin-script phrases match ignoring case on word boundaries; other scripts match as written.
+constexpr Phrase kPhrases[] = {
+    // "turn left"
+    {"Gire a la izquierda", "HEE-reh ah lah ees-kee-AIR-dah"},
+    {"Tournez à gauche", "toor-NAY ah GOHSH"},
+    {"Biegen Sie links ab", "BEE-gen zee LINKS ahp"},
+    {"Gira a sinistra", "JEE-rah ah see-NEES-trah"},
+    {"Vire à esquerda", "VEE-ree ah es-KEHR-dah"},
+    {"Sla linksaf", "slah LINKS-ahf"},
+    {"Sväng vänster", "svehng VEN-ster"},
+    {"Skręć w lewo", "skrench v LEH-vo"},
+    {"Поверните налево", "pah-vyer-NEE-tyeh nah-LYEH-vah"},
+    {"左に曲がってください", "hee-DAH-ree nee mah-GAHT-teh koo-dah-SIGH"},
+    {"좌회전하세요", "jwah-HWEH-jun hah-SEH-yo"},
+    {"向左转", "SHYAHNG DZWOH JWAHN"},
+    {"Käänny vasemmalle", "KAHN-noo VAH-sem-mahl-leh"},
+    {"Verte ad sinistram", "WER-teh ahd sin-IS-trahm"},
+    // "turn right", "recalculating", "I told you so"
+    {"Gire a la derecha", "HEE-reh ah lah deh-REH-chah"},
+    {"Tournez à droite", "toor-NAY ah DRWAHT"},
+    {"Recalculando", "reh-kahl-koo-LAHN-doh"},
+    {"Recalcul en cours", "reh-kahl-KOOL ahn KOOR"},
+    {"Te lo dije", "teh loh DEE-heh"},
+    // "learn to drive"
+    {"Aprende a conducir", "ah-PREN-deh ah kohn-doo-SEER"},
+    {"Apprends à conduire", "ah-PRAHN ah kohn-DWEER"},
+    {"Lern Auto fahren", "LAIRN OW-toh FAH-ren"},
+    {"Impara a guidare", "eem-PAH-rah ah gwee-DAH-reh"},
+    {"Aprenda a dirigir", "ah-PREN-dah ah jee-ree-ZHEER"},
+    {"運転を習ってください", "OON-tehn oh nah-RAHT-teh koo-dah-SIGH"},
+    // "I am an excellent driver"
+    {"Soy un conductor excelente", "SOY oon kohn-dook-TOR ehk-seh-LEN-teh"},
+    {"Je suis un excellent conducteur", "zhuh SWEE uhn ehk-seh-LAHN kohn-dook-TUR"},
+    {"Ich bin ein ausgezeichneter Fahrer", "ISH BIN EYEN OWS-geh-tsighsh-neh-ter FAH-rer"},
+    {"Sono un ottimo guidatore", "SOH-noh oon OHT-tee-moh gwee-dah-TOH-reh"},
+    {"私は運転がとても上手です", "wah-TAH-shee wah OON-tehn gah toh-TEH-moh JOH-zoo dess"},
+};
+
+std::string AsciiLower(std::string s)
+{
+  for (char & c : s)
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return s;
+}
+
+bool WordByte(std::string const & s, size_t i)
+{
+  auto const c = static_cast<unsigned char>(s[i]);
+  return std::isalnum(c) || c >= 0x80;
+}
+
+std::vector<std::string> SplitWords(std::string const & said)
+{
+  std::vector<std::string> out;
+  std::istringstream in(said);
+  for (std::string w; in >> w;)
+    out.push_back(w);
+  return out;
+}
+
+std::string StandIn(std::string const & respelling)
+{
+  std::string out = "fx";
+  for (char c : respelling)
+    if (IsAsciiLetter(c))
+      out += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return out;
+}
+
+/// A respelled word as phonemes. A one-syllable word has no capitals to mark its stress, so it
+/// is stressed when written in capitals ("GOHSH") and unstressed when not ("ah").
+std::optional<std::string> ForeignWordPhonemes(std::string const & respelling)
+{
+  if (respelling.find('-') != std::string::npos)
+    return RespellingPhonemes(respelling);
+  auto ph = RespellingPhonemes("\xCB\x88" + respelling);
+  if (ph && respelling != AsciiLower(respelling))
+    return ph;
+  if (ph)
+    *ph = ReplaceAll(*ph, "\xCB\x88", "");
+  return ph;
+}
+}  // namespace
+
+std::vector<std::pair<std::string, std::string>> const & ForeignPhrases()
+{
+  static std::vector<std::pair<std::string, std::string>> const phrases = [] {
+    std::vector<std::pair<std::string, std::string>> out;
+    for (auto const & p : kPhrases)
+    {
+      std::string standIns;
+      for (auto const & w : SplitWords(p.said))
+        standIns += (standIns.empty() ? "" : " ") + StandIn(w);
+      out.emplace_back(p.text, standIns);
+    }
+    return out;
+  }();
+  return phrases;
+}
+
+std::string Foreign(std::string const & text)
+{
+  std::string s = text;
+  for (auto const & [phrase, standIns] : ForeignPhrases())
+  {
+    bool const latin = IsAsciiLetter(phrase[0]);
+    std::string const needle = latin ? AsciiLower(phrase) : phrase;
+    std::string out;
+    std::string const hay = latin ? AsciiLower(s) : s;
+    size_t last = 0;
+    for (size_t at = hay.find(needle); at != std::string::npos; at = hay.find(needle, at + 1))
+    {
+      size_t const end = at + needle.size();
+      if (at < last || (latin && ((at > 0 && WordByte(s, at - 1)) || (end < s.size() && WordByte(s, end)))))
+        continue;
+      out.append(s, last, at - last);
+      out += standIns;
+      last = end;
+    }
+    out.append(s, last, std::string::npos);
+    s = out;
+  }
+  return s;
+}
+
 std::string ForSpeech(std::string const & text)
 {
   std::string s = ReplaceAll(text, "\xC2\xA0", " ");
+  // Foreign phrases first, before anything reads their letters as English abbreviations.
+  s = Foreign(s);
   // Ranges before dashes become pauses: "3–5" is "3 to 5", not "3, 5".
   s = Ranges(s);
   // Temperatures and approximations: "-5°F" is "minus 5 degrees Fahrenheit", "~5" "about 5".
@@ -905,6 +1049,11 @@ std::vector<std::pair<std::string, std::string>> const & Lexicon()
       else if (auto const ph = RespellingPhonemes(said))
         out.emplace_back(w.word, *ph);
     }
+    std::set<std::string> seen;
+    for (auto const & p : kPhrases)
+      for (auto const & w : SplitWords(p.said))
+        if (auto const ph = ForeignWordPhonemes(w); ph && seen.insert(StandIn(w)).second)
+          out.emplace_back(StandIn(w), *ph);
     return out;
   }();
   return lexicon;

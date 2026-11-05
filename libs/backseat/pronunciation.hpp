@@ -35,6 +35,14 @@ std::string PickSenses(std::string const & text);
 /// backseat_tests/spoken_ranges.json, shared with EpubToM4B's tests/fixtures/spoken_ranges.json.
 std::string Ranges(std::string const & text);
 
+/// Foreign phrases the lines quote ("Gire a la izquierda", "Tournez à gauche", "左に曲がってください")
+/// swapped for stand-ins the dictionary says in that language's sounds. Latin-script phrases match
+/// ignoring case on word boundaries. Part of ForSpeech.
+std::string Foreign(std::string const & text);
+
+/// Every foreign phrase Foreign() knows, with the stand-ins it swaps in (space-separated).
+std::vector<std::pair<std::string, std::string>> const & ForeignPhrases();
+
 /// Every entry of the pronunciation dictionary: lowercase word, Misaki phonemes (UTF-8 IPA).
 std::vector<std::pair<std::string, std::string>> const & Lexicon();
 
