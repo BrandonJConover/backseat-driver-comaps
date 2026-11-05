@@ -243,6 +243,21 @@ TEST(RoadsMatchTheGoldenCases)
   }
 }
 
+TEST(HouseNumbersAreSaidInPairs)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_ADDRESSES_PATH);
+  CHECK(cases.size() >= 20);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  CHECK_EQUAL(HouseNumbers("1600 Pennsylvania Avenue"), std::string("sixteen hundred Pennsylvania Avenue"));
+  CHECK_EQUAL(HouseNumbers("1,600 Main Street"), std::string("1,600 Main Street"));
+  CHECK_EQUAL(HouseNumbers("$1600 Main Street"), std::string("$1600 Main Street"));
+  CHECK_EQUAL(HouseNumbers("1600 feet"), std::string("1600 feet"));
+}
+
 TEST(RouteNumbersAreSaidTheWayDriversSayThem)
 {
   CHECK_EQUAL(RouteNumber("5"), std::string("five"));

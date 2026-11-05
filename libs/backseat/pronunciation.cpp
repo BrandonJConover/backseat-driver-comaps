@@ -475,7 +475,7 @@ bool LeadInWord(std::string const & w)
 }
 
 /// True when the word just before `pos` names a street, so "St"/"Dr" at `pos` is its type ("Main St.",
-/// "5th St"): a number, or a capitalised word that isn't a lead-in. Start of text, punctuation or a
+/// "5th St"): an ordinal, or a capitalised word that isn't a lead-in. Start of text, punctuation or a
 /// lowercase word before it mean a title ("onto St. Johns Rd", "Go to St Louis").
 bool StreetNameBefore(std::string const & s, size_t pos)
 {
@@ -488,8 +488,10 @@ bool StreetNameBefore(std::string const & s, size_t pos)
   if (start == end)
     return false;
   auto const first = static_cast<unsigned char>(s[start]);
+  // "5th St" is a street; a bare house number before it is not ("3502 St. Johns Rd").
   if (std::isdigit(first))
-    return true;
+    return !std::all_of(s.begin() + static_cast<std::ptrdiff_t>(start), s.begin() + static_cast<std::ptrdiff_t>(end),
+                        [](char ch) { return std::isdigit(static_cast<unsigned char>(ch)) != 0; });
   return std::isupper(first) && !LeadInWord(Lower(std::string_view(s).substr(start, end - start)));
 }
 
@@ -1242,6 +1244,23 @@ std::string Roads(std::string const & text)
   });
 }
 
+std::string HouseNumbers(std::string const & text)
+{
+  // A 3 or 4 digit number, then up to four name words (a compass point, capitalised words or a
+  // numbered street like "5th"), then a street type: "1600 Pennsylvania Avenue", "4521 Oak Street".
+  static std::regex const address(
+      "\\b(\\d{3,4})(?= (?:(?:North|South|East|West|Northeast|Northwest|Southeast|Southwest) )?"
+      "(?:(?:[A-Z][A-Za-z'.-]*|\\d+(?:st|nd|rd|th)) ){1,4}"
+      "(?:Street|Avenue|Boulevard|Road|Drive|Lane|Court|Parkway|Place|Circle|Terrace|Trail|Square|Way|Plaza)\\b)");
+  return Replace(text, address, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    // Part of a bigger number ("1,600", "2.500") or a word ("A123"): leave it.
+    if (pos > 0 && (std::isalnum(static_cast<unsigned char>(text[pos - 1])) || text[pos - 1] == ',' ||
+                    text[pos - 1] == '.' || text[pos - 1] == '-' || text[pos - 1] == '#' || text[pos - 1] == '$'))
+      return std::nullopt;
+    return RouteNumber(m.str(1));
+  });
+}
+
 std::string ForSpeech(std::string const & text)
 {
   std::string s = ReplaceAll(text, "\xC2\xA0", " ");
@@ -1301,6 +1320,8 @@ std::string ForSpeech(std::string const & text)
   // Highways, routes and exits the way drivers say them: "I-405" is "I four oh five", "FM 1431"
   // "F M fourteen thirty one", "TX-71" "Texas seventy one", "Exit 238B" "Exit two thirty eight B".
   s = Roads(s);
+  // House numbers in pairs: "1600 Pennsylvania Avenue" is "sixteen hundred ...".
+  s = HouseNumbers(s);
   // Money and percentages.
   static std::regex const money("\\$(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d{2}))?\\b");
   s = Replace(s, money, [](std::smatch const & m, size_t) -> std::optional<std::string> {

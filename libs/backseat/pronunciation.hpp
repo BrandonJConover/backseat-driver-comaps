@@ -70,6 +70,13 @@ std::string RouteNumber(std::string const & digits);
 /// golden cases in backseat_tests/spoken_roads.json.
 std::string Roads(std::string const & text);
 
+/// House numbers in pairs, the way people say an address: "1600 Pennsylvania Avenue" is "sixteen
+/// hundred Pennsylvania Avenue", "4521 Oak Street" "forty five twenty one Oak Street", "105 N Main
+/// Street" "one oh five North Main Street". Only a 3-4 digit number right before capitalised words
+/// ending in a spelled-out street type; counts ("500 feet", "1,600 Main") are left alone. Runs
+/// after the street pass in ForSpeech; golden cases in backseat_tests/spoken_addresses.json.
+std::string HouseNumbers(std::string const & text);
+
 /// A whole number in words, without hyphens ("one hundred twenty one").
 std::string SpellNumber(long long n);
 }  // namespace backseat::pronunciation
