@@ -609,3 +609,72 @@ TEST(CommandsDontRunTwice)
   CHECK(!repeats.IsRepeat({AppAction::RepeatInstruction, ""}, 217000));
   CHECK(!repeats.IsRepeat({AppAction::RepeatInstruction, ""}, 218000));
 }
+
+TEST(CursingAtTheGpsGetsAComeback)
+{
+  CHECK(CurseIn("Screw you!") == Curse::Screw);
+  CHECK(CurseIn("oh screw off") == Curse::Screw);
+  CHECK(CurseIn("Fuck you") == Curse::Proposition);
+  // The phone's recognizer censors it.
+  CHECK(CurseIn("F*** you!") == Curse::Proposition);
+  CHECK(CurseIn("go f*** yourself") == Curse::Proposition);
+  CHECK(CurseIn("go to hell") == Curse::Hell);
+  CHECK(CurseIn("damn you, phone") == Curse::Hell);
+  CHECK(CurseIn("you stupid phone") == Curse::Insult);
+  CHECK(CurseIn("you piece of junk") == Curse::Insult);
+  CHECK(CurseIn("f***ing phone") == Curse::Insult);
+  CHECK(CurseIn("oh s***") == Curse::Blurt);
+  CHECK(CurseIn("damn it, I missed it") == Curse::Blurt);
+  // Plain talk isn't swearing.
+  for (char const * chatter : {"screw top bottle", "hello there", "the shitake mushrooms", "Amsterdam", "I'm hell bent",
+                               "take me to the screwdriver store", "you're welcome", "screwball"})
+    CHECK(!CurseIn(chatter));
+  // And it's not a command, so nothing else takes it.
+  CHECK(ParseAppCommands("screw you").empty());
+  CHECK(ParseAppCommands("f*** you").empty());
+
+  CHECK(std::string(CurseLineKey(Curse::Screw)) == "curse.screw");
+  CHECK(std::string(CurseLineKey(Curse::Proposition)) == "curse.proposition");
+  // Brandon's lines debut first, at every frustration level.
+  for (int tier = 0; tier < 3; ++tier)
+  {
+    CHECK(LinesFor("curse.screw", tier)[0] ==
+          "Oh I didn't notice one of them had wiggled loose. Remember righty tighty.");
+    CHECK(LinesFor("curse.proposition", tier)[0] ==
+          "Am I being propositioned right now? Note to self {driver} likes technology a little too much.");
+  }
+  // Big pools, and no comeback that swears back: the mic would hear it and start a fight with itself.
+  for (char const * key : {"curse.screw", "curse.proposition", "curse.hell", "curse.insult", "curse.blurt"})
+  {
+    CHECK(LinesFor(key, 0).size() >= 6);
+    for (int tier = 0; tier < 3; ++tier)
+    {
+      CHECK(!LinesFor(key, tier).empty());
+      for (auto const & line : LinesFor(key, tier))
+        CHECK(!CurseIn(line));
+    }
+  }
+}
+
+TEST(CurseComebacksAreRationed)
+{
+  CurseRetorts retorts;
+  CHECK(retorts.KeyFor("screw you", 0) == std::string("curse.screw"));
+  // The recognizer says it twice.
+  CHECK(!retorts.KeyFor("screw you", 2000));
+  CHECK(retorts.KeyFor("f*** you", 15000) == std::string("curse.proposition"));
+  CHECK(retorts.KeyFor("oh s***", 30000) == std::string("curse.blurt"));
+  // Blurts only now and then, but at the GPS always gets a comeback.
+  CHECK(!retorts.KeyFor("damn it", 60000));
+  CHECK(retorts.KeyFor("you stupid phone", 75000) == std::string("curse.insult"));
+  CHECK(retorts.KeyFor("dammit", 30000 + CurseRetorts::kBlurtEveryMs) == std::string("curse.blurt"));
+  CHECK(!retorts.KeyFor("turn left here", 400000));
+}
+
+TEST(TheProposedToGpsNamesTheDriver)
+{
+  Navigator nav;
+  nav.SetDriverName("Brandon");
+  CHECK(nav.Reply("curse.proposition") ==
+        "Am I being propositioned right now? Note to self Brandon likes technology a little too much.");
+}

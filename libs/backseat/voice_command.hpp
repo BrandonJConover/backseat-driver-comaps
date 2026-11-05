@@ -178,6 +178,43 @@ private:
   std::string m_buildingTo;
 };
 
+/// Swearing the driver did, sorted by what the GPS can make of it.
+enum class Curse
+{
+  /// "Screw you": it checks itself for a loose one (Brandon: "Remember righty tighty").
+  Screw,
+  /// "F*** you", "f*** me": it wonders whether it's being propositioned (Brandon's line).
+  Proposition,
+  /// "Go to hell", "damn you".
+  Hell,
+  /// Name-calling: "you stupid phone", "piece of junk", "you suck".
+  Insult,
+  /// A swear word at nobody in particular: traffic, another driver, the turn just missed.
+  Blurt
+};
+/// The swearing in `spoken`, if any, the most specific kind first. Censored transcripts count:
+/// the phone's recognizer hears "f*** you".
+std::optional<Curse> CurseIn(std::string const & spoken);
+/// The line key that answers it: "curse.screw", "curse.proposition", "curse.hell", "curse.insult",
+/// "curse.blurt".
+char const * CurseLineKey(Curse curse);
+
+/// Decides when swearing gets a comeback. Anything said at the GPS gets one, unless the recognizer
+/// is repeating itself; a plain blurt only now and then, since a bad drive can be full of them.
+class CurseRetorts
+{
+public:
+  static double constexpr kRepeatMs = 10000;
+  static double constexpr kBlurtEveryMs = 120000;
+
+  /// The line key to answer `spoken` with at `tMs`, if it's swearing that gets one now.
+  std::optional<std::string> KeyFor(std::string const & spoken, double tMs);
+
+private:
+  std::optional<double> m_lastAt;
+  std::optional<double> m_lastBlurtAt;
+};
+
 /// "Yes", "yeah", "yep", "you got it"...
 bool SaidYes(std::string const & spoken);
 /// "No", "nope", "nah", "not really"...
