@@ -3,6 +3,7 @@
 #include "backseat/pronunciation.hpp"
 
 #include <fstream>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -162,6 +163,33 @@ TEST(TheDictionaryHasEveryStandIn)
     for (char c : word)
       CHECK(c >= 'a' && c <= 'z');
   }
+}
+
+TEST(NamesTheVoiceWouldGuessAreInTheDictionary)
+{
+  // Misaki phonemes from BookLyre's names lexicon (CROSS X-003): line-bank names and drivers' names.
+  CHECK_EQUAL(Lex("neil"), std::string("nˈil"));
+  CHECK_EQUAL(Lex("armstrong"), std::string("ˈɑɹmstɹˌɑŋ"));
+  CHECK_EQUAL(Lex("gertrude"), std::string("ɡˈɜɹtɹud"));
+  CHECK_EQUAL(Lex("nigel"), std::string("nˈIʤᵊl"));
+  CHECK_EQUAL(Lex("floyd"), std::string("flˈYd"));
+  CHECK_EQUAL(Lex("maxine"), std::string("mæksˈin"));
+  CHECK_EQUAL(Lex("doug"), std::string("dˈʌɡ"));
+  CHECK_EQUAL(Lex("linda"), std::string("lˈɪndə"));
+  CHECK_EQUAL(Lex("larry"), std::string("lˈɛɹi"));
+  CHECK_EQUAL(Lex("emily"), std::string("ˈɛməli"));
+  CHECK_EQUAL(Lex("paul"), std::string("pˈɔl"));
+  CHECK_EQUAL(Lex("kevin"), std::string("kˈɛvən"));
+  CHECK_EQUAL(Lex("yuri"), std::string("jˈʊɹi"));
+  // Words the dictionary had before keep their sounds.
+  CHECK_EQUAL(Lex("liv"), std::string("lˈɪv"));
+  CHECK_EQUAL(Lex("bayss"), std::string("bˈAs"));
+  // One entry per word, or a host's dictionary would keep whichever came last.
+  std::set<std::string> words;
+  for (auto const & [w, ph] : Lexicon())
+    CHECK(words.insert(w).second);
+  // Names only reach the voice through the dictionary: ForSpeech leaves them as written.
+  CHECK_EQUAL(ForSpeech("Nice one, Gertrude."), std::string("Nice one, Gertrude."));
 }
 
 TEST(RespellingsBecomePhonemes)

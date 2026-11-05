@@ -65,6 +65,47 @@ constexpr Word kWords[] = {
     {"mynoot", "/mInˈut/"},
 };
 
+// Names Kokoro's Misaki dictionaries lack, so the fallback guesses them ("Simon" -> "sim-on").
+// Misaki phonemes from BookLyre's names lexicon (EpubToM4B tools/pronunciation/build_names_lexicon.py,
+// CMUdict converted to Misaki; CROSS X-003). Keep this to names a line or the driver can bring up.
+struct Name
+{
+  char const * word;
+  char const * phonemes;
+};
+
+constexpr Name kNames[] = {
+    // Line-bank names (Neil Armstrong, Gertrude, Floyd...).
+    {"neil", "nˈil"}, {"armstrong", "ˈɑɹmstɹˌɑŋ"}, {"gertrude", "ɡˈɜɹtɹud"}, {"nigel", "nˈIʤᵊl"},
+    {"darlene", "dˈɑɹlˌin"}, {"sheila", "ʃˈilə"}, {"duane", "dwˈAn"}, {"bev", "bˈɛv"}, {"wanda", "wˈɑndə"},
+    {"floyd", "flˈYd"}, {"trudy", "tɹˈudi"}, {"maxine", "mæksˈin"}, {"lyle", "lˈIl"}, {"rhonda", "ɹˈɑndə"},
+    {"yee", "jˈi"}, {"angeles", "ˈænʤələs"}, {"ferrari", "fəɹˈɑɹi"}, {"yuri", "jˈʊɹi"}, {"katy", "kˈAɾi"},
+    // First names PronounsForName() knows, so the driver's own name is said right.
+    {"allison", "ˈæləsən"}, {"amanda", "əmˈændə"}, {"andrea", "ˈændɹˌiə"}, {"andrew", "ˈændɹu"}, {"andy", "ˈændi"},
+    {"angela", "ˈænʤələ"}, {"ann", "ˈæn"}, {"anthony", "ˈænθəni"}, {"ashley", "ˈæʃli"}, {"ava", "ˈAvə"},
+    {"betty", "bˈɛɾi"}, {"brian", "bɹˈIən"}, {"bruce", "bɹˈus"}, {"carolyn", "kˈɛɹələn"}, {"catherine", "kˈæθəɹən"},
+    {"cheryl", "ʃˈɛɹəl"}, {"chloe", "klˈOi"}, {"christine", "kɹəstˈin"}, {"connor", "kˈɑnəɹ"}, {"cynthia", "sˈɪnθiə"},
+    {"danielle", "dˌæniˈɛl"}, {"debbie", "dˈɛbi"}, {"debra", "dˈɛbɹə"}, {"denise", "dənˈis"}, {"dennis", "dˈɛnəs"},
+    {"derek", "dˈɛɹək"}, {"diane", "dIˈæn"}, {"donald", "dˈɑnəld"}, {"dorothy", "dˈɔɹəθi"}, {"doug", "dˈʌɡ"},
+    {"douglas", "dˈʌɡləs"}, {"dylan", "dˈɪlən"}, {"ed", "ˈɛd"}, {"emily", "ˈɛməli"}, {"eric", "ˈɛɹək"},
+    {"ethan", "ˈiθən"}, {"evan", "ˈɛvən"}, {"evelyn", "ˈɛvələn"}, {"gerald", "ʤˈɛɹəld"}, {"hannah", "hˈænə"},
+    {"ian", "ˈiən"}, {"jacqueline", "ʤˈækwələn"}, {"janet", "ʤˈænət"}, {"janice", "ʤˈænəs"}, {"jeremy", "ʤˈɛɹəmˌi"},
+    {"jerry", "ʤˈɛɹi"}, {"joan", "ʤˈOn"}, {"jose", "hˌOzˈA"}, {"juan", "wˈɑn"}, {"julie", "ʤˈuli"},
+    {"katherine", "kˈæθəɹən"}, {"kathleen", "kæθlˈin"}, {"kathryn", "kˈæθɹən"}, {"kathy", "kˈæθi"},
+    {"katie", "kˈAɾi"}, {"kayla", "kˈAlə"}, {"keith", "kˈiθ"}, {"kenneth", "kˈɛnəθ"}, {"kevin", "kˈɛvən"},
+    {"kim", "kˈɪm"}, {"kimberly", "kˈɪmbəɹli"}, {"kristen", "kɹˈɪstən"}, {"kyle", "kˈIl"}, {"larry", "lˈɛɹi"},
+    {"lauren", "lˈɔɹən"}, {"leah", "lˈiə"}, {"linda", "lˈɪndə"}, {"lindsay", "lˈɪndzi"}, {"liz", "lˈɪz"},
+    {"lori", "lˈɔɹi"}, {"lucas", "lˈukəs"}, {"luis", "luˈis"}, {"luke", "lˈuk"}, {"marcus", "mˈɑɹkəs"},
+    {"margaret", "mˈɑɹɡəɹət"}, {"marie", "məɹˈi"}, {"marilyn", "mˈɛɹələn"}, {"martha", "mˈɑɹθə"}, {"matt", "mˈæt"},
+    {"matthew", "mˈæθju"}, {"megan", "mˈAɡən"}, {"mia", "mˈiə"}, {"michelle", "məʃˈɛl"}, {"natalie", "nˈæɾəli"},
+    {"nathan", "nˈAθən"}, {"nicole", "nəkˈOl"}, {"olivia", "Olˈɪviə"}, {"paige", "pˈAʤ"}, {"pamela", "pˈæmələ"},
+    {"patricia", "pətɹˈɪʃə"}, {"patrick", "pˈætɹək"}, {"paul", "pˈɔl"}, {"raymond", "ɹˈAmənd"},
+    {"rebecca", "ɹəbˈɛkə"}, {"ronald", "ɹˈɑnəld"}, {"russell", "ɹˈʌsᵊl"}, {"ryan", "ɹˈIən"}, {"samantha", "səmˈænθə"},
+    {"sara", "sˈɛɹə"}, {"scott", "skˈɑt"}, {"sean", "ʃˈɔn"}, {"shirley", "ʃˈɜɹli"}, {"sophia", "sOfˈiə"},
+    {"stephanie", "stˈɛfəni"}, {"teresa", "təɹˈisə"}, {"theresa", "təɹˈisə"}, {"travis", "tɹˈævəs"},
+    {"willie", "wˈɪli"}, {"zach", "zˈæk"}, {"zachary", "zˈækəɹi"}, {"zoe", "zˈOi"},
+};
+
 // MARK: - Picking the sense
 
 using Set = std::initializer_list<std::string_view>;
@@ -1054,6 +1095,13 @@ std::vector<std::pair<std::string, std::string>> const & Lexicon()
       for (auto const & w : SplitWords(p.said))
         if (auto const ph = ForeignWordPhonemes(w); ph && seen.insert(StandIn(w)).second)
           out.emplace_back(StandIn(w), *ph);
+    // Names last, never replacing a word or stand-in above.
+    std::set<std::string> taken;
+    for (auto const & [w, ph] : out)
+      taken.insert(w);
+    for (auto const & n : kNames)
+      if (taken.insert(n.word).second)
+        out.emplace_back(n.word, n.phonemes);
     return out;
   }();
   return lexicon;
