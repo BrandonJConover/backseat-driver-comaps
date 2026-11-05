@@ -101,6 +101,12 @@ JNIEXPORT jstring JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeSpoke
   return jni::ToJavaString(env, backseat::pronunciation::ForSpeech(jni::ToNativeString(env, text)));
 }
 
+JNIEXPORT void JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeSetUserPronunciations(JNIEnv * env, jclass,
+                                                                                            jstring lines)
+{
+  backseat::pronunciation::SetUserWords(jni::ToNativeString(env, lines));
+}
+
 JNIEXPORT jstring JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativePronunciationLexicon(JNIEnv * env, jclass)
 {
   std::string out;

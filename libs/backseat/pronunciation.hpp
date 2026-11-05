@@ -28,8 +28,15 @@ std::string ForSpeech(std::string const & text);
 /// ("Where do you live?" reads "liv"). Part of ForSpeech.
 std::string PickSenses(std::string const & text);
 
-/// Every entry of the pronunciation dictionary: lowercase word, Misaki phonemes (UTF-8 IPA).
-std::vector<std::pair<std::string, std::string>> const & Lexicon();
+/// Every entry of the pronunciation dictionary: lowercase word, Misaki phonemes (UTF-8 IPA). Holds
+/// the stand-ins for the driver's own words too, so hand it to the voice again after SetUserWords.
+std::vector<std::pair<std::string, std::string>> Lexicon();
+
+/// The driver's own pronunciations, one "word<TAB>say it as" per line; they win over everything
+/// else here. "Say it as" is plain words ("wine sap"), a respelling with the loud syllable in
+/// capitals ("WINE-sap"), or Misaki IPA between slashes. A word can be a phrase ("Mt Hood").
+/// Replaces the previous list. Any thread.
+void SetUserWords(std::string const & lines);
 
 /// A reader-style respelling ("Ab-DEE-rus", "EE-fa") as Misaki phonemes; nullopt when the text
 /// isn't one. Syllables split on hyphens; the capitalised one (or the one marked ' ´ ˈ) is stressed.

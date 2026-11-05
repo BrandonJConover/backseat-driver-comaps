@@ -87,7 +87,43 @@ public final class Backseat
     return nativePronunciationLexicon();
   }
 
+  private static final String PREFS = "backseat_pronunciations";
+  private static final String KEY_LINES = "lines";
+  private static boolean sPronunciationsLoaded;
+
+  /// The driver's own pronunciations, one "word\tsay it as" line each, in the order added; they win
+  /// over the built-in ones. Saved on the phone.
+  @NonNull
+  public static synchronized String userPronunciations(@NonNull Context context)
+  {
+    return context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_LINES, "");
+  }
+
+  /// Saves the driver's pronunciations and hands them to the voice's rules at once. The Kokoro
+  /// voice then needs to reload its dictionary (KokoroVoice.pronunciationsChanged).
+  public static synchronized void setUserPronunciations(@NonNull Context context, @NonNull String lines)
+  {
+    context.getApplicationContext()
+        .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putString(KEY_LINES, lines)
+        .apply();
+    nativeSetUserPronunciations(lines);
+    sPronunciationsLoaded = true;
+  }
+
+  /// Hands the saved pronunciations to the voice's rules, once. Call before the voice loads.
+  public static synchronized void loadUserPronunciations(@NonNull Context context)
+  {
+    if (sPronunciationsLoaded)
+      return;
+    nativeSetUserPronunciations(userPronunciations(context));
+    sPronunciationsLoaded = true;
+  }
+
   private static native void nativeEnableMusicCheck();
+
+  private static native void nativeSetUserPronunciations(@NonNull String lines);
 
   @NonNull
   private static native String nativeSpokenText(@NonNull String text);
