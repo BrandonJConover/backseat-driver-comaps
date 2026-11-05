@@ -258,6 +258,32 @@ TEST(HouseNumbersAreSaidInPairs)
   CHECK_EQUAL(HouseNumbers("1600 feet"), std::string("1600 feet"));
 }
 
+TEST(ClockTimesAreSaidWithAmAndPm)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_TIMES_PATH);
+  CHECK(cases.size() >= 20);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  CHECK_EQUAL(Clock("by 5pm"), std::string("by five peeem"));
+  CHECK_EQUAL(Clock("12 PM"), std::string("noon"));
+  CHECK_EQUAL(Clock("12:00 a.m. Then"), std::string("midnight. Then"));
+  CHECK_EQUAL(Clock("five am"), std::string("five am"));
+  CHECK_EQUAL(Clock("13 pm"), std::string("13 pm"));
+  CHECK_EQUAL(Clock("$5 pm"), std::string("$5 pm"));
+  // The stand-ins are in the dictionary, so the voice says the letters.
+  bool ayem = false, peeem = false;
+  for (auto const & [w, ph] : Lexicon())
+  {
+    ayem = ayem || w == "ayem";
+    peeem = peeem || w == "peeem";
+  }
+  CHECK(ayem);
+  CHECK(peeem);
+}
+
 TEST(RouteNumbersAreSaidTheWayDriversSayThem)
 {
   CHECK_EQUAL(RouteNumber("5"), std::string("five"));

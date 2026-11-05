@@ -77,6 +77,13 @@ std::string Roads(std::string const & text);
 /// after the street pass in ForSpeech; golden cases in backseat_tests/spoken_addresses.json.
 std::string HouseNumbers(std::string const & text);
 
+/// Clock times with am/pm the way people say them: "5pm" is "five peeem", "9:05 a.m." "nine oh
+/// five ayem", "12 pm" "noon", "12am" "midnight", "9am-5pm" "nine ayem to five peeem" (ayem and
+/// peeem are Lexicon() stand-ins). Hours outside 1-12 and decimals ("1.5 am") are left alone; a
+/// dotted "p.m." that ended the sentence keeps its period. Part of ForSpeech; golden cases in
+/// backseat_tests/spoken_times.json.
+std::string Clock(std::string const & text);
+
 /// A whole number in words, without hyphens ("one hundred twenty one").
 std::string SpellNumber(long long n);
 }  // namespace backseat::pronunciation

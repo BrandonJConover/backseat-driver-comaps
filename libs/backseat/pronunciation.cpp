@@ -64,6 +64,9 @@ constexpr Word kWords[] = {
     {"bayss", "/bˈAs/"},
     // Tiny, not sixty seconds.
     {"mynoot", "/mInˈut/"},
+    // Clock times: "5pm", "5:30 p.m." (Clock()). Spelled "AM"/"PM" read as "am"/"pim" or get skipped.
+    {"ayem", "/ˌAˈɛm/"},
+    {"peeem", "/pˌiˈɛm/"},
 };
 
 // Names Kokoro's Misaki dictionaries lack, so the fallback guesses them ("Simon" -> "sim-on").
@@ -1261,6 +1264,77 @@ std::string HouseNumbers(std::string const & text)
   });
 }
 
+std::string Clock(std::string const & text)
+{
+  // "9am-5pm", "9-5pm", "9:30 a.m.–noon": a dash next to a clock time is "to".
+  static std::regex const span(
+      "(\\b\\d{1,2}(?::[0-5]\\d)?(?: ?[AaPp]\\.? ?[Mm]\\.?)?) ?(?:-|\xE2\x80\x93|\xE2\x80\x94) ?"
+      "(?=\\d{1,2}(?::[0-5]\\d)? ?[AaPp]\\.? ?[Mm](?![A-Za-z])|noon\\b|midnight\\b)");
+  auto const s = Replace(text, span, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    // Only when one side really is a clock time: "9am-5pm", "9-5pm", not "3-5pm" inside "13-5pm".
+    if (pos > 0 && (std::isalnum(static_cast<unsigned char>(text[pos - 1])) || text[pos - 1] == '.' ||
+                    text[pos - 1] == ',' || text[pos - 1] == '$'))
+      return std::nullopt;
+    if (auto const hour = ToNumber(m.str(1).substr(0, m.str(1).find_first_not_of("0123456789")));
+        hour < 1 || hour > 12)
+      return std::nullopt;
+    return m.str(1) + " to ";
+  });
+  // Digits, or a spelled hour before a dotted or capital "a.m."/"PM" ("five a.m.": a plain "five am"
+  // could be "am" the verb).
+  static std::regex const clock(
+      "\\b(\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?::([0-5]\\d))?"
+      "( ?)([AaPp])(\\. ?)?([Mm])(\\.)?(?![A-Za-z0-9])");
+  return Replace(s, clock, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    // Part of something bigger: "1.5 am", "$5 pm", "12:30:45 pm".
+    if (pos > 0 && (s[pos - 1] == '.' || s[pos - 1] == ',' || s[pos - 1] == ':' || s[pos - 1] == '$' ||
+                    s[pos - 1] == '#'))
+      return std::nullopt;
+    static std::vector<std::string> const words = {"one", "two",   "three", "four",   "five",  "six",
+                                                   "seven", "eight", "nine", "ten", "eleven", "twelve"};
+    long long hour = 0;
+    if (auto const w = std::find(words.begin(), words.end(), m.str(1)); w != words.end())
+    {
+      bool const capital = std::isupper(static_cast<unsigned char>(m.str(4)[0])) &&
+                           std::isupper(static_cast<unsigned char>(m.str(6)[0]));
+      if (m.length(3) == 0 || (!m[5].matched && !capital))
+        return std::nullopt;
+      hour = static_cast<long long>(w - words.begin()) + 1;
+    }
+    else
+      hour = ToNumber(m.str(1));
+    auto const minutes = m[2].matched ? ToNumber(m.str(2)) : 0;
+    if (hour < 1 || hour > 12)
+      return std::nullopt;
+    bool const pm = m.str(4) == "p" || m.str(4) == "P";
+    std::string said;
+    if (hour == 12 && minutes == 0)
+      said = pm ? "noon" : "midnight";
+    else
+    {
+      said = SpellNumber(hour);
+      if (minutes > 0)
+        said += (minutes < 10 ? " oh " : " ") + SpellNumber(minutes);
+      said += pm ? " peeem" : " ayem";
+    }
+    // "by 5 p.m. Then..." or "by 5 p.m." at the end: that period ended the sentence too.
+    if (m[7].matched)
+    {
+      size_t i = pos + static_cast<size_t>(m.length(0));
+      if (i == s.size())
+        said += '.';
+      else if (Space(s[i]))
+      {
+        while (i < s.size() && Space(s[i]))
+          ++i;
+        if (i < s.size() && std::isupper(static_cast<unsigned char>(s[i])))
+          said += '.';
+      }
+    }
+    return said;
+  });
+}
+
 std::string ForSpeech(std::string const & text)
 {
   std::string s = ReplaceAll(text, "\xC2\xA0", " ");
@@ -1268,6 +1342,8 @@ std::string ForSpeech(std::string const & text)
   s = Foreign(s);
   // Ranges before dashes become pauses: "3–5" is "3 to 5", not "3, 5".
   s = Ranges(s);
+  // Clock times before the dash pass can split "9am-5pm".
+  s = Clock(s);
   // Temperatures and approximations: "-5°F" is "minus 5 degrees Fahrenheit", "~5" "about 5".
   static std::regex const degrees("(^|[\\s(])-(?=\\d+(?:\\.\\d+)? ?\xC2\xB0)");
   s = std::regex_replace(s, degrees, "$1minus ");
