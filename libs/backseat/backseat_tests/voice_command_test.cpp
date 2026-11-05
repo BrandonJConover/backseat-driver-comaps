@@ -609,3 +609,96 @@ TEST(CommandsDontRunTwice)
   CHECK(!repeats.IsRepeat({AppAction::RepeatInstruction, ""}, 217000));
   CHECK(!repeats.IsRepeat({AppAction::RepeatInstruction, ""}, 218000));
 }
+
+TEST(TheGpsAnswersToItsVoicesName)
+{
+  std::vector<VoiceOption> const voices = {{"am_echo", "Echo"}, {"am_adam", "Adam"}, {"af_river", "River"}, {"af_sky", "Sky"}};
+  auto call = CalledByName(voices, "Hey Echo, can you take me home?");
+  CHECK(call && call->voice == 0 && call->greeted);
+  CHECK_EQUAL(call->rest, std::string("can you take me home"));
+  // The recognizer's spelling, and no punctuation at all.
+  call = CalledByName(voices, "hey eco how are you");
+  CHECK(call && call->voice == 0 && call->rest == "how are you");
+  call = CalledByName(voices, "Echo, are you there?");
+  CHECK(call && call->voice == 0 && !call->greeted && call->rest == "are you there");
+  call = CalledByName(voices, "Echo what's up");
+  CHECK(call && call->rest == "what's up");
+  call = CalledByName(voices, "Hey Echo");
+  CHECK(call && call->rest.empty());
+  call = CalledByName(voices, "Echo.");
+  CHECK(call && call->rest.empty());
+  call = CalledByName(voices, "um, okay Echo, mute");
+  CHECK(call && call->rest == "mute");
+  // At the end.
+  call = CalledByName(voices, "Thanks, Echo");
+  CHECK(call && call->voice == 0 && call->rest == "thanks");
+  call = CalledByName(voices, "thank you echo");
+  CHECK(call && call->rest == "thank you");
+  call = CalledByName(voices, "take me home Echo");
+  CHECK(call && call->rest == "take me home");
+  call = CalledByName(voices, "Hey Adam, take me to work");
+  CHECK(call && call->voice == 1);
+
+  // A voice's name used as a word isn't a call.
+  CHECK(!CalledByName(voices, "turn left at the river"));
+  CHECK(!CalledByName(voices, "sky is looking cloudy today"));
+  CHECK(!CalledByName(voices, "navigate to Adam's house"));
+  CHECK(!CalledByName(voices, "I heard an echo in that tunnel"));
+  CHECK(!CalledByName(voices, "take me home"));
+  CHECK(!CalledByName(voices, ""));
+}
+
+TEST(NameCallsAreSortedByWhatTheDriverWants)
+{
+  CHECK_EQUAL(NameCallTopic(""), std::string("bare"));
+  CHECK_EQUAL(NameCallTopic("are you there"), std::string("there"));
+  CHECK_EQUAL(NameCallTopic("can you hear me"), std::string("there"));
+  CHECK_EQUAL(NameCallTopic("how are you doing today"), std::string("howAreYou"));
+  CHECK_EQUAL(NameCallTopic("what's up"), std::string("howAreYou"));
+  CHECK_EQUAL(NameCallTopic("I love you"), std::string("love"));
+  CHECK_EQUAL(NameCallTopic("who are you"), std::string("who"));
+  CHECK_EQUAL(NameCallTopic("are you mad at me"), std::string("mad"));
+  CHECK_EQUAL(NameCallTopic("I'm sorry"), std::string("sorry"));
+  CHECK_EQUAL(NameCallTopic("thanks"), std::string("thanks"));
+  CHECK_EQUAL(NameCallTopic("good job"), std::string("thanks"));
+  CHECK_EQUAL(NameCallTopic("good night"), std::string("bye"));
+  CHECK_EQUAL(NameCallTopic("can you order me a pizza"), std::string("canYou"));
+  CHECK_EQUAL(NameCallTopic("what do you think about jazz"), std::string("chat"));
+}
+
+TEST(NameCallBanterIsRationed)
+{
+  NameCalls calls;
+  CHECK(!calls.IsRepeat("hey echo how are you", 0));
+  CHECK(calls.IsRepeat("Hey Echo, how are you?", 2000));
+  CHECK(!calls.IsRepeat("hey echo are you there", 3000));
+  CHECK(!calls.IsRepeat("hey echo are you there", 3000 + NameCalls::kRepeatMs));
+
+  CHECK(calls.QuipDue(0));
+  CHECK(!calls.QuipDue(60000));
+  CHECK(calls.QuipDue(NameCalls::kQuipEveryMs));
+  CHECK(calls.OtherNameDue(0));
+  CHECK(!calls.OtherNameDue(NameCalls::kOtherNameEveryMs - 1));
+}
+
+TEST(EveryNameCallTopicHasLines)
+{
+  for (char const * topic : {"bare", "there", "howAreYou", "love", "who", "mad", "sorry", "thanks", "bye", "canYou",
+                             "chat", "quip", "other", "title"})
+    for (int tier = 0; tier < 3; ++tier)
+      CHECK(!LinesFor(std::string("name.") + topic, tier).empty());
+  // Brandon's line opens the chit-chat pool, in the voice's own name.
+  Navigator nav;
+  std::string const line = nav.Reply("name.chat", {{"voice", "Heart"}});
+  CHECK(line.find("I was listening to you. Here is what I heard from you.") == 0);
+  CHECK(line.find("my sweet GPS Heart.") != std::string::npos);
+}
+
+TEST(BrandonsNameCallLinesComeFirst)
+{
+  Navigator nav;
+  nav.SetDriverName("Brandon");
+  CHECK_EQUAL(nav.Reply("name.bare"), std::string("What do you need Brandon?"));
+  CHECK_EQUAL(nav.Reply("name.there"),
+              std::string("Did you think I wasn't listening or something? I'm always listening. Even when I don't want to be."));
+}

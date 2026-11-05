@@ -260,6 +260,16 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
 
 + (void)driverSaid:(NSString *)text
 {
+  // "Hey Echo": the GPS answers to the voice that's speaking now.
+  auto & backseat = GetFramework().GetRoutingManager().GetBackseat();
+  backseat.SetCurrentVoice(BackseatKokoroVoice.currentVoiceID.UTF8String ?: "");
+  // Called by name for a chat it has lines for ("Hey Echo, how are you?"): the keywords answer. The
+  // model made a tool call or its own chat of it.
+  if (backseat.IsNameBanter(text.UTF8String ?: ""))
+  {
+    Perform(GetFramework().GetRoutingManager().BackseatDriverSaid(text.UTF8String ?: ""));
+    return;
+  }
   // "Yeah": nothing for the model to make into a route. The keywords still catch an answer to a question.
   if (backseat::IsFiller(text.UTF8String ?: ""))
   {
@@ -274,12 +284,17 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
     gToolHandler(text, ^(BOOL used, NSString * chat) {
       dispatch_async(dispatch_get_main_queue(), ^{
         if (used)
+        {
+          // "Hey Echo, take me home": the model ran it, and the GPS still has a word about the first name.
+          SayReply(GetFramework().GetRoutingManager().GetBackseat().NameCallQuip(text.UTF8String ?: ""), {});
           return;
+        }
         auto const heard = GetFramework().GetRoutingManager().BackseatDriverSaid(text.UTF8String ?: "");
         // Nothing the GPS listens for (no command, answer or place): the model's chat answers instead.
         bool const nothing = heard.kind == BackseatAdapter::HeardCommand::Kind::None && heard.actions.empty() &&
                              heard.reply.empty() && heard.voiceLines.empty();
-        if (nothing)
+        // A stock line for chit-chat it couldn't place: the model's own answer, in character, beats it.
+        if (nothing || (heard.chatMayReplace && chat.length > 0))
           SayReply(chat.UTF8String ?: "", {});
         else
           Perform(heard);

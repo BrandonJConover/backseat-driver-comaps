@@ -317,8 +317,8 @@ public:
   using NearbyThingsLookup = std::function<std::set<std::string>(LatLon const &)>;
   void SetNearbyThingsLookup(NearbyThingsLookup lookup) { m_nearbyThings = std::move(lookup); }
   /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate".
-  /// Same thread as OnFix.
-  void OnDriverSaid(double tMs, std::string const & text);
+  /// Same thread as OnFix. Whether it reacted (a line queued, a game answered, a cue taken).
+  bool OnDriverSaid(double tMs, std::string const & text);
   /// A line to say right now, outside the queue (e.g. the snarky reply to a voice command), picked
   /// like any other so it doesn't repeat. Works between trips too. The driver's {name} and
   /// pronouns ({theycap} {theyre} {them} {their}) are filled in unless `vars` has them.
@@ -491,6 +491,8 @@ private:
   void StartCall(double tMs);
   /// A quiet-stretch bit is still going (a call, a game of 20 Questions), so nothing else should start one.
 public:
+  /// Fed up, it answers only to its title ("wise, omnipotent overseer GPS") for the rest of the trip.
+  bool TitleDemanded() const { return m_titleDemanded; }
   /// 20 Questions or the plate game is on (or offered), so what's heard goes to the game first.
   bool InGame() const
   {

@@ -250,6 +250,53 @@ std::optional<size_t> VoiceByPhrase(std::vector<VoiceOption> const & voices, std
 /// The voice called `said` (by name or id, any case), as an index into `voices`.
 std::optional<size_t> VoiceNamed(std::vector<VoiceOption> const & voices, std::string const & said);
 
+/// The driver talking to the GPS by its voice's name: "Hey Echo, can you take me home?", "Echo, are
+/// you there?", "thanks, Echo".
+struct NameCall
+{
+  /// The voice called, as an index into the voices list.
+  size_t voice = 0;
+  /// What was said around the name, without the name or the "hey": "can you take me home".
+  std::string rest;
+  /// Opened with "hey", "hi", "okay", "yo"... (which also counts as polite).
+  bool greeted = false;
+};
+/// The name call in `spoken`, if there is one. The name has to be up front ("hey Echo", "Echo, ...",
+/// "Echo, what's up") or at the very end ("thanks, Echo"), so "turn at the river" isn't a call to River.
+/// A bare name up front needs a comma after it, nothing else, or a question or request to follow.
+/// Close misses by the recognizer count ("Eko").
+std::optional<NameCall> CalledByName(std::vector<VoiceOption> const & voices, std::string const & spoken);
+
+/// What the driver wants, called by name with no command in it. One of "bare" (just the name),
+/// "there" (are you there), "howAreYou", "love", "who", "mad", "sorry", "thanks", "bye", "canYou" (a
+/// favor a GPS can't do) or "chat" (anything else). The line key is "name." plus this.
+std::string NameCallTopic(std::string const & rest);
+
+/// Rations the banter that comes with being called by name.
+class NameCalls
+{
+public:
+  /// The recognizer says the same thing twice.
+  static double constexpr kRepeatMs = 8000;
+  /// A command said by name gets a quip on top the first time, then at most this often.
+  static double constexpr kQuipEveryMs = 180000;
+  /// Another voice's name ("Hey Adam" to Echo) gets a jealous line at most this often.
+  static double constexpr kOtherNameEveryMs = 600000;
+
+  /// Whether `spoken` at `tMs` is the recognizer repeating the last name call. If not, it's the latest.
+  bool IsRepeat(std::string const & spoken, double tMs);
+  /// Whether a command said by name gets a quip now. Counts it if so.
+  bool QuipDue(double tMs);
+  /// Whether calling it by another voice's name gets a line now. Counts it if so.
+  bool OtherNameDue(double tMs);
+
+private:
+  std::optional<double> m_lastAt;
+  std::string m_last;
+  std::optional<double> m_lastQuipAt;
+  std::optional<double> m_lastOtherAt;
+};
+
 /// Who the driver says they are, as the Settings screen saved it. Pronouns are "he", "she" or
 /// "they"; age is whatever was typed ("34"), empty if never given.
 struct DriverProfile
