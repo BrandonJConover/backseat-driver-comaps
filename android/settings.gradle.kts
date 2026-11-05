@@ -19,3 +19,5 @@ dependencyResolutionManagement {
 rootProject.name = "CoMaps"
 include(":app")
 include(":sdk")
+// Backseat Driver: the Kokoro voice model, delivered by Play as an install-time asset pack.
+include(":kokoro_pack")

@@ -715,6 +715,8 @@
 		FA8E808925F412E2002A1434 /* FirstSession.mm in Sources */ = {isa = PBXBuildFile; fileRef = FA8E808825F412E2002A1434 /* FirstSession.mm */; };
 		FAF9DDA32A86DC54000D7037 /* libharfbuzz.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FAF9DDA22A86DC54000D7037 /* libharfbuzz.a */; };
 		BD5EA7000000000000000003 /* KokoroVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000002 /* KokoroVoice.swift */; };
+		BD5EA700000000000077A002 /* CoreMLKokoro in Resources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000077A001 /* CoreMLKokoro */; };
+		BD5EA700000000000077A005 /* KokoroBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA700000000000077A004 /* KokoroBundle.swift */; };
 		BD5EA7000000000000000006 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = BD5EA7000000000000000005 /* FluidAudio */; };
 /* End PBXBuildFile section */
 
@@ -1889,6 +1891,8 @@
 		FAF9DDA22A86DC54000D7037 /* libharfbuzz.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libharfbuzz.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAFF42291347F101009BBB14 /* World.mwm */ = {isa = PBXFileReference; lastKnownFileType = file; name = World.mwm; path = ../../data/World.mwm; sourceTree = "<group>"; };
 		BD5EA7000000000000000002 /* KokoroVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KokoroVoice.swift; sourceTree = "<group>"; };
+		BD5EA700000000000077A001 /* CoreMLKokoro */ = {isa = PBXFileReference; lastKnownFileType = folder; path = CoreMLKokoro; sourceTree = "<group>"; };
+		BD5EA700000000000077A004 /* KokoroBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KokoroBundle.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -4177,6 +4181,8 @@
 			isa = PBXGroup;
 			children = (
 				BD5EA7000000000000000002 /* KokoroVoice.swift */,
+				BD5EA700000000000077A004 /* KokoroBundle.swift */,
+				BD5EA700000000000077A001 /* CoreMLKokoro */,
 			);
 			path = Kokoro;
 			sourceTree = "<group>";
@@ -4189,6 +4195,7 @@
 			buildConfigurationList = 6741AA541BF340DE002C974C /* Build configuration list for PBXNativeTarget "CoMaps" */;
 			buildPhases = (
 				2768C8A32E4E560D00F617AF /* ShellScript */,
+				BD5EA700000000000077A003 /* Bundle Kokoro */,
 				FA456C4E26BDCCC300B83C20 /* CopyFiles */,
 				6741A9411BF340DE002C974C /* Resources */,
 				6741A9A01BF340DE002C974C /* Sources */,
@@ -4378,6 +4385,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BD5EA700000000000077A002 /* CoreMLKokoro in Resources */,
 				165953742CB1D85500CFED7C /* fonts in Resources */,
 				165953942CB44B5600CFED7C /* symbols in Resources */,
 				271186872F19467400FD7FF3 /* countries_meta.txt in Resources */,
@@ -4550,6 +4558,29 @@
 			shellScript = "cd ${SRCROOT}/../../\nenv -i PATH=\"$PATH:/opt/homebrew/bin\" ./configure.sh 2>/dev/null\ntouch data/*\n";
 			showEnvVarsInLog = 0;
 		};
+		BD5EA700000000000077A003 /* Bundle Kokoro */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Core/TextToSpeech/Kokoro/bundle_kokoro.sh",
+				"$(SRCROOT)/Core/TextToSpeech/Kokoro/coreml_kokoro_manifest.tsv",
+				"$(SRCROOT)/../../kokoro_weights.tsv",
+			);
+			name = "Bundle Kokoro";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Core/TextToSpeech/Kokoro/CoreMLKokoro/WEIGHTS_ID",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/Core/TextToSpeech/Kokoro/bundle_kokoro.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -4558,6 +4589,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BD5EA7000000000000000003 /* KokoroVoice.swift in Sources */,
+				BD5EA700000000000077A005 /* KokoroBundle.swift in Sources */,
 				ED914ABE2D351FF800973C45 /* UILabel+SetFontStyle.swift in Sources */,
 				34845DB71E166084003D55B9 /* Common.swift in Sources */,
 				47F4F21323A6EC420022FD56 /* DownloadMapsViewController.swift in Sources */,

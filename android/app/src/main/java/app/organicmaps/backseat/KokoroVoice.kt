@@ -82,7 +82,7 @@ object KokoroVoice : NeuralVoice
   /** The driver changed their own pronunciations: the engine reloads with the new dictionary. */
   @Volatile private var lexiconChanged = false
 
-  /** Plugs the voice into [TtsPlayer] and loads (or first downloads) the model in the background. */
+  /** Plugs the voice into [TtsPlayer] and loads the bundled model (unpacking it once) in the background. */
   @JvmStatic
   fun install(context: Context)
   {
