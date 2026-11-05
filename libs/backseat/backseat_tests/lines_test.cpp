@@ -285,3 +285,58 @@ TEST(ThinPoolsHaveVariety)
     CHECK(LinesFor(key, 1) != LinesFor(key, 0));
   }
 }
+
+TEST(FlatTierBatchTwoEscalates)
+{
+  // Loop BI-012 batch 1: situations whose three tiers were identical, so a driver at full frustration
+  // heard the calm wording. Read straight from the table so walk/bike keys count too.
+  auto const & data = LineData();
+  for (char const * key :
+       {"driveThru.leaving", "hardAccel.first", "night.dark", "rest.ahead", "road.highway", "viewpoint.ahead",
+        "viewpoint.passed", "signal.lost.walk", "signal.lost.bike", "signal.lost.offroad", "partner.aside",
+        "quiet.aside", "start.slow.walk"})
+  {
+    auto const it = data.find(key);
+    CHECK(it != data.end());
+    if (it == data.end())
+      continue;
+    auto const & tiers = it->second;
+    std::vector<std::string> unique;
+    for (auto const & tier : tiers)
+      for (auto const & line : tier)
+      {
+        bool seen = false;
+        for (auto const & u : unique)
+          seen = seen || u == line;
+        if (!seen)
+          unique.push_back(line);
+      }
+    if (unique.size() < 6)
+      std::printf("    thin pool: %s has %zu unique lines\n", key, unique.size());
+    CHECK(unique.size() >= 6);
+    CHECK(tiers[1] != tiers[0]);
+    CHECK(tiers[2] != tiers[0]);
+    CHECK(tiers[2] != tiers[1]);
+    // New lines go beside the originals, never instead of them: the original first line is in every tier.
+    for (auto const & tier : tiers)
+    {
+      bool found = false;
+      for (auto const & l : tier)
+        found = found || l == tiers[0][0];
+      CHECK(found);
+    }
+  }
+}
+
+TEST(FlatTierKeysOnlyShrink)
+{
+  // Ratchet: keys whose three tiers are identical. Scripted onboarding, stories, facts and lists are flat on
+  // purpose; reactive situations should escalate. Lower this number as batches land, never raise it.
+  int flat = 0;
+  for (auto const & [key, tiers] : LineData())
+    if (tiers[0] == tiers[1] && tiers[1] == tiers[2])
+      ++flat;
+  if (flat > 72)
+    std::printf("    %d keys have identical tiers (limit 72)\n", flat);
+  CHECK(flat <= 72);
+}
