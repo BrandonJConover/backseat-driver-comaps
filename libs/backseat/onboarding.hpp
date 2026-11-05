@@ -12,10 +12,10 @@
 
 namespace backseat
 {
-/// The disclaimer, paragraph by paragraph, word for word as Brandon wrote it (his typos included).
-/// The last paragraph asks "do you accept these terms?". `creditCoMaps` names CoMaps next to
-/// Organic Maps in the thank-you.
-std::vector<std::string> DisclaimerParagraphs(bool creditCoMaps = false);
+/// The disclaimer, paragraph by paragraph, as Brandon wrote it (grammar polished 2026-11-05; the
+/// thank-you names CoMaps, which the app is built on). The last paragraph asks "do you accept
+/// these terms?".
+std::vector<std::string> DisclaimerParagraphs();
 
 /// A paragraph as the voice should read it: the politically correct slashes are said out loud
 /// ("him slash her slash the officer") and "gps" is spelled out as GPS.

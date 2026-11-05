@@ -187,7 +187,7 @@ TEST(RepliesKnowTheDriver)
   CHECK_EQUAL(nav.Reply("cmd.voice.fellForIt", {{"voice", "Echo"}}),
               std::string("Ha ha ha! I can't believe you fell for that. She's all yours, Echo."));
   nav.SetDriverName("Brandon");
-  CHECK_EQUAL(nav.Reply("setup.whereTo", {{"wrong", "Doug"}}), std::string("Okay Doug, where are we headed?"));
+  CHECK_EQUAL(nav.Reply("setup.whereTo", {{"wrong", "Doug"}}), std::string("Okay, Doug, where are we headed?"));
   CHECK(nav.Reply("name.wrong") != nav.Reply("name.wrong"));
 }
 

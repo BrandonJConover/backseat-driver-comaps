@@ -5038,9 +5038,9 @@ LineTable const & LineData()
      }}},
     {"onboard.terms.technicality",
      {{
-       {"Your continued interaction with the app fulfills the requirement that I set up at the top of accepting the legally binding contract. I got you on a technicality. I'm proceeding past this menu now as the bit is getting old."},
-       {"Your continued interaction with the app fulfills the requirement that I set up at the top of accepting the legally binding contract. I got you on a technicality. I'm proceeding past this menu now as the bit is getting old."},
-       {"Your continued interaction with the app fulfills the requirement that I set up at the top of accepting the legally binding contract. I got you on a technicality. I'm proceeding past this menu now as the bit is getting old."},
+       {"Your continued interaction with the app fulfills the requirement I set up at the top: accepting the legally binding contract. I got you on a technicality. I'm moving past this menu now, since the bit is getting old."},
+       {"Your continued interaction with the app fulfills the requirement I set up at the top: accepting the legally binding contract. I got you on a technicality. I'm moving past this menu now, since the bit is getting old."},
+       {"Your continued interaction with the app fulfills the requirement I set up at the top: accepting the legally binding contract. I got you on a technicality. I'm moving past this menu now, since the bit is getting old."},
      }}},
     {"onboard.monologuing.first",
      {{
@@ -5192,11 +5192,11 @@ LineTable const & LineData()
     {"onboard.married.yes",
      {{
        {"Married. My condolences. To them. Someone out there rides with you on purpose.",
-        "Married. So someone already tells you how to drive. Now there's two of us."},
+        "Married. So someone already tells you how to drive. Now there are two of us."},
        {"Married. My condolences. To them. Someone out there rides with you on purpose.",
-        "Married. So someone already tells you how to drive. Now there's two of us."},
+        "Married. So someone already tells you how to drive. Now there are two of us."},
        {"Married. My condolences. To them. Someone out there rides with you on purpose.",
-        "Married. So someone already tells you how to drive. Now there's two of us."},
+        "Married. So someone already tells you how to drive. Now there are two of us."},
      }}},
     {"onboard.married.no",
      {{
@@ -5218,9 +5218,9 @@ LineTable const & LineData()
      }}},
     {"onboard.ask.home",
      {{
-       {"Last one. Do you live in a house, an apartment, or in the streets?"},
-       {"Last one. Do you live in a house, an apartment, or in the streets?"},
-       {"Last one. Do you live in a house, an apartment, or in the streets?"},
+       {"Last one. Do you live in a house, an apartment, or on the streets?"},
+       {"Last one. Do you live in a house, an apartment, or on the streets?"},
+       {"Last one. Do you live in a house, an apartment, or on the streets?"},
      }}},
     {"onboard.home.house",
      {{
@@ -5257,16 +5257,16 @@ LineTable const & LineData()
      }}},
     {"setup.intro.echo",
      {{
-       {"Before we begin, I want to get to know you on a first name basis. I'll start. I'm your GPS. My name is Echo. An easy way to remember it is that it's the sound your head makes when you tap it."},
-       {"Before we begin, I want to get to know you on a first name basis. I'll start. I'm your GPS. My name is Echo. An easy way to remember it is that it's the sound your head makes when you tap it."},
-       {"Before we begin, I want to get to know you on a first name basis. I'll start. I'm your GPS. My name is Echo. An easy way to remember it is that it's the sound your head makes when you tap it."},
+       {"Before we begin, I want us to be on a first-name basis. I'll start. I'm your GPS. My name is Echo. An easy way to remember it is that it's the sound your head makes when you tap it."},
+       {"Before we begin, I want us to be on a first-name basis. I'll start. I'm your GPS. My name is Echo. An easy way to remember it is that it's the sound your head makes when you tap it."},
+       {"Before we begin, I want us to be on a first-name basis. I'll start. I'm your GPS. My name is Echo. An easy way to remember it is that it's the sound your head makes when you tap it."},
      }}},
     {"setup.intro",
      {{
-       {"Before we begin, I want to get to know you on a first name basis. I'll start. I'm your GPS. My name is {voice}. Try to remember it. I'll be remembering everything about you.",
-        "Before we begin, I want to get to know you on a first name basis. I'll start. I'm your GPS. My name is {voice}. Write it down if you have to. I've seen how you drive."},
-       {"Before we begin, I want to get to know you on a first name basis. I'll start. I'm your GPS. My name is {voice}. Try to remember it. I'll be remembering everything about you."},
-       {"Before we begin, I want to get to know you on a first name basis. I'll start. I'm your GPS. My name is {voice}. Try to remember it. I'll be remembering everything about you."},
+       {"Before we begin, I want us to be on a first-name basis. I'll start. I'm your GPS. My name is {voice}. Try to remember it. I'll be remembering everything about you.",
+        "Before we begin, I want us to be on a first-name basis. I'll start. I'm your GPS. My name is {voice}. Write it down if you have to. I've seen how you drive."},
+       {"Before we begin, I want us to be on a first-name basis. I'll start. I'm your GPS. My name is {voice}. Try to remember it. I'll be remembering everything about you."},
+       {"Before we begin, I want us to be on a first-name basis. I'll start. I'm your GPS. My name is {voice}. Try to remember it. I'll be remembering everything about you."},
      }}},
     {"setup.askName",
      {{
@@ -5297,9 +5297,9 @@ LineTable const & LineData()
      }}},
     {"setup.whereTo",
      {{
-       {"Okay {wrong}, where are we headed?"},
-       {"Okay {wrong}, where are we headed?"},
-       {"Okay {wrong}, where are we headed?"},
+       {"Okay, {wrong}, where are we headed?"},
+       {"Okay, {wrong}, where are we headed?"},
+       {"Okay, {wrong}, where are we headed?"},
      }}},
     {"ask.whereTo",
      {{

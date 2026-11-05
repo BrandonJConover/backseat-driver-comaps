@@ -732,10 +732,10 @@ static m2::PointD gWalkConfirmedTo{1e9, 1e9};
   return @(GetFramework().GetRoutingManager().BackseatVoiceRecovered().c_str());
 }
 
-+ (NSArray<NSString *> *)disclaimerParagraphs:(BOOL)creditCoMaps
++ (NSArray<NSString *> *)disclaimerParagraphs
 {
   NSMutableArray<NSString *> * out = [NSMutableArray array];
-  for (auto const & p : backseat::DisclaimerParagraphs(creditCoMaps))
+  for (auto const & p : backseat::DisclaimerParagraphs())
     [out addObject:@(p.c_str())];
   return out;
 }

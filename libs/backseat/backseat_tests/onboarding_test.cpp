@@ -28,14 +28,11 @@ TEST(DisclaimerIsBrandonsWordForWord)
   CHECK_EQUAL(paragraphs.size(), size_t{9});
   CHECK_EQUAL(paragraphs.front().substr(0, 52), std::string("You are probably wondering why this app is free. The"));
   CHECK(paragraphs[3].find("It was him/her/the officer! He/she/they did it.") != std::string::npos);
-  CHECK(paragraphs[6].find("wrote Organic Maps and the OpenStreetMap community.") != std::string::npos);
+  CHECK(paragraphs[6].find("wrote CoMaps and the OpenStreetMap community.") != std::string::npos);
   CHECK(paragraphs.back().find("do you accept these terms?") != std::string::npos);
   // Brandon's add: the joke is that there isn't one.
   CHECK(paragraphs[5].find("I will try harder next time. Did you spot my joke?") != std::string::npos);
-  // Naming CoMaps changes only the thank-you.
-  auto const withCoMaps = DisclaimerParagraphs(true);
-  CHECK(withCoMaps[6].find("wrote CoMaps, Organic Maps and the OpenStreetMap community.") != std::string::npos);
-  CHECK_EQUAL(withCoMaps[3], paragraphs[3]);
+  CHECK(paragraphs[6].find("Organic Maps") == std::string::npos);
 }
 
 TEST(DisclaimerReadsTheSlashesOutLoud)
@@ -103,7 +100,7 @@ TEST(NoHomeJokesForTheStreets)
   CHECK(!LinesFor("indoors.garage", 0).empty());
   // The first-launch script isn't touched: the streets answer itself says "streets".
   CHECK_EQUAL(LinesFor("onboard.ask.home", 0)[0],
-              std::string("Last one. Do you live in a house, an apartment, or in the streets?"));
+              std::string("Last one. Do you live in a house, an apartment, or on the streets?"));
   SetLineHousing(Housing::House);
   CHECK(AnyMentions(LinesFor("ask.stayPut", 1), "home"));
 }

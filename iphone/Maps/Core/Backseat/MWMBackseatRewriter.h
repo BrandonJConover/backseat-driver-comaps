@@ -211,7 +211,7 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 @property(class, nonatomic, readonly) NSArray<NSArray<NSString *> *> * learnedFacts;
 
 /// First launch (Brandon's script): the disclaimer, paragraph by paragraph, as written for the screen.
-+ (NSArray<NSString *> *)disclaimerParagraphs:(BOOL)creditCoMaps;
++ (NSArray<NSString *> *)disclaimerParagraphs;
 /// A disclaimer paragraph as the voice reads it ("him slash her slash the officer").
 + (NSString *)spokenDisclaimer:(NSString *)paragraph;
 /// What the GPS says to a disclaimer answer (0 yes, 1 no, 2 skip) at `round` (0 the first ask,

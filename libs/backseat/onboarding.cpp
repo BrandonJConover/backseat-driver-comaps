@@ -4,30 +4,29 @@
 
 namespace backseat
 {
-std::vector<std::string> DisclaimerParagraphs(bool creditCoMaps)
+std::vector<std::string> DisclaimerParagraphs()
 {
-  std::string const wrote = creditCoMaps ? "CoMaps, Organic Maps and the OpenStreetMap community"
-                                         : "Organic Maps and the OpenStreetMap community";
+  std::string const wrote = "CoMaps and the OpenStreetMap community";
   return {
       "You are probably wondering why this app is free. The answer is simple. Why should you have to pay to be "
-      "insulted, embarrassed, or otherwise offend you. Wait, people actually pay for that? I guess I missed an "
+      "insulted, embarrassed, or otherwise offended? Wait, people actually pay for that? I guess I missed an "
       "opportunity.",
       "Let’s lay down some ground rules so that you know what you are getting into.",
       "My goal is to make you laugh. By any means necessary.",
-      "Got pulled over? Don’t be surprised when your gps rats you out. It was him/her/the officer! He/she/they "
-      "did it. He/She/they 100% did that thing he/she/they did. Cuff him/her/they! See, I’m politically correct.",
-      "By proceeding forward with using this app, you are entering a legally binding contract between you and me "
-      "that you agreed to this. Don’t subject others to this app while you are in the passenger seat. They "
+      "Got pulled over? Don’t be surprised when your GPS rats you out. It was him/her/the officer! He/she/they "
+      "did it. He/she/they 100% did that thing he/she/they did. Cuff him/her/them! See, I’m politically correct.",
+      "By proceeding with this app, you are entering a legally binding contract between you and me, "
+      "saying that you agreed to all of this. Don’t subject others to this app while they are in the passenger seat. They "
       "didn’t agree to the contract. You did. I can’t accept that on my conscience.",
       "By using this app, you will experience my special brand of humor. Some jokes may go over your head. Some may "
-      "not. If they don’t I promise I will try harder next time. Did you spot my joke?",
-      "Don’t use this app if you want to get to your destination. I have no business writing a gps software. "
-      "This app was only possible due to the hard work of the open source community that wrote " + wrote +
-          ". I don’t think when they set out to build their software that they intended it to be used in this "
+      "not. If they don’t, I promise I will try harder next time. Did you spot my joke?",
+      "Don’t use this app if you want to get to your destination. I have no business writing GPS software. "
+      "This app is only possible thanks to the hard work of the open source community that wrote " + wrote +
+          ". I don’t think that when they set out to build their software, they intended it to be used in this "
           "exact manner. If you are competent in this space, go support their work. I might just steal it as well.",
       "My codebase is also publicly available if you want to steal from me. I’m not sure why you would.",
       "I purposely made this introduction longer than it needed to be to give you time to contemplate whether or "
-      "not you wanted to proceed forward. I legally have to ask, do you accept these terms?",
+      "not you want to proceed. I legally have to ask: do you accept these terms?",
   };
 }
 

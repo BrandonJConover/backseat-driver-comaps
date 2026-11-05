@@ -14,8 +14,6 @@ import UIKit
 /// says the same thing.
 @objc final class BackseatOnboarding: NSObject {
   static let doneKey = "backseat.onboardingDone"
-  /// Name CoMaps next to Organic Maps in the disclaimer's thank-you (Brandon chose this, 2026-10-31).
-  static let creditCoMaps = true
   private static weak var presented: UIViewController?
 
   @objc static var isDone: Bool { UserDefaults.standard.bool(forKey: doneKey) }
@@ -67,7 +65,7 @@ final class BackseatOnboardingModel: ObservableObject {
 
   // MARK: Disclaimer
 
-  let paragraphs = MWMBackseatRewriter.disclaimerParagraphs(BackseatOnboarding.creditCoMaps)
+  let paragraphs = MWMBackseatRewriter.disclaimerParagraphs()
   /// The paragraph being read.
   @Published var reading = 0
   /// The whole thing has been read (or there's no voice): the answer buttons show.
@@ -773,7 +771,7 @@ struct BackseatOnboardingView: View {
         choiceButton("Let's drive", primary: true, action: model.done)
       }
       Spacer(minLength: 0)
-      Text("No details leave this app I promise. These details just help inform my jokes. If you are living in the streets I don\u{2019}t want to remind you about the fact you don\u{2019}t have a house. I\u{2019}m not that cruel.")
+      Text("No details leave this app, I promise. These details just help inform my jokes. If you are living on the streets, I don\u{2019}t want to remind you that you don\u{2019}t have a house. I\u{2019}m not that cruel.")
         .font(.footnote)
         .foregroundColor(muted)
         .frame(maxWidth: .infinity, alignment: .leading)
