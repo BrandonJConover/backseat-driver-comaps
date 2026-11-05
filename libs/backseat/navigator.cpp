@@ -86,6 +86,13 @@ double constexpr kOffRoadForMs = 12000;
 double constexpr kOffRoadMinMps = 6;
 /// ...and said at most this often.
 double constexpr kOffRoadEveryMs = 300000;
+/// A fix this rough (horizontal accuracy, m) can't tell which road the car is on or which way it's
+/// pointing: downtown canyons and tunnel mouths read 100 m off and facing anywhere. Such fixes don't
+/// start or advance the off-road, dirt, wrong-way, U-turn or scary-curve judgements. Unknown (-1)
+/// counts as good, since some sources never report it. (Mileage drops fixes past 65 m for distance;
+/// judging the driver wants a tighter fix than adding up miles does.)
+double constexpr kJudgeMaxAccuracyM = 50;
+bool RoughFix(Fix const & fix) { return fix.accuracyM > kJudgeMaxAccuracyM; }
 /// A walking route this much on dirt (by distance) is a hike from the start.
 double constexpr kHikeDirtShare = 0.4;
 /// On trails this long, a walk becomes a hike. It stays one for the rest of the trip.
@@ -1523,6 +1530,12 @@ void Navigator::TrackTravelMode(Fix const & fix, RouteSnapshot const & route)
   {
     if (!moving)
       return;
+    // Matched to a dirt track off a fix 100 m out is a guess, not a trail.
+    if (RoughFix(fix))
+    {
+      m_dirtSince.reset();
+      return;
+    }
     if (route.onDirt)
     {
       m_pavedSince.reset();
@@ -1672,7 +1685,8 @@ void Navigator::TrackWrongWay(Fix const & fix, RouteSnapshot const & route)
 {
   bool const followingRoute = route.state == RouteState::OnRoute || route.state == RouteState::NotStarted;
   double off = 0;
-  if (followingRoute && fix.bearingDeg >= 0 && route.routeBearingDeg >= 0 && fix.speedMps >= std::min(kWrongWayMinMps, 0.75 * MovingMps()))
+  if (followingRoute && !RoughFix(fix) && fix.bearingDeg >= 0 && route.routeBearingDeg >= 0 &&
+      fix.speedMps >= std::min(kWrongWayMinMps, 0.75 * MovingMps()))
   {
     off = std::fabs(std::fmod(fix.bearingDeg - route.routeBearingDeg + 540.0, 360.0) - 180.0);
   }
@@ -1695,7 +1709,7 @@ void Navigator::TrackWrongWay(Fix const & fix, RouteSnapshot const & route)
 
 void Navigator::TrackUTurn(Fix const & fix, RouteSnapshot const & route)
 {
-  if (fix.bearingDeg < 0 || fix.speedMps < kUTurnMinMps)
+  if (fix.bearingDeg < 0 || fix.speedMps < kUTurnMinMps || RoughFix(fix))
     return;
   while (!m_headings.empty() && fix.tMs - m_headings.front().first > kUTurnMaxAgoMs)
     m_headings.pop_front();
@@ -2491,7 +2505,7 @@ void Navigator::TrackOffRoad(Fix const & fix)
 {
   if (m_travelMode == TravelMode::OffRoad || !m_roadDistanceLookup || fix.tMs - m_lastRoadCheckT < 2000)
     return;
-  if (fix.speedMps < kOffRoadMinMps)
+  if (fix.speedMps < kOffRoadMinMps || RoughFix(fix))
   {
     m_offRoadSince.reset();
     return;
@@ -2551,7 +2565,12 @@ void Navigator::TrackFear(Fix const & fix, RouteSnapshot const & route)
   }
 
   // Curves: sideways acceleration from the change in heading between fixes.
-  if (m_lastFix && m_lastFix->bearingDeg >= 0 && fix.bearingDeg >= 0 && fix.tMs > m_lastFix->tMs)
+  if (RoughFix(fix) || (m_lastFix && RoughFix(*m_lastFix)))
+  {
+    m_hardCurveSamples = 0;
+    m_curveGasSamples = 0;
+  }
+  else if (m_lastFix && m_lastFix->bearingDeg >= 0 && fix.bearingDeg >= 0 && fix.tMs > m_lastFix->tMs)
   {
     double turn = std::fabs(fix.bearingDeg - m_lastFix->bearingDeg);
     turn = std::min(turn, 360 - turn);

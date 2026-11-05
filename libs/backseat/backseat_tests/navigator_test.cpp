@@ -2319,3 +2319,93 @@ TEST(RealHardStopStillRoastsWithKnownSpeeds)
   nav.OnFix(At(31000, 0), OnRoute(1, TurnKind::Left, 19095));
   CHECK_EQUAL(nav.Engine()->Stats().hardBrakes, 1);
 }
+
+namespace
+{
+Fix Rough(Fix f, double accuracyM)
+{
+  f.accuracyM = accuracyM;
+  return f;
+}
+}  // namespace
+
+// Downtown canyons and tunnel mouths put a fix 100 m off and facing anywhere. Such fixes used to
+// start the off-road timer and turn the trip into an off-road trip on a city street.
+TEST(RoughFixesDontMakeItAnOffRoadTrip)
+{
+  for (double accuracy : {120.0, 8.0, -1.0})
+  {
+    Navigator nav(Config());
+    nav.SetRoadDistanceLookup([](LatLon const &) { return 80.0; });
+    int entered = 0;
+    for (int i = 0; i < 20; ++i)
+    {
+      nav.OnFix(Rough(Heading(i * 1000.0, 15, 90), accuracy), Far());
+      for (auto const & l : nav.TakeLines())
+        entered += SaidLineOf(l.text, "offroad.enter");
+    }
+    bool const rough = accuracy > 50;
+    CHECK_EQUAL(entered, rough ? 0 : 1);
+    CHECK(nav.Mode() == (rough ? TravelMode::Drive : TravelMode::OffRoad));
+    SetLineTravelMode(TravelMode::Drive);
+  }
+}
+
+TEST(RoughFixesMatchedToDirtStayADrive)
+{
+  Navigator nav(Config());
+  RouteSnapshot r = Far();
+  r.onDirt = true;
+  for (int i = 0; i < 120; ++i)
+    nav.OnFix(Rough(Heading(i * 1000.0, 12, 90), 120), r);
+  CHECK(nav.Mode() == TravelMode::Drive);
+  // A good patch in the middle of the rough ones doesn't count the rough time either.
+  for (int i = 120; i < 140; ++i)
+    nav.OnFix(Heading(i * 1000.0, 12, 90), r);
+  nav.OnFix(Rough(Heading(140000, 12, 90), 120), r);
+  for (int i = 141; i < 170; ++i)
+    nav.OnFix(Heading(i * 1000.0, 12, 90), r);
+  CHECK(nav.Mode() == TravelMode::Drive);
+  for (int i = 170; i < 200; ++i)
+    nav.OnFix(Heading(i * 1000.0, 12, 90), r);
+  CHECK(nav.Mode() == TravelMode::OffRoad);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(RoughFixesDontSayWrongWayOrUTurn)
+{
+  for (double accuracy : {120.0, 8.0})
+  {
+    Navigator nav(Config());
+    RouteSnapshot north = Far();
+    north.routeBearingDeg = 5;
+    bool wrongWay = false;
+    for (int i = 0; i < 10; ++i)
+    {
+      nav.OnFix(Rough(Heading(i * 1000.0, 10, 185), accuracy), north);
+      wrongWay = wrongWay || Has(nav.TakeLines(), Category::WrongWay);
+    }
+    CHECK_EQUAL(wrongWay, accuracy < 50);
+
+    Navigator turn(Config());
+    RouteSnapshot const route = OnRoute(1, TurnKind::Left, 2000);
+    bool uTurn = false;
+    for (int i = 0; i < 5; ++i)
+      turn.OnFix(Rough(Heading(i * 1000.0, 8, 10), accuracy), route);
+    turn.OnFix(Rough(Heading(6000, 8, 100), accuracy), route);
+    turn.OnFix(Rough(Heading(8000, 8, 190), accuracy), route);
+    uTurn = SaidKey(turn.TakeLines(), "uturn");
+    CHECK_EQUAL(uTurn, accuracy < 50);
+  }
+}
+
+TEST(RoughFixesDontYelpAboutCurves)
+{
+  for (double accuracy : {120.0, 8.0})
+  {
+    Navigator nav(Config());
+    for (int i = 0; i < 6; ++i)
+      nav.OnFix(Rough(Heading(i * 1000, 25, 10.0 * i), accuracy), Far());
+    CHECK_EQUAL(FearLines(nav.TakeLines()).size(), size_t(accuracy < 50 ? 1 : 0));
+  }
+}
