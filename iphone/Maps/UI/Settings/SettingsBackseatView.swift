@@ -224,6 +224,20 @@ struct SettingsBackseatView: View {
                 Text(verbatim: "Logs drives on its own and sorts them into business and personal for taxes. Off until you turn it on.")
             }
 
+            Section {
+                Button {
+                    BackseatOnboarding.replay()
+                } label: {
+                    HStack {
+                        Image(systemName: "doc.text.magnifyingglass")
+
+                        Text(verbatim: "Replay the first launch")
+                    }
+                }
+            } footer: {
+                Text(verbatim: "The disclaimer, picking a voice, and the getting-to-know-you questions, all over again.")
+            }
+
             BackseatDriveLogSection {
                 [
                     "kokoro": KokoroVoice.shared.isReady ? "ready" : "notReady",

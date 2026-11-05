@@ -36,6 +36,7 @@ import UIKit
     BackseatReturnTrip.install()
     BackseatDriveOverlay.install(in: view)
     BackseatCaption.install(in: view)
+    BackseatQuiz.install(in: view)
     BackseatArrivalCard.install()
     BackseatSketch.installPreviewButton(in: view)
     // The "Where to?" card has the mic now.

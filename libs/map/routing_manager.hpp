@@ -262,6 +262,11 @@ public:
   {
     return m_backseat.SetupHeard(step, spoken);
   }
+  std::string BackseatAboutYouAnswered(backseat::AboutYou question, std::string const & answer)
+  {
+    return m_backseat.AboutYouAnswered(question, answer);
+  }
+  std::string BackseatAboutYouAnswer(backseat::AboutYou question) const { return m_backseat.AboutYouAnswer(question); }
   std::string BackseatAskWhereTo() { return m_backseat.AskWhereTo(); }
   BackseatAdapter::SearchSpeech BackseatSpeakSearchResults(std::string const & query,
                                                            std::vector<BackseatAdapter::SearchResult> results)

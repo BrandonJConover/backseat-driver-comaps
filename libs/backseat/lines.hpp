@@ -40,9 +40,30 @@ void SetLineTravelMode(TravelMode mode);
 /// Whether `text` makes sense for `mode`: no cars, gas or brake pedals for someone on foot.
 bool LineFitsMode(std::string const & text, TravelMode mode);
 
+/// Where the driver lives, from the getting-to-know-you questions. Decides which lines fit: someone
+/// living on the streets doesn't need reminding that they don't have a house (Brandon: "I'm not that
+/// cruel").
+enum class Housing
+{
+  Unknown,
+  House,
+  Apartment,
+  Streets
+};
+/// "house", "apartment", "streets", or "" for Unknown; and back (anything else is Unknown).
+char const * HousingName(Housing housing);
+Housing HousingFrom(std::string const & name);
+
+/// The housing LinesFor() answers for. Unknown (every line fits) until told otherwise.
+void SetLineHousing(Housing housing);
+/// Whether `text` is fine to say to someone living in `housing`: no house, home, garage or rent
+/// jokes for the streets; no lawn, driveway or mortgage jokes for an apartment.
+bool LineFitsHousing(std::string const & text, Housing housing);
+
 /// Templates for `key` at `tier` (0..2), for the current travel mode: what fits it, plus `key`.walk,
 /// `key`.bike, `key`.hike (or else `key`.walk) or `key`.offroad if there are any, or mode.generic when
-/// nothing fits. Throws std::out_of_range for an unknown key.
+/// nothing fits. Lines that don't fit the driver's housing are left out too, unless that would leave
+/// none. Throws std::out_of_range for an unknown key.
 std::vector<std::string> const & LinesFor(std::string const & key, int tier);
 
 /// Fills {placeholders} from vars. {NAME} in capitals inserts the value in capitals.

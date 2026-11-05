@@ -464,8 +464,9 @@ static NSDate *gBackseatLastMapTouch;
   // Otherwise PP container view is nil, or there is no animation/selection of the point.
   if (DeepLinkHandler.shared.hasPendingDeepLink)
     (void)[DeepLinkHandler.shared handleDeepLinkAndReset];
-  // Backseat Driver introduces itself and asks who's driving, once, before the first trip.
-  [BackseatSetup startIfNeeded];
+  // Backseat Driver's first launch: the disclaimer, a voice, and getting to know the driver. After
+  // that, it introduces itself out loud if it never got a name.
+  [BackseatOnboarding startIfNeededFrom:self];
 }
 
 - (void)viewDidLayoutSubviews {
