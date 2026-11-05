@@ -2,10 +2,13 @@
 
 #include "backseat/lines.hpp"
 #include "backseat/lines_data.hpp"
+#include "backseat/pronunciation.hpp"
 
+#include <cctype>
 #include <cstdio>
 
 using namespace backseat;
+using namespace backseat::pronunciation;
 
 TEST(ShoutedLinesAreSpokenInNormalCase)
 {
@@ -48,4 +51,68 @@ TEST(MetricWordingSaysMetersAndLeavesFeetAlone)
           }
   }
   SetLineMetric(false);
+}
+
+
+namespace
+{
+std::string Lower(std::string s)
+{
+  for (char & c : s)
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return s;
+}
+
+bool StartsWith(std::string const & s, std::string const & prefix) { return s.rfind(prefix, 0) == 0; }
+}  // namespace
+
+TEST(ForeignPhraseLinesAreIdleBanterNeverAtATurn)
+{
+  // Brandon's template, "X means 'turn left' in Y.", lives in the idle banter: idle is never
+  // said within 600 m of a maneuver, so a "means turn left" line can't land near a real right turn.
+  size_t foreignLines = 0;
+  for (auto const & tier : LineData().at("idle"))
+    for (auto const & line : tier)
+    {
+      auto const at = line.find(" means '");
+      if (at == std::string::npos)
+        continue;
+      ++foreignLines;
+      std::string const phrase = Lower(line.substr(0, at));
+      bool known = false;
+      for (auto const & entry : ForeignPhrases())
+        known = known || Lower(entry.first) == phrase;
+      CHECK(known);
+      // The voice says the phrase in its own sounds, never the raw spelling.
+      std::string const said = ForSpeech(SpeakableText(line));
+      CHECK(StartsWith(said, "fx"));
+      // A translated direction is followed at once by a word that it is not an instruction.
+      std::string const lower = Lower(line);
+      if (lower.find("'turn left'") != std::string::npos || lower.find("'turn right'") != std::string::npos)
+        CHECK(lower.find("not now") != std::string::npos || lower.find("not yet") != std::string::npos ||
+              lower.find("don't") != std::string::npos);
+    }
+  CHECK(foreignLines >= 12);
+
+  // No line said at a turn, lane, exit, U-turn or reroute, or as part of an instruction, has a
+  // foreign phrase in it.
+  char const * const maneuverKeys[] = {"countdown", "lane.", "instruction.", "uturn", "straight", "rerouted",
+                                       "curve.", "sketch.", "cmd.", "search.", "fear.curve", "road.highway"};
+  size_t checked = 0;
+  for (auto const & [key, tiers] : LineData())
+  {
+    bool maneuver = false;
+    for (char const * k : maneuverKeys)
+      maneuver = maneuver || StartsWith(key, k);
+    if (!maneuver)
+      continue;
+    for (auto const & tier : tiers)
+      for (auto const & line : tier)
+      {
+        ++checked;
+        CHECK_EQUAL(Foreign(line), line);
+        CHECK(line.find(" means '") == std::string::npos);
+      }
+  }
+  CHECK(checked > 200);
 }
