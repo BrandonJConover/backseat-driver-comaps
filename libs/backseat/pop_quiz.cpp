@@ -1,5 +1,7 @@
 #include "backseat/pop_quiz.hpp"
 
+#include "backseat/types.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <set>
@@ -144,8 +146,9 @@ std::string QuizChoiceText(char const * choice)
 namespace
 {
 /// Lowercase words, with apostrophes dropped ("it's" is "its") and decimals kept ("0.08").
-std::vector<std::string> QuizWords(std::string const & text)
+std::vector<std::string> QuizWords(std::string const & raw)
 {
+  std::string const text = StraightApostrophes(raw);
   std::vector<std::string> words;
   std::string word;
   for (size_t i = 0; i < text.size(); ++i)
@@ -155,10 +158,9 @@ std::vector<std::string> QuizWords(std::string const & text)
                          i + 1 < text.size() && std::isdigit(static_cast<unsigned char>(text[i + 1]));
     if (std::isalnum(ch) || decimal)
       word += static_cast<char>(std::tolower(ch));
-    else if (ch == '\'' || ch == 0xE2)  // Straight or curly (UTF-8 E2 80 99) apostrophe.
+    else if (ch == '\'')
     {
-      if (ch == 0xE2)
-        i += 2;
+      // "it's" is "its"; curly ones were straightened above. Dashes and other marks split words.
     }
     else if (!word.empty())
       words.push_back(std::exchange(word, std::string()));

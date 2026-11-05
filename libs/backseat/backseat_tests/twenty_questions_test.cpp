@@ -509,3 +509,16 @@ TEST(TwentyIsAQuietStretchBit)
   CHECK(!asked.empty());
   CHECK_EQUAL(nav.GetTwentyLog().grudges, 1);
 }
+
+TEST(TwentyHearsCurlyApostrophes)
+{
+  auto const straight = ParseTwentyHeard("It's a deer");
+  CHECK_EQUAL(static_cast<int>(straight.kind), static_cast<int>(Kind::Guess));
+  for (char const * curly : {"It\xE2\x80\x99s a deer", "You\xE2\x80\x99re thinking of a deer", "itʼs a deer"})
+  {
+    auto const h = ParseTwentyHeard(curly);
+    CHECK_EQUAL(static_cast<int>(h.kind), static_cast<int>(Kind::Guess));
+    CHECK_EQUAL(h.thing, straight.thing);
+  }
+  CHECK_EQUAL(static_cast<int>(ParseTwentyHeard("I\xE2\x80\x99m done").kind), static_cast<int>(Kind::Quit));
+}

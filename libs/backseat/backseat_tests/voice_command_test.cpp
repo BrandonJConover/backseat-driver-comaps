@@ -609,3 +609,59 @@ TEST(CommandsDontRunTwice)
   CHECK(!repeats.IsRepeat({AppAction::RepeatInstruction, ""}, 217000));
   CHECK(!repeats.IsRepeat({AppAction::RepeatInstruction, ""}, 218000));
 }
+
+namespace
+{
+/// "what's" with each curly apostrophe dictation and keyboards send: ’ (U+2019), ‘ (U+2018), ʼ (U+02BC).
+std::vector<std::string> CurlyVersions(std::string const & straight)
+{
+  std::vector<std::string> out;
+  for (char const * curly : {"\xE2\x80\x99", "\xE2\x80\x98", "\xCA\xBC"})
+  {
+    std::string s;
+    for (char const c : straight)
+      s += c == '\'' ? std::string(curly) : std::string(1, c);
+    out.push_back(s);
+  }
+  return out;
+}
+
+std::string CommandsSummary(std::vector<AppCommand> const & commands)
+{
+  std::string out;
+  for (auto const & c : commands)
+    out += std::to_string(static_cast<int>(c.action)) + ":" + c.argument + ";";
+  return out;
+}
+}  // namespace
+
+TEST(StraightApostrophesOnlyTouchesApostrophes)
+{
+  CHECK_EQUAL(StraightApostrophes("What\xE2\x80\x99s next"), std::string("What's next"));
+  CHECK_EQUAL(StraightApostrophes("\xE2\x80\x98I\xCA\xBCm\xE2\x80\x99"), std::string("'I'm'"));
+  // Dashes, quotes and other UTF-8 stay as they were.
+  for (char const * keep : {"left\xE2\x80\x94right", "\xE2\x80\x9CHi\xE2\x80\x9D", "caf\xC3\xA9", "\xE2\x80", "\xCA"})
+    CHECK_EQUAL(StraightApostrophes(keep), std::string(keep));
+}
+
+TEST(CurlyApostrophesParseLikeStraightOnes)
+{
+  // Every ParseAppCommands cue with an apostrophe, in a sentence.
+  for (char const * said :
+       {"What's the next turn", "what's my next turn", "When's my next turn?", "What's the speed limit",
+        "what's my speed", "What's the ETA", "what's our arrival time", "What's the next stop", "where's the next stop",
+        "what's my grade", "What's in my file", "I'm walking", "I'm biking now", "I'm hiking", "I'm driving",
+        "we're off road", "you're wrong", "that's on you", "let's go to the airport", "Let's avoid tolls"})
+  {
+    auto const want = CommandsSummary(ParseAppCommands(said));
+    CHECK(!want.empty());
+    for (auto const & curly : CurlyVersions(said))
+      CHECK_EQUAL(CommandsSummary(ParseAppCommands(curly)), want);
+  }
+  for (auto const & curly : CurlyVersions("my wife's"))
+    CHECK(ParseBusinessOwner(curly) == ParseBusinessOwner("my wife's"));
+  for (auto const & curly : CurlyVersions("excuse me, I'm a woman"))
+    CHECK(PronounCorrection(curly) == std::string("she"));
+  for (auto const & curly : CurlyVersions("I'm hungry"))
+    CHECK(!PronounCorrection(curly));
+}

@@ -1,6 +1,7 @@
 #include "backseat/twenty_questions.hpp"
 
 #include "backseat/plate_game.hpp"
+#include "backseat/types.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -17,7 +18,7 @@ using T = Trait;
 std::string TqWords(std::string const & s)
 {
   std::string out = " ";
-  for (unsigned char const c : s)
+  for (unsigned char const c : StraightApostrophes(s))
   {
     if (std::isalnum(c))
       out += static_cast<char>(std::tolower(c));

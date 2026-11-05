@@ -342,4 +342,8 @@ struct TripStats
 char const * ToString(Category c);
 char const * ToString(IncidentKind k);
 char const * ToString(Priority p);
+
+/// Dictation and keyboards send curly apostrophes: "What’s the next turn", "I‘m walking", "youʼre wrong".
+/// Every word matcher compares against straight-apostrophe cues, so turn ’ ‘ ʼ (UTF-8) into '.
+std::string StraightApostrophes(std::string const & text);
 }  // namespace backseat

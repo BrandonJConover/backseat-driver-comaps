@@ -115,7 +115,7 @@ char const * const kBorders[][2] = {
 std::string Words(std::string const & s)
 {
   std::string out = " ";
-  for (unsigned char const c : s)
+  for (unsigned char const c : StraightApostrophes(s))
   {
     if (std::isalnum(c))
       out += static_cast<char>(std::tolower(c));

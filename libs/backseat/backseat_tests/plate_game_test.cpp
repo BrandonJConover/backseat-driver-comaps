@@ -274,3 +274,12 @@ TEST(NavigatorKnowsWhenThePlatesComeFromAParkingLot)
   nav.OnDriverSaid(91000, "Texas");
   CHECK(nav.GetPlateLog().lifetime == std::set<std::string>{"TX"});
 }
+
+TEST(PlateGameHearsCurlyApostrophes)
+{
+  // Dictation types "don’t": it must still be a no, not a shrug.
+  CHECK(ParseYesNo("I don\xE2\x80\x99t want to") == YesNo::No);
+  CHECK(ParseYesNo("I don\xE2\x80\x99t know") == YesNo::Unclear);
+  CHECK(ParseYesNo("okay let\xE2\x80\x99s do it") == YesNo::Yes);
+  CHECK(ParseYesNo("I\xE2\x80\x99m in") == YesNo::Yes);
+}

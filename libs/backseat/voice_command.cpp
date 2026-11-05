@@ -16,7 +16,7 @@ namespace
 std::string CommandWords(std::string const & text)
 {
   std::string out = " ";
-  for (unsigned char const ch : text)
+  for (unsigned char const ch : StraightApostrophes(text))
   {
     char const c = std::isalnum(ch) || ch == '\'' ? static_cast<char>(std::tolower(ch)) : ' ';
     if (c != ' ' || out.back() != ' ')

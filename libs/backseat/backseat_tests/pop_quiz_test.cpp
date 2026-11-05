@@ -424,3 +424,13 @@ TEST(PopQuizNavQuestionIsNotTakenMidQuiz)
   CHECK(nav.QuizTakes("Stop if you safely can"));
   CHECK(nav.QuizTakes("option two"));
 }
+
+TEST(QuizHearsCurlyApostrophesAndDashes)
+{
+  CHECK_EQUAL(PqPick("canberra", "I think it\xE2\x80\x99s Sydney"), 0);
+  CHECK(ParseQuizAnswer(PqQuestion("canberra"), "I don\xE2\x80\x99t know").kind == QuizHeard::Kind::GiveUp);
+  // A dash between words is a break, not glue: "um—Canberra" names Canberra.
+  CHECK_EQUAL(PqPick("canberra", "um\xE2\x80\x94"
+                                 "Canberra"),
+              2);
+}
