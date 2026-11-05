@@ -286,46 +286,61 @@ TEST(ThinPoolsHaveVariety)
   }
 }
 
+namespace
+{
+// A flat-tier key after its escalation batch: >= 6 unique lines, all three tiers differ, and the original first
+// line is still in every tier (new lines go beside the originals, never instead of them). Read straight from the
+// table so walk/bike keys count too.
+void CheckEscalated(char const * key)
+{
+  auto const & data = LineData();
+  auto const it = data.find(key);
+  CHECK(it != data.end());
+  if (it == data.end())
+    return;
+  auto const & tiers = it->second;
+  std::vector<std::string> unique;
+  for (auto const & tier : tiers)
+    for (auto const & line : tier)
+    {
+      bool seen = false;
+      for (auto const & u : unique)
+        seen = seen || u == line;
+      if (!seen)
+        unique.push_back(line);
+    }
+  if (unique.size() < 6)
+    std::printf("    thin pool: %s has %zu unique lines\n", key, unique.size());
+  CHECK(unique.size() >= 6);
+  CHECK(tiers[1] != tiers[0]);
+  CHECK(tiers[2] != tiers[0]);
+  CHECK(tiers[2] != tiers[1]);
+  for (auto const & tier : tiers)
+  {
+    bool found = false;
+    for (auto const & l : tier)
+      found = found || l == tiers[0][0];
+    CHECK(found);
+  }
+}
+}  // namespace
+
 TEST(FlatTierBatchTwoEscalates)
 {
   // Loop BI-012 batch 1: situations whose three tiers were identical, so a driver at full frustration
-  // heard the calm wording. Read straight from the table so walk/bike keys count too.
-  auto const & data = LineData();
+  // heard the calm wording.
   for (char const * key :
        {"driveThru.leaving", "hardAccel.first", "night.dark", "rest.ahead", "road.highway", "viewpoint.ahead",
         "viewpoint.passed", "signal.lost.walk", "signal.lost.bike", "signal.lost.offroad", "partner.aside",
         "quiet.aside", "start.slow.walk"})
-  {
-    auto const it = data.find(key);
-    CHECK(it != data.end());
-    if (it == data.end())
-      continue;
-    auto const & tiers = it->second;
-    std::vector<std::string> unique;
-    for (auto const & tier : tiers)
-      for (auto const & line : tier)
-      {
-        bool seen = false;
-        for (auto const & u : unique)
-          seen = seen || u == line;
-        if (!seen)
-          unique.push_back(line);
-      }
-    if (unique.size() < 6)
-      std::printf("    thin pool: %s has %zu unique lines\n", key, unique.size());
-    CHECK(unique.size() >= 6);
-    CHECK(tiers[1] != tiers[0]);
-    CHECK(tiers[2] != tiers[0]);
-    CHECK(tiers[2] != tiers[1]);
-    // New lines go beside the originals, never instead of them: the original first line is in every tier.
-    for (auto const & tier : tiers)
-    {
-      bool found = false;
-      for (auto const & l : tier)
-        found = found || l == tiers[0][0];
-      CHECK(found);
-    }
-  }
+    CheckEscalated(key);
+}
+
+TEST(FlatTierBatchThreeEscalates)
+{
+  // Loop BI-012 batch 2: the clean-streak beats, the clean arrival, yesterday's route and the designated driver.
+  for (char const * key : {"clean.1", "clean.2", "clean.3", "arrived.clean", "routine.yesterday", "nightOut.dd"})
+    CheckEscalated(key);
 }
 
 TEST(FlatTierKeysOnlyShrink)
@@ -336,7 +351,7 @@ TEST(FlatTierKeysOnlyShrink)
   for (auto const & [key, tiers] : LineData())
     if (tiers[0] == tiers[1] && tiers[1] == tiers[2])
       ++flat;
-  if (flat > 72)
-    std::printf("    %d keys have identical tiers (limit 72)\n", flat);
-  CHECK(flat <= 72);
+  if (flat > 66)
+    std::printf("    %d keys have identical tiers (limit 66)\n", flat);
+  CHECK(flat <= 66);
 }
