@@ -220,6 +220,9 @@ std::string InstructionText(RouteSnapshot const & route);
 /// Which way `to` is from `from`, as said out loud: "northwest".
 std::string CompassDirection(LatLon const & from, LatLon const & to);
 
+/// `spoken` answers quiz `q` rather than asking about the drive (see Navigator::QuizTakes).
+bool QuizAnswerTakes(QuizQuestion const & q, std::string const & spoken);
+
 class Navigator
 {
 public:
@@ -396,11 +399,13 @@ public:
   };
   std::optional<QuizCard> PopQuizCard() const;
   /// A pop quiz is waiting and `spoken` answers it (a choice, or "I don't know"), so it goes to the
-  /// quiz before anything else: "Pull to the right and stop" isn't "stop navigation".
-  bool QuizTakes(std::string const & spoken) const
-  {
-    return QuizAsking() && ParseQuizAnswer(*m_quiz.Question(), spoken).kind != QuizHeard::Kind::Unclear;
-  }
+  /// quiz before anything else: "Pull to the right and stop" isn't "stop navigation". But the drive
+  /// comes first: "where do I turn?" or "cancel the route" isn't an answer, even when a choice shares
+  /// a word with it, unless a choice was named by its letter ("B", "option two").
+  bool QuizTakes(std::string const & spoken) const;
+  /// "Can you repeat the question?" while a quiz waits: reads it again (once a quiz) and gives the
+  /// driver the full time to answer again. True when it did; hosts ask this before QuizTakes.
+  bool QuizReask(double tMs, std::string const & spoken);
   /// The driver tapped a choice on the card. Ignored on a drive.
   void QuizTapped(double tMs, int choice);
   int BrowniePoints() const { return m_said.Counter(kBrowniesKey); }
@@ -758,6 +763,8 @@ private:
   int m_quizzes = 0;
   double m_lastQuizT = -1e18;
   int m_quizUnclear = 0;
+  /// The current quiz has been read a second time.
+  bool m_quizReasked = false;
   /// The maneuver whose quiet stretch already had its roll of the dice for a quiz.
   std::optional<uint32_t> m_quizRolledFor;
   std::function<void(TwentyLog const &)> m_onTwentyLog;

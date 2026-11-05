@@ -2178,6 +2178,7 @@ void Navigator::ResetTrip()
   m_quizzes = 0;
   m_lastQuizT = -1e18;
   m_quizUnclear = 0;
+  m_quizReasked = false;
   m_quizRolledFor.reset();
   m_quietBits = 0;
   m_lastQuietBitT = -1e18;
@@ -3491,6 +3492,7 @@ bool Navigator::StartPopQuiz(double t, bool asked)
     readMs += SpeakingMs(c.text, c.voiceSpeed) + 400;
   m_quiz.Start(*q, t, t + readMs + kQuizAnswerMs, !car);
   m_quizUnclear = 0;
+  m_quizReasked = false;
   ++m_quizzes;
   m_lastQuizT = t;
   Trace("quiz", {{"event", "start"}, {"id", q->id}, {"asked", asked ? "yes" : "no"}});
@@ -3579,6 +3581,85 @@ std::optional<Navigator::QuizCard> Navigator::PopQuizCard() const
   card.tappable = m_quiz.Tappable();
   card.brownies = m_said.Counter(kBrowniesKey);
   return card;
+}
+
+namespace
+{
+/// A question about the drive itself: "where do I turn?", "which exit?", "is it this lane?".
+bool AsksAboutTheDrive(std::string const & spoken)
+{
+  std::string words = " ";
+  for (unsigned char const ch : spoken)
+    if (std::isalnum(ch))
+      words += static_cast<char>(std::tolower(ch));
+    else if (ch != '\'' && ch < 0x80)
+      words += ' ';
+  words += ' ';
+  bool question = spoken.find('?') != std::string::npos;
+  for (char const * w : {" where ", " when ", " which ", " how far ", " how long ", " do i ", " should i "})
+    question = question || words.find(w) != std::string::npos;
+  if (!question)
+    return false;
+  for (char const * w : {" turn ", " turning ", " exit ", " lane ", " lanes ", " merge ", " ramp ", " get off ", " go ",
+                         " going ", " way "})
+    if (words.find(w) != std::string::npos)
+      return true;
+  return false;
+}
+}  // namespace
+
+bool QuizAnswerTakes(QuizQuestion const & q, std::string const & spoken)
+{
+  if (AsksToRepeatQuiz(spoken))
+    return false;
+  QuizHeard const heard = ParseQuizAnswer(q, spoken);
+  if (heard.kind == QuizHeard::Kind::Unclear)
+    return false;
+  if (heard.named)
+    return true;
+  if (AsksAboutTheDrive(spoken))
+    return false;
+  for (auto const & command : ParseAppCommands(spoken))
+    switch (command.action)
+    {
+    case AppAction::NextTurn:
+    case AppAction::RepeatInstruction:
+    case AppAction::CurrentRoad:
+    case AppAction::SpeedLimit:
+    case AppAction::TimeLeft:
+    case AppAction::ArrivalTime:
+    case AppAction::CancelRoute:
+    case AppAction::Mute:
+    case AppAction::ReportPolice:
+    case AppAction::NavigateTo:
+    case AppAction::DifferentRoute:
+    case AppAction::TakeMeBack: return false;
+    default: break;
+    }
+  return true;
+}
+
+bool Navigator::QuizTakes(std::string const & spoken) const
+{
+  return QuizAsking() && QuizAnswerTakes(*m_quiz.Question(), spoken);
+}
+
+bool Navigator::QuizReask(double tMs, std::string const & spoken)
+{
+  if (!QuizAsking() || m_quizReasked || !AsksToRepeatQuiz(spoken))
+    return false;
+  m_lastT = std::max(m_lastT, tMs);
+  m_quizReasked = true;
+  QuizQuestion const & q = *m_quiz.Question();
+  Commentary line = QuizLine(m_lastT, "quiz.ask",
+                             {{"question", q.question},
+                              {"a", QuizChoiceText(q.choices[0])},
+                              {"b", QuizChoiceText(q.choices[1])},
+                              {"c", QuizChoiceText(q.choices[2])}});
+  m_quiz.ExtendAnswerBy(m_lastT + SpeakingMs(line.text, line.voiceSpeed) + 400 + kQuizAnswerMs);
+  Trace("quiz", {{"event", "reask"}, {"id", q.id}});
+  m_gate.Push(std::move(line), false);
+  return true;
 }
 
 void Navigator::QuizTapped(double tMs, int choice)

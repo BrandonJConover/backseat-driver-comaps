@@ -7,6 +7,7 @@
 // gets mocked. All offline: the questions are hardcoded here.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <optional>
 #include <string>
@@ -47,10 +48,15 @@ struct QuizHeard
   };
   Kind kind = Kind::Unclear;
   int choice = -1;
+  /// Named outright: by its letter or number ("B", "option two") or word for word ("the octagon").
+  bool named = false;
 };
 /// The choice named by its words ("octagon"), its letter ("B", "bee", "option c") or its place
 /// ("the second one"). Words win: "three" answers "3 seconds" before it means "C".
 QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken);
+
+/// "Can you repeat the question?", "what were the choices?", "say that again".
+bool AsksToRepeatQuiz(std::string const & spoken);
 
 /// The driver asked for one: "give me a pop quiz", "quiz me".
 bool AsksForPopQuiz(std::string const & spoken);
@@ -90,6 +96,8 @@ public:
   std::optional<Outcome> GiveUp(double t);
   /// Out of time. Empty until then.
   std::optional<Outcome> Tick(double t);
+  /// The question is read again: the time to answer starts over from `answerBy`, never shorter.
+  void ExtendAnswerBy(double answerBy) { m_answerBy = std::max(m_answerBy, answerBy); }
 
   /// After an answer the card shows the result this long.
   static double constexpr kResultShownMs = 8000;

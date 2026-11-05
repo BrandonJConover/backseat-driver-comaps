@@ -231,7 +231,7 @@ QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken)
       for (auto const & w : QuizWords(all.substr(start, bar - start)))
         spelled += w + " ";
       if (!spelled.empty() && (said == spelled || said == "the " + spelled || "the " + said == spelled))
-        return {QuizHeard::Kind::Choice, static_cast<int>(i)};
+        return {QuizHeard::Kind::Choice, static_cast<int>(i), true};
       start = bar + 1;
     }
   }
@@ -295,7 +295,7 @@ QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken)
     }
   }
   if (byLetter >= 0)
-    return {QuizHeard::Kind::Choice, byLetter};
+    return {QuizHeard::Kind::Choice, byLetter, true};
 
   std::string padded = " ";
   for (auto const & w : words)
@@ -305,6 +305,22 @@ QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken)
     if (padded.find(cue) != std::string::npos)
       return {QuizHeard::Kind::GiveUp, -1};
   return heard;
+}
+
+bool AsksToRepeatQuiz(std::string const & spoken)
+{
+  std::string padded = " ";
+  for (auto const & w : QuizWords(spoken))
+    padded += w + " ";
+  for (char const * cue : {" repeat the question ", " repeat that question ", " repeat the quiz ", " what was the question ",
+                           " whats the question ", " what is the question ", " what was that question ",
+                           " read the question again ", " ask me again ", " ask again ", " say it again ", " say that again ",
+                           " repeat that ", " repeat it ", " come again ", " what were the choices ", " what are the choices ",
+                           " what were the options ", " what are the options ", " read the choices ", " read the options ",
+                           " repeat the choices ", " repeat the options ", " one more time "})
+    if (padded.find(cue) != std::string::npos)
+      return true;
+  return false;
 }
 
 bool AsksForPopQuiz(std::string const & spoken)

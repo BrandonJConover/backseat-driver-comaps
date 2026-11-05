@@ -2176,6 +2176,9 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
 {
   backseat::Trace("heard.app", {{"text", text}});
   HeardCommand heard;
+  // "Can you repeat the question?" mid-quiz reads it again; it isn't "repeat the instruction".
+  if (m_navigator.QuizReask(0, text))
+    return heard;
   // A pop quiz answer ("pull to the right and stop", "speed up") is an answer, not a command.
   if (m_navigator.QuizTakes(text))
   {

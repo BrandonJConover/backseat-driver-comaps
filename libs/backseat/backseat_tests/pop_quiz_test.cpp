@@ -7,6 +7,7 @@
 #include "backseat/pop_quiz.hpp"
 
 #include <algorithm>
+#include <cstdio>
 
 using namespace backseat;
 
@@ -349,4 +350,77 @@ TEST(PopQuizTenBrowniesMakeATeachersPet)
   CHECK(PqHas(reply[0].text, "10") || !PqHas(reply[0].text, "brownie points"));
   CHECK_EQUAL(reply[1].key, std::string("badge.teacherspet"));
   CHECK(nav.GetAchievements().Has("teacherspet"));
+}
+
+TEST(PopQuizYieldsToNavigationQuestions)
+{
+  // Over every question: asking about the drive is never an answer, even when a choice shares a word.
+  for (auto const & q : QuizQuestions())
+  {
+    for (char const * said : {"where do i turn", "Where do I turn?", "what's the next turn", "turn left here?",
+                              "take me home", "cancel the route", "which exit do I take", "when do I get off"})
+    {
+      if (QuizAnswerTakes(q, said))
+        std::fprintf(stderr, "  quiz %s took \"%s\"\n", q.id, said);
+      CHECK(!QuizAnswerTakes(q, said));
+    }
+    // Choices named outright still count: by letter, by number, word for word.
+    for (int i = 0; i < 3; ++i)
+    {
+      std::string const letter(1, static_cast<char>('A' + i));
+      char const * const number[] = {"option one", "option two", "option three"};
+      for (std::string const & said : {letter, std::string(number[i]), QuizChoiceText(q.choices[i])})
+      {
+        if (!QuizAnswerTakes(q, said))
+          std::fprintf(stderr, "  quiz %s missed \"%s\"\n", q.id, said.c_str());
+        CHECK(QuizAnswerTakes(q, said));
+      }
+    }
+    CHECK(!QuizAnswerTakes(q, "can you repeat the question"));
+  }
+  CHECK(QuizAnswerTakes(PqQuestion("stopSides"), "the octagon"));
+  CHECK(QuizAnswerTakes(PqQuestion("canberra"), "I don't know"));
+}
+
+TEST(PopQuizRepeatTheQuestionReadsItAgainOnce)
+{
+  Navigator nav = PqNavigator();
+  nav.SetPopQuizOn(true);
+  double t = kPqDayMs;
+  double dist = 80000;
+  auto const asked = PqUntilAsked(nav, t, dist);
+  // Most of the time to answer goes by, then the driver asks to hear it again.
+  PqQuiz(PqDrive(nav, t, 20, dist));
+  CHECK(!nav.QuizTakes("can you repeat the question"));
+  CHECK(nav.QuizReask(t, "can you repeat the question"));
+  auto const again = PqQuiz(nav.TakeLines());
+  CHECK_EQUAL(again.size(), size_t{1});
+  CHECK_EQUAL(again[0].key, std::string("quiz.ask"));
+  CHECK(PqHas(again[0].text, "yellow light"));
+  // The clock starts over: what would have timed out the first reading doesn't.
+  auto const waited = PqQuiz(PqDrive(nav, t, 25, dist));
+  CHECK(waited.empty());
+  CHECK(nav.InGame());
+  // Only once a quiz.
+  CHECK(!nav.QuizReask(t, "what was the question"));
+  CHECK(nav.QuizTakes("B"));
+  nav.OnDriverSaid(t, "B");
+  auto const reply = PqQuiz(nav.TakeLines());
+  CHECK_EQUAL(reply.size(), size_t{1});
+  CHECK_EQUAL(reply[0].key, std::string("quiz.right.first"));
+  // No quiz waiting: nothing to re-read.
+  CHECK(!nav.QuizReask(t, "repeat the question"));
+}
+
+TEST(PopQuizNavQuestionIsNotTakenMidQuiz)
+{
+  Navigator nav = PqNavigator();
+  nav.SetPopQuizOn(true);
+  double t = kPqDayMs;
+  double dist = 80000;
+  PqUntilAsked(nav, t, dist);
+  CHECK(!nav.QuizTakes("where do i turn"));
+  CHECK(!nav.QuizTakes("cancel the route"));
+  CHECK(nav.QuizTakes("Stop if you safely can"));
+  CHECK(nav.QuizTakes("option two"));
 }
