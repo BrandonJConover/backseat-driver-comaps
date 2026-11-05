@@ -106,10 +106,22 @@ public:
       std::string text;
     };
     std::vector<VoiceLine> voiceLines;
+    /// `reply` is a stock line for chit-chat it couldn't place ("Hey Echo, what do you think of
+    /// jazz?"). The on-device model's own answer, in character, can be said instead.
+    bool chatMayReplace = false;
   };
   /// The voices the platform can speak in, for "what voice options do you have?" and picking one
   /// by name or code phrase. Without them, asking for the voices just opens the list.
   void SetVoices(std::vector<backseat::VoiceOption> voices) { m_voices = std::move(voices); }
+  /// The voice speaking now, by id ("am_echo"). Its name is what the driver calls it ("Hey Echo").
+  /// Echo until told otherwise.
+  void SetCurrentVoice(std::string id) { m_currentVoice = std::move(id); }
+  /// Called by name with nothing for a command in it ("Hey Echo, how are you?"): the GPS has a line
+  /// for that, so the on-device model shouldn't make it a tool call or chat.
+  bool IsNameBanter(std::string const & text) const;
+  /// A quip for a command said by name ("Oh, first names now. Fine."), when the on-device model ran
+  /// the command. Empty when it wasn't said by name, or a quip was said recently.
+  std::string NameCallQuip(std::string const & text);
   /// Speech recognition, keyword matching: "avoid tolls and take me home".
   HeardCommand OnDriverSaid(std::string const & text);
   /// The on-device model picked a tool from backseat::AppTools(). `spoken` is what the driver
@@ -472,6 +484,15 @@ private:
   bool m_askStateNext = false;
   int m_searches = 0;
   backseat::CommandRepeats m_commandRepeats;
+  backseat::NameCalls m_nameCalls;
+  std::string m_currentVoice;
+  /// Inside a name call, running what was said around the name.
+  bool m_inNameCall = false;
+  /// What the navigator made of the last thing passed to it.
+  bool m_navigatorReacted = false;
+  std::vector<backseat::VoiceOption> NameableVoices() const;
+  std::string CurrentVoiceName() const;
+  std::optional<HeardCommand> OnCalledByName(std::string const & text);
   std::optional<std::string> m_lastReadTopic;
   void ChoseSearchPlace(std::string const & place);
   std::string m_searchQuery;

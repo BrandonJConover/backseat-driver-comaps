@@ -33,6 +33,7 @@
 #include "base/timer.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <ctime>
 #include <cstdlib>
@@ -2182,6 +2183,9 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
     m_navigator.OnDriverSaid(0, text);
     return heard;
   }
+  // "Hey Echo, can you take me home?": it knows its name, and it has thoughts about being called by it.
+  if (auto named = OnCalledByName(text))
+    return *named;
   // "I'm a woman": it guessed wrong, and it's not happy about being corrected.
   if (auto const pronouns = backseat::PronounCorrection(text))
   {
@@ -2244,7 +2248,7 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
   if (commands.empty())
   {
     // Chatter, police, plates, thanks: the navigator's business.
-    m_navigator.OnDriverSaid(0, text);
+    m_navigatorReacted = m_navigator.OnDriverSaid(0, text);
     return heard;
   }
   bool const polite = backseat::SaidPolitely(text);
@@ -2254,6 +2258,136 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
     if (!reply.empty())
       heard.reply += (heard.reply.empty() ? "" : " ") + reply;
   }
+  return heard;
+}
+
+namespace
+{
+double SteadyNowMs()
+{
+  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+bool SameName(std::string const & a, std::string const & b)
+{
+  return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](unsigned char x, unsigned char y)
+                                            { return std::tolower(x) == std::tolower(y); });
+}
+}  // namespace
+
+std::string BackseatAdapter::CurrentVoiceName() const
+{
+  if (m_currentVoice.empty())
+    return "Echo";
+  for (auto const & v : m_voices)
+    if (v.id == m_currentVoice)
+      return v.name;
+  // "am_echo" -> "Echo".
+  auto const underscore = m_currentVoice.rfind('_');
+  std::string name = underscore == std::string::npos ? m_currentVoice : m_currentVoice.substr(underscore + 1);
+  if (!name.empty())
+    name[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
+  return name.empty() ? "Echo" : name;
+}
+
+std::vector<backseat::VoiceOption> BackseatAdapter::NameableVoices() const
+{
+  auto voices = m_voices;
+  std::string const me = CurrentVoiceName();
+  if (std::none_of(voices.begin(), voices.end(), [&me](auto const & v) { return SameName(v.name, me); }))
+    voices.push_back({m_currentVoice.empty() ? "am_echo" : m_currentVoice, me});
+  return voices;
+}
+
+bool BackseatAdapter::IsNameBanter(std::string const & text) const
+{
+  auto const voices = NameableVoices();
+  auto const call = backseat::CalledByName(voices, text);
+  if (!call || !SameName(voices[call->voice].name, CurrentVoiceName()) || !backseat::ParseAppCommands(call->rest).empty())
+    return false;
+  std::string const topic = backseat::NameCallTopic(call->rest);
+  return topic != "chat" && topic != "canYou";
+}
+
+std::string BackseatAdapter::NameCallQuip(std::string const & text)
+{
+  auto const voices = NameableVoices();
+  auto const call = backseat::CalledByName(voices, text);
+  std::string const me = CurrentVoiceName();
+  if (!call || !SameName(voices[call->voice].name, me) || !m_nameCalls.QuipDue(SteadyNowMs()))
+    return {};
+  return m_navigator.Reply("name.quip", {{"voice", me}});
+}
+
+std::optional<BackseatAdapter::HeardCommand> BackseatAdapter::OnCalledByName(std::string const & text)
+{
+  if (m_inNameCall || m_navigator.InGame())
+    return std::nullopt;
+  auto const voices = NameableVoices();
+  auto const call = backseat::CalledByName(voices, text);
+  if (!call)
+    return std::nullopt;
+  std::string const me = CurrentVoiceName();
+  std::string const called = voices[call->voice].name;
+  bool const mine = SameName(called, me);
+  bool const commands = !backseat::ParseAppCommands(call->rest).empty();
+  // "Hey Adam" to Echo only counts when it's plainly for the GPS: Adam could be in the back seat.
+  if (!mine && !commands)
+    return std::nullopt;
+  double const nowMs = SteadyNowMs();
+  backseat::Trace("name", {{"called", called}, {"voice", me}, {"rest", call->rest}});
+  HeardCommand heard;
+  if (m_nameCalls.IsRepeat(text, nowMs))
+    return heard;
+  auto const runRest = [&](std::string const & said)
+  {
+    m_inNameCall = true;
+    m_navigatorReacted = false;
+    HeardCommand inner = OnDriverSaid(said);
+    m_inNameCall = false;
+    return inner;
+  };
+  // Fed up, it answers only to its title. Its first name won't do.
+  std::string opener;
+  std::string words = " ";
+  for (unsigned char const ch : text)
+    words += std::isalnum(ch) ? static_cast<char>(std::tolower(ch)) : ' ';
+  words += ' ';
+  bool const titled = words.find(" omnipotent ") != std::string::npos || words.find(" overseer ") != std::string::npos;
+  if (!mine)
+  {
+    if (m_nameCalls.OtherNameDue(nowMs))
+      opener = m_navigator.Reply("name.other", {{"other", called}, {"voice", me}});
+  }
+  else if (m_navigator.TitleDemanded() && !titled)
+    opener = m_navigator.Reply("name.title", {{"voice", me}});
+  if (commands)
+  {
+    // "Hey" still counts as polite.
+    heard = runRest(call->greeted ? "hey " + call->rest : call->rest);
+    if (opener.empty() && mine && m_nameCalls.QuipDue(nowMs))
+      opener = m_navigator.Reply("name.quip", {{"voice", me}});
+    if (!opener.empty())
+      heard.reply = heard.reply.empty() ? opener : opener + " " + heard.reply;
+    return heard;
+  }
+  if (!opener.empty())
+  {
+    heard.reply = opener;
+    return heard;
+  }
+  std::string const topic = backseat::NameCallTopic(call->rest);
+  if (topic == "chat" || topic == "canYou")
+  {
+    // It may be for something that listens anyway: a pronoun correction, the police, a yes to a question.
+    heard = runRest(call->rest);
+    bool const handled = !heard.reply.empty() || heard.kind != HeardCommand::Kind::None || !heard.actions.empty() ||
+                         !heard.voiceLines.empty() || m_navigatorReacted;
+    if (handled)
+      return heard;
+    heard.chatMayReplace = true;
+  }
+  heard.reply = m_navigator.Reply("name." + topic, {{"voice", me}});
   return heard;
 }
 

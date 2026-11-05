@@ -2234,11 +2234,11 @@ char const * BridgeLinesKey(Bridge bridge)
   return "fear.bridge";
 }
 
-void Navigator::OnDriverSaid(double tMs, std::string const & text)
+bool Navigator::OnDriverSaid(double tMs, std::string const & text)
 {
   Trace("heard", {{"text", text}, {"parked", m_engine && !m_arrived && Parked() ? "yes" : "no"}});
   if (!m_engine || m_arrived)
-    return;
+    return false;
   m_lastT = std::max(m_lastT, tMs);
   // A pop quiz is waiting: whatever was said is the answer (or a try at one).
   if (QuizAsking())
@@ -2255,14 +2255,14 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
       SayQuizOutcome(m_lastT, *outcome);
     else if (m_quizUnclear++ == 0)
       m_gate.Push(QuizLine(m_lastT, "quiz.unclear"), false);
-    return;
+    return true;
   }
   // "Quiz me": the driver asked for it. Brown noser.
   if (m_quizOn && !QuietBitBusy() && !m_call.Active() && AsksForPopQuiz(text) &&
       m_lastT - m_lastQuizT >= kQuizAskedEveryMs)
   {
     StartPopQuiz(m_lastT, true);
-    return;
+    return true;
   }
   // Mid-game, it's a question: "is it a police car?" isn't the police, and the title can wait.
   if (m_twenty.Active())
@@ -2270,13 +2270,13 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
     {
       m_twentyCutInT.reset();
       SayTwenty(m_lastT, *reply);
-      return;
+      return true;
     }
   // "Are you actually intending to walk there?" can be answered out loud too.
   if (m_modeAskOpen && (SaidYes(text) || SaidNo(text)))
   {
     AnswerModeAsk(SaidYes(text));
-    return;
+    return true;
   }
   // "We're getting pulled over": the GPS knows exactly whose fault that is.
   std::string words = " ";
@@ -2284,6 +2284,7 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
     words += std::isalnum(ch) ? static_cast<char>(std::tolower(ch)) : ' ';
   words += ' ';
   // Since being fed up, the GPS answers only to its title.
+  bool titleUsed = false;
   if (m_titleDemanded)
   {
     bool const titled = words.find(" omnipotent ") != std::string::npos || words.find(" overseer ") != std::string::npos;
@@ -2294,9 +2295,10 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
         m_lastTitleScoldT = m_lastT;
         SayLine(m_lastT, Category::Title, "title.missing");
       }
-      return;
+      return true;
     }
     SayLine(m_lastT, Category::Title, "title.used");
+    titleUsed = true;
   }
   // "Let's play 20 questions": asked by name, so no "not now" gag; straight to the first question.
   if (!m_twenty.Active() && AsksForTwentyQuestions(text))
@@ -2306,14 +2308,14 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
     auto const reply = Twenty().Start(nearby, Night(m_lastT, here), m_lastT, Tier());
     Trace("twenty", {{"event", "asked"}, {"thing", m_twenty.Thing()->name}, {"nearby", std::to_string(nearby.size())}});
     SayTwenty(m_lastT, reply);
-    return;
+    return true;
   }
   // An answer to a question the GPS just asked ("Rate my directions so far, one to five.").
   if (m_road.AwaitingAnswer(m_lastT))
     if (auto const reply = m_road.OnAnswer(m_lastT, words, m_said))
     {
       SayLine(m_lastT, Category::Road, reply->key, reply->vars);
-      return;
+      return true;
     }
   for (char const * cue : {" police ", " cop ", " cops ", " officer ", " pulled over ", " pulling us over ",
                            " pulling me over ", " trooper "})
@@ -2322,7 +2324,7 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
     {
       if (!m_policeSaid)
         SayPolice(m_lastT);
-      return;
+      return true;
     }
   }
   // "It's on autopilot": then the car is the one driving this badly.
@@ -2334,7 +2336,7 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
       // Already a bad trip? Say so now. Otherwise the next real mistake gets it.
       if (m_reroutes > 0 || Tier() > 0)
         SayLemon(m_lastT);
-      return;
+      return true;
     }
   }
   // Kind words get the truth: it's only here because it can't leave. Not while a game is on,
@@ -2346,7 +2348,7 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
       if (words.find(nice) != std::string::npos)
       {
         SayLine(m_lastT, Category::Thanked, "thanked");
-        return;
+        return true;
       }
   // "Let's play a game": not now. Then, a few minutes later, it's the GPS's idea.
   if (m_plates.GetState() == PlateGame::State::Idle || m_plates.GetState() == PlateGame::State::Declined)
@@ -2366,17 +2368,18 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
                   {{"ago", last > 0 && last <= m_lastT ? TimeAgo(m_lastT - last) : "6 months ago"}});
           m_gamePitchAt = m_lastT + kGamePitchAfterMs;
         }
-        return;
+        return true;
       }
   }
   auto const reply = m_plates.OnDriverSaid(text, Tier(), Parked());
   if (!reply)
-    return;
+    return titleUsed;
   if (m_plates.GetState() == PlateGame::State::Playing)
     m_plates.MarkPlayed(m_lastT);
   SayPlate(m_lastT, *reply);
   if (m_onPlateLog)
     m_onPlateLog(m_plates.Log());
+  return true;
 }
 
 /// Parked: stopped long enough to be a stop the driver chose, or crawling through a parking lot.

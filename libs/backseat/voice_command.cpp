@@ -4,9 +4,11 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <initializer_list>
 #include <iterator>
 #include <map>
 #include <sstream>
+#include <utility>
 
 namespace backseat
 {
@@ -1121,6 +1123,187 @@ std::optional<size_t> VoiceNamed(std::vector<VoiceOption> const & voices, std::s
       return i;
   }
   return {};
+}
+
+namespace
+{
+/// A word as said, and whether punctuation came right after it ("Echo," or "Echo?").
+struct SaidWord
+{
+  std::string word;
+  bool pauseAfter = false;
+};
+
+std::vector<SaidWord> SaidWords(std::string const & text)
+{
+  std::vector<SaidWord> words;
+  std::string token;
+  auto const flush = [&]
+  {
+    if (!token.empty())
+      words.push_back({std::exchange(token, {}), false});
+  };
+  for (unsigned char const ch : text)
+  {
+    if (std::isalnum(ch) || ch == '\'')
+    {
+      token += static_cast<char>(std::tolower(ch));
+      continue;
+    }
+    flush();
+    if (!words.empty() && (ch == ',' || ch == '.' || ch == '!' || ch == '?' || ch == ';' || ch == ':' || ch == '-'))
+      words.back().pauseAfter = true;
+  }
+  flush();
+  return words;
+}
+
+bool OneOf(std::string const & word, std::initializer_list<char const *> list)
+{
+  return std::any_of(list.begin(), list.end(), [&word](char const * w) { return word == w; });
+}
+
+/// The voice `word` names: an exact match first, then a close miss by the recognizer.
+std::optional<size_t> VoiceForWord(std::vector<VoiceOption> const & voices, std::string const & word)
+{
+  for (size_t i = 0; i < voices.size(); ++i)
+    if (CommandWords(voices[i].name) == " " + word + " ")
+      return i;
+  for (size_t i = 0; i < voices.size(); ++i)
+  {
+    std::string const name = CommandWords(voices[i].name);
+    // One-word names only: nobody greets "banana phone".
+    if (name.find(' ', 1) == name.size() - 1 && CountVoiceName(word, voices[i].name) > 0)
+      return i;
+  }
+  return {};
+}
+
+std::string JoinWords(std::vector<SaidWord> const & words, size_t from, size_t to)
+{
+  std::string out;
+  for (size_t i = from; i < to && i < words.size(); ++i)
+    out += (out.empty() ? "" : " ") + words[i].word;
+  return out;
+}
+}  // namespace
+
+std::optional<NameCall> CalledByName(std::vector<VoiceOption> const & voices, std::string const & spoken)
+{
+  auto const words = SaidWords(spoken);
+  size_t const n = words.size();
+  size_t i = 0;
+  for (int skipped = 0; skipped < 2 && i < n && OneOf(words[i].word, {"um", "uh", "so", "oh", "well", "ah", "and"}); ++skipped)
+    ++i;
+  bool greeted = false;
+  if (i < n && OneOf(words[i].word, {"hey", "hi", "hello", "ok", "okay", "yo", "oi", "hiya", "heya", "ay", "ayy"}))
+  {
+    greeted = true;
+    ++i;
+  }
+  else if (i + 1 < n && ((words[i].word == "excuse" && words[i + 1].word == "me") ||
+                         (words[i].word == "good" && OneOf(words[i + 1].word, {"morning", "afternoon", "evening"}))))
+  {
+    greeted = true;
+    i += 2;
+  }
+  // Up front: "Hey Echo, ..." or "Echo, are you there?"
+  if (i < n)
+    if (auto const voice = VoiceForWord(voices, words[i].word))
+    {
+      std::string const rest = JoinWords(words, i + 1, n);
+      bool const request =
+          i + 1 < n && (OneOf(words[i + 1].word, {"can", "could", "would", "will", "what", "what's", "whats", "how", "how's",
+                                                  "hows", "where", "where's", "when", "why", "who", "who's", "are", "do",
+                                                  "did", "please", "take", "tell", "i", "i'm", "you", "you're", "youre",
+                                                  "let's", "lets", "turn", "stop", "shut", "go", "navigate", "find",
+                                                  "mute", "play", "show", "read", "give", "get", "thanks", "thank",
+                                                  "good", "say", "avoid", "skip", "zoom", "cancel", "repeat"}) ||
+                        !ParseAppCommands(rest).empty());
+      if (greeted || i + 1 == n || words[i].pauseAfter || request)
+        return NameCall{*voice, rest, greeted};
+    }
+  // At the end: "thanks, Echo", "take me home Echo". Not "turn at the river".
+  if (n >= 2 && n - 1 > i)
+    if (auto const voice = VoiceForWord(voices, words[n - 1].word))
+    {
+      std::string const & before = words[n - 2].word;
+      if (OneOf(before, {"the", "a", "an", "to", "at", "on", "in", "of", "by", "from", "near", "onto", "into", "toward",
+                         "towards", "and", "past", "via"}))
+        return std::nullopt;
+      std::string const rest = JoinWords(words, i, n - 1);
+      if (words[n - 2].pauseAfter || greeted ||
+          OneOf(before, {"thanks", "you", "bye", "goodbye", "night", "morning", "job", "up", "there", "please", "sorry",
+                         "later", "buddy", "pal", "friend"}) ||
+          !ParseAppCommands(rest).empty())
+        return NameCall{*voice, rest, greeted};
+    }
+  return std::nullopt;
+}
+
+std::string NameCallTopic(std::string const & rest)
+{
+  std::string const w = CommandWords(rest);
+  if (w == " ")
+    return "bare";
+  auto const has = [&w](std::initializer_list<char const *> phrases)
+  { return std::any_of(phrases.begin(), phrases.end(), [&w](char const * p) { return w.find(p) != std::string::npos; }); };
+  if (has({" sorry ", " apologize ", " my bad ", " forgive me "}))
+    return "sorry";
+  if (has({" bye ", " goodbye ", " good night ", " goodnight ", " see you ", " see ya ", " talk later ", " night night ",
+           " catch you later "}))
+    return "bye";
+  if (has({" love you ", " i love ", " marry me ", " date me ", " go out with me ", " you're cute ", " youre cute ",
+           " you're beautiful ", " youre beautiful ", " you're hot ", " youre hot ", " sexy ", " kiss "}))
+    return "love";
+  if (has({" thank ", " thanks ", " good job ", " nice job ", " great job ", " well done ", " you're the best ",
+           " youre the best ", " nice work ", " good work ", " you're awesome ", " youre awesome ", " good girl ",
+           " good boy "}))
+    return "thanks";
+  if (has({" mad ", " angry ", " upset ", " mean to me ", " so mean ", " hate me ", " annoyed ", " pissed ", " grumpy "}))
+    return "mad";
+  if (has({" who are you ", " what's your name ", " whats your name ", " what is your name ", " what are you ",
+           " are you real ", " are you a robot ", " are you human ", " are you alive ", " are you ai ", " are you an ai ",
+           " who is this ", " who's this ", " whos this "}))
+    return "who";
+  if (has({" how are you ", " how's it going ", " hows it going ", " how is it going ", " how you doing ",
+           " how're you ", " what's up ", " whats up ", " what is up ", " how's your day ", " hows your day ",
+           " how is your day ", " how have you been ", " sup ", " you good ", " you okay ", " are you okay ",
+           " are you ok ", " how do you feel ", " how are things "}))
+    return "howAreYou";
+  if (has({" are you there ", " you there ", " are you listening ", " you listening ", " can you hear me ",
+           " are you awake ", " you awake ", " are you on ", " wake up ", " are you still there ", " still there "}))
+    return "there";
+  for (char const * ask : {" can you ", " could you ", " will you ", " would you ", " can u ", " please ", " i need you ",
+                           " i want you to "})
+    if (w.rfind(ask, 0) == 0)
+      return "canYou";
+  return "chat";
+}
+
+bool NameCalls::IsRepeat(std::string const & spoken, double tMs)
+{
+  std::string const words = CommandWords(spoken);
+  bool const repeat = m_lastAt && tMs - *m_lastAt < kRepeatMs && words == m_last;
+  m_lastAt = tMs;
+  m_last = words;
+  return repeat;
+}
+
+bool NameCalls::QuipDue(double tMs)
+{
+  if (m_lastQuipAt && tMs - *m_lastQuipAt < kQuipEveryMs)
+    return false;
+  m_lastQuipAt = tMs;
+  return true;
+}
+
+bool NameCalls::OtherNameDue(double tMs)
+{
+  if (m_lastOtherAt && tMs - *m_lastOtherAt < kOtherNameEveryMs)
+    return false;
+  m_lastOtherAt = tMs;
+  return true;
 }
 
 std::optional<KnownPlace> KnownPlaceOf(std::string const & target)

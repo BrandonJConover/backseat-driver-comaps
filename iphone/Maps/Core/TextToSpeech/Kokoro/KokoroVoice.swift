@@ -72,6 +72,9 @@ final class KokoroVoice: NSObject {
   }
 
   /// The picked voice. Anything else stored (such as the old "system" choice) means the default.
+  /// The picked voice's id, for the navigator ("Hey Echo" is answered by the voice speaking now).
+  @objc static var currentVoiceID: String { selectedVoiceID }
+
   static var selectedVoiceID: String {
     let id = UserDefaults.standard.string(forKey: voiceKey) ?? defaultVoice
     return voiceOptions.contains { $0.id == id } ? id : defaultVoice
