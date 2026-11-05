@@ -2,8 +2,10 @@
 #include "check.hpp"
 #include "sim_drive.hpp"
 
+#include "backseat/lines.hpp"
 #include "backseat/navigator.hpp"
 
+#include <cstdio>
 #include <map>
 
 using namespace backseat;
@@ -132,4 +134,53 @@ TEST(SoakTripStartsDontBuryTheFirstTurn)
   }
   CHECK(trips > 40);
   CHECK(late * 100 <= trips * 8);
+}
+
+// Every line that reaches the voice is filled in: no "{street}" read out as "curly brace street",
+// nothing empty. Town and road trips, by car (miles and km), on foot and by bike.
+TEST(SoakNoUnfilledPlaceholdersInSpokenLines)
+{
+  struct Setup
+  {
+    TripShape shape;
+    TravelMode mode;
+    Units units;
+  };
+  Setup const setups[] = {
+      {TripShape::Town, TravelMode::Drive, Units::Mph},     {TripShape::RoadTrip, TravelMode::Drive, Units::Mph},
+      {TripShape::Town, TravelMode::Drive, Units::Kmh},     {TripShape::RoadTrip, TravelMode::Drive, Units::Kmh},
+      {TripShape::Town, TravelMode::Walk, Units::Mph},      {TripShape::Town, TravelMode::Bike, Units::Mph},
+      {TripShape::Town, TravelMode::Walk, Units::Kmh},      {TripShape::Town, TravelMode::Bike, Units::Kmh},
+  };
+  // The check below relies on Fill() leaving a placeholder it has no value for in the text.
+  CHECK(Fill("Turn onto {street}.", {}).find("{street}") != std::string::npos);
+  int lines = 0;
+  int bad = 0;
+  for (auto const & su : setups)
+  {
+    int const before = lines;
+    uint32_t const seeds = su.shape == TripShape::RoadTrip ? 6 : 30;
+    for (uint32_t seed = 1; seed <= seeds; ++seed)
+    {
+      EngineConfig c;
+      c.rng = SeededRng(seed);
+      Navigator nav(c);
+      nav.SetUnits(su.units);
+      nav.SetTravelMode(su.mode);
+      auto const r = SimulateTrip(nav, {su.shape, seed});
+      for (auto const & s : r.spoken)
+      {
+        ++lines;
+        auto const & text = s.line.text;
+        if (text.find_first_not_of(" \t\n") == std::string::npos || text.find_first_of("{}") != std::string::npos)
+        {
+          if (++bad <= 10)
+            std::fprintf(stderr, "  unfilled [%s]: %s\n", s.line.key.c_str(), text.c_str());
+        }
+      }
+    }
+    CHECK(lines - before > 100);
+  }
+  CHECK(lines > 5000);
+  CHECK(bad == 0);
 }
