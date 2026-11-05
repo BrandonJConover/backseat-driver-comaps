@@ -119,8 +119,8 @@ TEST(StreetsHighwaysAndNumbersAreWrittenOut)
 {
   CHECK_EQUAL(ForSpeech("Turn left onto Main St."), std::string("Turn left onto Main Street."));
   CHECK_EQUAL(ForSpeech("Main St NW"), std::string("Main Street Northwest"));
-  CHECK_EQUAL(ForSpeech("Call Dr Smith"), std::string("Call Dr Smith"));
-  CHECK_EQUAL(ForSpeech("Go to St Louis"), std::string("Go to St Louis"));
+  CHECK_EQUAL(ForSpeech("Call Dr Smith"), std::string("Call Doctor Smith"));
+  CHECK_EQUAL(ForSpeech("Go to St Louis"), std::string("Go to Saint Louis"));
   CHECK_EQUAL(ForSpeech("Take N Elm Dr"), std::string("Take North Elm Drive"));
   CHECK_EQUAL(ForSpeech("Merge onto US-36"), std::string("Merge onto yooess thirty six"));
   CHECK_EQUAL(ForSpeech("Take I-25 N"), std::string("Take I twenty five North"));
@@ -310,4 +310,37 @@ TEST(ForeignPhrasesAreSaidInTheirOwnSounds)
   CHECK_EQUAL(Lex("fxkoodahsigh"), std::string("kudɑsˈI"));
   CHECK_EQUAL(Lex("fxeeskeeairdah"), std::string("iskiˈɛɹdɑ"));
   CHECK_EQUAL(Lex("liv"), std::string("lˈɪv"));
+}
+
+TEST(SaintsDoctorsAndJuniorsInStreetNames)
+{
+  // Titles before a name.
+  CHECK_EQUAL(ForSpeech("Turn left onto St. Johns Rd"), std::string("Turn left onto Saint Johns Road"));
+  CHECK_EQUAL(ForSpeech("Continue on St Charles Ave"), std::string("Continue on Saint Charles Avenue"));
+  CHECK_EQUAL(ForSpeech("Take St. Johns Rd"), std::string("Take Saint Johns Road"));
+  CHECK_EQUAL(ForSpeech("St Louis is ahead."), std::string("Saint Louis is ahead."));
+  CHECK_EQUAL(ForSpeech("Visit St. John's Church"), std::string("Visit Saint John's Church"));
+  CHECK_EQUAL(ForSpeech("Head to Ste. Genevieve"), std::string("Head to Saint Genevieve"));
+  CHECK_EQUAL(ForSpeech("Exit toward Ft Worth"), std::string("Exit toward Fort Worth"));
+  CHECK_EQUAL(ForSpeech("Turn right onto Dr Martin Luther King Jr Blvd"),
+              std::string("Turn right onto Doctor Martin Luther King Junior Boulevard"));
+  CHECK_EQUAL(ForSpeech("Turn right onto Dr. Martin Luther King Jr. Blvd."),
+              std::string("Turn right onto Doctor Martin Luther King Junior Boulevard."));
+  CHECK_EQUAL(ForSpeech("Martin Luther King, Jr. was right."), std::string("Martin Luther King, Junior was right."));
+  CHECK_EQUAL(ForSpeech("Hank Williams Sr. Then left."), std::string("Hank Williams Senior. Then left."));
+  CHECK_EQUAL(ForSpeech("Like Sammy Davis Jr."), std::string("Like Sammy Davis Junior."));
+  // Street types stay street types.
+  CHECK_EQUAL(ForSpeech("Main St. Then left"), std::string("Main Street. Then left"));
+  CHECK_EQUAL(ForSpeech("Turn onto Elm Dr."), std::string("Turn onto Elm Drive."));
+  CHECK_EQUAL(ForSpeech("Main St NW"), std::string("Main Street Northwest"));
+  CHECK_EQUAL(ForSpeech("Turn onto 5th St. Johnson is waiting."), std::string("Turn onto fifth Street. Johnson is waiting."));
+  CHECK_EQUAL(ForSpeech("Elm Dr. Keep going."), std::string("Elm Drive. Keep going."));
+  // Road types next to a route number.
+  CHECK_EQUAL(ForSpeech("Take Hwy 290"), std::string("Take Highway two hundred ninety"));
+  CHECK_EQUAL(ForSpeech("Merge onto the 101 Fwy."), std::string("Merge onto the one hundred one Freeway."));
+  CHECK_EQUAL(ForSpeech("Stay on Rte. 66"), std::string("Stay on Route sixty six"));
+  // Not titles: all caps, lowercase, no name after.
+  CHECK_EQUAL(ForSpeech("Take SR 71"), std::string("Take State Route seventy one"));
+  CHECK_EQUAL(ForSpeech("the dr is in"), std::string("the dr is in"));
+  CHECK_EQUAL(ForSpeech("Jr high"), std::string("Jr high"));
 }

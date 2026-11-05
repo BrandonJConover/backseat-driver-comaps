@@ -461,6 +461,98 @@ bool Space(char ch)
   return std::isspace(static_cast<unsigned char>(ch)) != 0;
 }
 
+// MARK: - Titles in names
+
+// Capitalised words that can sit right before "St"/"Dr"/"Ft" without being the street's own name
+// ("Take St. Johns Rd", "Call Dr Smith"). Lowercase.
+bool LeadInWord(std::string const & w)
+{
+  static std::set<std::string> const words = {
+      "take", "turn", "continue", "merge", "exit", "keep", "stay", "head", "follow", "use", "visit",
+      "call", "ask", "see", "meet", "find", "blame", "thank", "onto", "on", "to", "at", "via", "toward",
+      "towards", "from", "into", "past", "near", "then", "and", "or", "by", "for", "in", "of", "the", "a", "off"};
+  return words.count(w) > 0;
+}
+
+/// True when the word just before `pos` names a street, so "St"/"Dr" at `pos` is its type ("Main St.",
+/// "5th St"): a number, or a capitalised word that isn't a lead-in. Start of text, punctuation or a
+/// lowercase word before it mean a title ("onto St. Johns Rd", "Go to St Louis").
+bool StreetNameBefore(std::string const & s, size_t pos)
+{
+  if (pos < 2 || s[pos - 1] != ' ')
+    return false;
+  size_t const end = pos - 1;
+  size_t start = end;
+  while (start > 0 && (std::isalnum(static_cast<unsigned char>(s[start - 1])) || s[start - 1] == '\''))
+    --start;
+  if (start == end)
+    return false;
+  auto const first = static_cast<unsigned char>(s[start]);
+  if (std::isdigit(first))
+    return true;
+  return std::isupper(first) && !LeadInWord(Lower(std::string_view(s).substr(start, end - start)));
+}
+
+bool StreetWord(std::string const & w)
+{
+  for (auto const & sw : kStreetWords)
+    if (w == sw[0] || w == sw[1])
+      return true;
+  return false;
+}
+
+/// "St. Johns Rd" is "Saint Johns Rd", "Dr Martin Luther King Jr Blvd" is "Doctor Martin Luther
+/// King Junior Blvd", "Ft Worth" is "Fort Worth", "Hwy 290" is "Highway 290", "101 Fwy" is "101
+/// Freeway". "Main St. Then left" and "Elm Dr." stay street types for the street pass.
+std::string Titles(std::string s)
+{
+  static std::regex const title("\\b(St|Ste|Dr|Ft)\\.? (?=[A-Z][a-z])");
+  s = Replace(s, title, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    if (StreetNameBefore(s, pos))
+      return std::nullopt;
+    static std::map<std::string, std::string> const words = {
+        {"St", "Saint"}, {"Ste", "Saint"}, {"Dr", "Doctor"}, {"Ft", "Fort"}};
+    return words.at(m.str(1)) + " ";
+  });
+  // Jr and Sr after a name. The period goes when the sentence carries on ("King Jr. Blvd",
+  // "Jr. was"), and stays when it may end the sentence ("Sammy Davis Jr.").
+  static std::regex const suffix("(,? )(Jr|Sr)(\\.?)(?=$|[\\s,;:!?)])");
+  s = Replace(s, suffix, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    if (pos == 0 || !IsAsciiLetter(s[pos - 1]))
+      return std::nullopt;
+    size_t start = pos;
+    while (start > 0 && IsAsciiLetter(s[start - 1]))
+      --start;
+    if (!std::isupper(static_cast<unsigned char>(s[start])))
+      return std::nullopt;
+    std::string out = m.str(1) + (m.str(2) == "Jr" ? "Junior" : "Senior");
+    if (m[3].length() > 0)
+    {
+      size_t next = pos + static_cast<size_t>(m.length(0));
+      while (next < s.size() && Space(s[next]))
+        ++next;
+      size_t wordEnd = next;
+      while (wordEnd < s.size() && IsAsciiLetter(s[wordEnd]))
+        ++wordEnd;
+      auto const word = s.substr(next, wordEnd - next);
+      bool const carriesOn = !word.empty() && (std::islower(static_cast<unsigned char>(word[0])) || StreetWord(word));
+      if (!carriesOn)
+        out += ".";
+    }
+    return out;
+  });
+  // Road types next to a route number.
+  static std::regex const roadBefore("\\b(Hwy|Fwy|Expy|Pkwy|Rte)\\.? (?=\\d)");
+  s = Replace(s, roadBefore, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return (m.str(1) == "Rte" ? std::string("Route") : Street(m.str(1))) + " ";
+  });
+  static std::regex const roadAfter("\\b(\\d+[A-Z]?) (Hwy|Fwy|Expy|Pkwy)\\b");
+  s = Replace(s, roadAfter, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return m.str(1) + " " + Street(m.str(2));
+  });
+  return s;
+}
+
 std::string Ordinal(long long n)
 {
   auto const words = SpellNumber(n);
@@ -1104,6 +1196,8 @@ std::string ForSpeech(std::string const & text)
   // The driver's own words first: they know best.
   s = ApplyUserWords(s);
   s = PickSenses(s);
+  // Saint, Doctor, Fort, Junior before the street pass can take them for street types.
+  s = Titles(s);
 
   // "Main St", "Elm Dr." after a word, at the end or before punctuation, a lowercase word or a
   // compass point ("Main St NW"). Not "Dr Smith" or "St Louis". A period after it stays: it was
