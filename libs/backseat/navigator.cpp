@@ -212,6 +212,8 @@ double constexpr kNavLinePauseMs = 350;
 double constexpr kFirstTurnFirstWithinM = 350;
 /// "Still speeding" nags back off to one every 5 minutes on a long stretch over the limit.
 double constexpr kSpeedingRenagMaxMs = 300000;
+// A one-second speed change past this is a GPS glitch, not driving (about 1.2 g; see EngineConfig).
+double constexpr kImplausibleMps2 = 12;
 int constexpr kSpeedingTolerance = 2;
 int constexpr kSpeedingToleranceFast = 3;
 double constexpr kSpeedingBarelyEveryMs = 5 * 60000;
@@ -1227,6 +1229,8 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   config.speechAware = true;
   if (config.speedingRenagMaxMs == 0)
     config.speedingRenagMaxMs = kSpeedingRenagMaxMs;
+  if (config.implausibleMps2 == 0)
+    config.implausibleMps2 = kImplausibleMps2;
   // A phone in a pocket jolts and jumps, and that's not hard braking.
   if (!InCar(m_travelMode))
   {

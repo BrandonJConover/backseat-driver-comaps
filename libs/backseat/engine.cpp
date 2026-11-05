@@ -331,7 +331,21 @@ std::vector<Commentary> CritiqueEngine::OnTelemetry(TelemetrySample const & s)
     // One continuous hard stop counts once, however many samples it spans.
     // A made-up speed (GPS said "unknown") on either side isn't a measurement: a tunnel isn't a stop.
     bool const measured = s.speedKnown && prev->speedKnown;
-    double const accel = dt <= 3 && measured ? (s.speedMps - prev->speedMps) / dt : 0;
+    // Measure from before a glitch when the last step was one, so the snap back isn't a launch.
+    TelemetrySample const & ref = m_beforeGlitch ? *m_beforeGlitch : *prev;
+    double const refDt = (s.t - ref.t) / 1000;
+    double accel = refDt <= 3 && measured && ref.speedKnown ? (s.speedMps - ref.speedMps) / refDt : 0;
+    if (m_config.implausibleMps2 > 0 && std::abs(accel) > m_config.implausibleMps2)
+    {
+      // Keep the last believable sample while the glitch lasts (the 3 s window above ends it).
+      if (!m_beforeGlitch)
+        m_beforeGlitch = *prev;
+      accel = 0;
+    }
+    else
+    {
+      m_beforeGlitch.reset();
+    }
     bool const braking = accel <= -m_config.hardBrakeMps2;
     bool const accelerating = accel >= m_config.hardAccelMps2;
     if (braking && !m_braking)

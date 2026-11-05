@@ -2316,9 +2316,29 @@ TEST(RealHardStopStillRoastsWithKnownSpeeds)
     nav.OnFix(At(i * 1000.0, 30), OnRoute(1, TurnKind::Left, 20000 - i * 30.0));
     nav.TakeLines();
   }
-  nav.OnFix(At(30000, 15), OnRoute(1, TurnKind::Left, 19100));
-  nav.OnFix(At(31000, 0), OnRoute(1, TurnKind::Left, 19095));
+  // About 9 m/s², an emergency stop a car can actually do (30 -> 0 in two seconds can't be).
+  nav.OnFix(At(30000, 21), OnRoute(1, TurnKind::Left, 19100));
+  nav.OnFix(At(31000, 12), OnRoute(1, TurnKind::Left, 19085));
+  nav.OnFix(At(32000, 3), OnRoute(1, TurnKind::Left, 19078));
+  nav.OnFix(At(33000, 0), OnRoute(1, TurnKind::Left, 19077));
   CHECK_EQUAL(nav.Engine()->Stats().hardBrakes, 1);
+}
+
+// A one-fix speed blip on the highway (30 -> 10 -> 30 m/s) is the GPS: no brake or launch roast.
+TEST(OneFixSpeedGlitchIsNotARoast)
+{
+  Navigator nav(Config());
+  bool roasted = false;
+  for (int i = 0; i < 40; ++i)
+  {
+    double const v = i == 30 ? 10 : 30;
+    nav.OnFix(At(i * 1000.0, v), OnRoute(1, TurnKind::Left, 20000 - i * 30.0));
+    for (auto const & l : nav.TakeLines())
+      roasted = roasted || l.category == Category::HardBraking || l.category == Category::HardAccel;
+  }
+  CHECK(!roasted);
+  CHECK_EQUAL(nav.Engine()->Stats().hardBrakes, 0);
+  CHECK_EQUAL(nav.Engine()->Stats().hardAccels, 0);
 }
 
 namespace
