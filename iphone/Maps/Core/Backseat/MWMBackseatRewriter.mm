@@ -265,6 +265,14 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
     Perform(GetFramework().GetRoutingManager().BackseatDriverSaid(text.UTF8String ?: ""));
     return;
   }
+  // Swearing with no command in it gets a comeback from the keywords. The model made "screw you"
+  // into a tool call, or answered it with chat.
+  std::string const said = text.UTF8String ?: "";
+  if (backseat::CurseIn(said) && backseat::ParseAppCommands(said).empty())
+  {
+    Perform(GetFramework().GetRoutingManager().BackseatDriverSaid(said));
+    return;
+  }
   // With the on-device model, it picks the app action; what it can't place goes to the keywords.
   // Not during a game: "Are you metal?" is a question for the game, and the model made it "list the
   // voices". The keywords hand it to the game, and still catch real commands.

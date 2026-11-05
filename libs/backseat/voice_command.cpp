@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <initializer_list>
 #include <iterator>
 #include <map>
 #include <sstream>
@@ -500,6 +501,101 @@ std::optional<std::string> SpokenLines::EchoOf(double tMs, std::string const & h
     if (IsEchoOf(heard, it->line))
       return it->line;
   return {};
+}
+
+namespace
+{
+/// CommandWords(), with censored swears spelled out: the recognizer writes "f***" and "s***".
+std::string SwearWords(std::string const & text)
+{
+  std::string words = " ";
+  std::string token;
+  auto const flush = [&]
+  {
+    if (token.empty())
+      return;
+    if (token.find('*') != std::string::npos)
+    {
+      // "f***", "f***ing", "a**hole", "****".
+      char const first = token[0];
+      bool const ing = token.size() > 3 && token.compare(token.size() - 3, 3, "ing") == 0;
+      token = first == 's' ? "shit" : first == 'b' ? "bitch" : first == 'a' ? "asshole" : first == 'd' ? "damn"
+            : ing ? "fucking" : "fuck";
+    }
+    words += token + " ";
+    token.clear();
+  };
+  for (unsigned char const ch : text)
+  {
+    if (std::isalnum(ch) || ch == '\'' || ch == '*')
+      token += static_cast<char>(std::tolower(ch));
+    else
+      flush();
+  }
+  flush();
+  return words;
+}
+
+bool CurseHasAny(std::string const & words, std::initializer_list<char const *> phrases)
+{
+  return std::any_of(phrases.begin(), phrases.end(), [&words](char const * p) { return words.find(p) != std::string::npos; });
+}
+}  // namespace
+
+std::optional<Curse> CurseIn(std::string const & spoken)
+{
+  std::string const w = SwearWords(spoken);
+  if (CurseHasAny(w, {" fuck you ", " fuck me ", " fuck yourself ", " eff you ", " f you ", " frick you ", " screw me ",
+                 " fuck u ", " fuckin you ", " fucking you "}))
+    return Curse::Proposition;
+  if (CurseHasAny(w, {" screw you ", " screw off ", " screw u ", " screw this phone ", " screw this gps ", " screw this app "}))
+    return Curse::Screw;
+  if (CurseHasAny(w, {" go to hell ", " to hell with you ", " damn you ", " damn phone ", " damn gps ", " damn app ",
+                 " goddamn phone ", " goddamn gps ", " goddamn app ", " damned phone "}))
+    return Curse::Hell;
+  if (CurseHasAny(w, {" you bitch ", " you asshole ", " you piece of ", " piece of junk ", " piece of crap ", " piece of shit ",
+                 " stupid phone ", " stupid gps ", " stupid app ", " dumb phone ", " dumb gps ", " dumb app ",
+                 " you suck ", " fuck off ", " shut up bitch ", " you're useless ", " youre useless ",
+                 " useless phone ", " useless gps ", " you idiot ", " you moron ", " you're an idiot ",
+                 " youre an idiot ", " you're stupid ", " youre stupid ", " you're so stupid ", " youre so stupid ",
+                 " you dumbass ", " you jerk ", " stupid bitch ", " fucking phone ", " fucking gps ", " fucking app ",
+                 " shitty phone ", " shitty gps ", " shitty app "}))
+    return Curse::Insult;
+  if (CurseHasAny(w, {" fuck ", " fucking ", " fuckin ", " fucker ", " motherfucker ", " shit ", " bullshit ", " shitty ",
+                 " damn ", " dammit ", " damnit ", " goddamn ", " goddammit ", " goddamnit ", " bitch ", " asshole ",
+                 " son of a bitch ", " sonofabitch ", " dumbass ", " jackass "}))
+    return Curse::Blurt;
+  return std::nullopt;
+}
+
+char const * CurseLineKey(Curse curse)
+{
+  switch (curse)
+  {
+  case Curse::Screw: return "curse.screw";
+  case Curse::Proposition: return "curse.proposition";
+  case Curse::Hell: return "curse.hell";
+  case Curse::Insult: return "curse.insult";
+  case Curse::Blurt: return "curse.blurt";
+  }
+  return "curse.blurt";
+}
+
+std::optional<std::string> CurseRetorts::KeyFor(std::string const & spoken, double tMs)
+{
+  auto const curse = CurseIn(spoken);
+  if (!curse)
+    return std::nullopt;
+  if (m_lastAt && tMs - *m_lastAt < kRepeatMs)
+    return std::nullopt;
+  if (*curse == Curse::Blurt)
+  {
+    if (m_lastBlurtAt && tMs - *m_lastBlurtAt < kBlurtEveryMs)
+      return std::nullopt;
+    m_lastBlurtAt = tMs;
+  }
+  m_lastAt = tMs;
+  return std::string(CurseLineKey(*curse));
 }
 
 bool IsFiller(std::string const & spoken)
