@@ -94,6 +94,28 @@ void SayReply(std::string const & text, std::string const & voiceId)
                               fallback:^{ [[MWMTextToSpeech tts] play:line]; }];
 }
 
+/// Screens whose lines are dropped once the driver taps past them, instead of being said late.
+NSString * const kWalkQuestionScreen = @"walkQuestion";
+NSString * const kDrivingButtonScreen = @"drivingButton";
+
+/// Says a line that goes with `screen` (an alert, a highlighted button). DropScreenLines(screen)
+/// throws it away if it hasn't been said yet.
+void SayScreenLine(std::string const & text, NSString * screen)
+{
+  if (text.empty())
+    return;
+  NSString * line = @(text.c_str());
+  [BackseatKokoroVoice.shared sayReply:line
+                               voiceID:nil
+                                screen:screen
+                              fallback:^{ [[MWMTextToSpeech tts] play:line]; }];
+}
+
+void DropScreenLines(NSString * screen)
+{
+  [BackseatKokoroVoice.shared dropLinesForScreen:screen];
+}
+
 void SetRoutingOption(void (^change)(MWMRoutingOptions * options))
 {
   MWMRoutingOptions * options = [[MWMRoutingOptions alloc] init];
@@ -514,20 +536,26 @@ static m2::PointD gWalkConfirmedTo{1e9, 1e9};
 + (void)askWalkQuestionTo:(m2::PointD)to
 {
   auto & rm = GetFramework().GetRoutingManager();
-  SayReply(rm.BackseatReply("mode.ask.walk"), {});
+  // The question goes with the alert: once it's answered, an unsaid question is dropped, not said
+  // a mile down the road (Brandon, 2026-11-05).
+  SayScreenLine(rm.BackseatReply("mode.ask.walk"), kWalkQuestionScreen);
   UIAlertController * alert = [UIAlertController alertControllerWithTitle:@"Are you actually intending to walk there?"
                                                                   message:nil
                                                            preferredStyle:UIAlertControllerStyleAlert];
   [alert addAction:[UIAlertAction actionWithTitle:@"No" style:UIAlertActionStyleDefault handler:^(UIAlertAction *) {
     gWalkQuestion = nil;
-    // "I'm going to need you to click the driving button." Nothing starts until it's tapped.
-    SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.no"), {});
+    DropScreenLines(kWalkQuestionScreen);
+    // "I'm going to need you to click the driving button." Nothing starts until it's tapped, and
+    // once it is, this goes too if it hasn't been said.
+    SayScreenLine(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.no"), kDrivingButtonScreen);
     gDrivingHighlighted = YES;
     [[NSNotificationCenter defaultCenter] postNotificationName:kBackseatDrivingHighlightChanged object:nil];
   }]];
   [alert addAction:[UIAlertAction actionWithTitle:@"Yes" style:UIAlertActionStyleDefault handler:^(UIAlertAction *) {
     gWalkQuestion = nil;
-    SayReply(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.yes"), {});
+    DropScreenLines(kWalkQuestionScreen);
+    // Still the alert's line: it waits only briefly for Kokoro, then the system voice says it.
+    SayScreenLine(GetFramework().GetRoutingManager().BackseatReply("mode.ask.walk.yes"), kWalkQuestionScreen);
     gWalkConfirmedTo = to;
     [MWMRouter startRouting];
   }]];
@@ -544,6 +572,7 @@ static m2::PointD gWalkConfirmedTo{1e9, 1e9};
     return;
   gDrivingHighlighted = NO;
   [[NSNotificationCenter defaultCenter] postNotificationName:kBackseatDrivingHighlightChanged object:nil];
+  DropScreenLines(kDrivingButtonScreen);
   // Tapped: the drive starts by itself once it's built, with "check the mode now and then".
   GetFramework().GetRoutingManager().GetBackseat().WarnModeOnNextDrive();
   [MWMRouter startWhenReady];

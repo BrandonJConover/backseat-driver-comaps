@@ -7,6 +7,11 @@
 // line queued behind others renders while they play, so a burst at trip start stays in Kokoro. Roasts queue, go stale after `roastMaxAge`, and are
 // cut off when a navigation line needs the speaker. Settings picks the voice, or the system voice.
 //
+// A line that belongs to something on screen (the "are you intending to walk there?" alert, the
+// driving button it lights up) carries that screen's name. Once the driver taps past it,
+// dropLines(forScreen:) throws the line away wherever it is (waiting for Kokoro, rendering, queued,
+// or talking) instead of saying it late (Brandon, 2026-11-05).
+//
 // Apple's BNNS can crash inside Core ML on iOS 26.4 and later (FluidAudio #817/#844). That can't be
 // caught, so `CoreMLCrashGuard` notices a crash during Kokoro's own model load at the next launch.
 // Kokoro stays the voice regardless: after such a crash it loads lazily on the first line instead
@@ -25,6 +30,8 @@ final class KokoroVoice: NSObject {
 
   /// True while the system voice is talking, so a Kokoro clip doesn't talk over it.
   @objc var systemIsSpeaking: (() -> Bool)?
+  /// Silences the system voice and what it has queued, for a line that went stale on it.
+  @objc var stopSystemVoice: (() -> Void)?
 
   private static let log = os.Logger(subsystem: "com.brandonjconover.backseatdriver", category: "Kokoro")
   fileprivate static let navDeadline: TimeInterval = 2.5
@@ -92,7 +99,7 @@ final class KokoroVoice: NSObject {
     speaksInstructionLanguage ? selectedVoiceID : nil
   }
 
-  private enum State { case waiting, playing, fellBack }
+  private enum State { case waiting, playing, fellBack, dropped }
 
   private final class Job {
     let text: String
@@ -101,6 +108,8 @@ final class KokoroVoice: NSObject {
     let voice: String
     /// A reply to the driver: it never goes stale.
     let keep: Bool
+    /// The screen it belongs to: dropped once the driver taps past it.
+    let screen: String?
     let fallback: () -> Void
     let generation: Int
     /// Navigation lines: how long to wait for Kokoro before the system voice says it.
@@ -110,13 +119,14 @@ final class KokoroVoice: NSObject {
     /// When nothing was ahead of it any more and the speaker was free (main queue only).
     var headSince: Date?
 
-    init(text: String, nav: Bool, speed: Float, voice: String, keep: Bool, fallback: @escaping () -> Void,
-         generation: Int, budget: TimeInterval = KokoroVoice.navDeadline) {
+    init(text: String, nav: Bool, speed: Float, voice: String, keep: Bool, screen: String? = nil,
+         fallback: @escaping () -> Void, generation: Int, budget: TimeInterval = KokoroVoice.navDeadline) {
       self.text = text
       self.nav = nav
       self.speed = speed
       self.voice = voice
       self.keep = keep
+      self.screen = screen
       self.fallback = fallback
       self.generation = generation
       self.budget = budget
@@ -145,10 +155,27 @@ final class KokoroVoice: NSObject {
   private var lastLoadAttempt = Date.distantPast
   /// After a failed load (not a crash), the next line tries again at most this often.
   private static let reloadEvery: TimeInterval = 60
+  /// A line that came in before Kokoro was ready. stop() and dropLines(forScreen:) cancel it, so
+  /// neither the ready signal nor its timer says it later. Guarded by `lock`.
+  private final class WaitingLine {
+    let screen: String?
+    var done = false
+    var say: () -> Void = {}
+    init(screen: String?) { self.screen = screen }
+  }
+
   /// Lines that came in before Kokoro was ready, to say once it is.
-  private var waitingForReady: [() -> Void] = []
-  /// How long a line waits for Kokoro to load before the system voice says it instead.
-  private static let readyWait: TimeInterval = 20
+  private var waitingForReady: [WaitingLine] = []
+  /// How long a line waits for Kokoro to load before the system voice says it instead. Loading
+  /// models that are already on the phone takes a few seconds on the CPU.
+  private static let readyWait: TimeInterval = 10
+  /// The same for a line that goes with something on screen: it has to match what's showing, so
+  /// the system voice says it rather than have it come in late.
+  private static let screenReadyWait: TimeInterval = 3
+  /// start() has a load coming in `warmUpDelay`: lines wait for it.
+  private var loadPending = false
+  /// The load is the first download of the models (hundreds of MB): nothing waits for that.
+  private var downloading = false
   /// How long after launch the warm-up starts, so loading the models isn't part of opening the app.
   private static let warmUpDelay: TimeInterval = 2
   /// The same, the launch after a crash during the load.
@@ -284,6 +311,7 @@ final class KokoroVoice: NSObject {
     let mode = CoreMLCrashGuard.checkAtLaunch()
     DispatchQueue.main.async { [self] in observeApp() }
     player.systemIsSpeaking = { [weak self] in self?.systemIsSpeaking?() ?? false }
+    player.stopSystemVoice = { [weak self] in self?.stopSystemVoice?() }
     player.systemStoodIn = { [weak self] in
       guard let self else { return }
       self.lock.lock(); self.systemStoodIn = true; self.lock.unlock()
@@ -314,6 +342,7 @@ final class KokoroVoice: NSObject {
     }
     if UserDefaults.standard.bool(forKey: Self.installedKey) {
       // Not during launch itself: give the first screen a moment, then load in the background.
+      lock.lock(); loadPending = true; lock.unlock()
       DispatchQueue.main.asyncAfter(deadline: .now() + Self.warmUpDelay) { [self] in load() }
       return
     }
@@ -342,13 +371,17 @@ final class KokoroVoice: NSObject {
 
   private func load() {
     lock.lock()
+    loadPending = false
     if loading || primary != nil { lock.unlock(); return }
     loading = true
+    // The first download waits on nobody: lines go to the system voice until it's done, instead
+    // of each one sitting out the wait (which is what backed up the first drive).
+    downloading = !UserDefaults.standard.bool(forKey: Self.installedKey)
     lastLoadAttempt = Date()
     lock.unlock()
     // Every line but an imminent turn waits for it.
     Task.detached(priority: .userInitiated) { [self] in
-      defer { lock.lock(); loading = false; lock.unlock() }
+      defer { lock.lock(); loading = false; downloading = false; lock.unlock() }
       let began = Date()
       let voice = Self.voice ?? Self.defaultVoice
       // The CPU first: after an install or update the Neural Engine recompiles the models, which
@@ -358,6 +391,7 @@ final class KokoroVoice: NSObject {
         defer { CoreMLCrashGuard.endLoad() }
         let cpu = KokoroAneManager(computeUnits: .cpuOnly)
         try await cpu.initialize(preloadVoices: [voice])
+        lock.lock(); downloading = false; lock.unlock()
         await KokoroPronunciation.install(on: cpu)
         UserDefaults.standard.set(true, forKey: Self.installedKey)
         _ = try await render("Hello.", speed: 1, voice: voice, nav: false, with: cpu)
@@ -410,11 +444,12 @@ final class KokoroVoice: NSObject {
     let waiting = first ? waitingForReady : []
     if first { waitingForReady.removeAll() }
     lock.unlock()
+    // Each line's say() checks it wasn't cancelled meanwhile.
     Self.log.info("Kokoro voice ready on \(name, privacy: .public) in \(Int(Date().timeIntervalSince(began) * 1000)) ms")
     BackseatLog.event("voice.ready", ["on": onCPU ? "cpu" : "ane", "ms": String(Int(Date().timeIntervalSince(began) * 1000))])
     if first {
       startWorker()
-      waiting.forEach { $0() }
+      waiting.forEach { $0.say() }
     }
   }
 
@@ -425,7 +460,7 @@ final class KokoroVoice: NSObject {
     let waiting = waitingForReady
     waitingForReady.removeAll()
     lock.unlock()
-    waiting.forEach { $0() }
+    waiting.forEach { $0.say() }
   }
 
   /// Lets the next start() try the download again.
@@ -559,6 +594,38 @@ final class KokoroVoice: NSObject {
     enqueue(text, nav: false, speed: 1, voice: voiceID, keep: true, fallback: fallback)
   }
 
+  /// A reply that goes with something on screen (`screen` names it). If the driver taps past it
+  /// before it's said, dropLines(forScreen:) throws it away rather than have it come in late.
+  @objc func sayReply(_ text: String, voiceID: String?, screen: String, fallback: @escaping () -> Void) {
+    enqueue(text, nav: false, speed: 1, voice: voiceID, keep: true, screen: screen, fallback: fallback)
+  }
+
+  /// The driver tapped past `screen`: its lines that haven't been said are dropped, and one that's
+  /// talking is faded out. Main queue.
+  @objc func dropLines(forScreen screen: String) {
+    lock.lock()
+    var dropped = 0
+    for line in waitingForReady where line.screen == screen && !line.done {
+      line.done = true
+      dropped += 1
+    }
+    waitingForReady.removeAll { $0.screen == screen }
+    for job in navJobs + roastJobs where job.screen == screen && job.state == .waiting {
+      job.state = .dropped
+      dropped += 1
+    }
+    navJobs.removeAll { $0.screen == screen }
+    roastJobs.removeAll { $0.screen == screen }
+    // Rendering right now: synthesize() sees it's no longer waiting and doesn't play it.
+    if let job = rendering, job.screen == screen, job.state == .waiting {
+      job.state = .dropped
+      dropped += 1
+    }
+    lock.unlock()
+    dropped += player.drop(screen: screen)
+    if dropped > 0 { BackseatLog.event("voice.dropped", ["screen": screen, "lines": String(dropped)]) }
+  }
+
   /// Like sayReply(_:voiceID:fallback:), at one of the first launch's tempos: a multiple of the
   /// usual pace.
   func sayReply(_ text: String, tempo: FirstLaunchTempo, voiceID: String?, fallback: @escaping () -> Void) {
@@ -572,7 +639,7 @@ final class KokoroVoice: NSObject {
   }
 
   private func enqueue(_ text: String, nav: Bool, speed: Float, voice requested: String?, keep: Bool,
-                       fallback: @escaping () -> Void, budget: TimeInterval = navDeadline,
+                       screen: String? = nil, fallback: @escaping () -> Void, budget: TimeInterval = navDeadline,
                        noWait: Bool = false) {
     MWMBackseatRewriter.noteSpoken(text)
     let queuedAt = Date()
@@ -592,45 +659,37 @@ final class KokoroVoice: NSObject {
       lock.lock()
     }
     let known = requested.flatMap { id in Self.voiceOptions.contains { $0.id == id } ? id : nil }
-    // Still loading: everything waits for Kokoro rather than switching voices. A navigation line
-    // waits only while a load is actually running, and only for what's left of its budget (a
-    // load takes 1-3 s); then the system voice says it.
-    let waitForLoad = primary == nil && Self.voice != nil && !failed && !noWait && (!nav || loading)
-    if waitForLoad, nav {
-      var said = false
-      let say = { [self] in
-        guard !said else { return }
-        said = true
-        enqueue(text, nav: nav, speed: speed, voice: requested, keep: keep, fallback: fallback,
-                budget: max(budget - Date().timeIntervalSince(queuedAt), Self.headGrace), noWait: true)
-      }
-      waitingForReady.append(say)
-      lock.unlock()
-      DispatchQueue.main.asyncAfter(deadline: .now() + budget) { [self] in
-        lock.lock()
-        let stillWaiting = primary == nil
-        lock.unlock()
-        if stillWaiting { say() }
-      }
-      return
-    }
+    // Still loading: lines wait for Kokoro rather than switching voices, but only while a load of
+    // models already on the phone is running or about to (a few seconds). The first download
+    // (or waiting for Wi-Fi to start it) holds nothing up: on the first drive every reply used to
+    // sit out a 20 s wait, so they came in late and bunched up. A navigation line waits only for
+    // what's left of its budget; a line for something on screen only `screenReadyWait`.
+    let loadSoon = (loading && !downloading) || loadPending
+    let waitForLoad = primary == nil && Self.voice != nil && !failed && !noWait && loadSoon
     if waitForLoad {
-      var said = false
-      let say = { [self] in
-        guard !said else { return }
-        said = true
-        enqueue(text, nav: nav, speed: speed, voice: requested, keep: keep, fallback: fallback, budget: budget,
+      let line = WaitingLine(screen: screen)
+      let remaining = nav ? budget : (screen != nil ? Self.screenReadyWait : Self.readyWait)
+      line.say = { [self, weak line] in
+        guard let line else { return }
+        lock.lock()
+        let cancelled = line.done
+        line.done = true
+        waitingForReady.removeAll { $0 === line }
+        lock.unlock()
+        guard !cancelled else { return }
+        enqueue(text, nav: nav, speed: speed, voice: requested, keep: keep, screen: screen, fallback: fallback,
+                budget: nav ? max(budget - Date().timeIntervalSince(queuedAt), Self.headGrace) : budget,
                 noWait: true)
       }
-      waitingForReady.append(say)
+      waitingForReady.append(line)
       lock.unlock()
-      DispatchQueue.main.asyncAfter(deadline: .now() + Self.readyWait) { [self] in
+      DispatchQueue.main.asyncAfter(deadline: .now() + remaining) { [self, line] in
         lock.lock()
         let stillWaiting = primary == nil
         lock.unlock()
         // After the wait, enqueue() hands this line to the system voice; the next one still waits
         // for Kokoro, which may yet finish loading.
-        if stillWaiting { say() }
+        if stillWaiting { line.say() }
       }
       return
     }
@@ -638,7 +697,7 @@ final class KokoroVoice: NSObject {
       let why = CoreMLCrashGuard.mode == .paused ? "crashGuard" : failed ? "error" : "notReady"
       lock.unlock()
       Self.trace(text, voice: "system", why: why, budget: nav ? budget : 0)
-      DispatchQueue.main.async { self.player.sayWithSystemVoice(nav: nav, text: text, fallback) }
+      DispatchQueue.main.async { self.player.sayWithSystemVoice(nav: nav, text: text, screen: screen, fallback) }
       return
     }
     let voice = known ?? picked
@@ -659,10 +718,10 @@ final class KokoroVoice: NSObject {
       touch(key)
       lock.unlock()
       Self.trace(text, voice: "kokoro-cached", budget: nav ? budget : 0)
-      DispatchQueue.main.async { self.player.play(wav, nav: nav, keep: keep, text: text) }
+      DispatchQueue.main.async { self.player.play(wav, nav: nav, keep: keep, text: text, screen: screen) }
       return
     }
-    let job = Job(text: text, nav: nav, speed: speed, voice: voice, keep: keep, fallback: fallback,
+    let job = Job(text: text, nav: nav, speed: speed, voice: voice, keep: keep, screen: screen, fallback: fallback,
                   generation: generation, budget: budget)
     if nav { navJobs.append(job) } else { roastJobs.append(job) }
     lock.unlock()
@@ -704,7 +763,7 @@ final class KokoroVoice: NSObject {
     Self.log.debug("Kokoro too slow for a navigation line, using the system voice")
     Self.trace(job.text, voice: "system", why: blocked ? "deadlineCap" : "deadline", waitMs: waited * 1000,
                budget: job.budget)
-    player.sayWithSystemVoice(nav: true, text: job.text, job.fallback)
+    player.sayWithSystemVoice(nav: true, text: job.text, screen: job.screen, job.fallback)
   }
 
   /// Stops playback and forgets queued lines.
@@ -713,6 +772,10 @@ final class KokoroVoice: NSObject {
     generation += 1
     navJobs.removeAll()
     roastJobs.removeAll()
+    // Lines still waiting for Kokoro to load went on being said after a stop (onboarding stops at
+    // every screen change, so the old screen's lines came in on the new one).
+    waitingForReady.forEach { $0.done = true }
+    waitingForReady.removeAll()
     lock.unlock()
     DispatchQueue.main.async { self.player.stop() }
   }
@@ -1027,7 +1090,11 @@ final class KokoroVoice: NSObject {
       let reload = lineFailures >= 3
       lock.unlock()
       if fallBack { Self.trace(job.text, voice: "system", why: "error", budget: job.nav ? job.budget : 0) }
-      if fallBack { DispatchQueue.main.async { self.player.sayWithSystemVoice(nav: job.nav, text: job.text, job.fallback) } }
+      if fallBack {
+        DispatchQueue.main.async {
+          self.player.sayWithSystemVoice(nav: job.nav, text: job.text, screen: job.screen, job.fallback)
+        }
+      }
       if reload { reloadEngines("three lines in a row failed") }
       return
     }
@@ -1046,7 +1113,9 @@ final class KokoroVoice: NSObject {
       Self.trace(job.text, voice: "kokoro", waitMs: renderStart.timeIntervalSince(job.queuedAt) * 1000,
                  renderMs: Date().timeIntervalSince(renderStart) * 1000, budget: job.nav ? job.budget : 0)
     }
-    if play { DispatchQueue.main.async { self.player.play(wav, nav: job.nav, keep: job.keep, text: job.text) } }
+    if play {
+      DispatchQueue.main.async { self.player.play(wav, nav: job.nav, keep: job.keep, text: job.text, screen: job.screen) }
+    }
   }
 
   /// One "voice" line in the drive log: who said it, and why the system voice did if it did.
@@ -1084,10 +1153,13 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
     var keep = false
     /// What it says, for the caption bubble.
     var text = ""
+    /// The screen it goes with, if any (KokoroVoice.dropLines(forScreen:)).
+    var screen: String?
     let queuedAt = Date()
   }
 
   var systemIsSpeaking: () -> Bool = { false }
+  var stopSystemVoice: () -> Void = {}
   /// Called whenever a line goes to the system voice.
   var systemStoodIn: () -> Void = {}
   /// Called when a call or Siri is over and the speaker is ours again.
@@ -1100,9 +1172,13 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   private var roastQueue: [Item] = []
   private var current: AVAudioPlayer?
   private var currentIsNav = false
+  private var currentScreen: String?
+  /// The screen of the last line handed to the system voice. Nothing was handed over after it, so
+  /// while the system voice talks, it's that line (or one before it) talking.
+  private var lastSystemScreen: String?
   private var waitingSince: Date?
   /// System-voice lines waiting for the clip that's talking to finish.
-  private var pendingSystem: [(nav: Bool, text: String, speak: () -> Void)] = []
+  private var pendingSystem: [(nav: Bool, text: String, screen: String?, speak: () -> Void)] = []
   /// No clip starts before this: the pause after the last one.
   private var quietUntil = Date.distantPast
   /// How long a clip waits for the system voice before giving up on politeness.
@@ -1138,12 +1214,12 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
                        object: nil)
   }
 
-  func play(_ wav: Data, nav: Bool, keep: Bool, text: String = "") {
+  func play(_ wav: Data, nav: Bool, keep: Bool, text: String = "", screen: String? = nil) {
     if nav {
-      navQueue.append(Item(wav: wav, nav: true, text: text))
+      navQueue.append(Item(wav: wav, nav: true, text: text, screen: screen))
       if current != nil && !currentIsNav { cutRoast(for: "clip") }
     } else {
-      roastQueue.append(Item(wav: wav, nav: false, keep: keep, text: text))
+      roastQueue.append(Item(wav: wav, nav: false, keep: keep, text: text, screen: screen))
     }
     if current != nil || systemIsSpeaking() {
       BackseatLog.event("audio.queue", ["depth": String(navQueue.count + roastQueue.count), "nav": nav ? "1" : "0"])
@@ -1153,14 +1229,15 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
 
   /// Runs `speak` (which talks with the system voice) once no clip is talking. A navigation line
   /// fades out a roast and goes now; anything else waits for the clip to finish.
-  func sayWithSystemVoice(nav: Bool, text: String = "", _ speak: @escaping () -> Void) {
+  func sayWithSystemVoice(nav: Bool, text: String = "", screen: String? = nil, _ speak: @escaping () -> Void) {
     systemStoodIn()
     if nav && current != nil && !currentIsNav { cutRoast(for: "system") }
     if current != nil {
-      pendingSystem.append((nav, text, speak))
+      pendingSystem.append((nav, text, screen, speak))
       BackseatLog.event("audio.queue", ["depth": String(pendingSystem.count), "nav": nav ? "1" : "0", "system": "1"])
     } else {
       if !text.isEmpty { BackseatCaption.said(text) }
+      lastSystemScreen = screen
       speak()
     }
   }
@@ -1171,6 +1248,37 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
     pendingSystem.removeAll()
     current?.stop()
     current = nil
+    currentScreen = nil
+    // A line Kokoro handed to the system voice is stopped too, or it still came in after the stop.
+    if systemIsSpeaking() { stopSystemVoice() }
+    lastSystemScreen = nil
+  }
+
+  /// Drops `screen`'s clips and system-voice lines that haven't been said, and fades out the one
+  /// that's talking. Returns how many it dropped.
+  func drop(screen: String) -> Int {
+    var dropped = 0
+    let before = navQueue.count + roastQueue.count + pendingSystem.count
+    navQueue.removeAll { $0.screen == screen }
+    roastQueue.removeAll { $0.screen == screen }
+    pendingSystem.removeAll { $0.screen == screen }
+    dropped += before - (navQueue.count + roastQueue.count + pendingSystem.count)
+    if let talking = current, currentScreen == screen {
+      current = nil
+      currentScreen = nil
+      talking.setVolume(0, fadeDuration: Self.fade)
+      DispatchQueue.main.asyncAfter(deadline: .now() + Self.fade) { talking.stop() }
+      quietUntil = Date().addingTimeInterval(Self.fade)
+      dropped += 1
+      flushSystemLines()
+      playNext()
+    }
+    if lastSystemScreen == screen, systemIsSpeaking() {
+      stopSystemVoice()
+      lastSystemScreen = nil
+      dropped += 1
+    }
+    return dropped
   }
 
   // MARK: Staying unstuck
@@ -1212,6 +1320,7 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
       // A roast that got cut off isn't worth finishing.
       player.stop()
       current = nil
+      currentScreen = nil
     }
     BackseatLog.event("voice.resume", ["queued": String(navQueue.count + roastQueue.count)])
     flushSystemLines()
@@ -1267,6 +1376,7 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
   func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
     guard player === current else { return }
     current = nil
+    currentScreen = nil
     quietUntil = Date().addingTimeInterval(Self.gap)
     flushSystemLines()
     playNext()
@@ -1283,6 +1393,7 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
     pendingSystem.removeAll()
     lines.forEach { line in
       if !line.text.isEmpty { BackseatCaption.said(line.text) }
+      lastSystemScreen = line.screen
       line.speak()
     }
   }
@@ -1292,6 +1403,7 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
     guard let roast = current, !currentIsNav else { return }
     BackseatLog.event("voice.cut", ["for": reason])
     current = nil
+    currentScreen = nil
     roast.setVolume(0, fadeDuration: Self.fade)
     DispatchQueue.main.asyncAfter(deadline: .now() + Self.fade) { roast.stop() }
     quietUntil = Date().addingTimeInterval(Self.fade)
@@ -1341,6 +1453,7 @@ private final class ClipPlayer: NSObject, AVAudioPlayerDelegate {
     player.delegate = self
     current = player
     currentIsNav = item.nav
+    currentScreen = item.screen
     if !item.text.isEmpty { BackseatCaption.said(item.text) }
     if player.play() {
       watch(player)
