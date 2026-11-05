@@ -6,6 +6,9 @@
 
 #include <cctype>
 #include <cstdio>
+#include <initializer_list>
+#include <string>
+#include <vector>
 
 using namespace backseat;
 using namespace backseat::pronunciation;
@@ -115,4 +118,142 @@ TEST(ForeignPhraseLinesAreIdleBanterNeverAtATurn)
       }
   }
   CHECK(checked > 200);
+}
+
+namespace
+{
+bool EndsWith(std::string const & s, std::string const & suffix)
+{
+  return s.size() >= suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+std::string Trimmed(std::string s)
+{
+  size_t const b = s.find_first_not_of(" \"'");
+  if (b == std::string::npos)
+    return {};
+  size_t const e = s.find_last_not_of(" \"'");
+  return s.substr(b, e - b + 1);
+}
+
+/// The clauses of a line, lower case: split at sentence and clause punctuation, the "||" pause,
+/// and "and"/"or"/"then", with leading fillers ("just", "please", "now", "so") dropped.
+std::vector<std::string> Clauses(std::string const & line)
+{
+  std::string text = Lower(line);
+  for (char & c : text)
+    if (c == '.' || c == '!' || c == '?' || c == ',' || c == ';' || c == ':' || c == '|')
+      c = '\n';
+  for (char const * joiner : {" and ", " or ", " then "})
+    for (size_t at = text.find(joiner); at != std::string::npos; at = text.find(joiner, at + 1))
+      text[at] = '\n';
+  std::vector<std::string> clauses;
+  size_t start = 0;
+  while (start <= text.size())
+  {
+    size_t end = text.find('\n', start);
+    if (end == std::string::npos)
+      end = text.size();
+    std::string clause = Trimmed(text.substr(start, end - start));
+    for (bool dropped = true; dropped;)
+    {
+      dropped = false;
+      for (char const * filler : {"just ", "please ", "now ", "so ", "okay ", "go ", "and ", "or ", "then "})
+        if (StartsWith(clause, filler))
+        {
+          clause = Trimmed(clause.substr(std::string(filler).size()));
+          dropped = true;
+        }
+    }
+    if (!clause.empty())
+      clauses.push_back(clause);
+    start = end + 1;
+  }
+  return clauses;
+}
+
+bool Mentions(std::string const & clause, std::initializer_list<char const *> words)
+{
+  for (char const * w : words)
+    if (clause.find(w) != std::string::npos)
+      return true;
+  return false;
+}
+
+/// Whether `line` tells the listener to touch, tap, type on or look at the phone (or to tap the
+/// brakes). Negated advice ("Don't touch the screen") doesn't start its clause with the verb, so
+/// it passes.
+bool TellsDriverToTouchOrLook(std::string const & line)
+{
+  std::string previous;
+  for (auto const & clause : Clauses(line))
+  {
+    // "DON'T. TOUCH. MY. SLIDER." is still a don't.
+    bool const negated = previous == "don't" || previous == "do not" || previous == "never" || previous == "no";
+    previous = clause;
+    if (negated)
+      continue;
+    std::string const first = clause.substr(0, clause.find(' '));
+    for (char const * verb : {"tap", "touch", "type", "swipe", "click", "scroll"})
+      if (first == verb)
+        return true;
+    std::initializer_list<char const *> const screen = {"screen", "phone", "map", "mic", "button", "app", "slider"};
+    if (StartsWith(clause, "press ") && Mentions(clause, screen))
+      return true;
+    for (char const * look : {"look at ", "look down", "glance at ", "check your ", "check the "})
+      if (StartsWith(clause, look) && Mentions(clause, {"screen", "phone", "map", "app"}))
+        return true;
+  }
+  return false;
+}
+}  // namespace
+
+TEST(SafetyNoTouchPromptsWhileDriving)
+{
+  // The detector itself: imperatives are caught, negated advice and unrelated words are not.
+  CHECK(TellsDriverToTouchOrLook("Not listening anymore. Tap the mic if you need me. You will."));
+  CHECK(TellsDriverToTouchOrLook("If you're being held against your will, tap the brakes twice. Gently."));
+  CHECK(TellsDriverToTouchOrLook("Fine. Type. I'll be over here."));
+  CHECK(TellsDriverToTouchOrLook("Just look at the screen for a second."));
+  CHECK(TellsDriverToTouchOrLook("Say it or tap it."));
+  CHECK(!TellsDriverToTouchOrLook("Out loud. Don't touch the phone."));
+  CHECK(!TellsDriverToTouchOrLook("PRESS THE PEDAL! THE ONE ON THE RIGHT!"));
+  CHECK(!TellsDriverToTouchOrLook("I spy a car in front of us. || Try not to touch it."));
+  CHECK(!TellsDriverToTouchOrLook("Stop the presses."));
+  CHECK(!TellsDriverToTouchOrLook("DON'T. TOUCH. MY. SLIDER."));
+  CHECK(!TellsDriverToTouchOrLook("Scrolling the map while driving. Bold."));
+  CHECK(!TellsDriverToTouchOrLook("Oh, you remembered me. How touching."));
+
+  // Every line the GPS can say in a car. Onboarding and setup happen parked; the walking question
+  // ("click the driving button") is asked as a trip starts on a walking route; walk/bike/hike
+  // lines never play in a car.
+  size_t checked = 0;
+  for (TravelMode mode : {TravelMode::Drive, TravelMode::OffRoad})
+  {
+    SetLineTravelMode(mode);
+    for (auto const & entry : LineData())
+    {
+      std::string const & key = entry.first;
+      if (StartsWith(key, "onboard.") || StartsWith(key, "setup.") || StartsWith(key, "mode.ask.") ||
+          EndsWith(key, ".walk") || EndsWith(key, ".bike") || EndsWith(key, ".hike") || EndsWith(key, ".offroad"))
+        continue;
+      for (int tier = 0; tier < 3; ++tier)
+        for (auto const & line : LinesFor(key, tier))
+        {
+          ++checked;
+          if (TellsDriverToTouchOrLook(line))
+            std::printf("    touch prompt while driving: %s [%d]: %s\n", key.c_str(), tier, line.c_str());
+          CHECK(!TellsDriverToTouchOrLook(line));
+        }
+    }
+  }
+  CHECK(checked > 5000);
+
+  // On foot the mic is fair game: the walking lines still say how to get the GPS back.
+  SetLineTravelMode(TravelMode::Walk);
+  bool tapTheMic = false;
+  for (auto const & line : LinesFor("cmd.stopListening", 0))
+    tapTheMic = tapTheMic || Lower(line).find("tap the mic") != std::string::npos;
+  CHECK(tapTheMic);
+  SetLineTravelMode(TravelMode::Drive);
 }
