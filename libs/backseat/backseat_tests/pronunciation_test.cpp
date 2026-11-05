@@ -284,6 +284,25 @@ TEST(ClockTimesAreSaidWithAmAndPm)
   CHECK(peeem);
 }
 
+TEST(KanaIsSaidNotSkipped)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_KANA_PATH);
+  CHECK(cases.size() >= 20);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  CHECK_EQUAL(Kana("きって"), std::string("kitte"));
+  CHECK_EQUAL(Kana("マッチャ"), std::string("matcha"));
+  CHECK_EQUAL(Kana("ティー"), std::string("ti"));
+  CHECK_EQUAL(Kana("ヷ"), std::string("ヷ"));
+  CHECK_EQUAL(Kana("no kana here"), std::string("no kana here"));
+  // Phrases the lines quote keep their hand-made respellings: Foreign() runs first.
+  CHECK(ForSpeech("左に曲がってください").find("magatte") == std::string::npos);
+  CHECK_EQUAL(Kana(Foreign("左に曲がってください")), Foreign("左に曲がってください"));
+}
+
 TEST(CyrillicIsSaidNotSkipped)
 {
   auto const cases = GoldenCases(BACKSEAT_SPOKEN_CYRILLIC_PATH);

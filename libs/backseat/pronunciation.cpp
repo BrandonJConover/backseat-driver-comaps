@@ -1289,6 +1289,180 @@ std::string Cyrillic(std::string const & text)
   return Encode(out);
 }
 
+// MARK: - Kana
+
+namespace
+{
+bool KanaLetter(char32_t c)
+{
+  return (c >= U'ぁ' && c <= U'ゖ') || (c >= U'ァ' && c <= U'ヺ') || c == U'ー';
+}
+
+bool Ideograph(char32_t c)
+{
+  return (c >= U'㐀' && c <= U'鿿') || (c >= U'豈' && c <= U'﫿');
+}
+
+/// Katakana is hiragana + 0x60; fold it so one table covers both.
+char32_t Hiragana(char32_t c)
+{
+  return (c >= U'ァ' && c <= U'ヶ') ? c - 0x60 : c;
+}
+
+/// Hepburn for one kana, the same table as BookLyre's text/spoken_foreign_scripts.py.
+std::string KanaRoman(char32_t c)
+{
+  static std::map<char32_t, char const *> const table = {
+      {U'あ', "a"},  {U'い', "i"},   {U'う', "u"},   {U'え', "e"},  {U'お', "o"},
+      {U'か', "ka"}, {U'き', "ki"},  {U'く', "ku"},  {U'け', "ke"}, {U'こ', "ko"},
+      {U'が', "ga"}, {U'ぎ', "gi"},  {U'ぐ', "gu"},  {U'げ', "ge"}, {U'ご', "go"},
+      {U'さ', "sa"}, {U'し', "shi"}, {U'す', "su"},  {U'せ', "se"}, {U'そ', "so"},
+      {U'ざ', "za"}, {U'じ', "ji"},  {U'ず', "zu"},  {U'ぜ', "ze"}, {U'ぞ', "zo"},
+      {U'た', "ta"}, {U'ち', "chi"}, {U'つ', "tsu"}, {U'て', "te"}, {U'と', "to"},
+      {U'だ', "da"}, {U'ぢ', "ji"},  {U'づ', "zu"},  {U'で', "de"}, {U'ど', "do"},
+      {U'な', "na"}, {U'に', "ni"},  {U'ぬ', "nu"},  {U'ね', "ne"}, {U'の', "no"},
+      {U'は', "ha"}, {U'ひ', "hi"},  {U'ふ', "fu"},  {U'へ', "he"}, {U'ほ', "ho"},
+      {U'ば', "ba"}, {U'び', "bi"},  {U'ぶ', "bu"},  {U'べ', "be"}, {U'ぼ', "bo"},
+      {U'ぱ', "pa"}, {U'ぴ', "pi"},  {U'ぷ', "pu"},  {U'ぺ', "pe"}, {U'ぽ', "po"},
+      {U'ま', "ma"}, {U'み', "mi"},  {U'む', "mu"},  {U'め', "me"}, {U'も', "mo"},
+      {U'や', "ya"}, {U'ゆ', "yu"},  {U'よ', "yo"},
+      {U'ら', "ra"}, {U'り', "ri"},  {U'る', "ru"},  {U'れ', "re"}, {U'ろ', "ro"},
+      {U'わ', "wa"}, {U'ゐ', "i"},   {U'ゑ', "e"},   {U'を', "o"},  {U'ん', "n"},  {U'ゔ', "vu"},
+      {U'ぁ', "a"},  {U'ぃ', "i"},   {U'ぅ', "u"},   {U'ぇ', "e"},  {U'ぉ', "o"},
+  };
+  auto const it = table.find(Hiragana(c));
+  return it == table.end() ? std::string() : std::string(it->second);
+}
+
+char YoonVowel(char32_t c)
+{
+  switch (Hiragana(c))
+  {
+  case U'ゃ': return 'a';
+  case U'ゅ': return 'u';
+  case U'ょ': return 'o';
+  default: return 0;
+  }
+}
+
+char SmallVowel(char32_t c)
+{
+  switch (Hiragana(c))
+  {
+  case U'ぁ': return 'a';
+  case U'ぃ': return 'i';
+  case U'ぅ': return 'u';
+  case U'ぇ': return 'e';
+  case U'ぉ': return 'o';
+  default: return 0;
+  }
+}
+
+/// Drops "o"+"o"/"u" and "uu" left to right without overlap, like Python's re.sub.
+std::string CollapseLong(std::string const & s)
+{
+  std::string a;
+  for (size_t i = 0; i < s.size(); ++i)
+  {
+    a += s[i];
+    if (s[i] == 'o' && i + 1 < s.size() && (s[i + 1] == 'o' || s[i + 1] == 'u'))
+      ++i;
+  }
+  std::string b;
+  for (size_t i = 0; i < a.size(); ++i)
+  {
+    b += a[i];
+    if (a[i] == 'u' && i + 1 < a.size() && a[i + 1] == 'u')
+      ++i;
+  }
+  return b;
+}
+
+std::string KanaWord(std::u32string const & run)
+{
+  // Greetings where は is a particle, spelled as said.
+  if (run == U"こんにちは")
+    return "konnichiwa";
+  if (run == U"こんばんは")
+    return "konbanwa";
+  std::string out;
+  bool twice = false;
+  for (size_t i = 0; i < run.size(); ++i)
+  {
+    char32_t const c = run[i];
+    char32_t const next = i + 1 < run.size() ? run[i + 1] : 0;
+    if (c == U'っ' || c == U'ッ')
+    {
+      twice = true;
+      continue;
+    }
+    if (c == U'ー')
+      continue;
+    std::string syl = KanaRoman(c);
+    if (char const v = YoonVowel(next); v && syl.size() >= 2 && syl.back() == 'i')
+    {
+      // shi+ya sha, chi+ya cha, ji+ya ja; ki+ya kya.
+      std::string const stem = syl.substr(0, syl.size() - 1);
+      syl = (stem == "sh" || stem == "ch" || stem == "j" ? stem : stem + "y") + v;
+      ++i;
+    }
+    else if (char const v = SmallVowel(next); v && !syl.empty())
+    {
+      // Katakana loan sounds: ティ ti, ファ fa, ウィ wi, チェ che, ヴァ va.
+      std::string stem = syl.substr(0, syl.size() - 1);
+      if (syl == "fu" || syl == "vu" || syl == "u")
+        stem = syl == "fu" ? "f" : syl == "vu" ? "v" : "w";
+      else if (syl == "te" || syl == "de")
+        stem = syl.substr(0, 1);
+      syl = stem + v;
+      ++i;
+    }
+    if (twice && !syl.empty() && std::string_view("aeiou").find(syl[0]) == std::string_view::npos)
+      syl = (syl.rfind("ch", 0) == 0 ? std::string("t") : std::string(1, syl[0])) + syl;
+    twice = false;
+    out += syl;
+  }
+  return CollapseLong(out);
+}
+}  // namespace
+
+std::string Kana(std::string const & text)
+{
+  std::u32string const in = Decode(text);
+  bool any = false;
+  for (char32_t c : in)
+    any = any || KanaLetter(c);
+  if (!any)
+    return text;
+  std::u32string out;
+  for (size_t i = 0; i < in.size();)
+  {
+    if (!KanaLetter(in[i]))
+    {
+      out += in[i++];
+      continue;
+    }
+    size_t end = i;
+    while (end < in.size() && KanaLetter(in[end]))
+      ++end;
+    std::string word = KanaWord(in.substr(i, end - i));
+    if (word.empty())
+    {
+      out.append(in, i, end - i);
+      i = end;
+      continue;
+    }
+    // Kanji stay as they are; keep the romaji from running into them: "ちょっと待って" "chotto 待 tte".
+    if (i > 0 && Ideograph(in[i - 1]))
+      word = " " + word;
+    if (end < in.size() && Ideograph(in[end]))
+      word += " ";
+    out += Decode(word);
+    i = end;
+  }
+  return Encode(out);
+}
+
 std::string RouteNumber(std::string const & digits)
 {
   if (digits.empty() || digits.size() > 4 ||
@@ -1578,6 +1752,8 @@ std::string ForSpeech(std::string const & text)
   s = Foreign(s);
   // Cyrillic map names and quotes the English voice would skip: "улица Ленина" is "ulitsa Lenina".
   s = Cyrillic(s);
+  // Kana by Hepburn, the same way: "ラーメン" is "ramen", "さくら通り" "sakura 通 ri".
+  s = Kana(s);
   // Ranges before dashes become pauses: "3–5" is "3 to 5", not "3, 5".
   s = Ranges(s);
   // Clock times before the dash pass can split "9am-5pm".

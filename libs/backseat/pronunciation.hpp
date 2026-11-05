@@ -45,6 +45,11 @@ std::string Foreign(std::string const & text);
 /// acronym in capitals is spelled ("СССР" "S-S-S-R"); a token mixing Latin letters ("Мoscow") is left.
 std::string Cyrillic(std::string const & text);
 
+/// Japanese kana romanised by Hepburn for street names and quotes the English voice would skip:
+/// small tsu doubles the next consonant ("きって" "kitte"), yoon ("キャ" "kya"), katakana loan sounds
+/// ("ティ" "ti"), long marks and ou/oo collapsed ("ありがとう" "arigato"). Kanji and hangul are left.
+std::string Kana(std::string const & text);
+
 /// Every foreign phrase Foreign() knows, with the stand-ins it swaps in (space-separated).
 std::vector<std::pair<std::string, std::string>> const & ForeignPhrases();
 
