@@ -70,7 +70,30 @@ public final class Backseat
     return null;
   }
 
+  /// A line as Kokoro should read it (libs/backseat/pronunciation.hpp, shared with iOS): streets,
+  /// numbers and times written out, "…" and dashes as pauses, and words spelled alike swapped for
+  /// the sense the sentence needs ("Where do you live?"). Only for the voice; captions keep `text`.
+  /// Any thread.
+  @NonNull
+  public static String spokenText(@NonNull String text)
+  {
+    return nativeSpokenText(text);
+  }
+
+  /// Kokoro's pronunciation dictionary, one "word\tphonemes" line per word (Misaki IPA).
+  @NonNull
+  public static String pronunciationLexicon()
+  {
+    return nativePronunciationLexicon();
+  }
+
   private static native void nativeEnableMusicCheck();
+
+  @NonNull
+  private static native String nativeSpokenText(@NonNull String text);
+
+  @NonNull
+  private static native String nativePronunciationLexicon();
 
   @NonNull
   private static native String nativeDriverSaid(@NonNull String text);

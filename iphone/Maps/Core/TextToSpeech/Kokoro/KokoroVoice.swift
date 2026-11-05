@@ -799,7 +799,7 @@ final class KokoroVoice: NSObject {
     var first = true
     var phonemes: [String] = []
     // A speed run keeps its commas tight: "right, left, right" with pauses isn't fast.
-    for (piece, pause) in Self.pieces(of: KokoroPronunciation.prepare(Self.speakable(text)), commas: !fast) {
+    for (piece, pause) in Self.pieces(of: KokoroPronunciation.prepare(text), commas: !fast) {
       let result = try await engine.synthesizeDetailed(text: KokoroPronunciation.deliver(piece), voice: voice,
                                                        speed: pace)
       phonemes.append(result.phonemes)
@@ -832,117 +832,6 @@ final class KokoroVoice: NSObject {
     let gain = min(targetPeak / peak, maxGain)
     guard abs(gain - 1) > 0.05 else { return }
     for i in samples.indices { samples[i] *= gain }
-  }
-
-  // MARK: - Reading text out loud
-
-  private static let streetWords = [
-    "St": "Street", "Ave": "Avenue", "Blvd": "Boulevard", "Rd": "Road", "Dr": "Drive", "Ln": "Lane",
-    "Ct": "Court", "Pkwy": "Parkway", "Hwy": "Highway", "Pl": "Place", "Cir": "Circle", "Ter": "Terrace",
-    "Trl": "Trail", "Expy": "Expressway", "Fwy": "Freeway", "Sq": "Square", "Mt": "Mount",
-  ]
-  private static let compassWords = [
-    "N": "North", "S": "South", "E": "East", "W": "West",
-    "NE": "Northeast", "NW": "Northwest", "SE": "Southeast", "SW": "Southwest",
-  ]
-  private static let unitWords = [
-    "ft": "feet", "mi": "miles", "mph": "miles an hour", "km": "kilometers", "m": "meters", "yd": "yards",
-  ]
-
-  /// `text` the way it should sound: street abbreviations, compass points, highway names, units and
-  /// numbers written out. Kokoro reads what's written; the system voice did this itself, which is
-  /// part of why its directions sounded clearer.
-  static func speakable(_ text: String) -> String {
-    var s = text.replacingOccurrences(of: " & ", with: " and ")
-    // "Main St", "Elm Dr." after a word, at the end or before punctuation, a lowercase word or a
-    // compass point ("Main St NW"). Not "Dr Smith" or "St Louis". A period after it stays: it was
-    // probably the end of the sentence too.
-    let compass = "(?:NE|NW|SE|SW|N|S|E|W)"
-    s = replace(s, "(?<=[A-Za-z] )(St|Ave|Blvd|Rd|Dr|Ln|Ct|Pkwy|Hwy|Pl|Cir|Ter|Trl|Expy|Fwy|Sq)(?=$|[,;:!?.)]|\\s+(?:[a-z]|\(compass)\\b))") {
-      streetWords[$0[1]] ?? $0[0]
-    }
-    s = replace(s, "\\bMt\\.? (?=[A-Z])") { _ in "Mount " }
-    // Compass points next to a street name: "N Main", "Main St NW".
-    s = replace(s, "(?<![^\\s])(\(compass))\\.?(?= [A-Z0-9])") { compassWords[$0[1]] ?? $0[0] }
-    s = replace(s, "(?<=[A-Za-z0-9] )(\(compass))(?=$|[\\s,;:!?.])") { compassWords[$0[1]] ?? $0[0] }
-    // Highways: "I-25" is "I twenty-five", "US-36" is "US thirty-six".
-    s = replace(s, "\\b(I|US|SR|CR)[- ](\\d+)\\b") { m in
-      // "US" stays: the lexicon says it as letters (the frontend reads it as the pronoun).
-      let name = ["I": "I", "US": "US", "SR": "State Route", "CR": "County Road"][m[1]] ?? m[1]
-      return "\(name) \(m[2])"
-    }
-    // Units after a number.
-    s = replace(s, "(?<=\\d) ?(ft|mi|mph|km|m|yd)\\b\\.?") { " " + (unitWords[$0[1]] ?? $0[1]) }
-    s = replace(s, "(\\d+)/(\\d+)") { m in
-      switch (m[1], m[2]) {
-      case ("1", "2"): return "a half"
-      case ("1", "4"): return "a quarter"
-      case ("3", "4"): return "three quarters"
-      default: return "\(m[1]) over \(m[2])"
-      }
-    }
-    // Times: "2:30" is "two thirty".
-    s = replace(s, "\\b(\\d{1,2}):(\\d{2})\\b") { m in
-      let minutes = Int(m[2]) ?? 0
-      let hour = spell(Int(m[1]) ?? 0)
-      if minutes == 0 { return "\(hour) o'clock" }
-      return minutes < 10 ? "\(hour) oh \(spell(minutes))" : "\(hour) \(spell(minutes))"
-    }
-    // Ordinals: "8th Street" is "eighth street".
-    s = replace(s, "\\b(\\d+)(st|nd|rd|th)\\b") { m in ordinal(Int(m[1]) ?? 0) }
-    // Decimals and plain numbers ("1,200" too). Long ones (phone numbers, zip codes) digit by digit.
-    s = replace(s, "\\b(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d+))?\\b") { m in
-      let whole = m[1].replacingOccurrences(of: ",", with: "")
-      var said = whole.count > 6 ? whole.map { spell(Int(String($0)) ?? 0) }.joined(separator: " ")
-                                 : spell(Int(whole) ?? 0)
-      if !m[2].isEmpty { said += " point " + m[2].map { spell(Int(String($0)) ?? 0) }.joined(separator: " ") }
-      return said
-    }
-    return s
-  }
-
-  private static let spellOut: NumberFormatter = {
-    let f = NumberFormatter()
-    f.numberStyle = .spellOut
-    f.locale = Locale(identifier: "en_US")
-    return f
-  }()
-
-  private static func spell(_ n: Int) -> String {
-    spellOut.string(from: NSNumber(value: n)) ?? String(n)
-  }
-
-  /// "twenty-one" to "twenty-first".
-  private static func ordinal(_ n: Int) -> String {
-    let words = spell(n)
-    let irregular = ["one": "first", "two": "second", "three": "third", "five": "fifth", "eight": "eighth",
-                     "nine": "ninth", "twelve": "twelfth"]
-    let cut = words.lastIndex { $0 == " " || $0 == "-" }.map { words.index(after: $0) } ?? words.startIndex
-    let head = String(words[..<cut])
-    let last = String(words[cut...])
-    if let word = irregular[last] { return head + word }
-    if last.hasSuffix("y") { return head + String(last.dropLast()) + "ieth" }
-    return head + last + "th"
-  }
-
-  /// Every match of `pattern` in `text`, replaced by `with` (given the match and its groups; a
-  /// group that didn't take part is "").
-  private static func replace(_ text: String, _ pattern: String, with: ([String]) -> String) -> String {
-    guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
-    let ns = text as NSString
-    var out = ""
-    var last = 0
-    for match in regex.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
-      out += ns.substring(with: NSRange(location: last, length: match.range.location - last))
-      let groups = (0..<match.numberOfRanges).map { i -> String in
-        let r = match.range(at: i)
-        return r.location == NSNotFound ? "" : ns.substring(with: r)
-      }
-      out += with(groups)
-      last = match.range.location + match.range.length
-    }
-    out += ns.substring(from: last)
-    return out
   }
 
   /// `text` split into sentences (and clauses at commas), each with the silence that follows it.
@@ -1453,66 +1342,26 @@ enum CoreMLCrashGuard {
   }
 }
 
-/// How Kokoro is told to say things, ported from Brandon's EpubToM4B (PronunciationLibrary.swift,
-/// where each rule came from a listening test on his phone):
-/// - "…" is a pause, never a sound of its own, and a dash is a comma;
+/// How Kokoro is told to say things. The rules live in the shared core
+/// (libs/backseat/pronunciation.cpp), so iOS and Android say words the same way:
+/// - the line is rewritten for the voice there: streets, numbers and times written out, "…" and
+///   dashes as pauses, and words spelled alike swapped for the sense the sentence needs
+///   ("Where do you live?" is the verb);
+/// - its dictionary reaches FluidAudio as the English custom lexicon (checked before Misaki's
+///   lexicon and the BART guess). When a word sounds wrong on a drive, the drive log's
+///   voice.phonemes event shows what Kokoro was given; add the word to kWords there.
 /// - a one-word sentence ending in a hard consonant ("Great." "Left." "Stop.") gets "!", since with
-///   a full stop Kokoro trails off into a breathy "eh";
-/// - words the frontend gets wrong go in `words`, as a respelling or as Misaki IPA, and reach
-///   FluidAudio as its English custom lexicon (checked before Misaki's lexicon and the BART guess).
+///   a full stop Kokoro trails off into a breathy "eh" (EpubToM4B's listening tests).
 enum KokoroPronunciation {
-  /// Words FluidAudio's English frontend says wrong. The value is a respelling, with hyphens
-  /// between syllables and the stressed one in capitals ("WINE-sap", "suh-WATCH"), or Misaki IPA
-  /// between slashes ("/jˌuˈɛs/"). A key matches its exact spelling first, then lowercase. When a
-  /// street sounds wrong on a drive, the drive log's voice.phonemes event shows what Kokoro was
-  /// given; add the word here.
-  static let words: [String: String] = [
-    // The highway ("US 36"), not the pronoun.
-    "US": "/jˌuˈɛs/",
-  ]
-
-  /// `words` as Misaki phonemes; entries that don't convert are left out (and logged once).
-  static let lexicon: [String: String] = {
-    var out: [String: String] = [:]
-    for (word, said) in words {
-      let value = said.trimmingCharacters(in: .whitespaces)
-      if value.hasPrefix("/"), value.hasSuffix("/"), value.count > 2 {
-        out[word] = String(value.dropFirst().dropLast())
-      } else if let phonemes = Respelling.phonemes(for: value) {
-        out[word] = phonemes
-      } else {
-        BackseatLog.event("voice.error", ["error": "unreadable respelling", "word": word, "said": said])
-      }
-    }
-    return out
-  }()
+  static let lexicon: [String: String] = MWMBackseatRewriter.pronunciationLexicon
 
   static func install(on engine: KokoroAneManager) async {
     await engine.setEnglishCustomLexicon(lexicon)
   }
 
-  /// The whole line: punctuation Kokoro would voice becomes the pause it stands for.
+  /// The whole line, as the voice should read it.
   static func prepare(_ text: String) -> String {
-    var s = text
-      .replacingOccurrences(of: "\u{00A0}", with: " ")
-      .replacingOccurrences(of: "—", with: ", ")
-      .replacingOccurrences(of: "–", with: ", ")
-      .replacingOccurrences(of: #"\.(?:\s?\.){2,}"#, with: "…", options: .regularExpression)
-    guard s.contains("…") else { return s }
-    // At the start it's dropped, before other punctuation it's dropped, at the end it's a full
-    // stop, anywhere else a comma (the same pause, measured on his phone).
-    let rules: [(String, String)] = [
-      (#"^\s*…\s*"#, ""),
-      (#"(?<=[\s(“"‘'])…\s*"#, ""),
-      (#"…+(?=\s*[?!.,;:])"#, ""),
-      (#"…+(?=\s*[”"’')\]]*\s*$)"#, "."),
-      (#"…+(?=\s*[”"’')\]])"#, ","),
-      (#"…+"#, ","),
-    ]
-    for (pattern, template) in rules {
-      s = s.replacingOccurrences(of: pattern, with: template, options: .regularExpression)
-    }
-    return s
+    MWMBackseatRewriter.spokenText(text)
   }
 
   /// One sentence as it's rendered: "Great." becomes "Great!" (see above).
@@ -1534,110 +1383,5 @@ enum KokoroPronunciation {
     let stops: Set<Character> = ["d", "t", "k", "p", "b", "g"]
     if let last = word.last, stops.contains(last) { return true }
     return word.hasSuffix("e") && word.count >= 3 && stops.contains(word[word.index(word.endIndex, offsetBy: -2)])
-  }
-
-  /// A reader-style respelling ("Ab-DEE-rus", "EE-fa") as Misaki phonemes. Given to Kokoro as
-  /// text, a respelling came out wrong: each hyphen was a pause and a capitalised syllable was
-  /// spelled letter by letter. Syllables split on hyphens; the capitalised one (or the one marked
-  /// ' ´ ˈ) is stressed. Nil when the text isn't a respelling. EpubToM4B's RespellingPhonemizer.
-  enum Respelling {
-    static func phonemes(for respelling: String) -> String? {
-      let raw = respelling.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard !raw.isEmpty, !raw.contains(" "), raw.allSatisfy({ $0.isLetter || "-'´ˈ".contains($0) }),
-            raw.unicodeScalars.allSatisfy({ $0.isASCII || "'´ˈ".unicodeScalars.contains($0) }) else { return nil }
-      let marks = CharacterSet(charactersIn: "'´ˈ")
-      let parts = raw.split(separator: "-").map(String.init).filter { !$0.isEmpty }
-      let hasCapsSyllable = parts.count > 1
-        && parts.contains { $0 == $0.uppercased() && $0.contains(where: \.isLetter) }
-      guard parts.count > 1 || raw.unicodeScalars.contains(where: { marks.contains($0) }) else { return nil }
-      var stressIndex = parts.firstIndex { $0.unicodeScalars.contains(where: { marks.contains($0) }) }
-      if stressIndex == nil, hasCapsSyllable {
-        stressIndex = parts.firstIndex { p in
-          let letters = p.filter(\.isLetter)
-          return !letters.isEmpty && letters == letters.uppercased() && (letters.count > 1 || parts.count > 1)
-            && !(parts.first == p && letters.count == 1 && parts.count > 2)
-        }
-      }
-      let stress = stressIndex ?? 0
-      var out = ""
-      for (i, part) in parts.enumerated() {
-        let sounds = part.lowercased().filter(\.isLetter)
-        guard let ph = syllable(sounds, stressed: i == stress, last: i == parts.count - 1) else { return nil }
-        out += ph
-      }
-      // "A-KIL-leez": a doubled consonant across syllables is one sound.
-      var collapsed = ""
-      for ch in out {
-        if ch == collapsed.last, "bdfhklmnpstvwzɡɹʃʒθŋʧʤj".contains(ch) { continue }
-        collapsed.append(ch)
-      }
-      return collapsed.isEmpty ? nil : collapsed
-    }
-
-    private static let digraphVowels: [(String, String)] = [
-      ("eye", "I"), ("igh", "I"), ("air", "ɛɹ"), ("are", "ɛɹ"), ("eer", "ɪɹ"), ("ear", "ɪɹ"),
-      ("ee", "i"), ("ea", "i"), ("ie", "i"), ("oo", "u"), ("ou", "W"), ("ow", "W"),
-      ("oy", "Y"), ("oi", "Y"), ("ay", "A"), ("ai", "A"), ("ey", "A"), ("aw", "ɔ"), ("au", "ɔ"),
-      ("ah", "ɑ"), ("ih", "ɪ"), ("eh", "ɛ"), ("oh", "O"), ("oa", "O"), ("oe", "O"), ("uh", "ʌ"), ("ew", "ju"),
-      ("ar", "ɑɹ"), ("or", "ɔɹ"), ("er", "ɜɹ"), ("ir", "ɜɹ"), ("ur", "ɜɹ"),
-    ]
-    private static let consonants: [(String, String)] = [
-      ("tch", "ʧ"), ("ch", "ʧ"), ("sh", "ʃ"), ("th", "θ"), ("zh", "ʒ"), ("ng", "ŋ"), ("ph", "f"),
-      ("ck", "k"), ("qu", "kw"), ("kh", "k"), ("j", "ʤ"), ("c", "k"), ("x", "ks"), ("q", "k"),
-      ("g", "ɡ"), ("r", "ɹ"), ("y", "j"),
-      ("b", "b"), ("d", "d"), ("f", "f"), ("h", "h"), ("k", "k"), ("l", "l"), ("m", "m"),
-      ("n", "n"), ("p", "p"), ("s", "s"), ("t", "t"), ("v", "v"), ("w", "w"), ("z", "z"),
-    ]
-
-    /// One syllable: onset consonants, the vowel (stress mark before it), coda consonants.
-    private static func syllable(_ s: String, stressed: Bool, last: Bool) -> String? {
-      var rest = Substring(s), out = "", vowelDone = false
-      while !rest.isEmpty {
-        if !vowelDone {
-          if let (from, to) = digraphVowels.first(where: { rest.hasPrefix($0.0) }) {
-            let reduced = to.hasPrefix("ɜ") ? "əɹ" : (to == "ʌ" ? "ə" : to)   // "ROOZ-uh"
-            out += (stressed ? "ˈ" : "") + (stressed ? to : reduced)
-            rest = rest.dropFirst(from.count); vowelDone = true; continue
-          }
-          if let v = rest.first, "aeiou".contains(v) {
-            let open = rest.dropFirst().allSatisfy { !$0.isLetter }
-            out += (stressed ? "ˈ" : "") + singleVowel(v, stressed: stressed, open: open, last: last)
-            rest = rest.dropFirst(); vowelDone = true; continue
-          }
-          if rest.first == "y", rest.count == 1, !out.isEmpty {   // "-ly", "-ty"
-            out += stressed ? "ˈI" : "i"; rest = rest.dropFirst(); vowelDone = true; continue
-          }
-        }
-        guard let (from, to) = consonants.first(where: { rest.hasPrefix($0.0) }) else {
-          if let v = rest.first, "aeiouy".contains(v) { rest = rest.dropFirst(); continue }
-          return nil
-        }
-        out += to
-        rest = rest.dropFirst(from.count)
-      }
-      return vowelDone ? out : (out.isEmpty ? nil : out)
-    }
-
-    private static func singleVowel(_ v: Character, stressed: Bool, open: Bool, last: Bool) -> String {
-      switch (v, stressed, open) {
-      case ("a", true, false): return "æ"
-      case ("a", true, true): return "ɑ"
-      case ("a", false, _): return "ə"
-      case ("e", true, false): return "ɛ"
-      case ("e", true, true): return "i"
-      case ("e", false, true): return last ? "i" : "ə"
-      case ("e", false, false): return "ə"
-      case ("i", true, false): return "ɪ"
-      case ("i", true, true): return "I"
-      case ("i", false, _): return "ɪ"
-      case ("o", true, false): return "ɑ"
-      case ("o", _, true): return "O"
-      case ("o", false, false): return "ə"
-      case ("u", true, false): return "ʌ"
-      case ("u", true, true): return "u"
-      case ("u", false, _): return "ə"
-      default: return "ə"
-      }
-    }
   }
 }

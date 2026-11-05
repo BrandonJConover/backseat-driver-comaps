@@ -13,6 +13,7 @@
 #include <CoreApi/Framework.h>
 
 #include "backseat/onboarding.hpp"
+#include "backseat/pronunciation.hpp"
 #include "backseat/rewriter.hpp"
 #include "backseat/voice_command.hpp"
 
@@ -1097,6 +1098,27 @@ static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == M
   for (auto const & [label, value] : GetFramework().GetRoutingManager().BackseatLearnedFacts())
     [facts addObject:@[@(label.c_str()), @(value.c_str())]];
   return facts;
+}
+
++ (NSString *)spokenText:(NSString *)text
+{
+  return @(backseat::pronunciation::ForSpeech(text.UTF8String ?: "").c_str()) ?: text;
+}
+
++ (NSDictionary<NSString *, NSString *> *)pronunciationLexicon
+{
+  NSMutableDictionary<NSString *, NSString *> * lexicon = [NSMutableDictionary dictionary];
+  for (auto const & [word, phonemes] : backseat::pronunciation::Lexicon())
+  {
+    NSString * key = @(word.c_str());
+    NSString * value = @(phonemes.c_str());
+    if (key == nil || value == nil)
+      continue;
+    lexicon[key] = value;
+    // A stand-in at the start of a sentence is capitalised ("Liv a little").
+    lexicon[key.capitalizedString] = value;
+  }
+  return lexicon;
 }
 
 + (BOOL)carHasAutopilot

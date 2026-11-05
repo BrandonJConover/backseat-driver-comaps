@@ -229,6 +229,14 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 /// Whether `typed` is the code phrase, ignoring case, spaces and punctuation.
 + (BOOL)typed:(NSString *)typed matchesPhrase:(NSString *)phrase;
 
+/// A line as Kokoro should read it (backseat/pronunciation.hpp, shared with Android): streets,
+/// numbers and times written out, "…" and dashes as pauses, and words spelled alike swapped for
+/// the sense the sentence needs ("Where do you live?"). Only for the voice; captions keep `text`.
+/// Any thread.
++ (NSString *)spokenText:(NSString *)text;
+/// Kokoro's pronunciation dictionary, word to Misaki phonemes, for the voice's custom lexicon.
+@property(class, nonatomic, readonly) NSDictionary<NSString *, NSString *> * pronunciationLexicon;
+
 @end
 
 NS_ASSUME_NONNULL_END

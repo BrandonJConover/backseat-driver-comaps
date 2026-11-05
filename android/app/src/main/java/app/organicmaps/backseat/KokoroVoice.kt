@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import androidx.annotation.RequiresApi
+import app.organicmaps.sdk.backseat.Backseat
 import app.organicmaps.sdk.sound.NeuralVoice
 import app.organicmaps.sdk.sound.TtsPlayer
 import app.organicmaps.sdk.util.log.Logger
@@ -185,7 +186,8 @@ object KokoroVoice : NeuralVoice
           model = "$path/model.int8.onnx",
           voices = "$path/voices.bin",
           tokens = "$path/tokens.txt",
-          lexicon = "$path/lexicon-us-en.txt",
+          // Ours first: sherpa-onnx keeps the first entry for a word.
+          lexicon = listOfNotNull(writeLexicon(dir), "$path/lexicon-us-en.txt").joinToString(","),
           dataDir = "$path/espeak-ng-data",
           lang = "en-us",
         ),
@@ -200,6 +202,36 @@ object KokoroVoice : NeuralVoice
     return engine
   }
 
+  /**
+   * Backseat Driver's pronunciation dictionary (libs/backseat/pronunciation.cpp, shared with iOS)
+   * as a sherpa-onnx lexicon file: each word, then its phonemes one per token. Null if it can't
+   * be written; Kokoro then uses its own lexicon alone.
+   */
+  private fun writeLexicon(dir: File): String?
+  {
+    return try
+    {
+      val lines = Backseat.pronunciationLexicon().lineSequence().mapNotNull { line ->
+        val parts = line.split('\t')
+        if (parts.size != 2 || parts[0].isEmpty() || parts[1].isEmpty()) return@mapNotNull null
+        val tokens = parts[1].codePoints().toArray().joinToString(" ") { String(Character.toChars(it)) }
+        "${parts[0]} $tokens"
+      }
+      val file = File(dir, "backseat-lexicon.txt")
+      file.writeText(lines.joinToString("\n", postfix = "\n"))
+      file.absolutePath
+    }
+    catch (e: Throwable)
+    {
+      Logger.e(TAG, "Couldn't write the pronunciation dictionary", e)
+      null
+    }
+  }
+
+  /** What Kokoro reads for `text`: see Backseat.spokenText. */
+  private fun spoken(text: String): String =
+    try { Backseat.spokenText(text) } catch (e: Throwable) { text }
+
   private fun synthesize(engine: OfflineTts, job: Job)
   {
     val player = player ?: return
@@ -213,7 +245,7 @@ object KokoroVoice : NeuralVoice
       return
 
     var aborted = false
-    val audio = engine.generateWithCallback(job.text, VOICE_ID, job.speed) {
+    val audio = engine.generateWithCallback(spoken(job.text), VOICE_ID, job.speed) {
       // Returning 0 stops synthesis: a navigation line is waiting.
       if (!job.nav && pendingNav.get() > 0) { aborted = true; 0 } else 1
     }

@@ -5,6 +5,7 @@
 
 #include "map/routing_manager.hpp"
 
+#include "backseat/pronunciation.hpp"
 #include "backseat/rewriter.hpp"
 
 #include <atomic>
@@ -93,6 +94,19 @@ JNIEXPORT void JNICALL Java_app_organicmaps_sdk_backseat_BackseatRewriter_native
 {
   if (auto const & rewriter = Rewriter())
     rewriter->Answer(id, jni::ToNativeString(env, text));
+}
+
+JNIEXPORT jstring JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeSpokenText(JNIEnv * env, jclass, jstring text)
+{
+  return jni::ToJavaString(env, backseat::pronunciation::ForSpeech(jni::ToNativeString(env, text)));
+}
+
+JNIEXPORT jstring JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativePronunciationLexicon(JNIEnv * env, jclass)
+{
+  std::string out;
+  for (auto const & [word, phonemes] : backseat::pronunciation::Lexicon())
+    out += word + '\t' + phonemes + '\n';
+  return jni::ToJavaString(env, out);
 }
 
 JNIEXPORT void JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeEnableMusicCheck(JNIEnv *, jclass)
