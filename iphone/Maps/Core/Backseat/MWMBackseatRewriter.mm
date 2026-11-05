@@ -1100,13 +1100,57 @@ static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == M
   return facts;
 }
 
+static NSString * const kUserPronunciationsKey = @"BackseatUserPronunciations";
+
+/// The driver's pronunciations as the core takes them: "word\tsay it as" lines.
+static std::string UserPronunciationLines(NSArray<NSArray<NSString *> *> * entries)
+{
+  std::string lines;
+  for (NSArray<NSString *> * entry in entries)
+  {
+    if (entry.count != 2)
+      continue;
+    lines += std::string(entry[0].UTF8String ?: "") + '\t' + (entry[1].UTF8String ?: "") + '\n';
+  }
+  return lines;
+}
+
+/// Hands the saved pronunciations to the core once, before the voice first needs them.
+static void LoadUserPronunciations()
+{
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    backseat::pronunciation::SetUserWords(UserPronunciationLines([MWMBackseatRewriter userPronunciations]));
+  });
+}
+
++ (NSArray<NSArray<NSString *> *> *)userPronunciations
+{
+  NSArray * saved = [NSUserDefaults.standardUserDefaults arrayForKey:kUserPronunciationsKey];
+  NSMutableArray<NSArray<NSString *> *> * entries = [NSMutableArray array];
+  for (id entry in saved)
+    if ([entry isKindOfClass:NSArray.class] && [entry count] == 2 && [entry[0] isKindOfClass:NSString.class] &&
+        [entry[1] isKindOfClass:NSString.class])
+      [entries addObject:entry];
+  return entries;
+}
+
++ (void)setUserPronunciations:(NSArray<NSArray<NSString *> *> *)userPronunciations
+{
+  LoadUserPronunciations();
+  [NSUserDefaults.standardUserDefaults setObject:userPronunciations forKey:kUserPronunciationsKey];
+  backseat::pronunciation::SetUserWords(UserPronunciationLines(userPronunciations));
+}
+
 + (NSString *)spokenText:(NSString *)text
 {
+  LoadUserPronunciations();
   return @(backseat::pronunciation::ForSpeech(text.UTF8String ?: "").c_str()) ?: text;
 }
 
 + (NSDictionary<NSString *, NSString *> *)pronunciationLexicon
 {
+  LoadUserPronunciations();
   NSMutableDictionary<NSString *, NSString *> * lexicon = [NSMutableDictionary dictionary];
   for (auto const & [word, phonemes] : backseat::pronunciation::Lexicon())
   {

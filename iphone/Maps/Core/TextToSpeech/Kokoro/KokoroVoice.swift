@@ -210,6 +210,19 @@ final class KokoroVoice: NSObject {
     lock.unlock()
   }
 
+  /// The driver changed their own pronunciations: hand the new dictionary to the engines and forget
+  /// clips rendered the old way.
+  func pronunciationsChanged() {
+    lock.lock()
+    cache.removeAll()
+    cacheOrder.removeAll()
+    lock.unlock()
+    addChore { [self] in
+      lock.lock(); let engines = [primary, fallbackEngine].compactMap { $0 }; lock.unlock()
+      for engine in engines { await KokoroPronunciation.install(on: engine) }
+    }
+  }
+
   /// The GPS answers its fake phone calls with its own name: the voice the driver picked ("Echo").
   @objc static func tellNavigatorItsName() {
     let name = voiceOptions.first { $0.id == selectedVoiceID }?.spokenName ?? "Echo"
@@ -1353,7 +1366,8 @@ enum CoreMLCrashGuard {
 /// - a one-word sentence ending in a hard consonant ("Great." "Left." "Stop.") gets "!", since with
 ///   a full stop Kokoro trails off into a breathy "eh" (EpubToM4B's listening tests).
 enum KokoroPronunciation {
-  static let lexicon: [String: String] = MWMBackseatRewriter.pronunciationLexicon
+  /// Read fresh each time: the driver's own words (Settings > Pronunciations) are in it.
+  static var lexicon: [String: String] { MWMBackseatRewriter.pronunciationLexicon }
 
   static func install(on engine: KokoroAneManager) async {
     await engine.setEnglishCustomLexicon(lexicon)

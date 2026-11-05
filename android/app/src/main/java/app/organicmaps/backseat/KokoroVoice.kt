@@ -79,6 +79,8 @@ object KokoroVoice : NeuralVoice
   @Volatile private var tts: OfflineTts? = null
   @Volatile private var installed = false
   @Volatile private var player: ClipPlayer? = null
+  /** The driver changed their own pronunciations: the engine reloads with the new dictionary. */
+  @Volatile private var lexiconChanged = false
 
   /** Plugs the voice into [TtsPlayer] and loads (or first downloads) the model in the background. */
   @JvmStatic
@@ -127,6 +129,17 @@ object KokoroVoice : NeuralVoice
     jobs.add(job)
   }
 
+  /**
+   * The driver changed their own pronunciations (Backseat.setUserPronunciations): the next line
+   * reloads the engine with the new dictionary, and clips rendered the old way are forgotten.
+   */
+  @JvmStatic
+  fun pronunciationsChanged()
+  {
+    lexiconChanged = true
+    synchronized(cache) { cache.clear() }
+  }
+
   override fun stop()
   {
     generation.incrementAndGet()
@@ -143,9 +156,11 @@ object KokoroVoice : NeuralVoice
   private fun start(context: Context)
   {
     Thread({
-      val engine = try
+      val dir = KokoroModel.dir(context)
+      var engine = try
       {
-        load(KokoroModel.dir(context))
+        Backseat.loadUserPronunciations(context)
+        load(dir)
       }
       catch (e: Throwable)
       {
@@ -158,6 +173,22 @@ object KokoroVoice : NeuralVoice
       while (true)
       {
         val job = try { jobs.take() } catch (e: InterruptedException) { return@Thread }
+        if (lexiconChanged)
+        {
+          lexiconChanged = false
+          try
+          {
+            // sherpa-onnx reads its lexicon once, at load.
+            val fresh = load(dir)
+            engine.release()
+            engine = fresh
+            tts = fresh
+          }
+          catch (e: Throwable)
+          {
+            Logger.e(TAG, "Couldn't reload Kokoro with the new pronunciations", e)
+          }
+        }
         try
         {
           synthesize(engine, job)

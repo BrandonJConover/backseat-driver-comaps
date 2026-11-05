@@ -236,6 +236,9 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 + (NSString *)spokenText:(NSString *)text;
 /// Kokoro's pronunciation dictionary, word to Misaki phonemes, for the voice's custom lexicon.
 @property(class, nonatomic, readonly) NSDictionary<NSString *, NSString *> * pronunciationLexicon;
+/// The driver's own pronunciations, each @[word, sayItAs], in the order added; they win over the
+/// built-in ones. Saved on the phone. After setting it, call KokoroVoice.pronunciationsChanged().
+@property(class, nonatomic, copy) NSArray<NSArray<NSString *> *> * userPronunciations;
 
 @end
 

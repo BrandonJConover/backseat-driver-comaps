@@ -32,6 +32,12 @@
       android:title="@string/pref_tts_test_voice_title"
       app:iconSpaceReserved="false"/>
   <Preference
+      android:key="backseat_pronunciations"
+      android:persistent="false"
+      android:title="Pronunciations"
+      android:summary="Words the voice says wrong, and how to say them"
+      app:iconSpaceReserved="false"/>
+  <Preference
       android:key="@string/pref_tts_open_system_settings"
       android:title="@string/pref_tts_open_system_settings"
       app:iconSpaceReserved="false"/>

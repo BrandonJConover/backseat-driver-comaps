@@ -112,6 +112,16 @@ struct SettingsBackseatView: View {
                     }
                 }
 
+                NavigationLink {
+                    SettingsBackseatPronunciationsView()
+                } label: {
+                    HStack {
+                        Image(systemName: "character.bubble")
+
+                        Text(verbatim: "Pronunciations")
+                    }
+                }
+
                 // Only while the crash guard has Kokoro sitting this session out.
                 if CoreMLCrashGuard.mode == .paused {
                     VStack(alignment: .leading, spacing: 6) {
@@ -1033,6 +1043,138 @@ struct SettingsBackseatMileageView: View {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("Backseat-Mileage-\(year).csv")
         if (try? MWMBackseatRewriter.mileageCsv(year).write(to: file, atomically: true, encoding: .utf8)) != nil {
             csvURL = file
+        }
+    }
+}
+
+
+
+/// The driver's own pronunciations: a word and how to say it, for every line the voice says. The
+/// core applies them on top of its own (libs/backseat/pronunciation.cpp).
+struct SettingsBackseatPronunciationsView: View {
+    struct Entry: Identifiable, Hashable {
+        let id = UUID()
+        var word: String
+        var said: String
+    }
+
+
+    /// The driver's words, in the order added
+    @State var entries: [Entry] = []
+
+
+    /// The word being added
+    @State var newWord: String = ""
+
+
+    /// How to say it
+    @State var newSaid: String = ""
+
+
+    private var canAdd: Bool {
+        !newWord.trimmingCharacters(in: .whitespaces).isEmpty && !newSaid.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+
+    /// The actual view
+    var body: some View {
+        List {
+            Section {
+                TextField(text: $newWord) {
+                    Text(verbatim: "Word or name, e.g. Quasi")
+                }
+                .autocorrectionDisabled()
+
+                TextField(text: $newSaid) {
+                    Text(verbatim: "Say it like, e.g. KWAH-zee")
+                }
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .onSubmit { add() }
+
+                Button {
+                    add()
+                } label: {
+                    HStack {
+                        Image(systemName: "plus.circle")
+
+                        Text(verbatim: "Add and hear it")
+                    }
+                }
+                .disabled(!canAdd)
+            } header: {
+                Text(verbatim: "Add a word")
+            } footer: {
+                Text(verbatim: "Write it how it sounds: plain words (\"wine sap\"), or syllables with dashes and the loud one in capitals (\"KWAH-zee\"). It applies to everything I say. Adding a word again replaces it.")
+            }
+
+            if !entries.isEmpty {
+                Section {
+                    ForEach(entries) { entry in
+                        Button {
+                            Self.hear(entry.word)
+                        } label: {
+                            HStack {
+                                Text(verbatim: entry.word)
+                                    .foregroundStyle(.primary)
+
+                                Spacer()
+
+                                Text(verbatim: entry.said)
+                                    .foregroundStyle(.secondary)
+
+                                Image(systemName: "play.circle")
+                            }
+                        }
+                    }
+                    .onDelete { offsets in
+                        entries.remove(atOffsets: offsets)
+                        save()
+                    }
+                } header: {
+                    Text(verbatim: "Your words")
+                } footer: {
+                    Text(verbatim: "Tap one to hear it. Swipe left to delete.")
+                }
+            }
+        }
+        .accentColor(.accent)
+        .backseatList()
+        .navigationTitle(Text(verbatim: "Pronunciations"))
+        .onAppear {
+            entries = MWMBackseatRewriter.userPronunciations.compactMap { pair in
+                pair.count == 2 ? Entry(word: pair[0], said: pair[1]) : nil
+            }
+        }
+    }
+
+
+    /// Saves the new word (replacing the same word added before) and says it.
+    private func add() {
+        let word = newWord.trimmingCharacters(in: .whitespacesAndNewlines)
+        let said = newSaid.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !word.isEmpty, !said.isEmpty else { return }
+        entries.removeAll { $0.word.caseInsensitiveCompare(word) == .orderedSame }
+        entries.append(Entry(word: word, said: said))
+        save()
+        newWord = ""
+        newSaid = ""
+        Self.hear(word)
+    }
+
+
+    private func save() {
+        MWMBackseatRewriter.userPronunciations = entries.map { [$0.word, $0.said] }
+        KokoroVoice.shared.pronunciationsChanged()
+    }
+
+
+    /// Says `word` in a short line, the way every other line will say it now.
+    static func hear(_ word: String) {
+        let line = "\(word). Did I get it right?"
+        KokoroVoice.shared.stop()
+        KokoroVoice.shared.test(line) {
+            MWMTextToSpeech.tts().play(line)
         }
     }
 }

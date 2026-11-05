@@ -6,6 +6,7 @@
 #include <functional>
 #include <initializer_list>
 #include <map>
+#include <mutex>
 #include <regex>
 #include <set>
 #include <sstream>
@@ -573,6 +574,91 @@ std::string Ellipses(std::string s)
   }
   return s;
 }
+
+// MARK: - The driver's own words
+
+struct UserWord
+{
+  std::string word;   // as typed, lowercase for matching
+  std::string said;   // what replaces it in the text: a stand-in or plain words
+  std::string phonemes;  // the stand-in's sound; empty for plain words
+};
+
+std::mutex g_userMutex;
+std::vector<UserWord> g_userWords;
+
+std::string Trim(std::string s)
+{
+  while (!s.empty() && Space(s.front()))
+    s.erase(s.begin());
+  while (!s.empty() && Space(s.back()))
+    s.pop_back();
+  return s;
+}
+
+/// The stand-in for the driver's word number `i`: "qzva", "qzvb"... Letters only and never a real
+/// word, so both phones' dictionaries can hold it.
+std::string StandIn(size_t i)
+{
+  std::string tail;
+  do
+  {
+    tail.insert(tail.begin(), static_cast<char>('a' + i % 26));
+    i /= 26;
+  } while (i > 0);
+  return "qzv" + tail;
+}
+
+bool WordChar(char ch)
+{
+  return std::isalnum(static_cast<unsigned char>(ch)) || ch == '\'' || (static_cast<unsigned char>(ch) & 0x80);
+}
+
+/// Every whole-word, any-case occurrence of the driver's words, replaced.
+std::string ApplyUserWords(std::string const & text)
+{
+  std::vector<UserWord> words;
+  {
+    std::lock_guard lock(g_userMutex);
+    words = g_userWords;
+  }
+  if (words.empty())
+    return text;
+  // Longest first, so "Mt Hood" wins over "Hood".
+  std::stable_sort(words.begin(), words.end(),
+                   [](UserWord const & a, UserWord const & b) { return a.word.size() > b.word.size(); });
+  std::string s = text;
+  for (auto const & w : words)
+  {
+    std::string lower = Lower(s);
+    // Lower() turns ’ into ', which changes lengths: match on a copy with ’ kept as is.
+    if (lower.size() != s.size())
+    {
+      lower.clear();
+      for (char ch : s)
+        lower += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    }
+    std::string out;
+    size_t last = 0;
+    for (size_t at = lower.find(w.word); at != std::string::npos; at = lower.find(w.word, at + 1))
+    {
+      size_t const end = at + w.word.size();
+      if (at < last || (at > 0 && WordChar(s[at - 1]) && WordChar(w.word.front())) ||
+          (end < s.size() && WordChar(s[end]) && WordChar(w.word.back())))
+        continue;
+      out.append(s, last, at - last);
+      std::string said = w.said;
+      if (!w.phonemes.empty() && std::isupper(static_cast<unsigned char>(s[at])))
+        said[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(said[0])));
+      out += said;
+      last = end;
+    }
+    out.append(s, last, std::string::npos);
+    s = out;
+  }
+  return s;
+}
+
 // MARK: - Ranges
 
 // Words a hyphen between two numbers can only mean "to" after ("pages 3-5", "from 10-20") or
@@ -655,6 +741,39 @@ std::string FractionWords(std::string const & a, std::string const & b)
 }
 }  // namespace
 
+void SetUserWords(std::string const & lines)
+{
+  std::vector<UserWord> words;
+  size_t start = 0;
+  while (start <= lines.size())
+  {
+    auto end = lines.find('\n', start);
+    if (end == std::string::npos)
+      end = lines.size();
+    auto const line = lines.substr(start, end - start);
+    start = end + 1;
+    auto const tab = line.find('\t');
+    if (tab == std::string::npos)
+      continue;
+    auto const word = Lower(Trim(line.substr(0, tab)));
+    auto said = Trim(line.substr(tab + 1));
+    if (word.empty() || said.empty())
+      continue;
+    UserWord w{word, said, ""};
+    if (said.size() > 2 && said.front() == '/' && said.back() == '/')
+      w.phonemes = said.substr(1, said.size() - 2);
+    else if (auto const ph = RespellingPhonemes(said))
+      w.phonemes = *ph;
+    else if (std::none_of(said.begin(), said.end(), [](char c) { return std::islower(static_cast<unsigned char>(c)); }))
+      w.said = Lower(said);  // "KWAH" alone would be spelled out letter by letter
+    if (!w.phonemes.empty())
+      w.said = StandIn(words.size());
+    words.push_back(std::move(w));
+  }
+  std::lock_guard lock(g_userMutex);
+  g_userWords = std::move(words);
+}
+
 // MARK: - Public
 
 std::string SpellNumber(long long n)
@@ -717,12 +836,21 @@ std::string PickSenses(std::string const & text)
   }
 
   auto const & rules = Rules();
+  // A word the driver gave their own sound is theirs, whatever the sentence says.
+  std::vector<std::string> theirs;
+  {
+    std::lock_guard lock(g_userMutex);
+    for (auto const & w : g_userWords)
+      theirs.push_back(w.word);
+    for (auto const & w : g_userWords)
+      theirs.push_back(Lower(w.said));
+  }
   std::string out;
   size_t last = 0;
   for (size_t k = 0; k < words.size(); ++k)
   {
     auto const rule = rules.find(words[k].lower);
-    if (rule == rules.end())
+    if (rule == rules.end() || std::find(theirs.begin(), theirs.end(), words[k].lower) != theirs.end())
       continue;
     Ctx c;
     if (!words[k].breakBefore && k >= 1)
@@ -973,6 +1101,8 @@ std::string ForSpeech(std::string const & text)
   s = std::regex_replace(s, dash, ", ");
   s = ReplaceAll(s, " & ", " and ");
 
+  // The driver's own words first: they know best.
+  s = ApplyUserWords(s);
   s = PickSenses(s);
 
   // "Main St", "Elm Dr." after a word, at the end or before punctuation, a lowercase word or a
@@ -1078,9 +1208,9 @@ std::string ForSpeech(std::string const & text)
   return Ellipses(s);
 }
 
-std::vector<std::pair<std::string, std::string>> const & Lexicon()
+std::vector<std::pair<std::string, std::string>> Lexicon()
 {
-  static std::vector<std::pair<std::string, std::string>> const lexicon = [] {
+  static std::vector<std::pair<std::string, std::string>> const builtIn = [] {
     std::vector<std::pair<std::string, std::string>> out;
     for (auto const & w : kWords)
     {
@@ -1104,6 +1234,11 @@ std::vector<std::pair<std::string, std::string>> const & Lexicon()
         out.emplace_back(n.word, n.phonemes);
     return out;
   }();
+  auto lexicon = builtIn;
+  std::lock_guard lock(g_userMutex);
+  for (auto const & w : g_userWords)
+    if (!w.phonemes.empty())
+      lexicon.emplace_back(w.said, w.phonemes);
   return lexicon;
 }
 
@@ -1231,9 +1366,19 @@ std::optional<std::u32string> Syllable(std::string const & s, bool stressed, boo
       if (std::string_view("aeiou").find(rest[0]) != std::string_view::npos)
       {
         bool const open = rest.size() == 1;
+        // "WINE", "NAME", "HOPE": a final e after one consonant makes the vowel say its name.
+        bool const silentE = rest.size() == 3 && rest[2] == 'e' &&
+                             std::string_view("aeiouy").find(rest[1]) == std::string_view::npos;
         if (stressed)
           out += U'ˈ';
-        out += SingleVowel(rest[0], stressed, open, last);
+        if (silentE)
+        {
+          static std::map<char, char32_t const *> const named = {
+              {'a', U"A"}, {'e', U"i"}, {'i', U"I"}, {'o', U"O"}, {'u', U"u"}};
+          out += named.at(rest[0]);
+        }
+        else
+          out += SingleVowel(rest[0], stressed, open, last);
         rest.remove_prefix(1);
         vowelDone = true;
         continue;

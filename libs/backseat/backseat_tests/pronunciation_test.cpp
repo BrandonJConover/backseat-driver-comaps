@@ -200,6 +200,25 @@ TEST(RespellingsBecomePhonemes)
   CHECK(!RespellingPhonemes("two words").has_value());
 }
 
+TEST(TheDriversOwnWordsWin)
+{
+  SetUserWords("Quasi\tKWAH-zee\nmt hood\tmount hood\nlive\tlive\nGIF\tJIF\n");
+  CHECK_EQUAL(ForSpeech("Quasi-legal. quasi"), std::string("Qzva-legal. qzva"));
+  CHECK_EQUAL(ForSpeech("Off to Mt Hood!"), std::string("Off to mount hood!"));
+  // The driver overrode the verb rule.
+  CHECK_EQUAL(ForSpeech("Where do you live?"), std::string("Where do you live?"));
+  CHECK_EQUAL(ForSpeech("A GIF of you."), std::string("A jif of you."));
+  CHECK_EQUAL(ForSpeech("Gifted"), std::string("Gifted"));
+  bool found = false;
+  for (auto const & [word, ph] : Lexicon())
+    if (word == "qzva")
+      found = ph == "kwˈɑzi";
+  CHECK(found);
+  SetUserWords("");
+  CHECK_EQUAL(ForSpeech("Where do you live?"), std::string("Where do you liv?"));
+  CHECK_EQUAL(RespellingPhonemes("WINE-sap").value_or(""), std::string("wˈInsəp"));
+}
+
 TEST(RangesMatchTheGoldenCasesSharedWithBookLyre)
 {
   auto const cases = GoldenCases(BACKSEAT_SPOKEN_RANGES_PATH);

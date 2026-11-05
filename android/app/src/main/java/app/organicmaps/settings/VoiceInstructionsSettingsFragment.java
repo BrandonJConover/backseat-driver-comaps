@@ -146,6 +146,13 @@ public class VoiceInstructionsSettingsFragment extends BaseXmlSettingsFragment
     mTtsPrefStreetNames = findPreference(getString(R.string.pref_tts_street_names));
     mTtsLangInfo = getPreference(getString(R.string.pref_tts_info));
 
+    final Preference pronunciations = findPreference("backseat_pronunciations");
+    if (pronunciations != null)
+      pronunciations.setOnPreferenceClickListener(pref -> {
+        app.organicmaps.backseat.PronunciationsDialog.show(requireContext());
+        return true;
+      });
+
     Preference mTtsOpenSystemSettings = getPreference(getString(R.string.pref_tts_open_system_settings));
     mTtsOpenSystemSettings.setOnPreferenceClickListener(pref -> {
       try
