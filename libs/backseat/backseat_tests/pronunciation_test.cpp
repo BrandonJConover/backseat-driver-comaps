@@ -2,6 +2,7 @@
 
 #include "backseat/pronunciation.hpp"
 
+#include <cctype>
 #include <fstream>
 #include <set>
 #include <sstream>
@@ -472,4 +473,40 @@ TEST(SaintsDoctorsAndJuniorsInStreetNames)
   CHECK_EQUAL(ForSpeech("Take SR 71"), std::string("Take State Route seventy one"));
   CHECK_EQUAL(ForSpeech("the dr is in"), std::string("the dr is in"));
   CHECK_EQUAL(ForSpeech("Jr high"), std::string("Jr high"));
+}
+
+TEST(StreetTypesAbroadAreSaidInTheirOwnLanguage)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_STREET_TYPES_PATH);
+  CHECK(cases.size() >= 25);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // Every stand-in the pass can swap in is in the dictionary, or the voice would read "fxkahyeh".
+  std::set<std::string> words;
+  for (auto const & [w, ph] : Lexicon())
+  {
+    CHECK(!ph.empty());
+    words.insert(w);
+  }
+  CHECK(ForeignStreetRespellings().size() >= 40);
+  for (auto const & said : ForeignStreetRespellings())
+  {
+    std::string standIn = "fx";
+    for (char ch : said)
+      if (std::isalpha(static_cast<unsigned char>(ch)))
+        standIn += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    CHECK(words.count(standIn) == 1);
+  }
+  // Names and English words are left; the pass only touches the type and its particles.
+  CHECK_EQUAL(ForeignStreets("Turn left onto Main Street."), std::string("Turn left onto Main Street."));
+  CHECK_EQUAL(ForeignStreets("de la Reforma"), std::string("de la Reforma"));
+  CHECK_EQUAL(ForeignStreets("Calle"), std::string("Calle"));
+  CHECK_EQUAL(ForeignStreets("Calle, Ocho"), std::string("Calle, Ocho"));
+  // The driver's own pronunciation of a name still wins: user words run first.
+  SetUserWords("Calle Ocho\tKAI-yeh OH-cho\n");
+  CHECK(ForSpeech("Turn onto Calle Ocho.").find("fxkahyeh") == std::string::npos);
+  SetUserWords("");
 }

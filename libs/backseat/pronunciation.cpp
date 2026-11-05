@@ -1173,6 +1173,172 @@ std::string Foreign(std::string const & text)
   return s;
 }
 
+// MARK: - Street names abroad
+
+namespace
+{
+struct ForeignWord
+{
+  char const * word;
+  /// Reader-style respelling, stressed syllable in capitals (see kPhrases).
+  char const * said;
+  /// The languages whose particles may follow ("es pt"); the first picks how "de" sounds.
+  char const * langs;
+};
+
+// Street-type words map data carries abroad (and in Miami, LA, Quebec) that English Kokoro reads
+// as English: "Calle Ocho" is "call Ocho", "Straße" loses its ß. Avenue, Boulevard, Plaza and Place
+// read fine in English and are left; Rue does too, but its "de"/"du" don't.
+constexpr ForeignWord kStreetTypes[] = {
+    {"Calle", "KAH-yeh", "es"},          {"Avenida", "ah-veh-NEE-dah", "es pt"},
+    {"Paseo", "pah-SEH-oh", "es"},       {"Calzada", "kahl-SAH-dah", "es"},
+    {"Carrera", "kah-REH-rah", "es"},    {"Carretera", "kah-reh-TEH-rah", "es"},
+    {"Callejón", "kah-yeh-HOHN", "es"},  {"Glorieta", "gloh-RYEH-tah", "es"},
+    {"Rue", "ROO", "fr"},                {"Chemin", "sheh-MAN", "fr"},
+    {"Allée", "ah-LAY", "fr"},           {"Quai", "KAY", "fr"},
+    {"Via", "VEE-ah", "it"},             {"Viale", "vee-AH-leh", "it"},
+    {"Piazza", "pee-AHT-sah", "it"},     {"Vicolo", "VEE-koh-loh", "it"},
+    {"Rua", "HOO-ah", "pt"},             {"Travessa", "trah-VEH-sah", "pt"},
+    {"Praça", "PRAH-sah", "pt"},         {"Straße", "SHTRAH-seh", "de"},
+    {"Strasse", "SHTRAH-seh", "de"},     {"Gasse", "GAH-seh", "de"},
+    {"Platz", "PLAHTS", "de"},
+};
+
+// Little words inside those names: "Paseo de la Reforma", "Rue du Bac", "Via della Spiga".
+constexpr ForeignWord kStreetParticles[] = {
+    {"de", "deh", "es"},   {"del", "dehl", "es"},   {"la", "lah", "es"},     {"las", "lahs", "es"},
+    {"los", "lohs", "es"}, {"de", "duh", "fr"},     {"du", "dew", "fr"},     {"des", "day", "fr"},
+    {"la", "lah", "fr"},   {"le", "luh", "fr"},     {"di", "dee", "it"},     {"del", "dehl", "it"},
+    {"della", "DEL-lah", "it"}, {"dei", "day", "it"}, {"delle", "DEL-leh", "it"},
+    {"degli", "DEL-yee", "it"}, {"de", "deh", "pt"}, {"do", "doo", "pt"},    {"da", "dah", "pt"},
+    {"dos", "doos", "pt"}, {"das", "dahs", "pt"},
+};
+
+bool InLangs(std::string_view langs, std::string_view lang)
+{
+  for (size_t at = langs.find(lang); at != std::string_view::npos; at = langs.find(lang, at + 1))
+    if ((at == 0 || langs[at - 1] == ' ') && (at + lang.size() == langs.size() || langs[at + lang.size()] == ' '))
+      return true;
+  return false;
+}
+
+/// The particle's respelling in the street word's languages, the first language winning.
+char const * StreetParticle(std::string const & word, std::string_view langs)
+{
+  std::string const w = AsciiLower(word);
+  if (w != word && !(std::isupper(static_cast<unsigned char>(word[0])) && AsciiLower(word.substr(1)) == word.substr(1)))
+    return nullptr;
+  std::istringstream in{std::string(langs)};
+  for (std::string lang; in >> lang;)
+    for (auto const & p : kStreetParticles)
+      if (w == p.word && lang == p.langs)
+        return p.said;
+  return nullptr;
+}
+
+/// A word that can carry a street name on: capitalised, a number, or non-ASCII ("Élysées").
+bool NameWord(std::string const & w)
+{
+  auto const c = static_cast<unsigned char>(w[0]);
+  return std::isupper(c) || std::isdigit(c) || c >= 0x80;
+}
+}  // namespace
+
+std::string ForeignStreets(std::string const & text)
+{
+  struct Span
+  {
+    size_t at, end;
+  };
+  std::vector<Span> words;
+  for (size_t i = 0; i < text.size();)
+  {
+    if (!WordByte(text, i))
+    {
+      ++i;
+      continue;
+    }
+    size_t j = i;
+    while (j < text.size() && WordByte(text, j))
+      ++j;
+    words.push_back({i, j});
+    i = j;
+  }
+  auto const word = [&](size_t k) { return text.substr(words[k].at, words[k].end - words[k].at); };
+  // The next word is on the same name: only spaces between, or an elided "d'"/"l'" right after.
+  auto const spaced = [&](size_t k) {
+    for (size_t i = words[k].end; i < words[k + 1].at; ++i)
+      if (text[i] != ' ')
+        return false;
+    return true;
+  };
+  auto const elided = [&](size_t k) {
+    auto const w = AsciiLower(word(k));
+    return (w == "d" || w == "l") && words[k].end < text.size() &&
+           (text[words[k].end] == '\'' || text.compare(words[k].end, 3, "\xE2\x80\x99") == 0);
+  };
+
+  std::vector<std::pair<Span, std::string>> swaps;
+  for (size_t k = 0; k < words.size(); ++k)
+  {
+    std::string const w = word(k);
+    // "Hauptstraße", "Bahnhofstrasse": the type is glued on.
+    for (std::string_view tail : {"stra\xC3\x9F" "e", "strasse"})
+      if (w.size() > tail.size() + 1 && std::isupper(static_cast<unsigned char>(w[0])) &&
+          AsciiLower(w.substr(w.size() - tail.size())) == tail)
+        swaps.push_back({{words[k].at + w.size() - tail.size(), words[k].end}, " " + StandIn(std::string("SHTRAH-seh"))});
+    ForeignWord const * type = nullptr;
+    for (auto const & t : kStreetTypes)
+      if (w == t.word)
+        type = &t;
+    if (!type)
+      continue;
+    bool const atEnd = k + 1 == words.size() || !spaced(k);
+    auto const carriesOn = [&](size_t n) {
+      return NameWord(word(n)) || StreetParticle(word(n), type->langs) || elided(n);
+    };
+    // German types follow the name: "Potsdamer Platz", "Lange Gasse".
+    bool const after = InLangs(type->langs, "de") && k > 0 && spaced(k - 1) && NameWord(word(k - 1));
+    if (!after && (atEnd || !carriesOn(k + 1)))
+      continue;
+    std::string standIns;
+    for (auto const & part : SplitWords(type->said))
+      standIns += (standIns.empty() ? "" : " ") + StandIn(part);
+    swaps.push_back({words[k], standIns});
+    for (size_t n = k + 1; !atEnd && n + 1 < words.size() && spaced(n); ++n)
+    {
+      auto const said = StreetParticle(word(n), type->langs);
+      if (!said || !carriesOn(n + 1))
+        break;
+      swaps.push_back({words[n], StandIn(std::string(said))});
+      k = n;
+    }
+  }
+  if (swaps.empty())
+    return text;
+  std::string out;
+  size_t last = 0;
+  for (auto const & [span, said] : swaps)
+  {
+    out.append(text, last, span.at - last);
+    out += said;
+    last = span.end;
+  }
+  out.append(text, last, std::string::npos);
+  return out;
+}
+
+std::vector<std::string> ForeignStreetRespellings()
+{
+  std::vector<std::string> out;
+  for (auto const & t : kStreetTypes)
+    for (auto const & part : SplitWords(t.said))
+      out.push_back(part);
+  for (auto const & p : kStreetParticles)
+    out.push_back(p.said);
+  return out;
+}
+
 // MARK: - Cyrillic
 
 namespace
@@ -1780,6 +1946,8 @@ std::string ForSpeech(std::string const & text)
 
   // The driver's own words first: they know best.
   s = ApplyUserWords(s);
+  // Street types abroad: "Calle Ocho" is "KAH-yeh Ocho", "Paseo de la Reforma" keeps its Spanish.
+  s = ForeignStreets(s);
   s = PickSenses(s);
   // Saint, Doctor, Fort, Junior before the street pass can take them for street types.
   s = Titles(s);
@@ -1902,6 +2070,9 @@ std::vector<std::pair<std::string, std::string>> Lexicon()
       for (auto const & w : SplitWords(p.said))
         if (auto const ph = ForeignWordPhonemes(w); ph && seen.insert(StandIn(w)).second)
           out.emplace_back(StandIn(w), *ph);
+    for (auto const & w : ForeignStreetRespellings())
+      if (auto const ph = ForeignWordPhonemes(w); ph && seen.insert(StandIn(w)).second)
+        out.emplace_back(StandIn(w), *ph);
     // Names last, never replacing a word or stand-in above.
     std::set<std::string> taken;
     for (auto const & [w, ph] : out)

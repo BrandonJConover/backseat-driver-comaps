@@ -40,6 +40,15 @@ std::string Ranges(std::string const & text);
 /// ignoring case on word boundaries. Part of ForSpeech.
 std::string Foreign(std::string const & text);
 
+/// Street types abroad said in their own language: "Calle Ocho" reads "KAH-yeh Ocho", "Paseo de la
+/// Reforma" keeps a Spanish "de la", "Hauptstraße" "Haupt SHTRAH-seh" (as dictionary stand-ins).
+/// Only before a capitalised word, a number or a name particle, so "via I-35" and "rue the day"
+/// stay English. Part of ForSpeech; golden cases in backseat_tests/spoken_street_types.json.
+std::string ForeignStreets(std::string const & text);
+
+/// Every respelling ForeignStreets() swaps in, one word each (their stand-ins are in Lexicon()).
+std::vector<std::string> ForeignStreetRespellings();
+
 /// Cyrillic romanised the way a reader says it, for street names and quotes the English voice
 /// would skip: "улица Ленина" is "ulitsa Lenina", "Київ" "Kiyiv", "Ёлка" "Yolka"; a vowelless
 /// acronym in capitals is spelled ("СССР" "S-S-S-R"); a token mixing Latin letters ("Мoscow") is left.
