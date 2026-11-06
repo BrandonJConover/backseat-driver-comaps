@@ -2439,6 +2439,15 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     m_lastReadTopic.reset();
     return m_navigator.Reply("cmd.forgot", {{"thing", *topic}});
   }
+  case AppAction::Unmute:
+    // Back on is all the way back on, whatever "shut up" did before the mute.
+    m_navigator.SetTalkLevel(backseat::TalkLevel::Full);
+    break;
+  case AppAction::TalkLess: m_navigator.SetTalkLevel(backseat::TalkLevel::Less); return m_navigator.Reply("cmd.talkLess");
+  case AppAction::DirectionsOnly:
+    m_navigator.SetTalkLevel(backseat::TalkLevel::DirectionsOnly);
+    return m_navigator.Reply("cmd.directionsOnly");
+  case AppAction::TalkMore: m_navigator.SetTalkLevel(backseat::TalkLevel::Full); return m_navigator.Reply("cmd.talkMore");
   case AppAction::BeNicer: return NicenessMoved();
   case AppAction::BeMeaner: return m_navigator.Reply("cmd.meaner");
   case AppAction::GradeSoFar:

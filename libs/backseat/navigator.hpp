@@ -62,6 +62,16 @@ enum class TurnKind
   Destination
 };
 
+/// How much the GPS says besides directions ("shut up", "talk less", "talk more").
+enum class TalkLevel
+{
+  Full,
+  /// About half the remarks; bits, games and directions as always.
+  Less,
+  /// Directions, lane calls and arrival only: no remarks, bits, games or badges.
+  DirectionsOnly
+};
+
 /// Which side of the road the lanes for the next maneuver are on, when the driver has to move over.
 enum class LaneSide
 {
@@ -379,6 +389,10 @@ public:
   /// line; empty otherwise. The host warms that voice up when this changes, so the caller's first
   /// line isn't late.
   std::string const & PhoneCallerVoice() const { return m_call.CallerVoice(); }
+
+  /// "Shut up" keeps the turns (DirectionsOnly); "talk less" halves the remarks. Kept across trips.
+  void SetTalkLevel(TalkLevel level);
+  TalkLevel GetTalkLevel() const { return m_talk; }
 
   /// Pop quizzes (pop_quiz.hpp) need the driver to answer out loud, so they only happen once the
   /// host says it listens after "quiz.ask" lines. Off until then.
@@ -760,6 +774,11 @@ private:
   // Pop quizzes.
   PopQuiz m_quiz;
   bool m_quizOn = false;
+  TalkLevel m_talk = TalkLevel::Full;
+  /// TalkLevel::Less: the next remark is the one let through (they alternate).
+  bool m_lessSayNext = true;
+  /// Drops what TalkLevel rules out from lines about to be spoken; `punchlines` were already let through.
+  void FilterForTalkLevel(std::vector<Commentary> & lines, std::set<std::string> const & punchlines);
   int m_quizzes = 0;
   double m_lastQuizT = -1e18;
   int m_quizUnclear = 0;

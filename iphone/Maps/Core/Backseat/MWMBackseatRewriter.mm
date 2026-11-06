@@ -201,6 +201,9 @@ void Perform(backseat::AppCommand const & command)
   case AppAction::BlameGps:
   case AppAction::WhatDoYouKnow:
   case AppAction::ForgetThat:
+  case AppAction::TalkLess:
+  case AppAction::DirectionsOnly:
+  case AppAction::TalkMore:
   case AppAction::Count: break;
   }
 }

@@ -5,6 +5,7 @@
 #include "backseat/voice_command.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <set>
 
 using namespace backseat;
@@ -115,7 +116,7 @@ TEST(AppCommandsAreHeardInOrder)
   CHECK(ParseAppCommands("ok cancel the route")[0].action == AppAction::CancelRoute);
   CHECK(ParseAppCommands("please unmute")[0].action == AppAction::Unmute);
   CHECK_EQUAL(ParseAppCommands("please unmute").size(), size_t(1));
-  CHECK(ParseAppCommands("shut up")[0].action == AppAction::Mute);
+  CHECK(ParseAppCommands("shut up")[0].action == AppAction::DirectionsOnly);
   CHECK(ParseAppCommands("How much longer?")[0].action == AppAction::TimeLeft);
   CHECK(ParseAppCommands("what did you say")[0].action == AppAction::RepeatInstruction);
   CHECK(ParseAppCommands("go to settings")[0].action == AppAction::OpenSettings);
@@ -697,12 +698,14 @@ TEST(NegatedAndOverheardCommandsDontRun)
   CHECK(ParseAppCommands("never mind, cancel the route")[0].action == AppAction::CancelRoute);
   CHECK(ParseAppCommands("never mind cancel the route")[0].action == AppAction::CancelRoute);
   CHECK(ParseAppCommands("why don't you tell me a joke")[0].action == AppAction::TellJoke);
-  // Said to the GPS itself it still mutes.
-  for (char const * said : {"shut up", "be quiet", "shut up, Backseat", "be quiet please", "oh shut up", "Kevin, mute"})
+  // Said to the GPS itself it still hushes it (directions stay on; "mute" is the full mute).
+  for (char const * said : {"shut up", "be quiet", "shut up, Backseat", "be quiet please", "oh shut up"})
   {
     auto const c = ParseAppCommands(said);
-    CHECK(!c.empty() && c[0].action == AppAction::Mute);
+    CHECK(!c.empty() && c[0].action == AppAction::DirectionsOnly);
   }
+  auto const kevin = ParseAppCommands("Kevin, mute");
+  CHECK(!kevin.empty() && kevin[0].action == AppAction::Mute);
 }
 
 TEST(NeedsSaidAsNeedsFindAStop)
@@ -762,4 +765,40 @@ TEST(NeedsSaidAsNeedsFindAStop)
   // The model's pick holds up when the words were a need.
   CHECK(WordsSupportTool(AppAction::FindAlongRoute, "restroom", "I have to pee"));
   CHECK(WordsSupportTool(AppAction::FindAlongRoute, "restaurant", "I'm starving"));
+}
+
+TEST(TalkLessKeepsTheTurns)
+{
+  auto const only = [](char const * said, AppAction action)
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == action;
+    if (!ok)
+      std::printf("  heard \"%s\": %zu commands, first %s\n", said, c.size(), c.empty() ? "-" : ToolFor(c[0].action).name);
+    return ok;
+  };
+  // A hush keeps the directions: only "mute" goes fully silent.
+  for (char const * said : {"shut up", "Shut up!", "be quiet", "stop talking", "hush", "just directions please",
+                            "only directions", "directions only", "just give me the directions", "just navigate",
+                            "oh my god just shut up", "can you stop talking", "could you be quiet, please"})
+    CHECK(only(said, AppAction::DirectionsOnly));
+  for (char const * said : {"mute", "mute everything", "mute yourself", "turn the sound off"})
+    CHECK(only(said, AppAction::Mute));
+  for (char const * said : {"talk less", "less talking please", "fewer jokes", "tone it down", "you talk too much",
+                            "stop being so chatty", "less chatty please"})
+    CHECK(!ParseAppCommands(said).empty() && ParseAppCommands(said)[0].action == AppAction::TalkLess);
+  for (char const * said : {"talk more", "more jokes", "you can talk more now", "say whatever you want"})
+    CHECK(only(said, AppAction::TalkMore));
+  // Unmuting brings everything back by itself.
+  for (char const * said : {"you can talk again", "talk to me again", "unmute and talk to me again"})
+    CHECK(only(said, AppAction::Unmute));
+  // Curly apostrophes and negations (B18, B19) work here too.
+  CHECK(only("don\u2019t be so chatty, just directions", AppAction::DirectionsOnly));
+  for (char const * said : {"don't shut up", "please don't stop talking", "never be quiet", "don't talk less",
+                            "kids be quiet", "shut up Kevin", "be quiet guys", "Kevin, stop talking"})
+    CHECK(ParseAppCommands(said).empty());
+  // The tools are there for the on-device model too, by name.
+  CHECK(AppActionNamed("directions_only") == AppAction::DirectionsOnly);
+  CHECK(AppActionNamed("talk_less") == AppAction::TalkLess);
+  CHECK(AppActionNamed("talk_more") == AppAction::TalkMore);
 }

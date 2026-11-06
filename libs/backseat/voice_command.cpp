@@ -130,7 +130,8 @@ bool GoIsAnOrder(std::string const & words, std::vector<size_t> const & starts, 
          (before[before.size() - 2] == "can" || before[before.size() - 2] == "could" || before[before.size() - 2] == "would");
 }
 
-/// "Kids, be quiet", "shut up Kevin": said to someone in the car, not to the GPS.
+/// "Kids, be quiet", "shut up Kevin", "Kevin, stop talking": said to someone in the car, not to
+/// the GPS.
 bool HushAimedElsewhere(std::string const & spoken)
 {
   std::vector<std::string> raw;
@@ -171,7 +172,8 @@ bool HushAimedElsewhere(std::string const & spoken)
     return i > 0 && std::isupper(static_cast<unsigned char>(raw[i][0]));
   };
   for (size_t i = 0; i + 1 < low.size(); ++i)
-    if ((low[i] == "shut" && low[i + 1] == "up") || (low[i] == "be" && low[i + 1] == "quiet"))
+    if ((low[i] == "shut" && low[i + 1] == "up") || (low[i] == "be" && low[i + 1] == "quiet") ||
+        (low[i] == "stop" && low[i + 1] == "talking"))
       if ((i > 0 && someoneElse(i - 1)) || someoneElse(i + 2))
         return true;
   return false;
@@ -270,6 +272,9 @@ std::vector<AppTool> const & AppTools()
       {AppAction::WhatDoYouKnow, "what_do_you_know", "Read out what's saved about the driver.", nullptr},
       {AppAction::ForgetThat, "forget_that", "Delete something saved about the driver.", "What to forget; empty for the last thing read out."},
       {AppAction::SetTravelMode, "set_travel_mode", "Change how the trip is being made: walking, biking, driving or off-roading.", "walk, bike, drive or offroad."},
+      {AppAction::TalkLess, "talk_less", "Make fewer comments; directions stay the same.", nullptr},
+      {AppAction::DirectionsOnly, "directions_only", "Only speak directions, lane calls and arrival: no comments, bits or games. What \"shut up\" means.", nullptr},
+      {AppAction::TalkMore, "talk_more", "Go back to the full commentary after talking less.", nullptr},
   };
   return tools;
 }
@@ -455,8 +460,16 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                                 " cancel directions ", " stop the directions ", " stop directions "}},
       {AppAction::Unmute, {" unmute ", " un mute ", " you can talk again ", " talk to me again ", " start talking again ",
                            " sound back on ", " turn the sound back on ", " you can speak again "}},
-      {AppAction::Mute, {" mute ", " mute yourself ", " be quiet ", " shut up ", " stop talking ", " quiet please ",
-                         " go quiet ", " turn off the sound ", " turn the sound off ", " hush "}},
+      {AppAction::Mute, {" mute ", " mute yourself ", " mute everything ", " turn off the sound ", " turn the sound off "}},
+      // A hush keeps the turns: going silent at the next exit isn't what anyone asked for.
+      {AppAction::DirectionsOnly, {" be quiet ", " shut up ", " stop talking ", " quiet please ", " go quiet ", " hush ",
+                                   " just directions ", " just the directions ", " only directions ", " directions only ",
+                                   " just give me directions ", " just give me the directions ", " just navigate "}},
+      {AppAction::TalkLess, {" talk less ", " less talking ", " not so much talking ", " fewer jokes ", " less jokes ",
+                             " tone it down ", " stop being so chatty ", " not so chatty ", " less chatty ",
+                             " you talk too much "}},
+      {AppAction::TalkMore, {" talk more ", " more talking ", " more jokes ", " you can talk more ", " be chatty ",
+                             " say whatever you want "}},
       {AppAction::RepeatInstruction, {" repeat that ", " say that again ", " what did you say ", " come again ",
                                       " repeat the direction ", " repeat the directions ", " repeat the last ",
                                       " what was that ", " say again ", " repeat yourself "}},
@@ -588,6 +601,11 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   bool const unmuted = std::any_of(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::Unmute; });
   if (unmuted || (words.find(" mute ") == std::string::npos && HushAimedElsewhere(spoken)))
     found.erase(std::remove_if(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::Mute; }), found.end());
+  if (HushAimedElsewhere(spoken))
+    found.erase(std::remove_if(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::DirectionsOnly; }), found.end());
+  // "Unmute and talk to me": unmuting already brings the full commentary back.
+  if (unmuted)
+    found.erase(std::remove_if(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::TalkMore; }), found.end());
   if (auto const destination = ParseDestinationCommand(spoken))
   {
     // "Go to settings" and "switch to echo" aren't places.
@@ -816,6 +834,9 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::ForgetThat: return saidAny({"forget", "delete"});
   case AppAction::SetTravelMode:
     return saidAny({"walk", "walking", "foot", "hike", "hiking", "bike", "biking", "cycling", "drive", "driving", "off", "offroading", "offroad", "road"});
+  case AppAction::TalkLess: return saidAny({"less", "fewer", "down", "chatty", "much"});
+  case AppAction::DirectionsOnly: return saidAny({"quiet", "shut", "hush", "stop", "directions", "just"});
+  case AppAction::TalkMore: return saidAny({"more", "chatty", "whatever"});
   case AppAction::Count: break;
   }
   return false;

@@ -678,7 +678,9 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & route)
   if (car)
     TrackNightOut(fix, route);
   TrackClean(fix, route);
-  TrackIdle(fix, route);
+  bool const chatty = m_talk != TalkLevel::DirectionsOnly;
+  if (chatty)
+    TrackIdle(fix, route);
   TrackWrongWay(fix, route);
   TrackUTurn(fix, route);
   TrackSlowStart(fix);
@@ -689,9 +691,12 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & route)
   TrackMusic(fix.tMs, route);
   TrackLeftBuilding(fix);
   TrackTwentyQuestions(fix, route);
-  TrackPopQuiz(fix, route);
-  TrackQuietBits(fix, route);
-  TrackRoadBits(fix, route);
+  if (chatty)
+  {
+    TrackPopQuiz(fix, route);
+    TrackQuietBits(fix, route);
+    TrackRoadBits(fix, route);
+  }
   // Fed up for the first time this trip: from now on it's "wise, omnipotent overseer GPS".
   if (!m_titleDemanded && Tier() == 2)
   {
@@ -868,8 +873,10 @@ std::vector<Commentary> Navigator::TakeLines()
       m_onSaid(m_said);
   }
   // Punchlines whose awkward pause is over.
+  std::set<std::string> punchlines;
   while (!m_punchlines.empty() && m_punchlines.front().t <= m_lastT)
   {
+    punchlines.insert(m_punchlines.front().text);
     m_gate.Push(std::move(m_punchlines.front()), false);
     m_punchlines.erase(m_punchlines.begin());
   }
@@ -884,6 +891,7 @@ std::vector<Commentary> Navigator::TakeLines()
              !(offRoad && (l.category == Category::HardBraking || l.category == Category::HardAccel));
     }), lines.end());
   }
+  FilterForTalkLevel(lines, punchlines);
   if (!lines.empty())
     m_lastSpokeT = m_lastT;
   // What the phone will be busy saying, so the next turn call and the roasts can plan around it.
@@ -905,6 +913,65 @@ std::vector<Commentary> Navigator::TakeLines()
       line.maxWaitMs = NavWaitMs(line);
   }
   return lines;
+}
+
+namespace
+{
+/// Said back to the driver, or a beat of a bit or game in progress: "talk less" doesn't cut these in half.
+bool PartOfAnExchange(Category c)
+{
+  switch (c)
+  {
+  case Category::PlateGame:
+  case Category::PhoneCall:
+  case Category::Quiet:
+  case Category::TwentyQuestions:
+  case Category::PopQuiz:
+  case Category::Bossy:
+  case Category::Thanked:
+  case Category::Title: return true;
+  default: return false;
+  }
+}
+}  // namespace
+
+void Navigator::SetTalkLevel(TalkLevel level)
+{
+  Trace("talk.level", {{"level", level == TalkLevel::Full ? "full" : level == TalkLevel::Less ? "less" : "directions"}});
+  m_talk = level;
+  m_lessSayNext = true;
+  if (level != TalkLevel::DirectionsOnly)
+    return;
+  // Hush means now: the call hangs up and the quiz is off, rather than going on in silence.
+  if (m_call.Active())
+    m_call.End();
+  m_quiz.End();
+}
+
+void Navigator::FilterForTalkLevel(std::vector<Commentary> & lines, std::set<std::string> const & punchlines)
+{
+  if (m_talk == TalkLevel::Full)
+    return;
+  lines.erase(std::remove_if(lines.begin(), lines.end(), [&](Commentary const & l)
+  {
+    bool drop = false;
+    if (m_talk == TalkLevel::DirectionsOnly)
+      drop = l.priority != Priority::Nav || l.category == Category::Achievement;
+    else if (l.priority != Priority::Nav && !PartOfAnExchange(l.category) && punchlines.count(l.text) == 0)
+    {
+      drop = !m_lessSayNext;
+      m_lessSayNext = !m_lessSayNext;
+    }
+    if (drop)
+    {
+      Trace("say.dropped", {{"key", l.key}, {"why", "talk.level"}});
+      // A dropped setup takes its punchline with it.
+      if (!l.key.empty())
+        m_punchlines.erase(std::remove_if(m_punchlines.begin(), m_punchlines.end(),
+                                          [&](Commentary const & p) { return p.key == l.key; }), m_punchlines.end());
+    }
+    return drop;
+  }), lines.end());
 }
 
 namespace

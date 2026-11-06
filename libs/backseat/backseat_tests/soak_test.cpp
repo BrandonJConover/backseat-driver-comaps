@@ -278,3 +278,104 @@ TEST(SoakHostileFixesAreHarmless)
   CHECK(lines > 1000);
   CHECK(bad == 0);
 }
+
+namespace
+{
+SimResult DriveTalking(TripShape shape, uint32_t seed, TalkLevel level)
+{
+  EngineConfig c;
+  c.rng = SeededRng(seed);
+  Navigator nav(c);
+  nav.SetPopQuizOn(true);
+  nav.SetTalkLevel(level);
+  auto r = SimulateTrip(nav, {shape, seed});
+  CHECK(nav.GetTalkLevel() == level);
+  return r;
+}
+
+/// Remarks the driver could have done without: not directions, and not a beat of a game or bit
+/// (those go whole or not at all).
+int Remarks(SimResult const & r)
+{
+  return static_cast<int>(std::count_if(r.spoken.begin(), r.spoken.end(), [](Spoken const & s)
+  {
+    switch (s.line.category)
+    {
+    case Category::PlateGame:
+    case Category::PhoneCall:
+    case Category::Quiet:
+    case Category::TwentyQuestions:
+    case Category::PopQuiz:
+    case Category::Bossy:
+    case Category::Thanked:
+    case Category::Title: return false;
+    default: return s.line.priority != Priority::Nav;
+    }
+  }));
+}
+}  // namespace
+
+// "Shut up" keeps the turns (scout 2026-11-06: it used to mute the directions too). In
+// directions-only every maneuver still gets its call and nothing else is said: no bits, games,
+// idle remarks or badges.
+TEST(SoakDirectionsOnlySaysEveryTurnAndNothingElse)
+{
+  int turns = 0;
+  for (uint32_t seed = 1; seed <= 12; ++seed)
+    for (auto const shape : {TripShape::Town, TripShape::RoadTrip})
+    {
+      auto const r = DriveTalking(shape, seed, TalkLevel::DirectionsOnly);
+      CHECK(r.arrived);
+      for (auto const & m : r.maneuvers)
+      {
+        if (m.reachedMs < 0 || m.missed || m.turn == TurnKind::Destination)
+          continue;
+        ++turns;
+        CHECK(m.directed);
+      }
+      for (auto const & s : r.spoken)
+      {
+        bool const plain = s.line.priority == Priority::Nav && s.line.category != Category::Achievement;
+        if (!plain)
+          std::printf("  seed %u said %s: %s\n", seed, ToString(s.line.category), s.line.text.c_str());
+        CHECK(plain);
+      }
+      CHECK(std::any_of(r.spoken.begin(), r.spoken.end(),
+                        [](Spoken const & s) { return s.line.category == Category::Arrived; }));
+    }
+  CHECK(turns > 100);
+}
+
+// "Talk less": about half the remarks, every turn still called.
+TEST(SoakTalkLessHalvesTheRemarks)
+{
+  int full = 0, less = 0;
+  for (uint32_t seed = 1; seed <= 12; ++seed)
+    for (auto const shape : {TripShape::Town, TripShape::RoadTrip})
+    {
+      full += Remarks(DriveTalking(shape, seed, TalkLevel::Full));
+      auto const r = DriveTalking(shape, seed, TalkLevel::Less);
+      CHECK(r.arrived);
+      less += Remarks(r);
+      for (auto const & m : r.maneuvers)
+        if (m.reachedMs >= 0 && !m.missed && m.turn != TurnKind::Destination)
+          CHECK(m.directed);
+    }
+  std::printf("  remarks: full %d, less %d\n", full, less);
+  CHECK(full > 100);
+  CHECK(less > 0);
+  CHECK(less * 100 <= full * 70);
+}
+
+// Back to Full, and a hush mid-quiz ends the quiz rather than leaving it hanging in silence.
+TEST(TalkLevelSwitchesBackAndEndsTheQuiz)
+{
+  EngineConfig c;
+  c.rng = SeededRng(3);
+  Navigator nav(c);
+  CHECK(nav.GetTalkLevel() == TalkLevel::Full);
+  nav.SetTalkLevel(TalkLevel::DirectionsOnly);
+  CHECK(!nav.PopQuizCard());
+  nav.SetTalkLevel(TalkLevel::Full);
+  CHECK(nav.GetTalkLevel() == TalkLevel::Full);
+}
