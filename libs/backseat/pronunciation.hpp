@@ -29,6 +29,17 @@ std::string ForSpeech(std::string const & text);
 /// and "24/7" are left. Part of ForSpeech; golden cases in backseat_tests/spoken_symbols.json.
 std::string Symbols(std::string const & text);
 
+/// Two-digit decades said as decades: "the 90s", "the '90s" and "the 80's" read "the nineties",
+/// "mid-70s" "mid-seventies". Twenties to nineties only; "10s", "$90s" and "A90s" are left. Part
+/// of ForSpeech; golden cases in backseat_tests/spoken_symbols.json.
+std::string Decades(std::string const & text);
+
+/// Fractions read with their unit: "1/2 mi" is "a half mile", "3/4 mi" "three quarters of a mile",
+/// "2/3 hr" "two thirds of an hour", "1 1/2 mi" "1 and a half miles", "2 1/2 years" "2 and a half
+/// years". Dates and other fractions are left. Part of ForSpeech; golden cases in
+/// backseat_tests/spoken_symbols.json.
+std::string FractionsWithUnits(std::string const & text);
+
 /// Just the words spelled the same but said differently, swapped for the sound the sentence needs
 /// ("Where do you live?" reads "liv"). Part of ForSpeech.
 std::string PickSenses(std::string const & text);

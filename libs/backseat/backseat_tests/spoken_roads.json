@@ -254,7 +254,7 @@
   {
    "input": "Only 3/4 mile",
    "language": "en",
-   "expected": "Only three quarters mile"
+   "expected": "Only three quarters of a mile"
   },
   {
    "input": "Never forget 9/11",

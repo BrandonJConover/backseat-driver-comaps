@@ -2352,6 +2352,80 @@ std::string Symbols(std::string const & text)
   return s;
 }
 
+std::string Decades(std::string const & text)
+{
+  // "the 90s", "the '90s", "the 80's", "in my 20s", "mid-70s": two-digit decades from the twenties on.
+  // Not "10s" (tens of what?), "$90s", "A90s", "90sec" or "1990s" (Years has those).
+  static std::regex const decade("'?([2-9])0'?s(?![A-Za-z0-9'])");
+  return Replace(text, decade, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    // "the '90s": the apostrophe stands for the missing "19" and goes with it.
+    bool const ok = pos == 0 || Space(text[pos - 1]) || text[pos - 1] == '(' || text[pos - 1] == '"' ||
+                    (text[pos - 1] == '-' && pos > 1 && IsAsciiLetter(text[pos - 2]));
+    if (!ok)
+      return std::nullopt;
+    static char const * const kTens[] = {"", "", "twenties", "thirties", "forties", "fifties",
+                                         "sixties", "seventies", "eighties", "nineties"};
+    return std::string(kTens[m.str(1)[0] - '0']);
+  });
+}
+
+std::string FractionsWithUnits(std::string const & text)
+{
+  // "1/2 mi" is "a half mile" (not "a half miles"), "3/4 mi" "three quarters of a mile", "2/3 hr"
+  // "two thirds of an hour", "1 1/2 mi" "1 and a half miles", "2 1/2 years" "2 and a half years".
+  // Dates ("1/2/2026"), "11/2" and other fractions are left for the passes after.
+  static std::regex const re(
+      "\\b(?:(\\d{1,3}) (?:and )?)?([123])/([234])(?![\\d/])"
+      "(?: ?(mi|miles?|km|kilometers?|ft|feet|foot|yd|yards?|m|meters?|hrs?|hours?|mins?|minutes?|secs?|"
+      "seconds?|gal|gallons?|inch|inches)\\b)?");
+  struct Unit
+  {
+    char const * one;
+    char const * many;
+  };
+  static std::map<std::string, Unit> const units = {
+      {"mi", {"mile", "miles"}},         {"mile", {"mile", "miles"}},     {"miles", {"mile", "miles"}},
+      {"km", {"kilometer", "kilometers"}}, {"kilometer", {"kilometer", "kilometers"}},
+      {"kilometers", {"kilometer", "kilometers"}}, {"ft", {"foot", "feet"}}, {"feet", {"foot", "feet"}},
+      {"foot", {"foot", "feet"}},        {"yd", {"yard", "yards"}},       {"yard", {"yard", "yards"}},
+      {"yards", {"yard", "yards"}},      {"m", {"meter", "meters"}},      {"meter", {"meter", "meters"}},
+      {"meters", {"meter", "meters"}},   {"hr", {"hour", "hours"}},       {"hrs", {"hour", "hours"}},
+      {"hour", {"hour", "hours"}},       {"hours", {"hour", "hours"}},    {"min", {"minute", "minutes"}},
+      {"mins", {"minute", "minutes"}},   {"minute", {"minute", "minutes"}}, {"minutes", {"minute", "minutes"}},
+      {"sec", {"second", "seconds"}},    {"secs", {"second", "seconds"}}, {"second", {"second", "seconds"}},
+      {"seconds", {"second", "seconds"}}, {"gal", {"gallon", "gallons"}}, {"gallon", {"gallon", "gallons"}},
+      {"gallons", {"gallon", "gallons"}}, {"inch", {"inch", "inches"}},   {"inches", {"inch", "inches"}}};
+  return Replace(text, re, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    auto const frac = m.str(2) + "/" + m.str(3);
+    static std::map<std::string, std::pair<char const *, char const *>> const words = {
+        // {said after a whole number or before a unit that reads fine bare, before "of a"}
+        {"1/2", {"a half", "a half"}},          {"1/4", {"a quarter", "a quarter"}},
+        {"3/4", {"three quarters", "three quarters of"}}, {"1/3", {"a third", "a third of"}},
+        {"2/3", {"two thirds", "two thirds of"}}};
+    auto const w = words.find(frac);
+    if (w == words.end())
+      return std::nullopt;
+    // Glued to something before it: "1.1/2", "x1/2", "-1/2".
+    if (pos > 0 && std::string_view(".,-/$#").find(text[pos - 1]) != std::string_view::npos)
+      return std::nullopt;
+    bool const whole = m[1].matched;
+    if (!whole && !m[4].matched)
+      return std::nullopt;
+    if (whole)
+    {
+      std::string out = m.str(1) + " and " + w->second.first;
+      if (m[4].matched)
+        out += " " + std::string(units.at(m.str(4)).many);
+      return out;
+    }
+    std::string const one = units.at(m.str(4)).one;
+    std::string const before = w->second.second;
+    if (before == w->second.first)  // "a half mile", "a quarter mile": what drivers say.
+      return before + " " + one;
+    return before + (one == "hour" ? " an " : " a ") + one;
+  });
+}
+
 std::string ForSpeech(std::string const & text)
 {
   std::string s = ReplaceAll(text, "\xC2\xA0", " ");
@@ -2371,6 +2445,9 @@ std::string ForSpeech(std::string const & text)
   // Years as years: "in 1868" is "in eighteen sixty eight", "the 1990s" "the nineteen nineties".
   if (HasDigit(s))
     s = Years(s);
+  // Two-digit decades: "the 90s" is "the nineties".
+  if (HasDigit(s))
+    s = Decades(s);
   // Temperatures and approximations: "-5°F" is "minus 5 degrees Fahrenheit", "~5" "about 5".
   // "\xB0" is the second byte of the UTF-8 degree sign, "\xB1" of plus-minus, "\x80" of both dashes.
   bool const degreeSign = HasDigit(s) && HasAny(s, "\xB0");
@@ -2473,6 +2550,10 @@ std::string ForSpeech(std::string const & text)
   static std::regex const percent("(\\d) ?%");
   if (HasAny(s, "%"))
     s = std::regex_replace(s, percent, "$1 percent");
+  // Fractions before a unit and after a whole number: "1/2 mi" is "a half mile", "1 1/2 mi" "1 and a
+  // half miles".
+  if (HasAny(s, "/"))
+    s = FractionsWithUnits(s);
   // Units after a number ("1 mile", "3 miles").
   static std::regex const unit("(\\d) ?(ft|mi|mph|km|m|yd|hrs|hr|mins|min|secs|sec)\\b");
   s = Replace(s, unit, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
@@ -2491,8 +2572,12 @@ std::string ForSpeech(std::string const & text)
   });
   static std::regex const fraction("(\\d+)/(\\d+)");
   if (HasAny(s, "/"))
-    s = Replace(s, fraction, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    s = Replace(s, fraction, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     auto const a = m.str(1), b = m.str(2);
+    // "open 24/7" is "twenty four seven"; "24/7/365" is left whole.
+    auto const after = pos + static_cast<size_t>(m.length(0));
+    if (a == "24" && b == "7" && (pos == 0 || !Digit(s[pos - 1])) && (after >= s.size() || s[after] != '/'))
+      return std::string("twenty four seven");
     if (a == "1" && b == "2")
       return std::string("a half");
     if (a == "1" && b == "4")

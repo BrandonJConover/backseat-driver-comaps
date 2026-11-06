@@ -652,4 +652,15 @@ TEST(SymbolsAndLeftoverAbbreviationsMatchTheGoldenCases)
   CHECK_EQUAL(ForSpeech("Kiln"), std::string("Kiln"));
   // "min" and "sec" stay words when no number comes first.
   CHECK_EQUAL(ForSpeech("Hold on a sec"), std::string("Hold on a sec"));
+  // Decades and fractions with a unit, each pass on its own.
+  CHECK_EQUAL(Decades("the 90s, the '80s, the 70's"), std::string("the nineties, the eighties, the seventies"));
+  CHECK_EQUAL(Decades("$90s A90s 10s 90sec 1995s x'90s"), std::string("$90s A90s 10s 90sec 1995s x'90s"));
+  CHECK_EQUAL(Decades("Exit 90 is 30 miles"), std::string("Exit 90 is 30 miles"));
+  CHECK_EQUAL(FractionsWithUnits("1/2 mi"), std::string("a half mile"));
+  CHECK_EQUAL(FractionsWithUnits("3/4 hr"), std::string("three quarters of an hour"));
+  CHECK_EQUAL(FractionsWithUnits("1 1/2 mi"), std::string("1 and a half miles"));
+  CHECK_EQUAL(FractionsWithUnits("1 and 1/2 miles"), std::string("1 and a half miles"));
+  // Dates, other fractions, bare fractions and glued ones are left for later passes.
+  CHECK_EQUAL(FractionsWithUnits("1/2/2026 5/8 mi 1/2 of it 1.1/2 mi -1/2 mi"),
+              std::string("1/2/2026 5/8 mi 1/2 of it 1.1/2 mi -1/2 mi"));
 }
