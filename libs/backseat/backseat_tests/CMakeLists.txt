@@ -5,6 +5,7 @@ project(backseat_tests)
 add_executable(${PROJECT_NAME}
   check.hpp
   engine_test.cpp
+  history_test.cpp
   hostile_text_test.cpp
   indoors_test.cpp
   main.cpp
