@@ -2126,6 +2126,16 @@ std::string Years(std::string const & text)
   return out;
 }
 
+/// Whether `s` has an ASCII digit, or any byte of `bytes`. The passes below are std::regex scans,
+/// slow ones, and most lines have no digit at all: a pass that can't match skips its scan. Checked
+/// right before each pass, on the text as it is then, so skipping never changes what is said.
+bool HasDigit(std::string const & s)
+{
+  return std::any_of(s.begin(), s.end(), [](char c) { return c >= '0' && c <= '9'; });
+}
+
+bool HasAny(std::string const & s, std::string_view bytes) { return s.find_first_of(bytes) != std::string::npos; }
+
 std::string ForSpeech(std::string const & text)
 {
   std::string s = ReplaceAll(text, "\xC2\xA0", " ");
@@ -2136,27 +2146,36 @@ std::string ForSpeech(std::string const & text)
   // Kana by Hepburn, the same way: "ラーメン" is "ramen", "さくら通り" "sakura 通 ri".
   s = Kana(s);
   // Ranges before dashes become pauses: "3–5" is "3 to 5", not "3, 5".
-  s = Ranges(s);
+  if (HasDigit(s))
+    s = Ranges(s);
   // Clock times before the dash pass can split "9am-5pm".
   s = Clock(s);
   // Years as years: "in 1868" is "in eighteen sixty eight", "the 1990s" "the nineteen nineties".
-  s = Years(s);
+  if (HasDigit(s))
+    s = Years(s);
   // Temperatures and approximations: "-5°F" is "minus 5 degrees Fahrenheit", "~5" "about 5".
+  // "\xB0" is the second byte of the UTF-8 degree sign, "\xB1" of plus-minus, "\x80" of both dashes.
+  bool const degreeSign = HasDigit(s) && HasAny(s, "\xB0");
   static std::regex const degrees("(^|[\\s(])-(?=\\d+(?:\\.\\d+)? ?\xC2\xB0)");
-  s = std::regex_replace(s, degrees, "$1minus ");
+  if (degreeSign)
+    s = std::regex_replace(s, degrees, "$1minus ");
   static std::regex const degree("(\\d+(?:\\.\\d+)?) ?\xC2\xB0(?: ?([FC])\\b)?");
-  s = Replace(s, degree, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+  if (degreeSign)
+    s = Replace(s, degree, [](std::smatch const & m, size_t) -> std::optional<std::string> {
     std::string out = m.str(1) + (m.str(1) == "1" ? " degree" : " degrees");
     if (m[2].matched)
       out += m.str(2) == "F" ? " Fahrenheit" : " Celsius";
     return out;
   });
   static std::regex const about("~ ?(?=\\d)");
-  s = std::regex_replace(s, about, "about ");
+  if (HasAny(s, "~") && HasDigit(s))
+    s = std::regex_replace(s, about, "about ");
   static std::regex const plusMinus("\xC2\xB1 ?(?=\\d)");
-  s = std::regex_replace(s, plusMinus, "plus or minus ");
+  if (HasAny(s, "\xB1") && HasDigit(s))
+    s = std::regex_replace(s, plusMinus, "plus or minus ");
   static std::regex const dash("\\s*(?:\xE2\x80\x94|\xE2\x80\x93)\\s*");
-  s = std::regex_replace(s, dash, ", ");
+  if (HasAny(s, "\x80"))
+    s = std::regex_replace(s, dash, ", ");
   s = ReplaceAll(s, " & ", " and ");
 
   // The driver's own words first: they know best.
@@ -2196,12 +2215,18 @@ std::string ForSpeech(std::string const & text)
   });
   // Highways, routes and exits the way drivers say them: "I-405" is "I four oh five", "FM 1431"
   // "F M fourteen thirty one", "TX-71" "Texas seventy one", "Exit 238B" "Exit two thirty eight B".
-  s = Roads(s);
+  if (HasDigit(s))
+    s = Roads(s);
   // House numbers in pairs: "1600 Pennsylvania Avenue" is "sixteen hundred ...".
-  s = HouseNumbers(s);
+  if (HasDigit(s))
+    s = HouseNumbers(s);
+  // Everything from here on reads numbers: no digit, nothing left to do.
+  if (!HasDigit(s))
+    return Ellipses(s);
   // Money and percentages.
   static std::regex const money("\\$(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d{2}))?\\b");
-  s = Replace(s, money, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+  if (HasAny(s, "$"))
+    s = Replace(s, money, [](std::smatch const & m, size_t) -> std::optional<std::string> {
     auto const whole = m.str(1);
     std::string out = whole + (whole == "1" ? " dollar" : " dollars");
     if (m[2].matched && m.str(2) != "00")
@@ -2212,7 +2237,8 @@ std::string ForSpeech(std::string const & text)
     return out;
   });
   static std::regex const percent("(\\d) ?%");
-  s = std::regex_replace(s, percent, "$1 percent");
+  if (HasAny(s, "%"))
+    s = std::regex_replace(s, percent, "$1 percent");
   // Units after a number ("1 mile", "3 miles").
   static std::regex const unit("(\\d) ?(ft|mi|mph|km|m|yd)\\b");
   s = Replace(s, unit, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
@@ -2228,7 +2254,8 @@ std::string ForSpeech(std::string const & text)
     return m.str(1) + " " + (one ? w.first : w.second);
   });
   static std::regex const fraction("(\\d+)/(\\d+)");
-  s = Replace(s, fraction, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+  if (HasAny(s, "/"))
+    s = Replace(s, fraction, [](std::smatch const & m, size_t) -> std::optional<std::string> {
     auto const a = m.str(1), b = m.str(2);
     if (a == "1" && b == "2")
       return std::string("a half");
@@ -2240,7 +2267,8 @@ std::string ForSpeech(std::string const & text)
   });
   // Times: "2:30" is "two thirty".
   static std::regex const time("\\b(\\d{1,2}):(\\d{2})\\b");
-  s = Replace(s, time, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+  if (HasAny(s, ":"))
+    s = Replace(s, time, [](std::smatch const & m, size_t) -> std::optional<std::string> {
     auto const hour = SpellNumber(ToNumber(m.str(1)));
     auto const minutes = ToNumber(m.str(2));
     if (minutes == 0)
