@@ -706,8 +706,12 @@ std::string Titles(std::string s)
     return out;
   });
   // Road types next to a route number.
-  static std::regex const roadBefore("\\b(Hwy|Fwy|Expy|Pkwy|Rte)\\.? (?=\\d)");
-  s = Replace(s, roadBefore, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+  // "Ranch Rd 2222", "County Rd 12": a capitalised word, then Rd and a number.
+  static std::regex const roadBefore("\\b(Hwy|Fwy|Expy|Pkwy|Rte|Rd)\\.? (?=\\d)");
+  s = Replace(s, roadBefore, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    if (m.str(1) == "Rd" && (pos < 2 || s[pos - 1] != ' ' || !std::isupper(static_cast<unsigned char>(
+                                                                    s[s.find_last_of(' ', pos - 2) + 1]))))
+      return std::nullopt;
     return (m.str(1) == "Rte" ? std::string("Route") : Street(m.str(1))) + " ";
   });
   static std::regex const roadAfter("\\b(\\d+[A-Z]?) (Hwy|Fwy|Expy|Pkwy)\\b");
@@ -2010,32 +2014,66 @@ std::string Roads(std::string const & text)
       {"VT", {"Vermont", false}},       {"WA", {"Washington", false}},    {"WI", {"Wisconsin", false}},
       {"WV", {"West Virginia", false}}, {"WY", {"Wyoming", false}}};
   static std::map<std::string, std::string> const names = {
-      {"I", "I"},         {"US", "yooess"},      {"SR", "State Route"}, {"CR", "County Road"},
-      {"FM", "F M"},      {"RM", "R M"},         {"SH", "State Highway"}, {"M", "M"}};
-  static std::regex const road(
-      "\\b(Interstate|Highway|Route|Loop|[Ee]xit|I|US|SR|CR|FM|RM|SH|M|[A-Z]{2})(-| )(\\d{1,4})([A-Z]?)"
-      "(?![A-Za-z0-9]|[.,:/]\\d| ?(?:ft|mi|mph|km|m|yd)\\b)");
-  auto s = Replace(text, road, [](std::smatch const & m, size_t) -> std::optional<std::string> {
-    auto const prefix = m.str(1);
-    bool const hyphen = m.str(2) == "-";
-    std::string name;
+      {"I", "I"},         {"IH", "I"},           {"US", "yooess"},      {"SR", "State Route"},
+      {"CR", "County Road"}, {"FM", "F M"},      {"RM", "R M"},         {"RR", "Ranch Road"},
+      {"SH", "State Highway"}, {"M", "M"}};
+  // What the prefix says out loud, or nothing when it isn't a route: "PO 5", "TV 2", "IN 5".
+  auto const spoken = [](std::string const & prefix, bool hyphen) -> std::optional<std::string> {
     if (auto const it = names.find(prefix); it != names.end())
     {
       if (prefix == "M" && !hyphen)
         return std::nullopt;
-      name = it->second;
+      return it->second;
     }
-    else if (auto const st = states.find(prefix); st != states.end())
+    if (auto const st = states.find(prefix); st != states.end())
     {
       if (st->second.second && !hyphen)
         return std::nullopt;
-      name = st->second.first;
+      return std::string(st->second.first);
     }
-    else if (prefix.size() == 2 && std::isupper(static_cast<unsigned char>(prefix[1])))
-      return std::nullopt;  // Some other two capitals ("PO 5", "TV 2").
-    else
-      name = prefix;
-    return name + " " + RouteNumber(m.str(3)) + (m[4].length() > 0 ? " " + m.str(4) : "");
+    if (prefix.size() == 2 && std::isupper(static_cast<unsigned char>(prefix[1])))
+      return std::nullopt;
+    return prefix;
+  };
+  // Business, alternate and bypass routes after the number: "US 290 Bus", "US 183 Alt", "US 87 Byp".
+  // Not when a lowercase word follows that makes it something else ("the I-35 bus stop").
+#define BACKSEAT_ROUTE_PREFIX "Interstate|Highway|Route|Road|Loop|[Ee]xit|I|IH|US|SR|CR|FM|RM|RR|SH|M|[A-Z]{2}"
+#define BACKSEAT_ROUTE_KIND "Bus|BUS|Business|Alt|ALT|Byp|BYP|Bypass"
+  // OSM joins the refs of a road shared by two routes with ';' ("US 290;TX 71"), signs use '/'.
+  static std::regex const pair(
+      "\\b(" BACKSEAT_ROUTE_PREFIX ")(-| )(\\d{1,4}[A-Z]?(?: (?:" BACKSEAT_ROUTE_KIND ")\\.?)?) ?[;/] ?"
+      "(?=(" BACKSEAT_ROUTE_PREFIX ")(-| )\\d)");
+  auto s = Replace(text, pair, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
+    if (!spoken(m.str(1), m.str(2) == "-") || !spoken(m.str(4), m.str(5) == "-"))
+      return std::nullopt;
+    return m.str(1) + m.str(2) + m.str(3) + " or ";
+  });
+  static std::regex const road(
+      "\\b(" BACKSEAT_ROUTE_PREFIX ")(-| )(\\d{1,4})([A-Z]?)"
+      "(?![A-Za-z0-9]|[.,:/]\\d| ?(?:ft|mi|mph|km|m|yd)\\b)"
+      "(?: (" BACKSEAT_ROUTE_KIND ")(\\.)?(?![A-Za-z0-9]| (?:stop|stops|station|lane|lanes|route|routes|key)\\b))?");
+#undef BACKSEAT_ROUTE_PREFIX
+#undef BACKSEAT_ROUTE_KIND
+  auto const before = s;
+  s = Replace(before, road, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    auto const name = spoken(m.str(1), m.str(2) == "-");
+    if (!name)
+      return std::nullopt;
+    std::string out = *name + " " + RouteNumber(m.str(3)) + (m[4].length() > 0 ? " " + m.str(4) : "");
+    if (m[5].matched)
+    {
+      auto const kind = m.str(5);
+      auto const k = static_cast<char>(std::tolower(static_cast<unsigned char>(kind[0])));
+      out += k == 'b' && std::tolower(static_cast<unsigned char>(kind[1])) == 'u' ? " Business"
+             : k == 'a'                                                           ? " Alternate"
+                                                                                  : " Bypass";
+      // "Byp." may end the sentence too: the period stays unless a lowercase word carries on.
+      auto const end = pos + static_cast<size_t>(m.length(0));
+      if (m[6].matched && !(end + 1 < before.size() && before[end] == ' ' &&
+                            std::islower(static_cast<unsigned char>(before[end + 1]))))
+        out += ".";
+    }
+    return out;
   });
   // "the 101 Freeway", "the 405 Expressway".
   static std::regex const after("\\b(\\d{3,4}) (Freeway|Highway|Expressway|Parkway)\\b");

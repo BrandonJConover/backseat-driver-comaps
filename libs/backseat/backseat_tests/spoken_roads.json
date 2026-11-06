@@ -160,6 +160,126 @@
    "input": "Arrive at 2:05",
    "language": "en",
    "expected": "Arrive at two oh five"
+  },
+  {
+   "input": "Take US 290 Bus",
+   "language": "en",
+   "expected": "Take yooess two ninety Business"
+  },
+  {
+   "input": "Merge onto US-183 Alt toward Austin",
+   "language": "en",
+   "expected": "Merge onto yooess one eighty three Alternate toward Austin"
+  },
+  {
+   "input": "Take US 87 Byp.",
+   "language": "en",
+   "expected": "Take yooess eighty seven Bypass."
+  },
+  {
+   "input": "Stay on TX-71 BUS",
+   "language": "en",
+   "expected": "Stay on Texas seventy one Business"
+  },
+  {
+   "input": "Merge onto I-35 Bus",
+   "language": "en",
+   "expected": "Merge onto I thirty five Business"
+  },
+  {
+   "input": "Merge onto US 290;TX 71",
+   "language": "en",
+   "expected": "Merge onto yooess two ninety or Texas seventy one"
+  },
+  {
+   "input": "Take I-35 / US-290",
+   "language": "en",
+   "expected": "Take I thirty five or yooess two ninety"
+  },
+  {
+   "input": "Take US 183;SH 45;Loop 1",
+   "language": "en",
+   "expected": "Take yooess one eighty three or State Highway forty five or Loop one"
+  },
+  {
+   "input": "Take US-290 Bus;TX-71",
+   "language": "en",
+   "expected": "Take yooess two ninety Business or Texas seventy one"
+  },
+  {
+   "input": "Take IH 35 S",
+   "language": "en",
+   "expected": "Take I thirty five South"
+  },
+  {
+   "input": "Take IH-10",
+   "language": "en",
+   "expected": "Take I ten"
+  },
+  {
+   "input": "Turn right onto Ranch Rd 2222",
+   "language": "en",
+   "expected": "Turn right onto Ranch Road twenty two twenty two"
+  },
+  {
+   "input": "Turn left onto RR 12",
+   "language": "en",
+   "expected": "Turn left onto Ranch Road twelve"
+  },
+  {
+   "input": "Take County Rd 3502",
+   "language": "en",
+   "expected": "Take County Road thirty five oh two"
+  },
+  {
+   "input": "Wait at the I-35 bus stop",
+   "language": "en",
+   "expected": "Wait at the I thirty five bus stop"
+  },
+  {
+   "input": "Take I-35 Bus stop",
+   "language": "en",
+   "expected": "Take I thirty five Bus stop"
+  },
+  {
+   "input": "Bus stop ahead",
+   "language": "en",
+   "expected": "Bus stop ahead"
+  },
+  {
+   "input": "Press the Alt key",
+   "language": "en",
+   "expected": "Press the Alt key"
+  },
+  {
+   "input": "Only 3/4 mile",
+   "language": "en",
+   "expected": "Only three quarters mile"
+  },
+  {
+   "input": "Never forget 9/11",
+   "language": "en",
+   "expected": "Never forget nine over eleven"
+  },
+  {
+   "input": "TV 2/PO 3",
+   "language": "en",
+   "expected": "TV two/PO three"
+  },
+  {
+   "input": "Down the Rd 5 times",
+   "language": "en",
+   "expected": "Down the Rd five times"
+  },
+  {
+   "input": "Take US 87 Byp. toward Lubbock",
+   "language": "en",
+   "expected": "Take yooess eighty seven Bypass toward Lubbock"
+  },
+  {
+   "input": "Take US 87 Byp. Then turn left.",
+   "language": "en",
+   "expected": "Take yooess eighty seven Bypass. Then turn left."
   }
  ]
 }

@@ -60,6 +60,10 @@ std::vector<Case> GoldenCases(char const * path)
     cases.push_back({JsonString(json, "input", at, close), JsonString(json, "language", at, close),
                      JsonString(json, "expected", at, close)});
     open = close;
+    // The last case closes the array; objects after it ("places", "localPlaces") aren't cases.
+    auto const next = json.find_first_not_of(" \t\r\n", close + 1);
+    if (next == std::string::npos || json[next] != ',')
+      break;
   }
   return cases;
 }
