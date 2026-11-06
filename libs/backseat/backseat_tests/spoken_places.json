@@ -1,0 +1,122 @@
+{
+ "about": "Place names said the local way for map turn instructions (BI-033). Places spelled like an English word (Burnet BURN-it, Humble UM-bul, Manor MAY-nur, Palestine PAL-uh-steen) are swapped for fx dictionary stand-ins only where the sentence says it's the place: before a street type or state, or after to/onto/in/toward (Palestine only before a street type or TX, 'in Palestine' is the country). Unambiguous place names Kokoro's dictionary lacks (Buda BYOO-duh, Manchaca MAN-shak, Pflugerville FLOO-gur-vil, Gruene GREEN, Boerne BUR-nee, Mexia muh-HAY-uh, Refugio, Bexar BAIR, Pedernales, Guadalupe GWAH-duh-loop, Natchitoches NAK-uh-tish, Puyallup pyoo-AL-up, Schuylkill SKOO-kul, Willamette wil-AM-it...) stay in the text and are fixed in the dictionary instead (see 'places'). Backseat Driver: backseat::pronunciation::ForSpeech / LocalPlaces / Lexicon (libs/backseat/backseat_tests/spoken_places.json). BookLyre can take both (CROSS).",
+ "cases": [
+  {
+   "input": "Turn right onto Burnet Rd",
+   "expected": "Turn right onto fxburnit Road"
+  },
+  {
+   "input": "Turn left onto Burnet Road.",
+   "expected": "Turn left onto fxburnit Road."
+  },
+  {
+   "input": "Head toward Burnet.",
+   "expected": "Head toward fxburnit."
+  },
+  {
+   "input": "Welcome to Humble, TX.",
+   "expected": "Welcome to fxumbul, TX."
+  },
+  {
+   "input": "You are now in Humble.",
+   "expected": "You are now in fxumbul."
+  },
+  {
+   "input": "Exit toward Manor.",
+   "expected": "Exit toward fxmaynur."
+  },
+  {
+   "input": "Turn left onto Manor Rd",
+   "expected": "Turn left onto fxmaynur Road"
+  },
+  {
+   "input": "Continue to Palestine, TX.",
+   "expected": "Continue to fxpaluhsteen, TX."
+  },
+  {
+   "input": "Turn right onto Palestine Ave",
+   "expected": "Turn right onto fxpaluhsteen Avenue"
+  },
+  {
+   "input": "Be humble.",
+   "expected": "Be humble."
+  },
+  {
+   "input": "Humble pie again, I see.",
+   "expected": "Humble pie again, I see."
+  },
+  {
+   "input": "We are pulling up to the manor.",
+   "expected": "We are pulling up to the manor."
+  },
+  {
+   "input": "Welcome to Manor House.",
+   "expected": "Welcome to Manor House."
+  },
+  {
+   "input": "A flight to Palestine.",
+   "expected": "A flight to Palestine."
+  },
+  {
+   "input": "Gilbert Burnet wrote history.",
+   "expected": "Gilbert Burnet wrote history."
+  },
+  {
+   "input": "Burnet, a herb, grows here.",
+   "expected": "Burnet, a herb, grows here."
+  },
+  {
+   "input": "Turn left toward Buda.",
+   "expected": "Turn left toward Buda."
+  },
+  {
+   "input": "Merge onto Pflugerville Pkwy",
+   "expected": "Merge onto Pflugerville Parkway"
+  }
+ ],
+ "places": {
+  "buda": "BYOO-duh",
+  "manchaca": "MAN-shak",
+  "pflugerville": "FLOO-gur-vil",
+  "gruene": "GREEN",
+  "boerne": "BUR-nee",
+  "mexia": "muh-HAY-uh",
+  "refugio": "reh-FYUR-ee-oh",
+  "bexar": "BAIR",
+  "pedernales": "pur-duh-NAL-iss",
+  "guadalupe": "GWAH-duh-loop",
+  "lamar": "luh-MAR",
+  "cibolo": "SEE-buh-loh",
+  "bastrop": "BASS-trop",
+  "lampasas": "lam-PASS-us",
+  "kerrville": "KUR-vil",
+  "seguin": "seh-GEEN",
+  "hutto": "HUH-toh",
+  "helotes": "heh-LOH-tiss",
+  "uvalde": "yoo-VAL-dee",
+  "waxahachie": "wawk-suh-HATCH-ee",
+  "wimberley": "WIM-bur-lee",
+  "marfa": "MAR-fuh",
+  "llano": "LAN-oh",
+  "leander": "lee-AN-dur",
+  "bandera": "ban-DAIR-uh",
+  "goliad": "GOH-lee-ad",
+  "nacogdoches": "nak-uh-DOH-chiss",
+  "natchitoches": "NAK-uh-tish",
+  "puyallup": "pyoo-AL-up",
+  "schuylkill": "SKOO-kul",
+  "willamette": "wil-AM-it",
+  "kosciusko": "koz-ee-US-koh",
+  "moines": "MOYN",
+  "yosemite": "yoh-SEM-ih-tee",
+  "sequim": "SKWIM",
+  "tualatin": "too-AWL-uh-tin",
+  "mukilteo": "muk-il-TEE-oh"
+ },
+ "localPlaces": {
+  "Burnet": "BURN-it",
+  "Humble": "UM-bul",
+  "Manor": "MAY-nur",
+  "Palestine": "PAL-uh-steen"
+ }
+}

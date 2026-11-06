@@ -2,7 +2,9 @@
 
 #include "backseat/pronunciation.hpp"
 
+#include <algorithm>
 #include <cctype>
+#include <map>
 #include <fstream>
 #include <set>
 #include <sstream>
@@ -564,4 +566,62 @@ TEST(RegnalNumbersMatchTheGoldenCases)
   CHECK_EQUAL(Regnal("charles V"), std::string("charles V"));
   // Lines with no numeral after a name come back byte for byte.
   CHECK_EQUAL(Regnal("Turn left onto Main St, then I-35 N."), std::string("Turn left onto Main St, then I-35 N."));
+}
+
+TEST(PlaceNamesAreSaidTheLocalWay)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_PLACES_PATH);
+  CHECK(cases.size() >= 15);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  std::map<std::string, std::string> lexicon;
+  std::vector<std::string> order;
+  for (auto const & [w, ph] : Lexicon())
+  {
+    CHECK(!ph.empty());
+    order.push_back(w);
+    lexicon.emplace(w, ph);
+  }
+  // The places Kokoro's dictionary lacks are in ours, each with phonemes.
+  std::vector<std::string> const places = {
+      "buda",     "manchaca",  "pflugerville", "gruene",    "boerne",     "mexia",      "refugio",
+      "bexar",    "pedernales", "guadalupe",   "lamar",     "cibolo",     "bastrop",    "lampasas",
+      "kerrville", "seguin",    "hutto",       "helotes",   "uvalde",     "waxahachie", "wimberley",
+      "marfa",    "natchitoches", "puyallup",  "schuylkill", "willamette", "kosciusko", "yosemite",
+      "sequim",   "tualatin",  "mukilteo"};
+  CHECK(places.size() >= 25);
+  for (auto const & p : places)
+  {
+    CHECK(lexicon.count(p) == 1);
+    CHECK(!lexicon[p].empty());
+  }
+  CHECK_EQUAL(lexicon["gruene"], std::string("ɡɹˈin"));
+  CHECK_EQUAL(lexicon["bexar"], std::string("bˈɛɹ"));
+  // Kyle was already a name: the place doesn't add a second entry or replace it.
+  CHECK(std::count(order.begin(), order.end(), std::string("kyle")) == 1);
+  CHECK(std::count(order.begin(), order.end(), std::string("buda")) == 1);
+  // Every stand-in LocalPlaces() can swap in is in the dictionary.
+  CHECK(LocalPlaceRespellings().size() >= 4);
+  for (auto const & said : LocalPlaceRespellings())
+  {
+    std::string standIn = "fx";
+    for (char ch : said)
+      if (std::isalpha(static_cast<unsigned char>(ch)))
+        standIn += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    CHECK(lexicon.count(standIn) == 1);
+  }
+  CHECK_EQUAL(lexicon["fxburnit"], std::string("bˈɜɹnɪt"));
+  // "Burnet" anywhere else keeps the dictionary's sound; lowercase is never the place.
+  CHECK_EQUAL(LocalPlaces("Burnet"), std::string("Burnet"));
+  CHECK_EQUAL(LocalPlaces("onto burnet rd"), std::string("onto burnet rd"));
+  CHECK_EQUAL(LocalPlaces("Burnetts Rd"), std::string("Burnetts Rd"));
+  CHECK_EQUAL(LocalPlaces("in Palestine"), std::string("in Palestine"));
+  CHECK_EQUAL(LocalPlaces("Burnet, Rd"), std::string("Burnet, Rd"));
+  // The driver's own pronunciation still wins: user words run first.
+  SetUserWords("Burnet\tbur-NET\n");
+  CHECK(ForSpeech("Turn right onto Burnet Rd").find("fxburnit") == std::string::npos);
+  SetUserWords("");
 }

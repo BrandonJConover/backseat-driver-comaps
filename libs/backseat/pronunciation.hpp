@@ -53,6 +53,16 @@ std::string ForeignStreets(std::string const & text);
 /// are left. Part of ForSpeech; golden cases in backseat_tests/spoken_regnal.json.
 std::string Regnal(std::string const & text);
 
+/// Place names spelled like an English word but said another way there, swapped for a stand-in
+/// only where the sentence says it's the place: "Turn right onto Burnet Rd" (BURN-it), "Humble, TX"
+/// (UM-bul), "toward Manor" (MAY-nur), "Palestine, TX" (PAL-uh-steen; never after "in", that's the
+/// country). "Be humble" and "the manor" are left. Part of ForSpeech; golden cases in
+/// backseat_tests/spoken_places.json (with the unambiguous place names Lexicon() holds).
+std::string LocalPlaces(std::string const & text);
+
+/// Every respelling LocalPlaces() swaps in (their stand-ins are in Lexicon()).
+std::vector<std::string> LocalPlaceRespellings();
+
 /// Every respelling ForeignStreets() swaps in, one word each (their stand-ins are in Lexicon()).
 std::vector<std::string> ForeignStreetRespellings();
 

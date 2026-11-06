@@ -118,6 +118,47 @@ constexpr Name kNames[] = {
     {"willie", "wˈɪli"}, {"zach", "zˈæk"}, {"zachary", "zˈækəɹi"}, {"zoe", "zˈOi"},
 };
 
+// Place names Kokoro's Misaki dictionaries lack (the fallback guesses them: "Buda" like the city in
+// Hungary, "Pflugerville" with a P), as the locals say them. Reader respellings, or Misaki IPA between
+// slashes; Lexicon() adds them after kNames without replacing a word already there (Kyle is a name).
+// Scout BI-033 checked each against misaki 0.7.4 us_gold/us_silver. Golden cases in
+// backseat_tests/spoken_places.json, shared with BookLyre (CROSS).
+constexpr Word kPlaces[] = {
+    // Central Texas.
+    {"buda", "BYOO-duh"}, {"manchaca", "MAN-shak"}, {"pflugerville", "FLOO-gur-vil"}, {"gruene", "GREEN"},
+    {"boerne", "BUR-nee"}, {"mexia", "muh-HAY-uh"}, {"refugio", "reh-FYUR-ee-oh"}, {"bexar", "BAIR"},
+    {"pedernales", "pur-duh-NAL-iss"}, {"guadalupe", "GWAH-duh-loop"}, {"lamar", "luh-MAR"},
+    {"cibolo", "SEE-buh-loh"}, {"bastrop", "BASS-trop"}, {"lampasas", "lam-PASS-us"}, {"kerrville", "KUR-vil"},
+    {"seguin", "seh-GEEN"}, {"hutto", "HUH-toh"}, {"helotes", "heh-LOH-tiss"}, {"uvalde", "yoo-VAL-dee"},
+    {"waxahachie", "wawk-suh-HATCH-ee"}, {"wimberley", "WIM-bur-lee"}, {"marfa", "MAR-fuh"},
+    {"llano", "LAN-oh"}, {"leander", "lee-AN-dur"}, {"bandera", "ban-DAIR-uh"}, {"goliad", "GOH-lee-ad"},
+    {"nacogdoches", "nak-uh-DOH-chiss"},
+    // Elsewhere in the US.
+    {"natchitoches", "NAK-uh-tish"}, {"puyallup", "pyoo-AL-up"}, {"schuylkill", "SKOO-kul"},
+    {"willamette", "wil-AM-it"}, {"kosciusko", "koz-ee-US-koh"}, {"moines", "MOYN"},
+    {"yosemite", "yoh-SEM-ih-tee"}, {"sequim", "SKWIM"}, {"tualatin", "too-AWL-uh-tin"},
+    {"mukilteo", "muk-il-TEE-oh"},
+};
+
+// Places spelled like an English word but said another way there ("Burnet Rd" in Austin is BURN-it,
+// Humble TX is UM-bul). Swapped for a stand-in only where the sentence says it's the place (see
+// LocalPlaces()), so "be humble" and "the manor" keep their sound.
+struct LocalPlace
+{
+  char const * word;
+  char const * said;
+  /// After "to", "onto", "in"... too; false when the word is also a country or common noun there.
+  bool afterPreposition;
+};
+
+constexpr LocalPlace kLocalPlaces[] = {
+    {"Burnet", "BURN-it", true},
+    {"Humble", "UM-bul", true},
+    {"Manor", "MAY-nur", true},
+    // "in Palestine" is the country; only "Palestine, TX" or "Palestine Ave".
+    {"Palestine", "PAL-uh-steen", false},
+};
+
 // MARK: - Picking the sense
 
 using Set = std::initializer_list<std::string_view>;
@@ -1554,6 +1595,91 @@ std::vector<std::string> ForeignStreetRespellings()
   return out;
 }
 
+// MARK: - Local place names
+
+std::string LocalPlaces(std::string const & text)
+{
+  bool any = false;
+  for (auto const & p : kLocalPlaces)
+    any = any || text.find(p.word) != std::string::npos;
+  if (!any)
+    return text;
+  struct Span
+  {
+    size_t at, end;
+  };
+  std::vector<Span> words;
+  for (size_t i = 0; i < text.size();)
+  {
+    if (!IsAsciiLetter(text[i]))
+    {
+      ++i;
+      continue;
+    }
+    size_t j = i;
+    while (j < text.size() && IsAsciiLetter(text[j]))
+      ++j;
+    words.push_back({i, j});
+    i = j;
+  }
+  auto const word = [&](size_t k) { return text.substr(words[k].at, words[k].end - words[k].at); };
+  // Only spaces, or one comma ("Humble, TX"), between two words.
+  auto const adjacent = [&](size_t a, size_t b) {
+    int commas = 0;
+    for (size_t i = words[a].end; i < words[b].at; ++i)
+    {
+      if (text[i] == ',')
+        ++commas;
+      else if (text[i] != ' ')
+        return false;
+    }
+    return commas <= 1;
+  };
+  static Set const placeAfter = {"Rd", "Road", "St", "Street", "Ave", "Avenue", "Dr", "Drive", "Ln", "Lane", "Blvd",
+                                 "Boulevard", "Hwy", "Highway", "Pkwy", "Parkway", "Ct", "Way", "Loop", "County",
+                                 "TX", "Tex", "Texas", "ISD", "Exit", "Station", "Square", "Plaza", "Center"};
+  static Set const toward = {"to", "onto", "into", "in", "toward", "towards", "near", "from", "via", "through",
+                             "past", "outside", "reach", "leaving", "entering"};
+  std::string out;
+  size_t last = 0;
+  for (size_t k = 0; k < words.size(); ++k)
+  {
+    auto const w = word(k);
+    auto const place = std::find_if(std::begin(kLocalPlaces), std::end(kLocalPlaces),
+                                    [&](LocalPlace const & p) { return w == p.word; });
+    if (place == std::end(kLocalPlaces))
+      continue;
+    // "Burnet Rd", "Humble, TX"; a comma only before the state.
+    bool here = false;
+    if (k + 1 < words.size() && adjacent(k, k + 1))
+    {
+      auto const next = word(k + 1);
+      bool const comma = text.find(',', words[k].end) < words[k + 1].at;
+      here = In(next, placeAfter) && (!comma || In(next, {"TX", "Tex", "Texas"}));
+    }
+    // "onto Burnet", "in Humble": the place unless a capitalised word follows ("to Manor House").
+    if (!here && place->afterPreposition && k > 0 && adjacent(k - 1, k) &&
+        text.find(',', words[k - 1].end) >= words[k].at && In(word(k - 1), toward))
+      here = !(k + 1 < words.size() && adjacent(k, k + 1) && text.find(',', words[k].end) >= words[k + 1].at &&
+               std::isupper(static_cast<unsigned char>(text[words[k + 1].at])) && !In(word(k + 1), placeAfter));
+    if (!here)
+      continue;
+    out.append(text, last, words[k].at - last);
+    out += StandIn(std::string(place->said));
+    last = words[k].end;
+  }
+  out.append(text, last, std::string::npos);
+  return out;
+}
+
+std::vector<std::string> LocalPlaceRespellings()
+{
+  std::vector<std::string> out;
+  for (auto const & p : kLocalPlaces)
+    out.push_back(p.said);
+  return out;
+}
+
 // MARK: - Cyrillic
 
 namespace
@@ -2182,6 +2308,8 @@ std::string ForSpeech(std::string const & text)
   s = ApplyUserWords(s);
   // Street types abroad: "Calle Ocho" is "KAH-yeh Ocho", "Paseo de la Reforma" keeps its Spanish.
   s = ForeignStreets(s);
+  // Places said the local way: "Burnet Rd" is BURN-it, "Humble, TX" UM-bul.
+  s = LocalPlaces(s);
   s = PickSenses(s);
   // Regnal numbers after a name: "King George VI Ave" is "King George the sixth Ave".
   s = Regnal(s);
@@ -2318,13 +2446,27 @@ std::vector<std::pair<std::string, std::string>> Lexicon()
     for (auto const & w : ForeignStreetRespellings())
       if (auto const ph = ForeignWordPhonemes(w); ph && seen.insert(StandIn(w)).second)
         out.emplace_back(StandIn(w), *ph);
-    // Names last, never replacing a word or stand-in above.
+    for (auto const & p : kLocalPlaces)
+      if (auto const ph = RespellingPhonemes(p.said); ph && seen.insert(StandIn(std::string(p.said))).second)
+        out.emplace_back(StandIn(std::string(p.said)), *ph);
+    // Names and places last, never replacing a word or stand-in above.
     std::set<std::string> taken;
     for (auto const & [w, ph] : out)
       taken.insert(w);
     for (auto const & n : kNames)
       if (taken.insert(n.word).second)
         out.emplace_back(n.word, n.phonemes);
+    for (auto const & p : kPlaces)
+    {
+      std::string said = p.said;
+      std::optional<std::string> ph;
+      if (said.size() > 2 && said.front() == '/' && said.back() == '/')
+        ph = said.substr(1, said.size() - 2);
+      else
+        ph = ForeignWordPhonemes(said);
+      if (ph && taken.insert(p.word).second)
+        out.emplace_back(p.word, *ph);
+    }
     return out;
   }();
   auto lexicon = builtIn;
