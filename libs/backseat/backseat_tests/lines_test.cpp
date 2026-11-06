@@ -208,6 +208,48 @@ bool TellsDriverToTouchOrLook(std::string const & line)
   }
   return false;
 }
+
+/// Whether `text` holds `phrase` with no negation ("don't", "not", "never", "no") before it in the
+/// same clause: "Do not take a photo while driving" passes, "Let's take a picture" doesn't.
+bool SaysUnnegated(std::string const & clause, char const * phrase)
+{
+  size_t const at = clause.find(phrase);
+  if (at == std::string::npos)
+    return false;
+  std::string const before = " " + clause.substr(0, at);
+  for (char const * no : {"n't ", " not ", " never ", " no ", " without "})
+    if (before.find(no) != std::string::npos)
+      return false;
+  return true;
+}
+
+/// Whether `line` tells the driver to take their hands off the wheel (hold up / raise their hands,
+/// let go of the wheel), take their eyes off the road (close your eyes), or take a picture (loop
+/// B41). "Keep both hands on the wheel", "Hands off the phone" and "Don't look at the water" pass.
+bool TellsDriverToLetGoOrLookAway(std::string const & line)
+{
+  std::string previous;
+  for (auto const & clause : Clauses(line))
+  {
+    bool const negated = previous == "don't" || previous == "do not" || previous == "never" || previous == "no";
+    previous = clause;
+    if (negated)
+      continue;
+    std::initializer_list<char const *> const hands = {"hand", "arm", "finger"};
+    if ((StartsWith(clause, "hold up ") || StartsWith(clause, "raise ") || StartsWith(clause, "put up ") ||
+         StartsWith(clause, "wave ")) &&
+        Mentions(clause, hands))
+      return true;
+    for (char const * phrase :
+         {"hands up", "hands in the air", "let go of the wheel", "hands off the wheel", "hands off the steering",
+          "close your eyes", "shut your eyes", "eyes closed", "eyes off the road", "take a picture", "take a photo",
+          "take a pic", "take a selfie", "snap a photo", "snap a picture", "grab a photo", "get a photo",
+          "get a picture", "selfie time"})
+      if (SaysUnnegated(clause, phrase))
+        return true;
+  }
+  return false;
+}
 }  // namespace
 
 TEST(SafetyNoTouchPromptsWhileDriving)
@@ -225,6 +267,23 @@ TEST(SafetyNoTouchPromptsWhileDriving)
   CHECK(!TellsDriverToTouchOrLook("DON'T. TOUCH. MY. SLIDER."));
   CHECK(!TellsDriverToTouchOrLook("Scrolling the map while driving. Bold."));
   CHECK(!TellsDriverToTouchOrLook("Oh, you remembered me. How touching."));
+
+  // Hands off the wheel, eyes off the road, cameras out (loop B41).
+  CHECK(TellsDriverToLetGoOrLookAway("Hold up both hands. The one that makes an L is left."));
+  CHECK(TellsDriverToLetGoOrLookAway("Raise your hands if you're lost."));
+  CHECK(TellsDriverToLetGoOrLookAway("Let go of the wheel. Feel the road."));
+  CHECK(TellsDriverToLetGoOrLookAway("Close your eyes and picture the exit."));
+  CHECK(TellsDriverToLetGoOrLookAway("Mall time. Let's take a picture of the parking spot."));
+  CHECK(TellsDriverToLetGoOrLookAway("Selfie time!"));
+  CHECK(TellsDriverToLetGoOrLookAway("Hands up! This is a stick-up."));
+  CHECK(!TellsDriverToLetGoOrLookAway("Keep both hands on the wheel."));
+  CHECK(!TellsDriverToLetGoOrLookAway("Both hands on the wheel. Ten and two."));
+  CHECK(!TellsDriverToLetGoOrLookAway("I'm going to need a photo. Do not take a photo while driving. Logged."));
+  CHECK(!TellsDriverToLetGoOrLookAway("Hands off the phone."));
+  CHECK(!TellsDriverToLetGoOrLookAway("Don't look at the water."));
+  CHECK(!TellsDriverToLetGoOrLookAway("Don't. Close your eyes. Ever."));
+  CHECK(!TellsDriverToLetGoOrLookAway("Never take your eyes off the road."));
+  CHECK(!TellsDriverToLetGoOrLookAway("Raise the volume. I have things to say."));
 
   // Every line the GPS can say in a car. Onboarding and setup happen parked; the walking question
   // ("click the driving button") is asked as a trip starts on a walking route; walk/bike/hike
@@ -246,6 +305,12 @@ TEST(SafetyNoTouchPromptsWhileDriving)
           if (TellsDriverToTouchOrLook(line))
             std::printf("    touch prompt while driving: %s [%d]: %s\n", key.c_str(), tier, line.c_str());
           CHECK(!TellsDriverToTouchOrLook(line));
+          // nightOut.tube only plays parked (TrackNightOut's parked branch): the sobriety joke stays.
+          if (key == "nightOut.tube")
+            continue;
+          if (TellsDriverToLetGoOrLookAway(line))
+            std::printf("    hands/eyes/photo prompt while driving: %s [%d]: %s\n", key.c_str(), tier, line.c_str());
+          CHECK(!TellsDriverToLetGoOrLookAway(line));
         }
     }
   }
