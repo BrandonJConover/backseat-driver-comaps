@@ -16,6 +16,7 @@ add_executable(${PROJECT_NAME}
   pronunciation_backup_test.cpp
   pronunciation_test.cpp
   quiet_bits_test.cpp
+  report_test.cpp
   road_bits_test.cpp
   voice_command_test.cpp
   rewriter_test.cpp

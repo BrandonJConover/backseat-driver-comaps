@@ -127,8 +127,11 @@ TripReport BuildReport(std::vector<Incident> const & incidents, TripStats const 
   double const overallScore = JsRound(0.65 * instrScore + 0.35 * drivingScore);
   r.overall = {static_cast<int>(overallScore), Letter(overallScore)};
   r.quip = Quip(overallScore);
-  r.instructions = {static_cast<int>(JsRound(instrScore)), Letter(instrScore)};
-  r.driving = {static_cast<int>(JsRound(drivingScore)), Letter(drivingScore)};
+  // Letter from the rounded score, like overall, so a card never shows "87, B" or "93, A-".
+  double const instrShown = JsRound(instrScore);
+  double const drivingShown = JsRound(drivingScore);
+  r.instructions = {static_cast<int>(instrShown), Letter(instrShown)};
+  r.driving = {static_cast<int>(drivingShown), Letter(drivingShown)};
   r.speedingSeconds = static_cast<int>(JsRound(stats.speedingSeconds));
   r.maxOverLimit = stats.maxOverLimit;
   r.hardBrakes = stats.hardBrakes;
