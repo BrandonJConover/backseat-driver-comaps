@@ -64,6 +64,13 @@ constexpr Word kWords[] = {
     {"bayss", "/bˈAs/"},
     // Tiny, not sixty seconds.
     {"mynoot", "/mInˈut/"},
+    // bow, bowed, bowing: bending, or a ship's front ("took a bow", "bowed his head", "the bow of the
+    // ship"); the default is the ribbon or the archer's bow. "bough"/"boughs" are real words with that
+    // sound; the other two aren't words at all.
+    {"bough", "/bˈW/"},
+    {"boughs", "/bˈWz/"},
+    {"boughed", "/bˈWd/"},
+    {"boughing", "/bˈWɪŋ/"},
     // Clock times: "5pm", "5:30 p.m." (Clock()). Spelled "AM"/"PM" read as "am"/"pim" or get skipped.
     {"ayem", "/ˌAˈɛm/"},
     {"peeem", "/pˌiˈɛm/"},
@@ -150,8 +157,75 @@ bool Obj(std::string const & w)
 
 struct Ctx
 {
-  std::string p2, p1, n1, n2;
+  std::string p2, p1, n1, n2, n3;
+  /// Punctuation or the end of the text right after the word ("He bowed." "He bowed, then left").
+  bool endsClause = false;
 };
+
+// MARK: - bow (BookLyre's spoken_heteronyms, CROSS X-016)
+
+bool BowManner(std::string const & w)
+{
+  return In(w, {"deep", "low", "slight", "polite", "courtly", "stiff", "formal", "curt", "quick", "mocking", "sweeping",
+                "graceful", "gracious", "respectful", "solemn", "theatrical", "elaborate", "exaggerated", "ironic",
+                "courteous", "humble", "brief", "awkward", "gallant", "final", "last", "curtain"});
+}
+
+bool Ship(std::string const & w)
+{
+  return In(w, {"ship", "boat", "vessel", "yacht", "canoe", "ferry", "galley", "schooner", "frigate", "steamer",
+                "barge", "liner", "launch"});
+}
+
+// "bow and arrow", "bow tie", "violin bow strings", "took a bow from the rack": the ribbon or the weapon.
+bool BowIsAThing(Ctx const & c)
+{
+  return (c.n1 == "and" && In(c.n2, {"arrow", "arrows"})) ||
+         In(c.n1, {"tie", "ties", "string", "strings", "from", "off"}) || (c.n1 == "out" && c.n2 == "of");
+}
+
+bool TakeVerb(std::string const & w)
+{
+  return In(w, {"take", "takes", "took", "taken", "taking"});
+}
+
+// "the bow of the ship", "from bow to stern", "the boat's bows", "stern to bow".
+bool ShipsBow(Ctx const & c)
+{
+  if (c.n1 == "of" && In(c.n2, {"the", "our", "his", "her", "their", "a"}) && Ship(c.n3))
+    return true;
+  if (In(c.n1, {"to", "and"}) && c.n2 == "stern")
+    return true;
+  if (c.p1.size() > 2 && EndsWith(c.p1, "'s") && Ship(c.p1.substr(0, c.p1.size() - 2)))
+    return true;
+  return c.p2 == "stern" && c.p1 == "to";
+}
+
+// "bowed low", "bowing to the queen", "bows deeply", "bowed his head", "bowed and scraped".
+bool BendsAfter(Ctx const & c)
+{
+  if (In(c.n1, {"low", "lower", "deeply", "slightly", "politely", "stiffly", "formally", "gravely", "gracefully",
+                "courteously", "respectfully", "solemnly", "humbly", "graciously", "to", "before", "down", "out"}))
+    return true;
+  if (In(c.n1, {"his", "her", "their", "its", "my", "your", "our"}) && In(c.n2, {"head", "heads"}))
+    return true;
+  if (c.n1 == "and" && In(c.n2, {"scraped", "scraping"}))
+    return true;
+  return c.n1 == "in" && In(c.n2, {"greeting", "return"});
+}
+
+char const * Bow(Ctx const & c, char const * bent)
+{
+  if (BowIsAThing(c))
+    return nullptr;
+  // "took a bow", "took his final bow", "taking bows".
+  if (TakeVerb(c.p1) || (TakeVerb(c.p2) && (Det(c.p1) || In(c.p1, {"another"}) || BowManner(c.p1))))
+    return bent;
+  // "a deep bow", "with a low sweeping bow".
+  if (BowManner(c.p1) && (Det(c.p2) || In(c.p2, {"another"}) || BowManner(c.p2)))
+    return bent;
+  return ShipsBow(c) ? bent : nullptr;
+}
 
 using Rule = std::function<char const *(Ctx const &)>;
 
@@ -190,8 +264,20 @@ std::map<std::string, Rule> const & Rules()
        }},
       {"lead",
        [](Ctx const & c) -> char const * {
-         if (In(c.n1, {"foot", "feet", "footed", "pipe", "pipes", "paint", "poisoning", "weight", "weights",
-                       "balloon", "pencil", "pencils", "apron", "shot"}))
+         if (In(c.n1, {"foot", "feet", "footed", "pipe", "pipes", "piping", "paint", "poisoning", "weight", "weights",
+                       "balloon", "pencil", "pencils", "apron", "shot", "soldier", "soldiers", "crystal", "mine",
+                       "mines", "miner", "miners", "ore", "sinker", "sinkers", "bullet", "bullets", "pellet",
+                       "pellets", "slug", "slugs", "roof", "roofs", "roofing", "coffin", "coffins", "casket",
+                       "acetate", "oxide", "glass", "lined", "based", "free", "framed"}))
+           return "led";
+         // "made of lead", "heavy as lead", "red lead", but not "heavy as lead singers go".
+         if (!In(c.n1, {"the", "a", "an", "us", "them", "him", "her", "me", "you", "to", "singer", "singers", "role",
+                       "roles", "story", "vocals", "vocalist", "guitar", "guitarist", "actor", "actress",
+                       "character", "dog", "car"}) &&
+             ((In(c.p1, {"of", "with", "in", "as", "to", "than"}) &&
+               In(c.p2, {"made", "full", "lined", "filled", "weighted", "heavy", "cast", "coated", "plated", "turned",
+                         "sheathed", "heavier"})) ||
+              In(c.p1, {"red", "white"})))
            return "led";
          if (c.p1 == "the" && c.n1 == "out")  // "get the lead out"
            return "led";
@@ -352,11 +438,42 @@ std::map<std::string, Rule> const & Rules()
        }},
       {"minute",
        [](Ctx const & c) -> char const * {
-         return In(c.n1, {"detail", "details", "amount", "amounts", "difference", "differences", "fraction",
-                          "changes", "adjustments", "particles"})
-                    ? "mynoot"
-                    : nullptr;
+         static Set const tiny = {
+             "detail", "details", "amount", "amounts", "difference", "differences", "fraction", "fractions",
+             "changes", "adjustment", "adjustments", "particle", "particles", "quantity", "quantities", "trace",
+             "traces", "insect", "insects", "organism", "organisms", "creature", "creatures", "crack", "cracks",
+             "hole", "holes", "droplet", "droplets", "grain", "grains", "speck", "specks", "portion", "portions",
+             "variation", "variations", "examination", "inspection", "scrutiny", "crystal", "crystals", "fragment",
+             "fragments", "fleck", "flecks", "bubble", "bubbles", "hair", "hairs", "cell", "cells", "spore",
+             "spores", "scale", "scales", "precision"};
+         // "minute particles", "minute and careful examination".
+         if (In(c.n1, tiny) || (c.n1 == "and" && In(c.n3, tiny)))
+           return "mynoot";
+         // "so minute that nobody saw them", but not "a very minute later", "every minute or so".
+         if (In(c.p1, {"so", "very", "too", "quite", "most", "extremely", "rather", "incredibly", "infinitely",
+                       "exceedingly", "almost"}) &&
+             !In(c.n1, {"hand", "later", "ago", "or", "before", "after", "of", "to"}) &&
+             !(c.n1 == "and" && c.n2 == "a"))
+           return "mynoot";
+         return nullptr;
        }},
+      {"bow", [](Ctx const & c) -> char const * { return Bow(c, "bough"); }},
+      {"bows",
+       [](Ctx const & c) -> char const * {
+         if (auto const said = Bow(c, "boughs"))
+           return said;
+         // "He bows deeply." Not "bows to match" on a dress: only after someone.
+         return BendsAfter(c) && In(c.p1, {"he", "she", "it", "who", "everyone", "and", "then", "always"}) ? "boughs"
+                                                                                                         : nullptr;
+       }},
+      {"bowed",
+       [](Ctx const & c) -> char const * {
+         if (BendsAfter(c) || In(c.p1, {"head", "heads"}) || In(c.n1, {"head", "heads"}))
+           return "boughed";
+         // "He bowed." "and bowed, then left".
+         return c.endsClause && In(c.p1, {"i", "he", "she", "they", "we", "you", "and"}) ? "boughed" : nullptr;
+       }},
+      {"bowing", [](Ctx const & c) -> char const * { return BendsAfter(c) ? "boughing" : nullptr; }},
       {"use",
        [](Ctx const & c) -> char const * {
          if (Obj(c.n1) || In(c.n1, {"a", "an", "to"}))
@@ -960,7 +1077,18 @@ std::string PickSenses(std::string const & text)
     {
       c.n1 = words[k + 1].lower;
       if (k + 2 < words.size() && !words[k + 2].breakBefore)
+      {
         c.n2 = words[k + 2].lower;
+        if (k + 3 < words.size() && !words[k + 3].breakBefore)
+          c.n3 = words[k + 3].lower;
+      }
+    }
+    {
+      size_t at = words[k].start + words[k].len;
+      while (at < text.size() && Space(text[at]))
+        ++at;
+      c.endsClause = at >= text.size() || std::string_view(",.;:!?)").find(text[at]) != std::string_view::npos ||
+                     text.compare(at, 3, "\xE2\x80\x94") == 0 || text.compare(at, 3, "\xE2\x80\x93") == 0;
     }
     char const * token = rule->second(c);
     if (token == nullptr)

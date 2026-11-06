@@ -510,3 +510,39 @@ TEST(StreetTypesAbroadAreSaidInTheirOwnLanguage)
   CHECK(ForSpeech("Turn onto Calle Ocho.").find("fxkahyeh") == std::string::npos);
   SetUserWords("");
 }
+
+TEST(HeteronymSensesMatchTheGoldenCasesSharedWithBookLyre)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_HETERONYMS_PATH);
+  CHECK(cases.size() >= 50);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // "boughed" and "boughing" aren't words, so the voice needs them in the dictionary.
+  std::set<std::string> words;
+  for (auto const & [w, ph] : Lexicon())
+    words.insert(w);
+  for (auto const * standIn : {"bough", "boughs", "boughed", "boughing", "mynoot", "bayss"})
+    CHECK(words.count(standIn) == 1);
+}
+
+TEST(BowLeadAndMinuteNeedTheirWholeContext)
+{
+  // Needs the third word after: "the bow of the ship", "minute and careful examination".
+  CHECK_EQUAL(PickSenses("the bow of the ship"), std::string("the bough of the ship"));
+  CHECK_EQUAL(PickSenses("the bow of the queen"), std::string("the bow of the queen"));
+  CHECK_EQUAL(PickSenses("a minute and careful examination"), std::string("a mynoot and careful examination"));
+  CHECK_EQUAL(PickSenses("a minute and a half"), std::string("a minute and a half"));
+  CHECK_EQUAL(PickSenses("so minute and a half"), std::string("so minute and a half"));
+  // A sentence break cuts the context: "...the boat. Bow ties..." isn't a ship's bow.
+  CHECK_EQUAL(PickSenses("Sell the boat's. Bow ties too."), std::string("Sell the boat's. Bow ties too."));
+  // "bowed" at the end of a clause only after someone did it.
+  CHECK_EQUAL(PickSenses("He bowed"), std::string("He boughed"));
+  CHECK_EQUAL(PickSenses("The shelf bowed."), std::string("The shelf bowed."));
+  CHECK_EQUAL(PickSenses("They bowed \xE2\x80\x94 then left."), std::string("They boughed \xE2\x80\x94 then left."));
+  // Lead after a material verb, unless it's the other lead.
+  CHECK_EQUAL(PickSenses("heavy as lead singers go"), std::string("heavy as lead singers go"));
+  CHECK_EQUAL(PickSenses("pumped him full of lead"), std::string("pumped him full of led"));
+}

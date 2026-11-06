@@ -1,0 +1,285 @@
+{
+ "about": "Heteronym senses for ForSpeech/PickSenses (B20, CROSS X-016): BookLyre's English cases from EpubToM4B tests/fixtures/spoken_heteronyms.json with this lexicon's stand-ins (my-newt -> mynoot, base -> bayss; led/bough/boughs are real words with the right sound, boughed/boughing are Lexicon() entries), plus street and driving negatives. Divergence: Backseat swaps all-caps words too (tier-2 lines shout in capitals), so 'LEAD PIPE' reads 'Led PIPE'. BookLyre's French cases are left out (English voice only).",
+ "cases": [
+  {
+   "input": "He hit him with a lead pipe.",
+   "language": "en",
+   "expected": "He hit him with a led pipe."
+  },
+  {
+   "input": "Lead poisoning killed the painter.",
+   "language": "en",
+   "expected": "Led poisoning killed the painter."
+  },
+  {
+   "input": "The box was lead-lined.",
+   "language": "en",
+   "expected": "The box was led-lined."
+  },
+  {
+   "input": "Its walls were made of lead.",
+   "language": "en",
+   "expected": "Its walls were made of led."
+  },
+  {
+   "input": "The joke went down like a lead balloon.",
+   "language": "en",
+   "expected": "The joke went down like a led balloon."
+  },
+  {
+   "input": "His legs felt heavy as lead.",
+   "language": "en",
+   "expected": "His legs felt heavy as led."
+  },
+  {
+   "input": "A row of toy lead soldiers stood on the shelf.",
+   "language": "en",
+   "expected": "A row of toy led soldiers stood on the shelf."
+  },
+  {
+   "input": "He sharpened a lead pencil.",
+   "language": "en",
+   "expected": "He sharpened a led pencil."
+  },
+  {
+   "input": "She studied a minute insect.",
+   "language": "en",
+   "expected": "She studied a mynoot insect."
+  },
+  {
+   "input": "He described it in minute detail.",
+   "language": "en",
+   "expected": "He described it in mynoot detail."
+  },
+  {
+   "input": "The crystals were so minute that nobody saw them.",
+   "language": "en",
+   "expected": "The crystals were so mynoot that nobody saw them."
+  },
+  {
+   "input": "Every minute particle was counted.",
+   "language": "en",
+   "expected": "Every mynoot particle was counted."
+  },
+  {
+   "input": "He played bass guitar in the band.",
+   "language": "en",
+   "expected": "He played bayss guitar in the band."
+  },
+  {
+   "input": "The bass line throbbed.",
+   "language": "en",
+   "expected": "The bayss line throbbed."
+  },
+  {
+   "input": "She plays double bass.",
+   "language": "en",
+   "expected": "She plays double bayss."
+  },
+  {
+   "input": "Turn up the bass and treble.",
+   "language": "en",
+   "expected": "Turn up the bayss and treble."
+  },
+  {
+   "input": "The actor took a bow.",
+   "language": "en",
+   "expected": "The actor took a bough."
+  },
+  {
+   "input": "He gave a deep bow.",
+   "language": "en",
+   "expected": "He gave a deep bough."
+  },
+  {
+   "input": "With a low sweeping bow, he left.",
+   "language": "en",
+   "expected": "With a low sweeping bough, he left."
+  },
+  {
+   "input": "Spray hit the bow of the ship.",
+   "language": "en",
+   "expected": "Spray hit the bough of the ship."
+  },
+  {
+   "input": "Waves broke over the boat's bows.",
+   "language": "en",
+   "expected": "Waves broke over the boat's boughs."
+  },
+  {
+   "input": "He bowed low.",
+   "language": "en",
+   "expected": "He boughed low."
+  },
+  {
+   "input": "She bowed her head.",
+   "language": "en",
+   "expected": "She boughed her head."
+  },
+  {
+   "input": "He bowed.",
+   "language": "en",
+   "expected": "He boughed."
+  },
+  {
+   "input": "They stood with heads bowed.",
+   "language": "en",
+   "expected": "They stood with heads boughed."
+  },
+  {
+   "input": "The congregation bowed to the altar.",
+   "language": "en",
+   "expected": "The congregation boughed to the altar."
+  },
+  {
+   "input": "He was bowing to the queen.",
+   "language": "en",
+   "expected": "He was boughing to the queen."
+  },
+  {
+   "input": "He bows deeply.",
+   "language": "en",
+   "expected": "He boughs deeply."
+  },
+  {
+   "input": "The lead singer took the lead.",
+   "language": "en",
+   "expected": "The lead singer took the lead."
+  },
+  {
+   "input": "They will lead the way.",
+   "language": "en",
+   "expected": "They will lead the way."
+  },
+  {
+   "input": "Follow my lead.",
+   "language": "en",
+   "expected": "Follow my lead."
+  },
+  {
+   "input": "He had a lead of three points.",
+   "language": "en",
+   "expected": "He had a lead of three points."
+  },
+  {
+   "input": "LEAD PIPE was stamped on it.",
+   "language": "en",
+   "expected": "Led PIPE was stamped on it."
+  },
+  {
+   "input": "Wait a minute.",
+   "language": "en",
+   "expected": "Wait a minute."
+  },
+  {
+   "input": "A minute later he left.",
+   "language": "en",
+   "expected": "A minute later he left."
+  },
+  {
+   "input": "The minute hand moved.",
+   "language": "en",
+   "expected": "The minute hand moved."
+  },
+  {
+   "input": "Every minute counts.",
+   "language": "en",
+   "expected": "Every minute counts."
+  },
+  {
+   "input": "He caught a sea bass.",
+   "language": "en",
+   "expected": "He caught a sea bass."
+  },
+  {
+   "input": "They went bass fishing.",
+   "language": "en",
+   "expected": "They went bass fishing."
+  },
+  {
+   "input": "He drew his bow and arrow.",
+   "language": "en",
+   "expected": "He drew his bow and arrow."
+  },
+  {
+   "input": "She tied a bow in her hair.",
+   "language": "en",
+   "expected": "She tied a bow in her hair."
+  },
+  {
+   "input": "He wore a bow tie.",
+   "language": "en",
+   "expected": "He wore a bow tie."
+  },
+  {
+   "input": "The violin bow snapped.",
+   "language": "en",
+   "expected": "The violin bow snapped."
+  },
+  {
+   "input": "He took a bow and arrow from the rack.",
+   "language": "en",
+   "expected": "He took a bow and arrow from the rack."
+  },
+  {
+   "input": "Turn left onto Bow St.",
+   "language": "en",
+   "expected": "Turn left onto Bow Street."
+  },
+  {
+   "input": "Keep right on Bass Lake Rd.",
+   "language": "en",
+   "expected": "Keep right on Bass Lake Road."
+  },
+  {
+   "input": "Ease off the lead foot.",
+   "language": "en",
+   "expected": "Ease off the led foot."
+  },
+  {
+   "input": "Take the lead, I'll follow.",
+   "language": "en",
+   "expected": "Take the lead, I'll follow."
+  },
+  {
+   "input": "In a minute, turn right.",
+   "language": "en",
+   "expected": "In a minute, turn right."
+  },
+  {
+   "input": "Five minute drive to go.",
+   "language": "en",
+   "expected": "Five minute drive to go."
+  },
+  {
+   "input": "Take a bow, you parked it.",
+   "language": "en",
+   "expected": "Take a bough, you parked it."
+  },
+  {
+   "input": "The ferry's bow swung around.",
+   "language": "en",
+   "expected": "The ferry's bough swung around."
+  },
+  {
+   "input": "He bowed out of the race.",
+   "language": "en",
+   "expected": "He boughed out of the race."
+  },
+  {
+   "input": "She bowed, then smiled.",
+   "language": "en",
+   "expected": "She boughed, then smiled."
+  },
+  {
+   "input": "The bowed legs of the chair.",
+   "language": "en",
+   "expected": "The bowed legs of the chair."
+  },
+  {
+   "input": "Ribbons with bows to match.",
+   "language": "en",
+   "expected": "Ribbons with bows to match."
+  }
+ ]
+}
