@@ -30,6 +30,20 @@ struct TripRecord
   std::optional<LatLon> to;
 };
 
+/// The trip log on disk: one trip per line, tab-separated: routeKey, destination, endedAt, expectedMinutes,
+/// actualMinutes, speedingShare, missedTurns, hardBrakes, grade, then (newer lines) "lat,lon" of where it
+/// was headed. Tabs and line breaks in the text fields become spaces, so one trip is always one line.
+/// Numbers keep full precision (endedAt is ms since the epoch; six digits lost hours).
+std::string TripToLine(TripRecord const & r);
+/// A trip from one log line, or nothing if the line is damaged (too few fields, a number that doesn't
+/// parse or isn't finite, negative counts).
+std::optional<TripRecord> TripFromLine(std::string const & line);
+/// Every readable trip in a log, oldest first, keeping the last `max`. `lines`, if given, gets how many
+/// non-empty lines the log had, so the host can rewrite a log that has grown well past `max`.
+std::vector<TripRecord> ParseTrips(std::string const & text, size_t max, size_t * lines = nullptr);
+/// A whole log for these trips (each line ends with a newline).
+std::string SerializeTrips(std::vector<TripRecord> const & trips);
+
 struct TripPlan
 {
   LatLon origin;
