@@ -704,3 +704,62 @@ TEST(NegatedAndOverheardCommandsDontRun)
     CHECK(!c.empty() && c[0].action == AppAction::Mute);
   }
 }
+
+TEST(NeedsSaidAsNeedsFindAStop)
+{
+  auto const stopFor = [](char const * said) -> std::string
+  {
+    auto const commands = ParseAppCommands(said);
+    for (auto const & c : commands)
+      CHECK(c.action != AppAction::NavigateTo);
+    for (auto const & c : commands)
+      if (c.action == AppAction::FindAlongRoute)
+        return c.argument;
+    return "<none>";
+  };
+  // Needs said as needs, and "nearest" places: a stop, never the end of the trip.
+  CHECK_EQUAL(stopFor("I need to go to the bathroom"), std::string("restroom"));
+  CHECK_EQUAL(stopFor("my son needs to go to the bathroom"), std::string("restroom"));
+  CHECK_EQUAL(stopFor("I have to pee"), std::string("restroom"));
+  CHECK_EQUAL(stopFor("I gotta pee so bad"), std::string("restroom"));
+  CHECK_EQUAL(stopFor("we need a bathroom break"), std::string("restroom"));
+  CHECK_EQUAL(stopFor("we're low on gas"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("we’re running low on fuel"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("the gas light came on"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("I'm starving"), std::string("restaurant"));
+  CHECK_EQUAL(stopFor("we have to stop for lunch"), std::string("restaurant"));
+  CHECK_EQUAL(stopFor("I need some coffee"), std::string("coffee"));
+  CHECK_EQUAL(stopFor("take me to the nearest gas station"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("take me to a gas station please"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("navigate to the closest Starbucks"), std::string("starbucks"));
+  CHECK_EQUAL(stopFor("find a Starbucks"), std::string("starbucks"));
+  CHECK_EQUAL(stopFor("find me a McDonald's"), std::string("mcdonald's"));
+  CHECK_EQUAL(stopFor("can you find the nearest Walgreens"), std::string("walgreens"));
+  CHECK_EQUAL(stopFor("find a place to eat"), std::string("restaurant"));
+  CHECK_EQUAL(stopFor("stop at Target on the way"), std::string("target"));
+  CHECK_EQUAL(stopFor("let's stop at a gas station"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("okay, stop by the Costco first"), std::string("costco"));
+  // What already worked still does.
+  CHECK_EQUAL(stopFor("find gas"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("I need a bathroom"), std::string("restroom"));
+  CHECK_EQUAL(stopFor("add a stop at Walmart please"), std::string("walmart"));
+
+  // Not a stop: places as destinations, other errands, chatter, negations.
+  CHECK(ParseAppCommands("take me to Starbucks")[0].action == AppAction::NavigateTo);
+  CHECK(ParseAppCommands("take me to the airport")[0].argument == "airport");
+  CHECK(ParseAppCommands("take me to work")[0].action == AppAction::NavigateTo);
+  CHECK(Heard("find a different route", AppAction::DifferentRoute));
+  CHECK(!Heard("find a different route", AppAction::FindAlongRoute));
+  for (char const * said : {"I need to go to work", "I can't find a pen", "stop at the light", "stop at the stop sign",
+                            "should we stop at Target", "we stopped at Target on the way", "I don't have to pee",
+                            "I'm not hungry", "skip the stop at Walmart", "she has to go to the dentist",
+                            "I need to get home", "find a way out of this", "stop at nothing"})
+  {
+    auto const commands = ParseAppCommands(said);
+    CHECK(std::none_of(commands.begin(), commands.end(), [](AppCommand const & c)
+    { return c.action == AppAction::FindAlongRoute || c.action == AppAction::NavigateTo; }));
+  }
+  // The model's pick holds up when the words were a need.
+  CHECK(WordsSupportTool(AppAction::FindAlongRoute, "restroom", "I have to pee"));
+  CHECK(WordsSupportTool(AppAction::FindAlongRoute, "restaurant", "I'm starving"));
+}
