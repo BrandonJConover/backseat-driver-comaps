@@ -70,7 +70,8 @@ std::string MetricWording(std::string const & text);
 /// Templates for `key` at `tier` (0..2), for the current travel mode: what fits it, plus `key`.walk,
 /// `key`.bike, `key`.hike (or else `key`.walk) or `key`.offroad if there are any, or mode.generic when
 /// nothing fits. Lines that don't fit the driver's housing are left out too, unless that would leave
-/// none. Throws std::out_of_range for an unknown key.
+/// none. An unknown key or a tier outside 0..2 gives an empty pool (and a
+/// "lines.missing" trace) instead of throwing.
 std::vector<std::string> const & LinesFor(std::string const & key, int tier);
 
 /// Fills {placeholders} from vars. {NAME} in capitals inserts the value in capitals.
@@ -92,6 +93,7 @@ class SaidLog
 {
 public:
   /// A line from `options` not said recently for `key`, chosen by `r` in [0, 1), and remembered.
+  /// An r outside [0, 1) (or NaN) is clamped; empty `options` give "" and remember nothing.
   std::string const & Pick(std::string const & key, std::vector<std::string> const & options, double r);
   /// Whether anything for `key` was said before (as far as the log remembers).
   bool Said(std::string const & key) const

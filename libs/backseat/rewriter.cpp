@@ -198,6 +198,13 @@ RewriteGate::RewriteGate(std::chrono::milliseconds budget, Clock clock)
 
 void RewriteGate::Push(Commentary line, bool mayRewrite)
 {
+  // A line with nothing to say (an empty pool, a template that filled to blanks) never reaches the
+  // voice: the host would otherwise speak silence or a stray "||".
+  if (line.text.find_first_not_of(" \t\r\n|.") == std::string::npos)
+  {
+    Trace("say.empty", {{"key", line.key}});
+    return;
+  }
   Entry e;
   e.line = std::move(line);
   if (!mayRewrite)

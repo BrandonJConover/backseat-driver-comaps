@@ -4,7 +4,9 @@
 #include "backseat/lines_data.hpp"
 #include "backseat/pronunciation.hpp"
 
+#include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <initializer_list>
 #include <string>
@@ -363,4 +365,81 @@ TEST(FlatTierKeysOnlyShrink)
   if (flat > 66)
     std::printf("    %d keys have identical tiers (limit 66)\n", flat);
   CHECK(flat <= 66);
+}
+
+TEST(PickNeverCrashesOnAnEmptyPoolOrABadRandom)
+{
+  SaidLog log;
+  // Nothing to pick from: "" back, nothing remembered, nothing to save.
+  CHECK_EQUAL(log.Pick("no.lines", {}, 0.5), std::string());
+  CHECK(!log.Said("no.lines"));
+  CHECK(!log.Dirty());
+
+  std::vector<std::string> const pool = {"one", "two", "three"};
+  auto const inPool = [&](std::string const & s) { return std::find(pool.begin(), pool.end(), s) != pool.end(); };
+  // A random source that hands back NaN, a negative, exactly 1 or more still picks a real line.
+  for (double const r : {std::nan(""), -1.0, -0.0001, 1.0, 2.0, 1e300, -1e300, 0.9999999})
+    for (int i = 0; i < 4; ++i)
+      CHECK(inPool(log.Pick("pool", pool, r)));
+  // The first-ever pick is still the first option, whatever r says.
+  SaidLog fresh;
+  CHECK_EQUAL(fresh.Pick("k", pool, std::nan("")), std::string("one"));
+  // r >= 1 picks the last fresh line, never past the end.
+  SaidLog edge;
+  edge.Pick("k", pool, 0);
+  CHECK_EQUAL(edge.Pick("k", pool, 1.0), std::string("three"));
+}
+
+TEST(UnknownKeysAndTiersGiveAnEmptyPoolInsteadOfThrowing)
+{
+  CHECK(LinesFor("no.such.key", 0).empty());
+  CHECK(LinesFor("", 1).empty());
+  auto const & firstKey = LineData().begin()->first;
+  CHECK(!LinesFor(firstKey, 0).empty());
+  CHECK(LinesFor(firstKey, -1).empty());
+  CHECK(LinesFor(firstKey, 3).empty());
+  CHECK(LinesFor(firstKey, 5).empty());
+  // Also off the cached path (not driving, not a house).
+  SetLineTravelMode(TravelMode::Walk);
+  SetLineHousing(Housing::Streets);
+  SetLineMetric(true);
+  CHECK(LinesFor("no.such.key", 0).empty());
+  CHECK(LinesFor(firstKey, 7).empty());
+  SetLineTravelMode(TravelMode::Drive);
+  SetLineHousing(Housing::Unknown);
+  SetLineMetric(false);
+}
+
+TEST(EveryKeyHasLinesForEveryModeHousingUnitAndTier)
+{
+  int empty = 0, checked = 0;
+  std::string firstEmpty;
+  for (TravelMode const mode :
+       {TravelMode::Drive, TravelMode::Walk, TravelMode::Bike, TravelMode::OffRoad, TravelMode::Hike})
+    for (Housing const housing : {Housing::Unknown, Housing::House, Housing::Apartment, Housing::Streets})
+      for (bool const metric : {false, true})
+      {
+        SetLineTravelMode(mode);
+        SetLineHousing(housing);
+        SetLineMetric(metric);
+        for (auto const & [key, tiers] : LineData())
+          for (int tier = 0; tier < 3; ++tier)
+          {
+            ++checked;
+            if (LinesFor(key, tier).empty())
+            {
+              if (firstEmpty.empty())
+                firstEmpty = key + " tier " + std::to_string(tier) + " " + TravelModeName(mode) + " " +
+                             HousingName(housing) + (metric ? " metric" : "");
+              ++empty;
+            }
+          }
+      }
+  SetLineTravelMode(TravelMode::Drive);
+  SetLineHousing(Housing::Unknown);
+  SetLineMetric(false);
+  if (empty)
+    std::printf("first empty pool: %s\n", firstEmpty.c_str());
+  CHECK_EQUAL(empty, 0);
+  CHECK(checked > 1000);
 }

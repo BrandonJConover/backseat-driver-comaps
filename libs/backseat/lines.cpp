@@ -195,7 +195,16 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
 {
   bool const metric = g_metric;
   LineTable const & table = metric ? MetricLineData() : LineData();
-  auto const & raw = table.at(key).at(static_cast<size_t>(tier));
+  // A key or tier that isn't in the table (a typo, a key from a newer line bank) says nothing rather
+  // than taking the app down mid-drive; the trace shows which one.
+  static std::vector<std::string> const kNone;
+  auto const found = table.find(key);
+  if (found == table.end() || tier < 0 || static_cast<size_t>(tier) >= found->second.size())
+  {
+    Trace("lines.missing", {{"key", key}, {"tier", std::to_string(tier)}});
+    return kNone;
+  }
+  auto const & raw = found->second[static_cast<size_t>(tier)];
   TravelMode const mode = g_travelMode;
   Housing const housing = g_housing;
   // Story beats are read by position, and mode and outdoors lines are written for their mode.
@@ -357,6 +366,18 @@ size_t constexpr kSaidKeep = 30;
 
 std::string const & SaidLog::Pick(std::string const & key, std::vector<std::string> const & options, double r)
 {
+  // Nothing to pick from (a key missing from the line bank): say nothing, remember nothing.
+  static std::string const kNothing;
+  if (options.empty())
+  {
+    Trace("pick.empty", {{"key", key}});
+    return kNothing;
+  }
+  // r should be in [0, 1); a broken random source (NaN, negative, 1 or more) still picks a real line.
+  if (!(r >= 0))
+    r = 0;
+  else if (r >= 1)
+    r = std::nextafter(1.0, 0.0);
   auto & recent = m_recent[key];
   // A key's first ever line is its first option, which is Brandon's line where there is one.
   if (recent.empty())
