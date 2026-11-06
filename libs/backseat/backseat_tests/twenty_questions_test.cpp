@@ -45,13 +45,13 @@ RouteSnapshot TqRoute(uint32_t turnId, double dist)
   return r;
 }
 
-Fix TqFix(double tMs)
+Fix TqFix(double tMs, double speedMps = 25)
 {
   Fix f;
   f.tMs = tMs;
   f.lat = 39.74;
   f.lon = -104.99;
-  f.speedMps = 25;
+  f.speedMps = speedMps;
   f.bearingDeg = 90;
   return f;
 }
@@ -521,4 +521,48 @@ TEST(TwentyHearsCurlyApostrophes)
     CHECK_EQUAL(h.thing, straight.thing);
   }
   CHECK_EQUAL(static_cast<int>(ParseTwentyHeard("I\xE2\x80\x99m done").kind), static_cast<int>(Kind::Quit));
+}
+
+// At 70 mph 500 ft is five seconds, inside the "now" call: the hold scales to 12 s at the current speed.
+TEST(TwentyHoldScalesWithSpeed)
+{
+  for (bool highway : {true, false})
+  {
+    Navigator nav = TqNavigator();
+    double t = kTqDayMs;
+    double dist = 60000;
+    TqDrive(nav, t, 30, 1, dist);
+    nav.OnDriverSaid(t, "twenty questions");
+    TqDrive(nav, t, 5, 1, dist);
+    double const speed = highway ? 31 : 10;
+    double const at = highway ? 300 : 200;
+    nav.OnFix(TqFix(t, speed), TqRoute(1, at));
+    nav.TakeLines();
+    t += 1000;
+    nav.OnDriverSaid(t, "Is it alive?");
+    std::vector<Commentary> near;
+    for (int i = 0; i < 3; ++i, t += 1000)
+    {
+      nav.OnFix(TqFix(t, speed), TqRoute(1, at - speed * (i + 1)));
+      auto lines = nav.TakeLines();
+      near.insert(near.end(), lines.begin(), lines.end());
+    }
+    if (highway)
+    {
+      CHECK(TqGame(near).empty());
+      std::vector<Commentary> past;
+      for (int i = 0; i < 3; ++i, t += 1000)
+      {
+        nav.OnFix(TqFix(t, speed), TqRoute(2, 30000));
+        auto lines = nav.TakeLines();
+        past.insert(past.end(), lines.begin(), lines.end());
+      }
+      CHECK_EQUAL(TqGame(past).size(), size_t{1});
+    }
+    else
+    {
+      // Town speed: 200 m is 20 s off, the answer plays as it always did.
+      CHECK_EQUAL(TqGame(near).size(), size_t{1});
+    }
+  }
 }

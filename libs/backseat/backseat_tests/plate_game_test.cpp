@@ -30,13 +30,13 @@ RouteSnapshot PlateRoute(double distToTurnM)
   return r;
 }
 
-Fix PlateFix(double tMs)
+Fix PlateFix(double tMs, double speedMps = 13)
 {
   Fix f;
   f.tMs = tMs;
   f.lat = 39.745;
   f.lon = -104.96;
-  f.speedMps = 13;
+  f.speedMps = speedMps;
   return f;
 }
 
@@ -282,4 +282,42 @@ TEST(PlateGameHearsCurlyApostrophes)
   CHECK(ParseYesNo("I don\xE2\x80\x99t know") == YesNo::Unclear);
   CHECK(ParseYesNo("okay let\xE2\x80\x99s do it") == YesNo::Yes);
   CHECK(ParseYesNo("I\xE2\x80\x99m in") == YesNo::Yes);
+}
+
+// 500 ft is five seconds at 70 mph, inside the "now" call; the hold is 12 s at the current speed instead.
+TEST(PlateHoldScalesWithSpeed)
+{
+  for (bool highway : {true, false})
+  {
+    EngineConfig c;
+    c.rng = SeededRng(4);
+    Navigator nav(c, Commutes(3));
+    nav.SetRegionLookup([](LatLon const &) { return std::optional<std::string>("Colorado"); });
+    nav.OnFix(PlateFix(0), PlateRoute(5000));
+    nav.OnFix(PlateFix(70000), PlateRoute(4800));
+    CHECK_EQUAL(PlateLines(nav.TakeLines()).size(), size_t(1));
+    nav.OnDriverSaid(85000, "sure");
+    nav.TakeLines();
+    double const speed = highway ? 31 : 10;
+    nav.OnFix(PlateFix(95000, speed), PlateRoute(highway ? 300 : 200));
+    nav.TakeLines();
+    nav.OnDriverSaid(96000, "Texas");
+    nav.OnFix(PlateFix(97000, speed), PlateRoute(highway ? 269 : 190));
+    auto near = PlateLines(nav.TakeLines());
+    if (highway)
+    {
+      CHECK(near.empty());
+      RouteSnapshot next = PlateRoute(3000);
+      next.turnId = 2;
+      nav.OnFix(PlateFix(100000, speed), next);
+      auto released = PlateLines(nav.TakeLines());
+      CHECK_EQUAL(released.size(), size_t(1));
+      CHECK(released[0].text.find("Texas") != std::string::npos);
+    }
+    else
+    {
+      CHECK_EQUAL(near.size(), size_t(1));
+      CHECK(near[0].text.find("Texas") != std::string::npos);
+    }
+  }
 }

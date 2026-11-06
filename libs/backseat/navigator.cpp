@@ -306,6 +306,11 @@ double constexpr kQuietMinMovingMps = 5;
 
 double SecondsToTurn(double distM, double speedMps) { return distM / std::max(speedMps, kQuietMinSpeedMps); }
 
+/// Game talk (plate game, 20 Questions) holds this many seconds before a maneuver at the current speed, never
+/// less than the game's own floor (500 ft): at highway speed 500 ft is ~5 s, inside the "now" instruction.
+double constexpr kGameHoldS = 12;
+double GameHoldM(double floorM, double speedMps) { return std::max(floorM, kGameHoldS * std::max(speedMps, 0.0)); }
+
 // Pop quizzes (pop_quiz.hpp): a quiet stretch, not too early, a couple a trip, spaced out.
 double constexpr kQuizAfterStartMs = 5 * 60000;
 int constexpr kQuizzesPerTrip = 2;
@@ -656,7 +661,7 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & route)
     TrackTraffic(fix, route);
     TrackOffRoad(fix);
     TrackLastExit(fix.tMs, route);
-    TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
+    TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, fix.speedMps, route);
     TrackLongDrive(fix.tMs, route);
   }
   TrackFear(fix, route);
@@ -2244,7 +2249,7 @@ int Navigator::Tier() const
   return f < 34 ? 0 : f < 67 ? 1 : 2;
 }
 
-void Navigator::TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot const & route)
+void Navigator::TrackPlateGame(double tMs, LatLon const & here, double speedMps, RouteSnapshot const & route)
 {
   // Which state we're in barely changes; look it up every half minute.
   if (m_regionLookup && tMs - m_lastRegionCheckT >= 30000)
@@ -2253,7 +2258,7 @@ void Navigator::TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot co
     auto const name = m_regionLookup(here);
     m_plates.SetHere(name ? MatchPlateRegion(*name) : std::nullopt);
   }
-  bool const nearManeuver = route.turnId && route.distToTurnM < PlateGame::kHoldNearManeuverM;
+  bool const nearManeuver = route.turnId && route.distToTurnM < GameHoldM(PlateGame::kHoldNearManeuverM, speedMps);
   // The game the GPS refused a few minutes ago is now its own idea.
   if (m_gamePitchAt && tMs >= *m_gamePitchAt && !nearManeuver && route.state == RouteState::OnRoute &&
       m_plates.GetState() != PlateGame::State::Playing)
@@ -2665,7 +2670,8 @@ void Navigator::SayPlate(double tMs, PlateGame::Reply const & reply)
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = Priority::Roast;
   c.voiceSpeed = 1 + c.frustration / 1000.0;
-  if (m_turnId && m_lastDistToTurnM < PlateGame::kHoldNearManeuverM && !m_arrived)
+  if (m_turnId && m_lastDistToTurnM < GameHoldM(PlateGame::kHoldNearManeuverM, m_lastFix ? m_lastFix->speedMps : 0) &&
+      !m_arrived)
     m_heldPlateLines.push_back(std::move(c));
   else
     // The driver is waiting for an answer; don't hold it up for the rewording model.
@@ -3402,7 +3408,7 @@ void Navigator::TrackTwentyQuestions(Fix const & fix, RouteSnapshot const & rout
     return;
   }
   // Directions first: nothing from the game this close to a maneuver.
-  if (route.turnId && route.distToTurnM < TwentyQuestions::kHoldNearManeuverM)
+  if (route.turnId && route.distToTurnM < GameHoldM(TwentyQuestions::kHoldNearManeuverM, fix.speedMps))
     return;
   if (!m_heldTwentyLines.empty())
   {
@@ -3440,7 +3446,8 @@ void Navigator::SayTwenty(double tMs, TwentyQuestions::Reply const & reply)
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = Priority::Roast;
   c.voiceSpeed = 1 + c.frustration / 250.0;
-  if (m_turnId && m_lastDistToTurnM < TwentyQuestions::kHoldNearManeuverM && !m_arrived)
+  if (m_turnId && m_lastDistToTurnM < GameHoldM(TwentyQuestions::kHoldNearManeuverM, m_lastFix ? m_lastFix->speedMps : 0) &&
+      !m_arrived)
     m_heldTwentyLines.push_back(std::move(c));
   else
     // The driver is waiting for an answer; don't hold it up for the rewording model.

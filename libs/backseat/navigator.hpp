@@ -428,7 +428,7 @@ private:
   void CountLefts(double t);
   /// "In half a mile, turn left onto Elm Street." for the maneuver in route.
   void SayInstruction(double t, RouteSnapshot const & route);
-  void TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot const & route);
+  void TrackPlateGame(double tMs, LatLon const & here, double speedMps, RouteSnapshot const & route);
   void SayPlate(double tMs, PlateGame::Reply const & reply);
   void SayLine(double tMs, Category category, std::string const & key, Vars vars = {},
                Priority priority = Priority::Roast);

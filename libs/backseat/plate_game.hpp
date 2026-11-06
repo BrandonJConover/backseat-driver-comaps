@@ -76,7 +76,8 @@ public:
   static double constexpr kQuietStretchM = 3219;
   /// Only when the GPS isn't already fed up (tier 0).
   static int constexpr kMaxFrustration = 33;
-  /// No game talk this close to a maneuver (500 ft); directions come first.
+  /// No game talk this close to a maneuver (500 ft, or 12 s at the current speed if that is farther; the
+  /// navigator scales it); directions come first.
   static double constexpr kHoldNearManeuverM = 152;
 
   explicit PlateGame(Rng rng = {});
