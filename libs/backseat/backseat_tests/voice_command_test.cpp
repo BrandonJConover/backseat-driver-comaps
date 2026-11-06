@@ -665,3 +665,42 @@ TEST(CurlyApostrophesParseLikeStraightOnes)
   for (auto const & curly : CurlyVersions("I'm hungry"))
     CHECK(!PronounCorrection(curly));
 }
+
+TEST(NegatedAndOverheardCommandsDontRun)
+{
+  // Negated in the same clause: heard, not asked for.
+  for (char const * said : {"don't cancel the route", "please don't stop navigating", "don't mute", "do not take me home",
+                            "I don't want to go to work", "never cancel the route", "don’t mute"})
+    CHECK(ParseAppCommands(said).empty());
+  // Overheard: a bare "go to" that nobody ordered, and a hush aimed at someone in the car.
+  for (char const * said : {"should we go to Costco", "my wife wants to go to Target", "kids be quiet", "shut up Kevin",
+                            "Kevin, be quiet", "be quiet guys", "I want to go home"})
+    CHECK(ParseAppCommands(said).empty());
+
+  for (char const * said : {"go to work", "Go to work.", "okay go to work", "take me to work instead", "hey, go to work",
+                            "could you go to work", "thanks. Go to work"})
+  {
+    auto const c = ParseAppCommands(said);
+    CHECK(c.size() == 1 && c[0].action == AppAction::NavigateTo && c[0].argument == "work");
+  }
+  auto const airport = ParseAppCommands("let's go to the airport");
+  CHECK(airport.size() == 1 && airport[0].argument == "airport");
+  for (char const * tail : {"later", "right now", "real quick", "for me"})
+  {
+    auto const c = ParseAppCommands(std::string("take me to the gym ") + tail);
+    CHECK(c.size() == 1 && c[0].argument == "gym");
+  }
+  CHECK(ParseAppCommands("go home")[0].argument == "home");
+
+  auto const argue = ParseAppCommands("cancel the route, don't argue");
+  CHECK(argue.size() == 1 && argue[0].action == AppAction::CancelRoute);
+  CHECK(ParseAppCommands("never mind, cancel the route")[0].action == AppAction::CancelRoute);
+  CHECK(ParseAppCommands("never mind cancel the route")[0].action == AppAction::CancelRoute);
+  CHECK(ParseAppCommands("why don't you tell me a joke")[0].action == AppAction::TellJoke);
+  // Said to the GPS itself it still mutes.
+  for (char const * said : {"shut up", "be quiet", "shut up, Backseat", "be quiet please", "oh shut up", "Kevin, mute"})
+  {
+    auto const c = ParseAppCommands(said);
+    CHECK(!c.empty() && c[0].action == AppAction::Mute);
+  }
+}

@@ -48,7 +48,8 @@ std::string ParseTarget(std::string const & rest)
   for (bool trimmed = true; trimmed;)
   {
     trimmed = false;
-    for (std::string const tail : {" please ", " thanks ", " thank you ", " now ", " asap "})
+    for (std::string const tail : {" please ", " thanks ", " thank you ", " right now ", " now ", " asap ", " instead ",
+                                   " later ", " real quick ", " for me "})
       if (target.size() >= tail.size() && target.compare(target.size() - tail.size(), tail.size(), tail) == 0)
       {
         target.erase(target.size() - tail.size() + 1);
@@ -61,18 +62,136 @@ std::string ParseTarget(std::string const & rest)
       target.erase(0, lead.size());
   return target;
 }
+
+/// Offsets in CommandWords(text) where a clause starts: 0 and each space left by , . ; : ! or ?.
+std::vector<size_t> ClauseStarts(std::string const & text)
+{
+  std::vector<size_t> starts{0};
+  std::string out = " ";
+  for (unsigned char const ch : StraightApostrophes(text))
+  {
+    char const c = std::isalnum(ch) || ch == '\'' ? static_cast<char>(std::tolower(ch)) : ' ';
+    if (c != ' ' || out.back() != ' ')
+      out += c;
+    if (std::string_view(",.;:!?").find(static_cast<char>(ch)) != std::string_view::npos)
+      starts.push_back(out.size() - 1);
+  }
+  return starts;
+}
+
+/// The words of CommandWords(text) between the clause start before `at` and `at`.
+std::vector<std::string> ClauseBefore(std::string const & words, std::vector<size_t> const & starts, size_t at)
+{
+  size_t from = 0;
+  for (size_t const s : starts)
+    if (s <= at)
+      from = std::max(from, s);
+  std::istringstream in(words.substr(from, at - from));
+  std::vector<std::string> out;
+  for (std::string w; in >> w;)
+    out.push_back(w);
+  return out;
+}
+
+/// "Please don't stop navigating", "I don't want to go to work": a negation in the few words before a cue,
+/// in the same clause. "Never mind" and "why don't you" aren't negations.
+bool NegatedAt(std::string const & words, std::vector<size_t> const & starts, size_t at)
+{
+  if (at == std::string::npos)
+    return false;
+  auto const before = ClauseBefore(words, starts, at);
+  size_t const first = before.size() > 4 ? before.size() - 4 : 0;
+  for (size_t i = first; i < before.size(); ++i)
+  {
+    std::string const & w = before[i];
+    bool const why = i > 0 && before[i - 1] == "why";
+    if ((w == "don't" || w == "dont" || w == "didn't" || w == "didnt") && !why)
+      return true;
+    if (w == "not" && i > 0 && before[i - 1] == "do" && !(i > 1 && before[i - 2] == "why"))
+      return true;
+    if (w == "never" && !(i + 1 < before.size() && before[i + 1] == "mind"))
+      return true;
+  }
+  return false;
+}
+
+/// A bare "go to"/"go home" is an order only at the start of a clause or after a word that asks:
+/// "go to work", "okay go to work", "let's go home". Not "should we go to Costco", "she wants to go to Target".
+bool GoIsAnOrder(std::string const & words, std::vector<size_t> const & starts, size_t at)
+{
+  auto const before = ClauseBefore(words, starts, at);
+  if (before.empty())
+    return true;
+  std::string const & last = before.back();
+  for (char const * w : {"let's", "lets", "please", "just", "okay", "ok", "now", "hey", "google", "so", "then"})
+    if (last == w)
+      return true;
+  return last == "you" && before.size() > 1 &&
+         (before[before.size() - 2] == "can" || before[before.size() - 2] == "could" || before[before.size() - 2] == "would");
+}
+
+/// "Kids, be quiet", "shut up Kevin": said to someone in the car, not to the GPS.
+bool HushAimedElsewhere(std::string const & spoken)
+{
+  std::vector<std::string> raw;
+  std::string word;
+  for (char const ch : StraightApostrophes(spoken) + " ")
+  {
+    if (std::isalnum(static_cast<unsigned char>(ch)) || ch == '\'')
+      word += ch;
+    else if (!word.empty())
+    {
+      raw.push_back(word);
+      word.clear();
+    }
+  }
+  std::vector<std::string> low;
+  for (auto const & w : raw)
+  {
+    std::string l;
+    for (char const c : w)
+      l += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    low.push_back(l);
+  }
+  auto const someoneElse = [&](size_t i)
+  {
+    if (i >= low.size())
+      return false;
+    std::string const & l = low[i];
+    for (char const * app : {"backseat", "gps", "app", "computer", "phone", "you", "yourself", "i", "please", "and", "now"})
+      if (l == app)
+        return false;
+    for (char const * who : {"kids", "guys", "everyone", "everybody", "boys", "girls", "children", "y'all", "yall",
+                             "dog", "dogs", "puppy", "buddy", "honey", "babe", "dude", "bro", "sis"})
+      if (l == who)
+        return true;
+    if (l != "will" && PronounsForName(l))
+      return true;
+    // A capital in mid-sentence is a name: "Shut up Kevin", "be quiet Rosalind".
+    return i > 0 && std::isupper(static_cast<unsigned char>(raw[i][0]));
+  };
+  for (size_t i = 0; i + 1 < low.size(); ++i)
+    if ((low[i] == "shut" && low[i + 1] == "up") || (low[i] == "be" && low[i + 1] == "quiet"))
+      if ((i > 0 && someoneElse(i - 1)) || someoneElse(i + 2))
+        return true;
+  return false;
+}
 }  // namespace
 
 std::optional<DestinationCommand> ParseDestinationCommand(std::string const & spoken)
 {
   std::string const words = CommandWords(spoken);
+  auto const starts = ClauseStarts(spoken);
   std::string target;
   for (char const * cue : {" take me to ", " take us to ", " navigate to ", " drive me to ", " drive us to ",
                            " directions to ", " get me to ", " get us to ", " route to ", " route me to ",
                            " let's go to ", " lets go to ", " head to ", " go to ", " bring me to ", " take me back to ",
                            " take us back to ", " head back to "})
   {
-    auto const at = words.find(cue);
+    bool const bareGo = std::string_view(cue) == " go to ";
+    auto at = words.find(cue);
+    while (at != std::string::npos && bareGo && !GoIsAnOrder(words, starts, at))
+      at = words.find(cue, at + 1);
     if (at != std::string::npos)
     {
       target = ParseTarget(words.substr(at + std::string(cue).size()));
@@ -85,8 +204,12 @@ std::optional<DestinationCommand> ParseDestinationCommand(std::string const & sp
   // "Take me home" needs no "to".
   for (char const * cue : {" take me home ", " take us home ", " go home ", " drive me home ", " drive us home ",
                            " navigate home ", " head home ", " bring me home ", " get me home ", " get us home "})
-    if (target.empty() && words.find(cue) != std::string::npos)
+  {
+    auto const at = words.find(cue);
+    bool const bareGo = std::string_view(cue) == " go home ";
+    if (target.empty() && at != std::string::npos && (!bareGo || GoIsAnOrder(words, starts, at)))
       target = "home";
+  }
   if (target.empty())
     return {};
 
@@ -358,7 +481,7 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
     { return f.second.action == AppAction::ChangeVoice && f.second.argument.empty(); }), found.end());
   // "Unmute" also contains "mute", and "turn the sound back on" isn't muting.
   bool const unmuted = std::any_of(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::Unmute; });
-  if (unmuted)
+  if (unmuted || (words.find(" mute ") == std::string::npos && HushAimedElsewhere(spoken)))
     found.erase(std::remove_if(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::Mute; }), found.end());
   if (auto const destination = ParseDestinationCommand(spoken))
   {
@@ -376,6 +499,10 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       found.push_back({at, AppCommand{AppAction::NavigateTo, t}});
     }
   }
+  // "Don't cancel the route", "I don't want to go to work": heard, but not asked for.
+  auto const starts = ClauseStarts(spoken);
+  found.erase(std::remove_if(found.begin(), found.end(), [&](auto const & f) { return NegatedAt(words, starts, f.first); }),
+              found.end());
   std::stable_sort(found.begin(), found.end(), [](auto const & a, auto const & b) { return a.first < b.first; });
   std::vector<AppCommand> out;
   for (auto & f : found)
