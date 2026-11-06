@@ -5,6 +5,7 @@
 #include <cctype>
 #include <functional>
 #include <initializer_list>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <regex>
@@ -1080,6 +1081,8 @@ std::string SpellNumber(long long n)
                                       "seven",   "eight",   "nine",      "ten",      "eleven",   "twelve",  "thirteen",
                                       "fourteen", "fifteen", "sixteen",  "seventeen", "eighteen", "nineteen"};
   static char const * const tens[] = {"", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"};
+  if (n == std::numeric_limits<long long>::min())
+    return std::to_string(n);  // -n overflows; nothing real is this big
   if (n < 0)
     return "minus " + SpellNumber(-n);
   if (n < 20)
