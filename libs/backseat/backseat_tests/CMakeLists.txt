@@ -13,6 +13,7 @@ add_executable(${PROJECT_NAME}
   parity_test.cpp
   plate_game_test.cpp
   pop_quiz_test.cpp
+  pronunciation_backup_test.cpp
   pronunciation_test.cpp
   quiet_bits_test.cpp
   road_bits_test.cpp
@@ -38,6 +39,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
   BACKSEAT_SPOKEN_YEARS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_years.json"
   BACKSEAT_SPOKEN_CYRILLIC_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_cyrillic.json"
   BACKSEAT_SPOKEN_KANA_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_kana.json"
+  BACKSEAT_PRONUNCIATION_BACKUP_PATH="${CMAKE_CURRENT_SOURCE_DIR}/pronunciation_backup.json"
   BACKSEAT_SPOKEN_STREET_TYPES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_street_types.json"
   BACKSEAT_SPOKEN_HETERONYMS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_heteronyms.json"
   BACKSEAT_SPOKEN_REGNAL_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_regnal.json")
