@@ -1,5 +1,6 @@
 #include "backseat/achievements.hpp"
 
+#include <cmath>
 #include <cstdlib>
 #include <sstream>
 
@@ -54,8 +55,9 @@ Achievements Achievements::Parse(std::string const & text)
     double const tMs = std::strtod(when, &end);
     if (end == when)
       continue;
+    // A hand-edited "nan"/"inf" time keeps the badge but not the time (0 = unknown).
     // Badges that were renamed or removed stay in the file but don't count.
-    a.m_unlocked.emplace(row.substr(0, tab), tMs);
+    a.m_unlocked.emplace(row.substr(0, tab), std::isfinite(tMs) ? tMs : 0.0);
   }
   return a;
 }

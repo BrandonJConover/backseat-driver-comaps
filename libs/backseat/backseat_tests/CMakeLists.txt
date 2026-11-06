@@ -20,6 +20,8 @@ add_executable(${PROJECT_NAME}
   pronunciation_test.cpp
   quiet_bits_test.cpp
   report_test.cpp
+  achievements_test.cpp
+  rundown_test.cpp
   road_bits_test.cpp
   voice_command_test.cpp
   rewriter_test.cpp
