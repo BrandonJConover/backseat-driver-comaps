@@ -375,7 +375,7 @@ TEST(RangesSymbolsAndTemperaturesAreSaid)
   CHECK_EQUAL(ForSpeech("In 3–5 miles"), std::string("In three to five miles"));
   CHECK_EQUAL(ForSpeech("between 3 and 5 miles"), std::string("between three and five miles"));
   CHECK_EQUAL(ForSpeech("between 3-5 miles"), std::string("between three and five miles"));
-  CHECK_EQUAL(ForSpeech("Delays of 10–15 min"), std::string("Delays of ten to fifteen min"));
+  CHECK_EQUAL(ForSpeech("Delays of 10–15 min"), std::string("Delays of ten to fifteen minutes"));
   CHECK_EQUAL(ForSpeech("Exits 12-14 closed"), std::string("Exits twelve to fourteen closed"));
   CHECK_EQUAL(ForSpeech("a 3-1/2 mile detour"), std::string("a three and a half mile detour"));
   CHECK_EQUAL(ForSpeech("10–15% slower"), std::string("ten to fifteen percent slower"));
@@ -628,4 +628,28 @@ TEST(PlaceNamesAreSaidTheLocalWay)
   SetUserWords("Burnet\tbur-NET\n");
   CHECK(ForSpeech("Turn right onto Burnet Rd").find("fxburnit") == std::string::npos);
   SetUserWords("");
+}
+
+TEST(SymbolsAndLeftoverAbbreviationsMatchTheGoldenCases)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_SYMBOLS_PATH);
+  CHECK(cases.size() >= 20);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // The pass on its own: only symbols change, everything else byte for byte.
+  CHECK_EQUAL(Symbols("Turn left onto Main St, then I-35 N."), std::string("Turn left onto Main St, then I-35 N."));
+  CHECK_EQUAL(Symbols("\xC2\xBD mile"), std::string("1/2 mile"));
+  CHECK_EQUAL(Symbols("2\xC2\xBE"), std::string("2 and 3/4"));
+  CHECK_EQUAL(Symbols("#blessed #5"), std::string("#blessed number 5"));
+  CHECK_EQUAL(Symbols("$2.99/gal"), std::string("$2.99 per gallon"));
+  CHECK_EQUAL(Symbols("24/7 and/or w/o"), std::string("24/7 and/or w/o"));
+  CHECK_EQUAL(Symbols("hours/day"), std::string("hours/day"));
+  // "Ct" or "Ln" alone, or inside a word, is not a street type.
+  CHECK_EQUAL(ForSpeech("Ct"), std::string("Ct"));
+  CHECK_EQUAL(ForSpeech("Kiln"), std::string("Kiln"));
+  // "min" and "sec" stay words when no number comes first.
+  CHECK_EQUAL(ForSpeech("Hold on a sec"), std::string("Hold on a sec"));
 }

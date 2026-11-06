@@ -1,0 +1,160 @@
+{
+ "about": "Shared expectations for leftover abbreviations and symbols: hr/min/sec after a number, '#'+digits, vulgar fractions, '/gal' '/hr' rates, USPS street suffixes (Cv, Xing, Ext, Svc) and type-first streets (Ave B). Backseat Driver: backseat::pronunciation::ForSpeech (libs/backseat/backseat_tests/spoken_symbols.json). EpubToM4B can port the fractions, #N and hr/min rules; keep both copies in sync.",
+ "cases": [
+  {
+   "input": "ETA 1 hr 20 min",
+   "language": "en",
+   "expected": "ETA one hour twenty minutes"
+  },
+  {
+   "input": "That took 3 hrs and 5 mins.",
+   "language": "en",
+   "expected": "That took three hours and five minutes."
+  },
+  {
+   "input": "Wait 1 sec",
+   "language": "en",
+   "expected": "Wait one second"
+  },
+  {
+   "input": "Wait 30 secs",
+   "language": "en",
+   "expected": "Wait thirty seconds"
+  },
+  {
+   "input": "Give me a min",
+   "language": "en",
+   "expected": "Give me a min"
+  },
+  {
+   "input": "5 minimum",
+   "language": "en",
+   "expected": "five minimum"
+  },
+  {
+   "input": "Rest stop #5 ahead",
+   "language": "en",
+   "expected": "Rest stop number five ahead"
+  },
+  {
+   "input": "Starbucks #12345",
+   "language": "en",
+   "expected": "Starbucks number twelve thousand three hundred forty five"
+  },
+  {
+   "input": "We're #1",
+   "language": "en",
+   "expected": "We're number one"
+  },
+  {
+   "input": "(#3)",
+   "language": "en",
+   "expected": "(number three)"
+  },
+  {
+   "input": "#blessed traffic",
+   "language": "en",
+   "expected": "#blessed traffic"
+  },
+  {
+   "input": "C#5 chord",
+   "language": "en",
+   "expected": "C#five chord"
+  },
+  {
+   "input": "Gas is $3.49/gal",
+   "language": "en",
+   "expected": "Gas is three dollars and forty nine cents per gallon"
+  },
+  {
+   "input": "60 mi/hr",
+   "language": "en",
+   "expected": "sixty miles per hour"
+  },
+  {
+   "input": "100 km/h",
+   "language": "en",
+   "expected": "one hundred kilometers per hour"
+  },
+  {
+   "input": "and/or w/o",
+   "language": "en",
+   "expected": "and/or w/o"
+  },
+  {
+   "input": "½ mile ahead",
+   "language": "en",
+   "expected": "a half mile ahead"
+  },
+  {
+   "input": "In ¼ mile turn right",
+   "language": "en",
+   "expected": "In a quarter mile turn right"
+  },
+  {
+   "input": "1½ miles to go",
+   "language": "en",
+   "expected": "one and a half miles to go"
+  },
+  {
+   "input": "⅓ of the way there, ⅔ to go",
+   "language": "en",
+   "expected": "a third of the way there, two thirds to go"
+  },
+  {
+   "input": "Turn onto Oak Cv",
+   "language": "en",
+   "expected": "Turn onto Oak Cove"
+  },
+  {
+   "input": "Turn onto Deer Xing",
+   "language": "en",
+   "expected": "Turn onto Deer Crossing"
+  },
+  {
+   "input": "Turn onto Main St Ext",
+   "language": "en",
+   "expected": "Turn onto Main Street Extension"
+  },
+  {
+   "input": "Turn onto Frontage Svc Rd",
+   "language": "en",
+   "expected": "Turn onto Frontage Service Road"
+  },
+  {
+   "input": "Turn onto Ave B",
+   "language": "en",
+   "expected": "Turn onto Avenue B"
+  },
+  {
+   "input": "Turn onto Ave N",
+   "language": "en",
+   "expected": "Turn onto Avenue N"
+  },
+  {
+   "input": "Turn onto Ln 5",
+   "language": "en",
+   "expected": "Turn onto Lane five"
+  },
+  {
+   "input": "Turn onto Ave Maria",
+   "language": "en",
+   "expected": "Turn onto Ave Maria"
+  },
+  {
+   "input": "Xing Wang called",
+   "language": "en",
+   "expected": "Xing Wang called"
+  },
+  {
+   "input": "Lnx is a word",
+   "language": "en",
+   "expected": "Lnx is a word"
+  },
+  {
+   "input": "Kiln Cv, then left",
+   "language": "en",
+   "expected": "Kiln Cove, then left"
+  }
+ ]
+}

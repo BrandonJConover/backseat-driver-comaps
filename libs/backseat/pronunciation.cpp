@@ -598,7 +598,7 @@ std::string const kStreetWords[][2] = {
     {"St", "Street"},     {"Ave", "Avenue"},  {"Blvd", "Boulevard"}, {"Rd", "Road"},        {"Dr", "Drive"},
     {"Ln", "Lane"},       {"Ct", "Court"},    {"Pkwy", "Parkway"},   {"Hwy", "Highway"},    {"Pl", "Place"},
     {"Cir", "Circle"},    {"Ter", "Terrace"}, {"Trl", "Trail"},      {"Expy", "Expressway"}, {"Fwy", "Freeway"},
-    {"Sq", "Square"},
+    {"Sq", "Square"},     {"Cv", "Cove"},     {"Xing", "Crossing"},  {"Ext", "Extension"},
 };
 
 std::string Street(std::string const & abbreviation)
@@ -2300,6 +2300,58 @@ bool HasDigit(std::string const & s)
 
 bool HasAny(std::string const & s, std::string_view bytes) { return s.find_first_of(bytes) != std::string::npos; }
 
+std::string Symbols(std::string const & text)
+{
+  std::string s = text;
+  // Vulgar fractions as the ASCII ones the fraction pass reads: "½ mile" is "1/2 mile", and after
+  // a whole number "1½" is "1 and 1/2".
+  if (HasAny(s, "\xBC\xBD\xBE\x85"))
+  {
+    static std::pair<std::string_view, std::string_view> const kFractions[] = {
+        {"\xC2\xBD", "1/2"}, {"\xC2\xBC", "1/4"}, {"\xC2\xBE", "3/4"}, {"\xE2\x85\x93", "1/3"}, {"\xE2\x85\x94", "2/3"}};
+    for (auto const & [glyph, ascii] : kFractions)
+      for (size_t at = s.find(glyph); at != std::string::npos; at = s.find(glyph, at))
+      {
+        bool const afterDigit = at > 0 && std::isdigit(static_cast<unsigned char>(s[at - 1]));
+        std::string const with = (afterDigit ? " and " : "") + std::string(ascii);
+        s.replace(at, glyph.size(), with);
+        at += with.size();
+      }
+  }
+  // "#5" and "Starbucks #12345" are "number 5": a hash right before digits, at a word start.
+  // "#blessed" and "C#5" are left.
+  if (HasAny(s, "#"))
+  {
+    static std::regex const hash("#(?=\\d)");
+    s = Replace(s, hash, [&](std::smatch const &, size_t pos) -> std::optional<std::string> {
+      if (pos > 0 && !Space(s[pos - 1]) && s[pos - 1] != '(')
+        return std::nullopt;
+      return std::string("number ");
+    });
+  }
+  // Rates after a number or a unit: "$3.49/gal" is "per gallon", "60 mi/hr" and "km/h" "per hour".
+  // "and/or", "w/o" and "24/7" are left.
+  if (HasAny(s, "/"))
+  {
+    static std::regex const rate("\\b([0-9A-Za-z.,]+)/(gal|hr|h|mi|km|day|wk|mo|yr)\\b");
+    s = Replace(s, rate, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
+      static std::set<std::string> const units = {"mi", "km", "m", "ft", "gal", "miles", "kilometers", "meters", "feet"};
+      auto const left = m.str(1);
+      bool const number = std::isdigit(static_cast<unsigned char>(left.back())) &&
+                          std::all_of(left.begin(), left.end(), [](char ch) {
+                            return std::isdigit(static_cast<unsigned char>(ch)) || ch == '.' || ch == ',';
+                          });
+      if (!number && units.count(left) == 0)
+        return std::nullopt;
+      static std::map<std::string, char const *> const per = {
+          {"gal", "gallon"},   {"hr", "hour"}, {"h", "hour"},  {"mi", "mile"},  {"km", "kilometer"},
+          {"day", "day"},      {"wk", "week"}, {"mo", "month"}, {"yr", "year"}};
+      return left + " per " + per.at(m.str(2));
+    });
+  }
+  return s;
+}
+
 std::string ForSpeech(std::string const & text)
 {
   std::string s = ReplaceAll(text, "\xC2\xA0", " ");
@@ -2309,6 +2361,8 @@ std::string ForSpeech(std::string const & text)
   s = Cyrillic(s);
   // Kana by Hepburn, the same way: "ラーメン" is "ramen", "さくら通り" "sakura 通 ri".
   s = Kana(s);
+  // Symbols the voice would skip or spell: "½" is "1/2", "#5" "number 5", "/gal" "per gallon".
+  s = Symbols(s);
   // Ranges before dashes become pauses: "3–5" is "3 to 5", not "3, 5".
   if (HasDigit(s))
     s = Ranges(s);
@@ -2358,11 +2412,18 @@ std::string ForSpeech(std::string const & text)
   // compass point ("Main St NW"). Not "Dr Smith" or "St Louis". A period after it stays: it was
   // probably the end of the sentence too.
   static std::regex const street(
-      "(St|Ave|Blvd|Rd|Dr|Ln|Ct|Pkwy|Hwy|Pl|Cir|Ter|Trl|Expy|Fwy|Sq)(?=$|[,;:!?.)]|\\s+(?:[a-z]|(?:NE|NW|SE|SW|N|S|E|W)\\b))");
+      "(St|Ave|Blvd|Rd|Dr|Ln|Ct|Pkwy|Hwy|Pl|Cir|Ter|Trl|Expy|Fwy|Sq|Cv|Xing|Ext)(?=$|[,;:!?.)]|\\s+(?:[a-z]|Ext\\b|(?:NE|NW|SE|SW|N|S|E|W)\\b))");
   s = Replace(s, street, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (pos < 2 || s[pos - 1] != ' ' || !IsAsciiLetter(s[pos - 2]))
       return std::nullopt;
     return Street(m.str(1));
+  });
+  // "Frontage Svc Rd" is a service road; "Ave B" and "Ln 5" name the street after its type.
+  static std::regex const service("\\bSvc\\.? (?=(?:Rd|Road|Dr|Drive)\\b)");
+  s = std::regex_replace(s, service, "Service ");
+  static std::regex const typeFirst("(^|\\s)(Ave|Cir|Ln)\\.? (?=(?:[A-Z]|\\d+)(?:$|[\\s,;:!?.)]))");
+  s = Replace(s, typeFirst, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return m.str(1) + Street(m.str(2)) + " ";
   });
   static std::regex const mount("\\bMt\\.? (?=[A-Z])");
   s = std::regex_replace(s, mount, "Mount ");
@@ -2376,6 +2437,13 @@ std::string ForSpeech(std::string const & text)
   static std::regex const compassAfter("(NE|NW|SE|SW|N|S|E|W)(?=$|[\\s,;:!?.])");
   s = Replace(s, compassAfter, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (pos < 2 || s[pos - 1] != ' ' || !std::isalnum(static_cast<unsigned char>(s[pos - 2])))
+      return std::nullopt;
+    // "Avenue N" in Brooklyn is the letter, not north.
+    size_t start = pos - 1;
+    while (start > 0 && IsAsciiLetter(s[start - 1]))
+      --start;
+    auto const before = s.substr(start, pos - 1 - start);
+    if (m.str(1).size() == 1 && (before == "Avenue" || before == "Lane" || before == "Circle"))
       return std::nullopt;
     return Compass(m.str(1));
   });
@@ -2406,7 +2474,7 @@ std::string ForSpeech(std::string const & text)
   if (HasAny(s, "%"))
     s = std::regex_replace(s, percent, "$1 percent");
   // Units after a number ("1 mile", "3 miles").
-  static std::regex const unit("(\\d) ?(ft|mi|mph|km|m|yd)\\b");
+  static std::regex const unit("(\\d) ?(ft|mi|mph|km|m|yd|hrs|hr|mins|min|secs|sec)\\b");
   s = Replace(s, unit, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     size_t start = pos;
     while (start > 0 && (std::isdigit(static_cast<unsigned char>(s[start - 1])) || s[start - 1] == ',' ||
@@ -2415,7 +2483,9 @@ std::string ForSpeech(std::string const & text)
     bool const one = s.substr(start, pos + 1 - start) == "1";
     static std::map<std::string, std::pair<char const *, char const *>> const words = {
         {"ft", {"foot", "feet"}},           {"mi", {"mile", "miles"}},   {"mph", {"mile an hour", "miles an hour"}},
-        {"km", {"kilometer", "kilometers"}}, {"m", {"meter", "meters"}}, {"yd", {"yard", "yards"}}};
+        {"km", {"kilometer", "kilometers"}}, {"m", {"meter", "meters"}}, {"yd", {"yard", "yards"}},
+        {"hr", {"hour", "hours"}},          {"hrs", {"hour", "hours"}},  {"min", {"minute", "minutes"}},
+        {"mins", {"minute", "minutes"}},    {"sec", {"second", "seconds"}}, {"secs", {"second", "seconds"}}};
     auto const & w = words.at(m.str(2));
     return m.str(1) + " " + (one ? w.first : w.second);
   });
@@ -2429,6 +2499,10 @@ std::string ForSpeech(std::string const & text)
       return std::string("a quarter");
     if (a == "3" && b == "4")
       return std::string("three quarters");
+    if (a == "1" && b == "3")
+      return std::string("a third");
+    if (a == "2" && b == "3")
+      return std::string("two thirds");
     return a + " over " + b;
   });
   // Times: "2:30" is "two thirty".

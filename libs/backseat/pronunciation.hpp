@@ -24,6 +24,11 @@ namespace backseat::pronunciation
 /// `text` the way the voice should read it (see above). UTF-8 in, UTF-8 out.
 std::string ForSpeech(std::string const & text);
 
+/// Symbols the voice would skip or spell out: "½ mile" is "1/2 mile" ("1½" "1 and 1/2"), "#5"
+/// "number 5", "$3.49/gal" "$3.49 per gallon", "60 mi/hr" "60 mi per hour". "#blessed", "and/or"
+/// and "24/7" are left. Part of ForSpeech; golden cases in backseat_tests/spoken_symbols.json.
+std::string Symbols(std::string const & text);
+
 /// Just the words spelled the same but said differently, swapped for the sound the sentence needs
 /// ("Where do you live?" reads "liv"). Part of ForSpeech.
 std::string PickSenses(std::string const & text);
