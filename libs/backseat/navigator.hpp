@@ -370,6 +370,7 @@ public:
   /// Whether the question still waits for an answer (a spoken one closes it too).
   bool ModeAskOpen() const { return m_modeAskOpen; }
   /// Yes, we really are walking (or no: then it's a drive). False if there was no question open.
+  /// A "no" while the car is already moving gets "pick Driving when we're parked", not a tap prompt.
   bool AnswerModeAsk(bool walking);
   /// The next drive's start says "check the mode now and then, I may swap it on you" (it won't).
   void WarnModeOnNextDrive() { m_modeWarnNextDrive = true; }

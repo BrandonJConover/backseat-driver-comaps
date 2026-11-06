@@ -2230,6 +2230,45 @@ TEST(ALongWalkAsksAndNoMeansTapDriving)
   SetLineTravelMode(TravelMode::Drive);
 }
 
+TEST(NoWhileAlreadyDrivingWaitsForAStopToTapDriving)
+{
+  // BI-014: the app started on walking and the car pulled away before anyone answered. "Click the
+  // driving button" would be a touch prompt at speed; the moving reply says to do it once parked.
+  for (double const mps : {20.0, 1.4})
+  {
+    Navigator nav(Config());
+    nav.SetCanAskTravelMode(true);
+    nav.SetTravelMode(TravelMode::Walk);
+    nav.OnFix(Heading(0, 0, 90), LongWalk());
+    CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk"), 1);
+    for (int i = 1; i < 6; ++i)
+      nav.OnFix(Heading(i * 1000.0, mps, 90), LongWalk());
+    nav.TakeLines();
+    nav.OnDriverSaid(6000, "no");
+    auto const said = nav.TakeLines();
+    bool const driving = mps > 5;
+    CHECK_EQUAL(CountKey(said, "mode.ask.walk.no.moving"), driving ? 1 : 0);
+    CHECK_EQUAL(CountKey(said, "mode.ask.walk.no"), driving ? 0 : 1);
+    // Either way Driving is highlighted for later.
+    CHECK(nav.TakeModeSwitch() == TravelMode::Drive);
+  }
+  // A speed from long ago (GPS lost since) doesn't count as moving.
+  Navigator nav(Config());
+  nav.SetCanAskTravelMode(true);
+  nav.SetTravelMode(TravelMode::Walk);
+  nav.OnFix(Heading(0, 20, 90), LongWalk());
+  nav.TakeLines();
+  Fix lost = Heading(30000, 0, 90);
+  lost.speedMps = -1;
+  nav.OnFix(lost, LongWalk());
+  nav.TakeLines();
+  CHECK(nav.AnswerModeAsk(false));
+  auto const said = nav.TakeLines();
+  CHECK_EQUAL(CountKey(said, "mode.ask.walk.no"), 1);
+  CHECK_EQUAL(CountKey(said, "mode.ask.walk.no.moving"), 0);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
 TEST(EveryLongWalkAsksAndShortOnesDont)
 {
   Navigator nav(Config());

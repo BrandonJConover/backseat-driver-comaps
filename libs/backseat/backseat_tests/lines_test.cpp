@@ -248,6 +248,15 @@ TEST(SafetyNoTouchPromptsWhileDriving)
     }
   }
   CHECK(checked > 5000);
+  // The "no, not walking" reply for a car that's already moving (BI-014) must not ask for a tap.
+  SetLineTravelMode(TravelMode::Walk);
+  for (int tier = 0; tier < 3; ++tier)
+  {
+    CHECK(!LinesFor("mode.ask.walk.no.moving", tier).empty());
+    for (auto const & line : LinesFor("mode.ask.walk.no.moving", tier))
+      CHECK(!TellsDriverToTouchOrLook(line));
+  }
+  SetLineTravelMode(TravelMode::Drive);
 
   // On foot the mic is fair game: the walking lines still say how to get the GPS back.
   SetLineTravelMode(TravelMode::Walk);

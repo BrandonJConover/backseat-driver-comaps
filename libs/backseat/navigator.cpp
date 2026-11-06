@@ -195,6 +195,9 @@ char const * const kLastModeKey = "_mode.last";
 double constexpr kAskWalkOverM = 3200;
 /// Walking pace, for the route's length when the host doesn't give it.
 double constexpr kAskWalkPaceMps = 1.4;
+// Answering "no, not walking" at more than this (~10 mph, past a run) means the car is already
+// moving: the reply waits for a stop before the driver picks Driving.
+double constexpr kAskWalkMovingMps = 4.5;
 
 /// SaidLog values: the trip under way (destination, last seen in s since the epoch), so a relaunch in
 /// the middle of it (a crash, or iOS closing the app in the background) picks it back up instead
@@ -1594,9 +1597,17 @@ bool Navigator::AnswerModeAsk(bool walking)
     return false;
   m_modeAskOpen = false;
   Trace("trip.modeAsk", {{"answer", walking ? "walk" : "drive"}});
-  SayLine(m_lastT, Category::Instruction, walking ? "mode.ask.walk.yes" : "mode.ask.walk.no", {}, Priority::Nav);
   if (walking)
+  {
+    SayLine(m_lastT, Category::Instruction, "mode.ask.walk.yes", {}, Priority::Nav);
     return true;
+  }
+  // Already doing car speed: "click the driving button" would be a touch prompt in a moving car, so
+  // the moving reply says to switch it once parked. Driving is still highlighted on screen.
+  bool const moving = m_knownSpeedMps && m_lastT - m_knownSpeedT <= kUnknownSpeedCarryMs &&
+                      *m_knownSpeedMps > kAskWalkMovingMps;
+  SayLine(m_lastT, Category::Instruction, moving ? "mode.ask.walk.no.moving" : "mode.ask.walk.no", {},
+          Priority::Nav);
   // The GPS won't do it for them: "I'm going to need you to click the driving button." The host
   // shows the route types with Driving highlighted. The drive that follows is this trip still, so
   // it gets the first trip's rundown, and no "so now we're driving?".

@@ -8689,6 +8689,17 @@ LineTable const & LineData()
         "Obviously. I'm going to need you to click the driving button. I've highlighted it on screen to make it easy for you."},
        {"I'M GOING TO NEED YOU TO CLICK THE DRIVING BUTTON. I'VE HIGHLIGHTED IT ON SCREEN TO MAKE IT EASY FOR YOU."},
      }}},
+    {"mode.ask.walk.no.moving",
+     {{
+       {"I knew it. We're already moving, so leave the screen alone. Pick Driving when we're parked. I've highlighted it.",
+        "Thought so. Car speed on a walking route. When we stop, pick Driving. Until then I'll make do.",
+        "Of course not. Hands where they are. Switch it to Driving next time we're parked.",
+        "I had a feeling. We'll fix it when we're stopped. For now I'm a pedestrian GPS in a car. Humiliating.",
+        "Obviously. Not while we're moving, though. Driving is highlighted for when we park."},
+       {"Obviously. When we're parked, pick Driving. Not before.",
+        "No. Of course not. Fix it when we stop."},
+       {"OBVIOUSLY! FIX IT WHEN WE STOP! NOT BEFORE!"},
+     }}},
     {"mode.ask.walk.yes",
      {{
        {"We're walking? The whole way? Okay. Bring snacks.",
