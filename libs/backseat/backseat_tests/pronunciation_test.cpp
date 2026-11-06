@@ -630,6 +630,36 @@ TEST(PlaceNamesAreSaidTheLocalWay)
   SetUserWords("");
 }
 
+TEST(DatesMatchTheGoldenCases)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_DATES_PATH);
+  CHECK(cases.size() >= 20);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // The pass on its own: only dates change.
+  CHECK_EQUAL(Dates("Turn left onto Main St, then I-35 N."), std::string("Turn left onto Main St, then I-35 N."));
+  CHECK_EQUAL(Dates("1/2 mi"), std::string("1/2 mi"));
+  CHECK_EQUAL(Dates("by 3/4 mile"), std::string("by 3/4 mile"));
+  CHECK_EQUAL(Dates("on 1/2"), std::string("on 1/2"));
+  CHECK_EQUAL(Dates("open 24/7"), std::string("open 24/7"));
+  CHECK_EQUAL(Dates("12/25"), std::string("12/25"));  // no date word: could be anything
+  CHECK_EQUAL(Dates("1/2/3/4"), std::string("1/2/3/4"));
+  CHECK_EQUAL(Dates("A1/2/2026"), std::string("A1/2/2026"));
+  CHECK_EQUAL(Dates("11/6/2026B"), std::string("11/6/2026B"));
+  CHECK_EQUAL(Dates("2026-13-01"), std::string("2026-13-01"));
+  CHECK_EQUAL(Dates("800-555-1234"), std::string("800-555-1234"));
+  CHECK_EQUAL(Dates("Mayday 5"), std::string("Mayday 5"));
+  CHECK_EQUAL(Dates("may 5"), std::string("may 5"));
+  CHECK_EQUAL(Dates("Nov 31"), std::string("Nov 31"));
+  CHECK_EQUAL(Dates("Feb 29"), std::string("February twenty ninth"));
+  CHECK_EQUAL(Dates("Nov 6.5"), std::string("Nov 6.5"));
+  CHECK_EQUAL(Dates("by 12/31/49"), std::string("by December thirty first, twenty forty nine"));
+  CHECK_EQUAL(Dates("by 12/31/50"), std::string("by December thirty first, nineteen fifty"));
+}
+
 TEST(SymbolsAndLeftoverAbbreviationsMatchTheGoldenCases)
 {
   auto const cases = GoldenCases(BACKSEAT_SPOKEN_SYMBOLS_PATH);

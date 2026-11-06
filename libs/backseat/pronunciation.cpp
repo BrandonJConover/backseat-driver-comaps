@@ -2426,6 +2426,120 @@ std::string FractionsWithUnits(std::string const & text)
   });
 }
 
+static std::string MonthName(int month)
+{
+  static char const * const kMonths[] = {"",       "January",   "February", "March",    "April",
+                                         "May",    "June",      "July",     "August",   "September",
+                                         "October", "November", "December"};
+  return month >= 1 && month <= 12 ? kMonths[month] : "";
+}
+
+/// "11/6/2026", "1/2/26", "2026-11-06", "31/12/1999", "Nov. 6", "November 6, 2026", "on 12/25":
+/// said the way people say dates ("November sixth, twenty twenty six"; day-first when the first
+/// number can't be a month: "the thirty first of December"). Fractions ("3/4 mile", "1/2"), versions
+/// ("1/2/3"), counts after a month-ish word ("May 3 cars") and invalid days stay for the later passes.
+std::string Dates(std::string const & text)
+{
+  // A unit or count after the number makes it a quantity, not a day.
+  static std::set<std::string> const counted = {
+      "mi", "mile", "miles", "ft", "feet", "foot", "km", "kilometers", "m", "meters", "yd", "yards", "mph",
+      "kph", "min", "mins", "minute", "minutes", "hr", "hrs", "hour", "hours", "sec", "secs", "seconds",
+      "gal", "gallon", "gallons", "inch", "inches", "cup", "cups", "tank", "people", "cars", "times", "of",
+      "lb", "lbs", "pounds", "kg", "points", "lanes", "exits", "blocks", "stops", "days", "weeks", "years"};
+  // Words that put a month/day without a year after them: "on 12/25", "Fri 11/6", "due 3/1".
+  static std::set<std::string> const dateWord = {
+      "on", "by", "until", "till", "due", "before", "after", "since", "from", "through", "thru", "dated",
+      "mon", "tue", "tues", "wed", "thu", "thur", "thurs", "fri", "sat", "sun", "monday", "tuesday",
+      "wednesday", "thursday", "friday", "saturday", "sunday"};
+  auto const yearWords = [](std::string const & y) {
+    auto year = ToNumber(y);
+    if (y.size() == 2)
+      year += year < 50 ? 2000 : 1900;
+    return YearWords(year, false);
+  };
+  auto const say = [&](int month, int day, std::string const & year, bool dayFirst) {
+    std::string out = dayFirst ? "the " + Ordinal(day) + " of " + MonthName(month)
+                               : MonthName(month) + " " + Ordinal(day);
+    if (!year.empty())
+      out += ", " + yearWords(year);
+    return out;
+  };
+  static int const kDays[] = {0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  auto const valid = [](long long month, long long day) {
+    return month >= 1 && month <= 12 && day >= 1 && day <= kDays[month];
+  };
+  std::string s = text;
+  if (HasAny(s, "/"))
+  {
+    // Not glued to more digits, slashes or letters on either side ("1/2/3/4", "A1/2/2026").
+    static std::regex const slashed("(\\d{1,2})/(\\d{1,2})(?:/(\\d{4}|\\d{2}))?(?![\\d/A-Za-z])");
+    s = Replace(s, slashed, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+      if (pos > 0 && (Digit(s[pos - 1]) || IsAsciiLetter(s[pos - 1]) ||
+                      std::string_view("/-.,$#").find(s[pos - 1]) != std::string_view::npos))
+        return std::nullopt;
+      auto const after = pos + static_cast<size_t>(m.length(0));
+      // "11/6. 5 more" is fine; "11/6.5" is a number.
+      if (after + 1 < s.size() && s[after] == '.' && Digit(s[after + 1]))
+        return std::nullopt;
+      auto const a = ToNumber(m.str(1)), b = ToNumber(m.str(2));
+      std::string const year = m[3].matched ? m.str(3) : "";
+      if (counted.count(WordAfter(s, after)))
+        return std::nullopt;
+      if (year.empty())
+      {
+        size_t wordStart = 0;
+        if (!dateWord.count(WordBefore(s, pos, wordStart)))
+          return std::nullopt;
+        // "by 1/2", "on 3/4": the common fractions stay fractions without a year.
+        if (a < b && b <= 4)
+          return std::nullopt;
+      }
+      if (valid(a, b))
+        return say(static_cast<int>(a), static_cast<int>(b), year, false);
+      if (valid(b, a) && !year.empty())
+        return say(static_cast<int>(b), static_cast<int>(a), year, true);
+      return std::nullopt;
+    });
+  }
+  if (HasAny(s, "-"))
+  {
+    static std::regex const iso("\\b(1\\d{3}|20\\d{2})-(\\d{2})-(\\d{2})(?![\\d\\-A-Za-z])");
+    s = Replace(s, iso, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+      if (pos > 0 && (s[pos - 1] == '-' || s[pos - 1] == '/'))
+        return std::nullopt;
+      auto const month = ToNumber(m.str(2)), day = ToNumber(m.str(3));
+      if (!valid(month, day))
+        return std::nullopt;
+      return say(static_cast<int>(month), static_cast<int>(day), m.str(1), false);
+    });
+  }
+  // "Nov. 6", "November 6th, 2026": the day as an ordinal and the year said with it. Capital month
+  // only ("may 5" is the verb), and not before a count ("May 3 cars").
+  static std::regex const named(
+      "\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)(uary|ruary|ch|il|e|y|ust|tember|ober|ember)?"
+      "(\\.)? (\\d{1,2})(?:st|nd|rd|th)?(?:, (1\\d{3}|20\\d{2}))?(?![\\d/:A-Za-z])");
+  s = Replace(s, named, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    static std::map<std::string, int> const kMonth = {
+        {"Jan", 1}, {"Feb", 2}, {"Mar", 3}, {"Apr", 4},  {"May", 5},  {"Jun", 6},  {"Jul", 7},
+        {"Aug", 8}, {"Sep", 9}, {"Sept", 9}, {"Oct", 10}, {"Nov", 11}, {"Dec", 12}};
+    int const month = kMonth.at(m.str(1));
+    // Only the month's own ending: "Mayday 5" or "Junee 5" aren't months.
+    if (m[2].matched && MonthName(month) != m.str(1) + m.str(2))
+      return std::nullopt;
+    // "May. 5" and "March. 5" have no abbreviation period.
+    if (m[3].matched && m[2].matched)
+      return std::nullopt;
+    auto const after = pos + static_cast<size_t>(m.length(0));
+    if (after + 1 < s.size() && (s[after] == '.' || s[after] == ',') && Digit(s[after + 1]))
+      return std::nullopt;
+    auto const day = ToNumber(m.str(4));
+    if (!valid(month, day) || (!m[5].matched && counted.count(WordAfter(s, after))))
+      return std::nullopt;
+    return say(month, static_cast<int>(day), m[5].matched ? m.str(5) : "", false);
+  });
+  return s;
+}
+
 std::string ForSpeech(std::string const & text)
 {
   std::string s = ReplaceAll(text, "\xC2\xA0", " ");
@@ -2437,6 +2551,10 @@ std::string ForSpeech(std::string const & text)
   s = Kana(s);
   // Symbols the voice would skip or spell: "½" is "1/2", "#5" "number 5", "/gal" "per gallon".
   s = Symbols(s);
+  // Dates before ranges and fractions take their parts: "11/6/2026" is "November sixth, twenty twenty
+  // six", "2026-11-06" too, "Nov. 6" "November sixth".
+  if (HasDigit(s))
+    s = Dates(s);
   // Ranges before dashes become pauses: "3–5" is "3 to 5", not "3, 5".
   if (HasDigit(s))
     s = Ranges(s);

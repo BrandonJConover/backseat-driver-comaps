@@ -39,6 +39,10 @@ std::string Decades(std::string const & text);
 /// years". Dates and other fractions are left. Part of ForSpeech; golden cases in
 /// backseat_tests/spoken_symbols.json.
 std::string FractionsWithUnits(std::string const & text);
+/// Dates said as dates: "11/6/2026" and "2026-11-06" are "November sixth, twenty twenty six", "Nov. 6"
+/// "November sixth", "31/12/1999" "the thirty first of December, ...", "on 12/25" "on December twenty
+/// fifth". Fractions, versions, counts ("May 3 cars") and impossible days are left alone.
+std::string Dates(std::string const & text);
 
 /// Just the words spelled the same but said differently, swapped for the sound the sentence needs
 /// ("Where do you live?" reads "liv"). Part of ForSpeech.

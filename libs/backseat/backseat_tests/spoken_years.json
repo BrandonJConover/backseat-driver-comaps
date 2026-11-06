@@ -74,7 +74,7 @@
   {
    "input": "Opened on May 5, 1868 and closed in June 1869.",
    "language": "en",
-   "expected": "Opened on May five, eighteen sixty eight and closed in June eighteen sixty nine."
+   "expected": "Opened on May fifth, eighteen sixty eight and closed in June eighteen sixty nine."
   },
   {
    "input": "the summer of 1969",
