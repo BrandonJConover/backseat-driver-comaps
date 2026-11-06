@@ -675,6 +675,90 @@ std::string Titles(std::string s)
   return s;
 }
 
+std::string Ordinal(long long n);
+
+/// I..XXXIX as a number, or 0 when it isn't a well-formed numeral ("IIII", "VX", "IC").
+int RomanValue(std::string const & r)
+{
+  static char const * const ones[] = {"", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"};
+  static char const * const tens[] = {"", "X", "XX", "XXX"};
+  for (int n = 1; n < 40; ++n)
+    if (r == std::string(tens[n / 10]) + ones[n % 10])
+      return n;
+  return 0;
+}
+
+/// Given names that carry a regnal number on streets and squares abroad and at home. Any other
+/// capitalised name counts too when a title (King, Pope, ...) comes right before it.
+bool RegnalName(std::string const & lower)
+{
+  static std::set<std::string> const names = {
+      "abdullah", "adrian", "albert", "alexander", "alfonso", "amadeus", "anne", "baudouin", "benedict",
+      "boniface", "carlo", "carlos", "catherine", "charles", "christian", "clement", "constantine",
+      "david", "edward", "elizabeth", "emmanuel", "felipe", "ferdinand", "fernando", "francis",
+      "franz", "frederick", "friedrich", "george", "gregory", "gustav", "gustavo", "haakon", "harald",
+      "hassan", "henri", "henry", "innocent", "isabel", "isabella", "ivan", "jaime", "james", "jean",
+      "joão", "john", "joseph", "juan", "julius", "kamehameha", "karl", "leo", "leopold", "louis",
+      "ludwig", "manuel", "mary", "mohammed", "napoleon", "nicholas", "olav", "otto", "pablo",
+      "paul", "pedro", "peter", "philip", "philippe", "pio", "pius", "rama", "ramesses", "richard",
+      "robert", "rudolf", "sixtus", "stephen", "umberto", "urban", "victor", "wilhelm", "william"};
+  return names.count(lower) > 0;
+}
+
+bool RegnalTitle(std::string const & lower)
+{
+  static std::set<std::string> const titles = {
+      "king", "queen", "pope", "tsar", "czar", "emperor", "empress", "prince", "princess", "sultan",
+      "kaiser", "shah", "pharaoh", "rey", "roi", "re", "rei", "könig", "papa", "san", "saint"};
+  return titles.count(lower) > 0;
+}
+
+/// The word that ends just before `end` (a run of anything but spaces), and where it starts.
+std::string WordEndingAt(std::string const & s, size_t end, size_t & start)
+{
+  start = end;
+  while (start > 0 && !Space(s[start - 1]))
+    --start;
+  return s.substr(start, end - start);
+}
+}  // namespace
+
+std::string Regnal(std::string const & text)
+{
+  static std::regex const numeral("\\b([IVX]{1,6})(?=$|[\\s,;:!?.)])");
+  return Replace(text, numeral, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    auto const roman = m.str(1);
+    int const n = RomanValue(roman);
+    if (n == 0 || pos < 2 || text[pos - 1] != ' ')
+      return std::nullopt;
+    size_t nameStart = 0;
+    auto const name = WordEndingAt(text, pos - 1, nameStart);
+    if (name.empty() || !std::isupper(static_cast<unsigned char>(name[0])))
+      return std::nullopt;
+    auto const lowerName = Lower(name);
+    bool named = RegnalName(lowerName);
+    if (!named && nameStart >= 2 && text[nameStart - 1] == ' ')
+    {
+      size_t titleStart = 0;
+      named = RegnalTitle(Lower(WordEndingAt(text, nameStart - 1, titleStart))) && !RegnalTitle(lowerName);
+    }
+    if (!named || (lowerName == "malcolm" && roman == "X"))
+      return std::nullopt;
+    size_t const after = pos + roman.size();
+    // "John V. Smith Rd": one letter and a period before another name is a middle initial.
+    if (roman.size() == 1 && after + 2 < text.size() && text[after] == '.' && text[after + 1] == ' ' &&
+        std::isupper(static_cast<unsigned char>(text[after + 2])))
+      return std::nullopt;
+    // "Henry I think": a lone I before a lowercase word is the pronoun.
+    if (roman == "I" && after + 1 < text.size() && text[after] == ' ' &&
+        std::islower(static_cast<unsigned char>(text[after + 1])) && text.compare(after + 1, 3, "of ") != 0)
+      return std::nullopt;
+    return "the " + Ordinal(n);
+  });
+}
+
+namespace
+{
 std::string Ordinal(long long n)
 {
   auto const words = SpellNumber(n);
@@ -2077,6 +2161,8 @@ std::string ForSpeech(std::string const & text)
   // Street types abroad: "Calle Ocho" is "KAH-yeh Ocho", "Paseo de la Reforma" keeps its Spanish.
   s = ForeignStreets(s);
   s = PickSenses(s);
+  // Regnal numbers after a name: "King George VI Ave" is "King George the sixth Ave".
+  s = Regnal(s);
   // Saint, Doctor, Fort, Junior before the street pass can take them for street types.
   s = Titles(s);
 

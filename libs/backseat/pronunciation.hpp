@@ -46,6 +46,13 @@ std::string Foreign(std::string const & text);
 /// stay English. Part of ForSpeech; golden cases in backseat_tests/spoken_street_types.json.
 std::string ForeignStreets(std::string const & text);
 
+/// Regnal numbers after a monarch's or pope's name read as ordinals: "King George VI Ave" is "King
+/// George the sixth Ave", "Pope John Paul II Blvd" "Pope John Paul the second Blvd", "Rue Louis XVI"
+/// "Rue Louis the sixteenth". Only after a known given name or any name after a title (King, Pope,
+/// ...), I..XXXIX only; "World War II", "Phase II", "Malcolm X", "John V. Smith" and "Henry I think"
+/// are left. Part of ForSpeech; golden cases in backseat_tests/spoken_regnal.json.
+std::string Regnal(std::string const & text);
+
 /// Every respelling ForeignStreets() swaps in, one word each (their stand-ins are in Lexicon()).
 std::vector<std::string> ForeignStreetRespellings();
 

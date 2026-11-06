@@ -546,3 +546,22 @@ TEST(BowLeadAndMinuteNeedTheirWholeContext)
   CHECK_EQUAL(PickSenses("heavy as lead singers go"), std::string("heavy as lead singers go"));
   CHECK_EQUAL(PickSenses("pumped him full of lead"), std::string("pumped him full of led"));
 }
+
+TEST(RegnalNumbersMatchTheGoldenCases)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_REGNAL_PATH);
+  CHECK(cases.size() >= 25);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // The pass alone: titles make any name regnal, a title alone doesn't.
+  CHECK_EQUAL(Regnal("King Zog I"), std::string("King Zog the first"));
+  CHECK_EQUAL(Regnal("King II"), std::string("King II"));
+  CHECK_EQUAL(Regnal("Henry I of England"), std::string("Henry the first of England"));
+  CHECK_EQUAL(Regnal("Charles XL"), std::string("Charles XL"));
+  CHECK_EQUAL(Regnal("charles V"), std::string("charles V"));
+  // Lines with no numeral after a name come back byte for byte.
+  CHECK_EQUAL(Regnal("Turn left onto Main St, then I-35 N."), std::string("Turn left onto Main St, then I-35 N."));
+}
