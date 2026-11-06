@@ -34,6 +34,7 @@ add_executable(${PROJECT_NAME}
   lines_test.cpp
   stop_go_test.cpp
   twenty_questions_test.cpp
+  units_test.cpp
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
 target_compile_definitions(${PROJECT_NAME} PRIVATE
