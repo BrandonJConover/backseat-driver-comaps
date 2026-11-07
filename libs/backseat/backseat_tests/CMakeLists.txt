@@ -38,6 +38,7 @@ add_executable(${PROJECT_NAME}
   speech_fast_path_test.cpp
   turn_words_test.cpp
   drive_side_test.cpp
+  line_filters_test.cpp
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
 target_compile_definitions(${PROJECT_NAME} PRIVATE

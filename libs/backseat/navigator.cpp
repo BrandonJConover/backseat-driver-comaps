@@ -575,7 +575,13 @@ Navigator::Navigator(EngineConfig config, std::vector<TripRecord> history, TripR
   m_plates = PlateGame(m_config.rng);
   m_twenty = TwentyQuestions(m_config.rng);
   m_road.SetUnits(m_config.units);
+  // The line pickers' filters are process-wide; a new navigator starts them from its own defaults
+  // (driving, housing unknown, right-hand traffic) so an earlier trip's walk, housing or country
+  // can't leak into this one.
   SetLineMetric(m_config.units == Units::Kmh);
+  SetLineTravelMode(m_travelMode);
+  SetLineHousing(m_housing);
+  SetLineDriveSide(DrivesOnLeft(m_country));
 }
 
 void Navigator::SetUnits(Units units)
