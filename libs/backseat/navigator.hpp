@@ -619,6 +619,10 @@ private:
   LatLon m_stopAt;
   double m_stopWanderM = 0;
   bool m_stopAnnounced = false;
+  /// The navigator called it traffic at some point during this stop: a jam, not a stop the driver chose.
+  bool m_stopInTraffic = false;
+  /// When the car last pulled away from a stop of a minute or more.
+  double m_resumedT = -1e18;
   /// Pulled over at the roadside: said once per stop. The police line once per trip.
   bool m_pullOverSaid = false;
   bool m_policeSaid = false;

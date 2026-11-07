@@ -43,6 +43,8 @@ double constexpr kStoppedMps = 0.5;
 double constexpr kResumedMps = 4;
 /// Stopped this long away from the destination is a stop the driver chose (gas, food...).
 double constexpr kUnplannedStopAfterMs = 180000;
+/// A stop at least this long (not a red light) restarts the quiet stretch the quiet bits wait for.
+double constexpr kQuietAfterStopMinMs = 60000;
 /// Stops this close to the destination are just arriving.
 double constexpr kNearDestinationM = 250;
 /// If the GPS position never strays this far from where the car stopped, the phone stayed
@@ -745,6 +747,7 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
       m_stopWanderM = 0;
       m_stopAnnounced = false;
       m_pullOverSaid = false;
+      m_stopInTraffic = m_inTraffic;
       // Christmas season, after dark, at a red light: the GPS has had it with lights.
       if (!m_christmasSaid && m_lightLookup && KnowsTheDate(fix.tMs))
       {
@@ -766,6 +769,9 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
     double const stoppedMs = fix.tMs - *m_stopSince;
     bool const stayedInCar = m_stopWanderM < kPhoneWanderedM;
     m_stopSince.reset();
+    // Pulling away after a real stop isn't a quiet stretch yet: the quiet bits start counting again.
+    if (stoppedMs >= kQuietAfterStopMinMs)
+      m_resumedT = fix.tMs;
     // Rest areas and drive-thrus get their own lines when the car pulls out (road_bits.hpp).
     StopSpot const spot = m_road.CurrentStopSpot();
     // Remarks about the stop still held for a turn ("Why are we stopping here?") are stale now:
@@ -775,11 +781,14 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
       Category const c = h.line.category;
       return c == Category::UnplannedStop || c == Category::LongStop || c == Category::PullOver;
     }), m_turnHeld.end());
-    if (spot != StopSpot::RestArea && spot != StopSpot::DriveThru)
+    // Stuck in a jam the driver never left the car: the traffic lines already cover it (B52).
+    if (spot != StopSpot::RestArea && spot != StopSpot::DriveThru && !m_stopInTraffic)
       Say(m_engine->OnNav(NavEvent::Resumed(fix.tMs, stoppedMs, stayedInCar)));
     return;
   }
   m_stopWanderM = std::max(m_stopWanderM, DistanceM(m_stopAt, here));
+  // Traffic is judged after the stop on each fix, so this sees the last fix's call.
+  m_stopInTraffic = m_stopInTraffic || m_inTraffic;
   bool const hasDestination = route.destinationPoint.lat || route.destinationPoint.lon;
   bool const nearDestination = hasDestination && DistanceM(here, route.destinationPoint) < kNearDestinationM;
   if (!m_pullOverSaid && !nearDestination && !m_inTraffic && route.state == RouteState::OnRoute &&
@@ -800,7 +809,7 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
         SayLine(fix.tMs, Category::PullOver, "pullOver");
     }
   }
-  if (!m_stopAnnounced && !nearDestination && fix.tMs - *m_stopSince >= kUnplannedStopAfterMs)
+  if (!m_stopAnnounced && !nearDestination && !m_stopInTraffic && fix.tMs - *m_stopSince >= kUnplannedStopAfterMs)
   {
     m_stopAnnounced = true;
     // The drive-thru has its own lines.
@@ -2289,6 +2298,7 @@ void Navigator::ResetTrip()
   m_quizRolledFor.reset();
   m_quietBits = 0;
   m_lastQuietBitT = -1e18;
+  m_resumedT = -1e18;
   m_quietRolledFor.reset();
   m_quietTurnId.reset();
   m_quietTurnSince = -1e18;
@@ -3316,7 +3326,7 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
       QuietBitBusy())
     return;
   if (t - m_tripStartT < kQuietBitAfterStartMs || t - m_lastQuietBitT < kQuietBitEveryMs ||
-      t - std::max({m_lastSpokeT, m_quietTurnSince, m_lastRoadT}) < kQuietSilenceMs || toTurnS < kQuietMinToTurnS)
+      t - std::max({m_lastSpokeT, m_quietTurnSince, m_lastRoadT, m_resumedT}) < kQuietSilenceMs || toTurnS < kQuietMinToTurnS)
     return;
   bool const roomForCall = !m_callTaken && toTurnS >= kCallMinToTurnS && route.distToTurnM >= kCallMinToTurnM;
   bool const night = Night(t, {fix.lat, fix.lon});
