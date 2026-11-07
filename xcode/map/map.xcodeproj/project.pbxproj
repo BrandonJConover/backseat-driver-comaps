@@ -22,6 +22,7 @@
 		BD5EA7000000000000000E14 /* pop_quiz.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA7000000000000000E13 /* pop_quiz.cpp */; };
 		BD5EA70000000000000000B9 /* twenty_questions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000B8 /* twenty_questions.cpp */; };
 		BD5EA70000000000000000F1 /* pronunciation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000F0 /* pronunciation.cpp */; };
+		BD5EA70000000000000000F4 /* persona_lines_data.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000F3 /* persona_lines_data.cpp */; };
 		BD5EA70000000000000000C9 /* road_bits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000C8 /* road_bits.cpp */; };
 		BD5EA70000000000000000D9 /* running_bits.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BD5EA70000000000000000D8 /* running_bits.cpp */; };
 		D11B0EA0545E2DA5C39B6197 /* lines.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7AA0F37DC5A858FEA309EA24 /* lines.cpp */; };
@@ -204,6 +205,8 @@
 		BD5EA70000000000000000BA /* twenty_questions.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = twenty_questions.hpp; path = ../backseat/twenty_questions.hpp; sourceTree = "<group>"; };
 		BD5EA70000000000000000F0 /* pronunciation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = pronunciation.cpp; path = ../backseat/pronunciation.cpp; sourceTree = "<group>"; };
 		BD5EA70000000000000000F2 /* pronunciation.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = pronunciation.hpp; path = ../backseat/pronunciation.hpp; sourceTree = "<group>"; };
+		BD5EA70000000000000000F3 /* persona_lines_data.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = persona_lines_data.cpp; path = ../backseat/persona_lines_data.cpp; sourceTree = "<group>"; };
+		BD5EA70000000000000000F5 /* persona_lines_data.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = persona_lines_data.hpp; path = ../backseat/persona_lines_data.hpp; sourceTree = "<group>"; };
 		BD5EA70000000000000000C8 /* road_bits.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = road_bits.cpp; path = ../backseat/road_bits.cpp; sourceTree = "<group>"; };
 		BD5EA70000000000000000CA /* road_bits.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = road_bits.hpp; path = ../backseat/road_bits.hpp; sourceTree = "<group>"; };
 		BD5EA70000000000000000D8 /* running_bits.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = running_bits.cpp; path = ../backseat/running_bits.cpp; sourceTree = "<group>"; };
@@ -531,6 +534,8 @@
 				BD5EA70000000000000000BA /* twenty_questions.hpp */,
 				BD5EA70000000000000000F0 /* pronunciation.cpp */,
 				BD5EA70000000000000000F2 /* pronunciation.hpp */,
+				BD5EA70000000000000000F3 /* persona_lines_data.cpp */,
+				BD5EA70000000000000000F5 /* persona_lines_data.hpp */,
 				BD5EA70000000000000000C8 /* road_bits.cpp */,
 				BD5EA70000000000000000CA /* road_bits.hpp */,
 				BD5EA70000000000000000D8 /* running_bits.cpp */,
@@ -826,6 +831,7 @@
 				BD5EA7000000000000000E14 /* pop_quiz.cpp in Sources */,
 				BD5EA70000000000000000B9 /* twenty_questions.cpp in Sources */,
 				BD5EA70000000000000000F1 /* pronunciation.cpp in Sources */,
+				BD5EA70000000000000000F4 /* persona_lines_data.cpp in Sources */,
 				BD5EA70000000000000000C9 /* road_bits.cpp in Sources */,
 				BD5EA70000000000000000D9 /* running_bits.cpp in Sources */,
 				D11B0EA0545E2DA5C39B6197 /* lines.cpp in Sources */,

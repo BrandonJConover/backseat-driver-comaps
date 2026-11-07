@@ -2424,6 +2424,14 @@ void Navigator::PushLine(Commentary c, std::string const & setupVoice)
   m_gate.Push(std::move(c), false);
 }
 
+std::string Navigator::ReplyAs(Persona persona, std::string const & key, Vars const & vars)
+{
+  SetLinePersona(persona);
+  std::string text = Reply(key, vars);
+  SetLinePersona(m_persona);
+  return text;
+}
+
 std::string Navigator::Reply(std::string const & key, Vars const & vars)
 {
   double const r = m_config.rng ? m_config.rng() : 0;

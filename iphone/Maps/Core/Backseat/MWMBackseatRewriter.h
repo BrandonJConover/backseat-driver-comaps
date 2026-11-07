@@ -226,6 +226,9 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 + (NSString *)aboutYouAnswer:(NSInteger)question;
 /// Each voice's audition for the voice line-up ("Hi, I'm Echo. ...say Purple Monkey."), in order.
 + (NSArray<NSString *> *)voiceAuditions:(NSArray<NSString *> *)voiceIDs;
+/// The personality a voice comes with, by its spoken name ("George" -> "Melancholy"), or "" for the
+/// usual Critic. Picking the voice picks it.
++ (NSString *)personaTitleForVoice:(NSString *)voiceName;
 /// Whether `typed` is the code phrase, ignoring case, spaces and punctuation.
 + (BOOL)typed:(NSString *)typed matchesPhrase:(NSString *)phrase;
 

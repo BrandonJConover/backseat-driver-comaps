@@ -421,7 +421,11 @@ struct SettingsBackseatVoiceView: View {
     /// Says a test line in the picked voice, or the system voice when Kokoro can't. A new tap cuts
     /// off the last test instead of queueing behind it.
     static func playTest() {
-        let testLine = testLines[nextTestLine % testLines.count]
+        // A voice with its own personality says hello in it, so the test shows what you're getting.
+        let spokenName = KokoroVoice.voiceOptions.first { $0.id == KokoroVoice.selectedVoiceID }?.spokenName ?? ""
+        let testLine = MWMBackseatRewriter.personaTitle(forVoice: spokenName).isEmpty
+            ? testLines[nextTestLine % testLines.count]
+            : MWMBackseatRewriter.line("cmd.voice", vars: ["voice": spokenName])
         nextTestLine += 1
         KokoroVoice.shared.stop()
         KokoroVoice.shared.test(testLine) {
@@ -451,14 +455,25 @@ struct SettingsBackseatVoiceView: View {
             Section {
                 Picker(selection: $selectedBackseatVoice) {
                     ForEach(KokoroVoice.voiceOptions) { voiceOption in
-                        Text(verbatim: voiceOption.name)
-                            .tag(voiceOption.id)
+                        let persona = MWMBackseatRewriter.personaTitle(forVoice: voiceOption.spokenName)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: voiceOption.name)
+
+                            if !persona.isEmpty {
+                                Text(verbatim: persona)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .tag(voiceOption.id)
                     }
                 } label: {
                     Text("voice")
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
+            } footer: {
+                Text(verbatim: "Most voices are the Critic. George is Melancholy: he still gives every direction, with a sigh. Heart is a Proud Parent: everything you do is wonderful, sweetie. Santa is Dirty Santa: he gave you everything, and you should be grateful.")
             }
         }
         .accentColor(.accent)
