@@ -33,6 +33,8 @@ set(
   pronunciation.hpp
   pronunciation_backup.cpp
   pronunciation_backup.hpp
+  pronunciation_scripts.cpp
+  pronunciation_text.hpp
   pop_quiz.cpp
   pop_quiz.hpp
   quiet_bits.cpp
