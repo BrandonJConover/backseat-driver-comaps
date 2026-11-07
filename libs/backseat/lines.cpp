@@ -210,6 +210,11 @@ LineTable const * PersonaTable(Persona persona, bool metric)
     static LineTable const metricTable = Metric(ProudLineData());
     return metric ? &metricTable : &ProudLineData();
   }
+  case Persona::Santa:
+  {
+    static LineTable const metricTable = Metric(SantaLineData());
+    return metric ? &metricTable : &SantaLineData();
+  }
   }
   return nullptr;
 }
@@ -241,13 +246,14 @@ char const * PersonaName(Persona persona)
   case Persona::Critic: return "critic";
   case Persona::Melancholy: return "melancholy";
   case Persona::Proud: return "proud";
+  case Persona::Santa: return "santa";
   }
   return "critic";
 }
 
 Persona PersonaFrom(std::string const & name)
 {
-  for (Persona const p : {Persona::Melancholy, Persona::Proud})
+  for (Persona const p : {Persona::Melancholy, Persona::Proud, Persona::Santa})
     if (name == PersonaName(p))
       return p;
   return Persona::Critic;
@@ -260,6 +266,7 @@ char const * PersonaTitle(Persona persona)
   case Persona::Critic: return "The Critic";
   case Persona::Melancholy: return "Melancholy";
   case Persona::Proud: return "Proud Parent";
+  case Persona::Santa: return "Dirty Santa";
   }
   return "The Critic";
 }
@@ -278,6 +285,7 @@ Persona PersonaForVoice(std::string const & voiceName)
   static std::pair<char const *, Persona> const kVoices[] = {
       {"george", Persona::Melancholy},
       {"heart", Persona::Proud},
+      {"santa", Persona::Santa},
   };
   for (auto const & [voice, persona] : kVoices)
     if (name == voice)

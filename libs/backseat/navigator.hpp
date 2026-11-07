@@ -261,7 +261,7 @@ public:
     SetPersona(PersonaForVoice(name));
     m_gpsName = std::move(name);
   }
-  /// How the GPS talks: the Critic, Melancholy or Proud Parent. LinesFor() follows it.
+  /// How the GPS talks: the Critic, Melancholy, Proud Parent or Dirty Santa. LinesFor() follows it.
   void SetPersona(Persona persona)
   {
     m_persona = persona;

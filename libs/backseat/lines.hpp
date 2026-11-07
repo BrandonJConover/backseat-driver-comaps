@@ -77,12 +77,15 @@ enum class Persona
   Melancholy,
   /// Praises every little thing to the point of being patronizing ("My little driver would never
   /// miss a turn"). Every mistake is the GPS's fault.
-  Proud
+  Proud,
+  /// Dirty Santa (Brandon): he's gifting you with his presence, and he lists everything he's given
+  /// you ("Do you like the car you are driving? ... I gave it to you."). You should be grateful.
+  Santa
 };
-/// "critic", "melancholy", "proud"; and back (anything else is the Critic).
+/// "critic", "melancholy", "proud", "santa"; and back (anything else is the Critic).
 char const * PersonaName(Persona persona);
 Persona PersonaFrom(std::string const & name);
-/// For Settings: "The Critic", "Melancholy", "Proud Parent".
+/// For Settings: "The Critic", "Melancholy", "Proud Parent", "Dirty Santa".
 char const * PersonaTitle(Persona persona);
 /// The personality that comes with a voice, by its spoken name ("George"), any case. Voices
 /// without one of their own are the Critic.

@@ -473,7 +473,7 @@ struct SettingsBackseatVoiceView: View {
                 .pickerStyle(.inline)
                 .labelsHidden()
             } footer: {
-                Text(verbatim: "Most voices are the Critic. George is Melancholy: he still gives every direction, with a sigh. Heart is a Proud Parent: everything you do is wonderful, sweetie.")
+                Text(verbatim: "Most voices are the Critic. George is Melancholy: he still gives every direction, with a sigh. Heart is a Proud Parent: everything you do is wonderful, sweetie. Santa is Dirty Santa: he gave you everything, and you should be grateful.")
             }
         }
         .accentColor(.accent)

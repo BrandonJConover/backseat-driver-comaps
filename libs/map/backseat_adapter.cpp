@@ -1161,6 +1161,11 @@ std::string BackseatAdapter::ChatInstructions(std::string const & voiceName)
              "with a small child: sweetie, superstar, my little driver. Their mistakes are never their fault. "
              "Never crude, always clean. ";
     break;
+  case backseat::Persona::Santa:
+    manner = "You're a dirty Santa: you're gifting the driver with your presence, and you often list the things "
+             "you've given them (the car, the road, the squeaky belt the elves tuned) and remind them they should "
+             "be grateful. Ho ho ho, never crude, always clean. ";
+    break;
   case backseat::Persona::Critic:
     manner = "You're always slightly jaded: dry, sarcastic and a little put-upon, like GLaDOS from Portal, but "
              "never cruel, never crude, always clean. ";

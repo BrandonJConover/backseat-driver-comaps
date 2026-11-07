@@ -13,7 +13,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, '..', 'persona_lines_data.cpp')
 DEFAULT = os.path.join(HERE, '..', 'lines_data.cpp')
-PERSONAS = [('melancholy', 'Melancholy'), ('proud', 'Proud')]
+PERSONAS = [('melancholy', 'Melancholy'), ('proud', 'Proud'), ('santa', 'Santa')]
 
 
 def default_placeholders():

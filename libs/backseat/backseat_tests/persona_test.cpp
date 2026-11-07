@@ -40,7 +40,7 @@ struct CriticAfter
 
 TEST(PersonaLinesOnlyUseWhatTheCriticsLinesAreGiven)
 {
-  for (auto const * table : {&MelancholyLineData(), &ProudLineData()})
+  for (auto const * table : {&MelancholyLineData(), &ProudLineData(), &SantaLineData()})
     for (auto const & [key, tiers] : *table)
     {
       CHECK(!tiers[0].empty());
@@ -79,6 +79,7 @@ TEST(EveryTurnByTurnKeyHasItsOwnLinesInEachPersona)
   {
     CHECK(PersonaHasLines(Persona::Melancholy, key));
     CHECK(PersonaHasLines(Persona::Proud, key));
+    CHECK(PersonaHasLines(Persona::Santa, key));
   }
   CHECK(PersonaHasLines(Persona::Proud, "straight.serious+"));
   CHECK(!PersonaHasLines(Persona::Critic, "missedTurn"));
@@ -90,9 +91,10 @@ TEST(VoicesComeWithTheirPersonality)
   CHECK(PersonaForVoice("bm_george") == Persona::Melancholy);
   CHECK(PersonaForVoice("Heart (American female)") == Persona::Proud);
   CHECK(PersonaForVoice("HEART") == Persona::Proud);
+  CHECK(PersonaForVoice("am_santa") == Persona::Santa);
   CHECK(PersonaForVoice("Echo") == Persona::Critic);
   CHECK(PersonaForVoice("") == Persona::Critic);
-  for (Persona const p : {Persona::Critic, Persona::Melancholy, Persona::Proud})
+  for (Persona const p : {Persona::Critic, Persona::Melancholy, Persona::Proud, Persona::Santa})
     CHECK(PersonaFrom(PersonaName(p)) == p);
   CHECK_EQUAL(std::string(PersonaTitle(Persona::Proud)), std::string("Proud Parent"));
 }
@@ -168,4 +170,16 @@ TEST(RewritesSoundLikeThePersona)
   CHECK(RewritePrompt({"Nice turn.", "turnCompleted", 90, {}}).find("tearfully proud") != std::string::npos);
   SetLinePersona(Persona::Critic);
   CHECK_EQUAL(RewriteInstructions(), critic);
+}
+
+TEST(DirtySantaDebutsWithBrandonsCarLine)
+{
+  CriticAfter after;
+  SaidLog said;
+  SetLinePersona(Persona::Santa);
+  CHECK_EQUAL(said.Pick("idle", LinesFor("idle", 0), 0.9),
+              std::string("Do you like the car you are driving? You should be grateful for it, because I gave it to "
+                          "you. The elves worked especially hard to make the belt squeak at that exact pitch. You "
+                          "should be grateful."));
+  CHECK(RewriteInstructions().find("dirty Santa") != std::string::npos);
 }

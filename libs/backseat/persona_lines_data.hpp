@@ -9,4 +9,5 @@ namespace backseat
 /// are said in the Critic's lines.
 LineTable const & MelancholyLineData();
 LineTable const & ProudLineData();
+LineTable const & SantaLineData();
 }  // namespace backseat
