@@ -353,6 +353,13 @@ public:
   /// like any other so it doesn't repeat. Works between trips too. The driver's {name} and
   /// pronouns ({theycap} {theyre} {them} {their}) are filled in unless `vars` has them.
   std::string Reply(std::string const & key, Vars const & vars = {});
+  /// Within this far of the next maneuver (or 20 s at the current speed, whichever is more),
+  /// "repeat that" only gets lines that say the direction within the first few words.
+  static double constexpr kRepeatFirstWithinM = 400;
+  /// Words a near-turn "repeat that" line may have before its {instruction}.
+  static int constexpr kRepeatFirstMaxWords = 3;
+  /// Whether a line says {instruction} within the first kRepeatFirstMaxWords words.
+  static bool InstructionComesFirst(std::string const & line);
   /// On-device model that rewords roasts in real time. Without one, canned lines are spoken.
   void SetRewriter(std::shared_ptr<LineRewriter> rewriter) { m_gate.SetRewriter(std::move(rewriter)); }
 

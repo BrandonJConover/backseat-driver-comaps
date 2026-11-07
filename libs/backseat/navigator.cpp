@@ -2623,7 +2623,21 @@ std::string Navigator::Reply(std::string const & key, Vars const & vars)
   case Pronouns::She: add("theycap", "She"); add("theyre", "She's"); add("them", "her"); add("their", "her"); break;
   case Pronouns::They: add("theycap", "They"); add("theyre", "They're"); add("them", "them"); add("their", "their"); break;
   }
-  std::string text = Fill(m_said.Pick(key, LinesFor(key, Tier()), r), all);
+  auto const & lines = LinesFor(key, Tier());
+  // "Repeat that" near a turn: the direction first, the commentary after (loop B58). Own pick log,
+  // so the short pool doesn't trim the full pool's no-repeat memory.
+  std::vector<std::string> nearTurn;
+  bool const repeatNearTurn = key == "cmd.repeat" && m_turnId &&
+                              m_lastDistToTurnM < std::max(kRepeatFirstWithinM, 20 * (m_lastFix ? m_lastFix->speedMps : 0));
+  if (repeatNearTurn)
+  {
+    for (auto const & l : lines)
+      if (InstructionComesFirst(l))
+        nearTurn.push_back(l);
+    if (nearTurn.empty())
+      nearTurn.push_back("{instruction}");
+  }
+  std::string text = Fill(repeatNearTurn ? m_said.Pick("cmd.repeat.nearTurn", nearTurn, r) : m_said.Pick(key, lines, r), all);
   // Said in one go, so a punchline just gets a beat.
   for (auto pause = text.find(" || "); pause != std::string::npos; pause = text.find(" || "))
     text.replace(pause, 4, " ... ");
@@ -2635,6 +2649,26 @@ std::string Navigator::Reply(std::string const & key, Vars const & vars)
       m_onSaid(m_said);
   }
   return text;
+}
+
+bool Navigator::InstructionComesFirst(std::string const & line)
+{
+  // Either case: the shouting tier writes {INSTRUCTION}.
+  std::string lower = line;
+  std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
+  auto const at = lower.find("{instruction}");
+  if (at == std::string::npos)
+    return false;
+  int words = 0;
+  bool inWord = false;
+  for (size_t i = 0; i < at; ++i)
+  {
+    bool const space = std::isspace(static_cast<unsigned char>(line[i])) != 0;
+    if (!space && !inWord)
+      ++words;
+    inWord = !space;
+  }
+  return words <= kRepeatFirstMaxWords;
 }
 
 static std::string CarWeight(Units units)

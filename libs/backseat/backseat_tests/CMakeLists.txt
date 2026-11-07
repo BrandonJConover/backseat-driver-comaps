@@ -45,6 +45,7 @@ add_executable(${PROJECT_NAME}
   drive_side_test.cpp
   line_filters_test.cpp
   unseen_turns_test.cpp
+  repeat_near_turn_test.cpp
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
 target_compile_definitions(${PROJECT_NAME} PRIVATE
