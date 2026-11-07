@@ -30,6 +30,7 @@ add_executable(${PROJECT_NAME}
   route_sketch_test.cpp
   sim_drive.hpp
   soak_test.cpp
+  soak_gaps_test.cpp
   debug_log_test.cpp
   lines_test.cpp
   stop_go_test.cpp

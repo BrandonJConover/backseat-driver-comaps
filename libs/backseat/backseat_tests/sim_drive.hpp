@@ -70,6 +70,8 @@ struct SimResult
   std::vector<Maneuver> maneuvers;
   double endMs = 0;
   bool arrived = false;
+  /// "Now, ..." calls handed over for a maneuver the car had already got to (stale snapshot).
+  int staleNowCalls = 0;
 };
 
 /// Seconds the phone takes to say a line: Kokoro at the app's pace, plus the pause after it.
@@ -178,6 +180,15 @@ struct SimOptions
   /// Every few seconds the phone also hands over a broken fix (NaN/inf fields, a bearing past 360,
   /// a stale or repeated timestamp, absurd accuracy) right before the real one, as GPS stacks do.
   bool hostileFixes = false;
+  /// Seconds into the trip, and how long: the GPS goes quiet (no fixes, the router's snapshot
+  /// stays where it was, the app still polls), the app is suspended (nothing runs, the phone
+  /// says nothing) and the driver stops mid-route (parked, speed 0). Negative start = never.
+  double outageFromS = -1, outageS = 0;
+  double suspendFromS = -1, suspendS = 0;
+  double stopFromS = -1, stopS = 0;
+  /// The stop is in a parking lot (off the road: no speed limit, the parking lookup says yes)
+  /// rather than stopped dead in a lane, which reads as traffic.
+  bool stopParked = true;
 };
 
 /// The broken fix the sim slips in before the real one when SimOptions::hostileFixes is set.
@@ -284,6 +295,10 @@ inline SimResult SimulateTrip(backseat::Navigator & nav, SimOptions const & o, d
     nav.SetBridgeLookup([](LatLon const &, double) { return Bridge::None; });
   }
 
+  bool parkedNow = false;
+  if (o.lookups)
+    nav.SetParkingLookup([&parkedNow](LatLon const &) { return parkedNow; });
+
   SimPhone phone;
   double t = startMs;
   double speed = 0;
@@ -324,12 +339,21 @@ inline SimResult SimulateTrip(backseat::Navigator & nav, SimOptions const & o, d
     return r;
   };
 
+  // What the router last told the app: frozen while the GPS is out.
+  RouteSnapshot routerSnap;
+  size_t routerLeg = 0;
   auto take = [&]()
   {
     auto lines = nav.TakeLines();
     for (auto const & l : lines)
+    {
       if (l.priority == Priority::Nav && l.category == Category::Instruction && leg < res.maneuvers.size())
         res.maneuvers[leg].directed = true;
+      // A blind router still points at a maneuver the car may have gone through already.
+      if (l.text.rfind("Now, ", 0) == 0 && routerLeg < res.maneuvers.size() && res.maneuvers[routerLeg].reachedMs >= 0 &&
+          res.maneuvers[routerLeg].reachedMs < t - 2000)
+        ++res.staleNowCalls;
+    }
     phone.Queue(std::move(lines), t, leg);
   };
 
@@ -345,6 +369,12 @@ inline SimResult SimulateTrip(backseat::Navigator & nav, SimOptions const & o, d
     if (L.light && left < 25 && lightWaitUntil < 0 && !offRoute)
       lightWaitUntil = t + uni(0, 35000);
     if (lightWaitUntil > t)
+      target = 0;
+    double const tripS = (t - startMs) / 1000;
+    auto within = [tripS](double from, double len) { return from >= 0 && tripS >= from && tripS < from + len; };
+    bool const stopping = within(o.stopFromS, o.stopS);
+    parkedNow = stopping && o.stopParked;
+    if (stopping)
       target = 0;
     double const accel = target > speed ? 2.0 : -3.0;
     speed = accel > 0 ? std::min(target, speed + accel) : std::max(target, speed + accel);
@@ -400,14 +430,31 @@ inline SimResult SimulateTrip(backseat::Navigator & nav, SimOptions const & o, d
     f.lon = lon;
     f.speedMps = speed;
     f.bearingDeg = bearing;
-    f.speedLimitMps = legs[leg].limitMps;
+    if (!parkedNow)
+      f.speedLimitMps = legs[leg].limitMps;
     f.accuracyM = 5;
-    RouteSnapshot const snap = snapshot();
-    if (o.hostileFixes && step % 5 == 2)
-      nav.OnFix(HostileFix(f, lastFix, step / 5), snap);
-    nav.OnFix(f, snap);
-    lastFix = f;
-    take();
+    if (within(o.suspendFromS, o.suspendS))
+    {
+      // Suspended: no fixes, no polls, nothing spoken. The router catches up when it wakes.
+      routerSnap = snapshot();
+      routerLeg = leg;
+      continue;
+    }
+    bool const blind = within(o.outageFromS, o.outageS);
+    if (!blind)
+    {
+      routerSnap = snapshot();
+      routerLeg = leg;
+    }
+    RouteSnapshot const snap = routerSnap;
+    if (!blind)
+    {
+      if (o.hostileFixes && step % 5 == 2)
+        nav.OnFix(HostileFix(f, lastFix, step / 5), snap);
+      nav.OnFix(f, snap);
+      lastFix = f;
+      take();
+    }
     // Directions also go out between fixes, right before the phone speaks.
     nav.Poll(snap);
     take();
