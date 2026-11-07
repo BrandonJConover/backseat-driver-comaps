@@ -753,6 +753,14 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
       m_stopAnnounced = false;
       m_pullOverSaid = false;
       m_stopInTraffic = m_inTraffic;
+      // On a road fast enough to judge traffic on, a dead stop is called a jam within one traffic
+      // window, so the engine's longStop waits for that call (BI-056). Elsewhere it keeps its 45 s.
+      if (m_engine)
+      {
+        bool const judged = InCar(m_travelMode) && route.state == RouteState::OnRoute && fix.speedLimitMps &&
+                            *fix.speedLimitMps >= kTrafficMinLimitMps && !m_inTraffic;
+        m_engine->HoldLongStop(judged ? fix.tMs + kTrafficWindowMs : 0);
+      }
       // Christmas season, after dark, at a red light: the GPS has had it with lights.
       if (!m_christmasSaid && m_lightLookup && KnowsTheDate(fix.tMs))
       {

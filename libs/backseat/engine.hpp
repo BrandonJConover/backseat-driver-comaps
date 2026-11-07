@@ -142,6 +142,11 @@ public:
 
   std::vector<Commentary> OnTelemetry(TelemetrySample const & s);
   std::vector<Commentary> OnNav(NavEvent const & e);
+  /// Hold the parked-mid-route longStop remark until `untilMs` (0 = no hold). The navigator sets this
+  /// when a stop starts on a road fast enough to judge traffic on: until its traffic window has seen
+  /// the stop, the stop may be a jam about to be called, and "We've been stopped for a while" eight
+  /// seconds before "Traffic. Great." is one remark too many (BI-056).
+  void HoldLongStop(double untilMs) { m_longStopHoldUntil = untilMs; }
 
   int Frustration() const;
   TripStats const & Stats() const { return m_stats; }
@@ -263,6 +268,8 @@ private:
   static constexpr int kLongStopRemarksPerStop = 3;
   /// When an unplannedStop remark last spoke, so longStop doesn't land in the same breath.
   double m_lastUnplannedStopAt = -1e18;
+  /// See HoldLongStop.
+  double m_longStopHoldUntil = 0;
   bool m_braking = false;
   bool m_accelerating = false;
   double m_lastSpeedingLogAt;

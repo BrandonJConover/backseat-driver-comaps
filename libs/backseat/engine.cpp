@@ -1061,6 +1061,9 @@ void CritiqueEngine::CheckStopped(TelemetrySample const & s, std::vector<Comment
   // Parked mid-route, each remark waits twice as long as the last (45 s, 90, 180), then it gives up.
   if (m_longStopRemarks >= kLongStopRemarksPerStop)
     return;
+  // The navigator may still call this stop a traffic jam (HoldLongStop).
+  if (s.t < m_longStopHoldUntil)
+    return;
   if (s.t - *m_stoppedSince < m_config.longStopAfterMs * std::pow(2.0, m_longStopRemarks))
     return;
   // The stop was just remarked on by name ("Why are we stopping here?"), so don't pile on.
