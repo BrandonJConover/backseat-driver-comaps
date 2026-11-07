@@ -281,6 +281,11 @@ double constexpr kCallMinToTurnM = 1000;
 /// Once each bit has had its first time, a quiet stretch gets one this often; the call, I spy
 /// and the fact are picked by these weights.
 double constexpr kQuietBitChance = 0.5;
+/// A familiar commute (a learned routine driven at least this many times before) thins the optional
+/// banter: idle remarks and quiet-stretch bits come at this share of their usual rate, until anything
+/// new happens on the trip (BI-055: the same jokes on trip 50 as on trip 1 wear thin).
+int constexpr kFamiliarAfterTrips = 10;
+double constexpr kFamiliarTalkShare = 0.6;
 /// call 30%, I spy 15%, 20 Questions 20%, fact 15%, then an aside or a trap (20 Questions
 /// falls to the fact when it can't be offered).
 double constexpr kCallWeight = 0.3;
@@ -820,6 +825,7 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
       place = m_placeLookup(m_stopAt);
     if (place && place->grocery)
       m_groceryT = fix.tMs;
+    NotFamiliarAnymore("stop");
     Say(m_engine->OnNav(NavEvent::UnplannedStop(fix.tMs, place)));
   }
 }
@@ -848,6 +854,7 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
   if (!m_inTraffic && share < kCrawlShare)
   {
     m_inTraffic = true;
+    NotFamiliarAnymore("traffic");
     m_stopGo.Reset();
     std::optional<std::string> alternate;
     if (m_alternateLookup)
@@ -968,6 +975,9 @@ void Navigator::SetTalkLevel(TalkLevel level)
   Trace("talk.level", {{"level", level == TalkLevel::Full ? "full" : level == TalkLevel::Less ? "less" : "directions"}});
   m_talk = level;
   m_lessSayNext = true;
+  // "Talk more" means it: the familiar-commute thinning is off for the rest of the trip.
+  if (level == TalkLevel::Full)
+    NotFamiliarAnymore("talk.full");
   if (level != TalkLevel::DirectionsOnly)
     return;
   // Hush means now: the call hangs up and the quiz is off, rather than going on in silence.
@@ -1212,6 +1222,7 @@ void Navigator::Update(double t, RouteSnapshot const & route)
         Say(m_engine->OnNav(NavEvent::MissedTurn(t)));
       }
       m_rerouting = true;
+      NotFamiliarAnymore("offroute");
       Trace("nav.offroute", {{"missed", (m_turnId && m_lastDistToTurnM < kMissedTurnWithinM) ? "yes" : "no"},
                              {"reroutes", std::to_string(m_reroutes + 1)}});
       // Back on the route in a moment, or the route changed because the driver asked: no joke.
@@ -1411,6 +1422,13 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   std::string const routeKey = RouteKey(m_plan.origin, m_plan.destination);
   m_tripsOnRoute = static_cast<int>(
       std::count_if(m_history.begin(), m_history.end(), [&](TripRecord const & r) { return r.routeKey == routeKey; }));
+  m_familiarTrip = false;
+  if (m_tripsOnRoute >= kFamiliarAfterTrips && KnowsTheDate(t))
+    for (auto const & r : Routines())
+      if (r.routeKey == routeKey && r.trips >= kFamiliarAfterTrips)
+        m_familiarTrip = true;
+  if (m_familiarTrip)
+    Trace("talk.familiar", {{"trips", std::to_string(m_tripsOnRoute)}});
   m_plates.NewTrip(routeKey);
   m_twenty.NewTrip();
   m_heldTwentyLines.clear();
@@ -1822,10 +1840,17 @@ void Navigator::TrackIdle(Fix const & fix, RouteSnapshot const & route)
     return;
   if (m_idleGapMs <= 0)
     m_idleGapMs = kIdleMinMs + (m_config.rng ? m_config.rng() : 0.5) * (kIdleMaxMs - kIdleMinMs);
-  double const quietSince = std::max(m_lastSpokeT, m_tripStartT);
+  double const quietSince = std::max({m_lastSpokeT, m_tripStartT, m_idleSkippedT});
   if (fix.tMs - quietSince < m_idleGapMs || RemarkWaiting())
     return;
   m_idleGapMs = 0;
+  // A familiar commute lets some of these silences be.
+  if (FamiliarQuiet() && (m_config.rng ? m_config.rng() : 0) >= kFamiliarTalkShare)
+  {
+    m_idleSkippedT = fix.tMs;
+    Trace("say.dropped", {{"key", "idle"}, {"why", "familiar"}});
+    return;
+  }
   m_lastSpokeT = fix.tMs;
   SayLine(fix.tMs, Category::Idle, "idle");
 }
@@ -2014,6 +2039,16 @@ void Navigator::SayOutdoorBit(double t, std::string const & key)
   c.voiceSpeed = 1 + c.frustration / 1000.0;
   c.key = key;
   PushLine(std::move(c), m_gpsName == "Sarah" ? "af_heart" : "af_sarah");
+}
+
+bool Navigator::FamiliarQuiet() const { return m_familiarTrip && m_talk == TalkLevel::Full && m_reroutes == 0; }
+
+void Navigator::NotFamiliarAnymore(char const * why)
+{
+  if (!m_familiarTrip)
+    return;
+  m_familiarTrip = false;
+  Trace("talk.familiar", {{"off", why}});
 }
 
 std::vector<Routine> Navigator::Routines() const
@@ -2255,6 +2290,7 @@ void Navigator::ResetTrip()
   m_upcomingSight.reset();
   m_lastSpokeT = -1e18;
   m_idleGapMs = 0;
+  m_idleSkippedT = -1e18;
   m_bits.NewTrip((m_config.rng ? m_config.rng() : 0) < kCleanBitChance, m_said.Counter(kTurnStreakKey));
   m_bendHeadings.clear();
   m_curveAheadM = -1;
@@ -3366,6 +3402,7 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
   if (!steady || fix.speedMps < std::min(kQuietMinMovingMps, 1.25 * MovingMps()) || m_quietBits >= kQuietBitsPerTrip || !m_punchlines.empty() ||
       QuietBitBusy())
     return;
+  double const talkShare = FamiliarQuiet() ? kFamiliarTalkShare : 1.0;
   if (t - m_tripStartT < kQuietBitAfterStartMs || t - m_lastQuietBitT < kQuietBitEveryMs ||
       t - std::max({m_lastSpokeT, m_quietTurnSince, m_lastRoadT, m_resumedT}) < kQuietSilenceMs || toTurnS < kQuietMinToTurnS)
     return;
@@ -3400,9 +3437,10 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
       return;
     m_quietRolledFor = route.turnId;
     double const r = m_config.rng ? m_config.rng() : 0;
-    if (r >= kQuietBitChance)
+    double const chance = kQuietBitChance * talkShare;
+    if (r >= chance)
       return;
-    double pick = r / kQuietBitChance;
+    double pick = r / chance;
     if (!roomForCall)
       pick = kCallWeight + pick * (1 - kCallWeight);
     double const twenty = kCallWeight + kISpyWeight + kTwentyWeight;

@@ -684,6 +684,8 @@ private:
   /// When the last line went out (TakeLines), for filling a long silence.
   double m_lastSpokeT = -1e18;
   double m_idleGapMs = 0;
+  /// When a familiar commute last let an idle remark go unsaid (the next one waits a full gap from there).
+  double m_idleSkippedT = -1e18;
   /// When the car started heading away from the route, or negative while it isn't.
   double m_wrongWaySince = -1;
   double m_lastWrongWayT = -1e18;
@@ -800,6 +802,11 @@ private:
   TurnKind m_turnKind = TurnKind::None;
   int m_leftsInARow = 0;
   int m_tripsOnRoute = 0;
+  /// This trip is a learned routine driven kFamiliarAfterTrips+ times: optional banter is thinned
+  /// until something new happens (a reroute, a jam, an unplanned stop, "talk more").
+  bool m_familiarTrip = false;
+  bool FamiliarQuiet() const;
+  void NotFamiliarAnymore(char const * why);
   double m_tripStartT = 0;
   double m_lastRegionCheckT = -1e18;
   /// Game lines held back while a maneuver is close; directions come first.
