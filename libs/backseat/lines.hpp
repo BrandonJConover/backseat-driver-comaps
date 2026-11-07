@@ -107,6 +107,11 @@ public:
   /// A line from `options` not said recently for `key`, chosen by `r` in [0, 1), and remembered.
   /// An r outside [0, 1) (or NaN) is clamped; empty `options` give "" and remember nothing.
   std::string const & Pick(std::string const & key, std::vector<std::string> const & options, double r);
+  /// Takes back the last Pick() for `key` when it gave `line`: a line picked but replaced before anyone
+  /// heard it must not push a line that was heard out of the rotation (it would come back on the next
+  /// trip). Only the latest pick can be taken back, once; if it gave another line, or anything else
+  /// was done to `key` since, this does nothing.
+  void Unpick(std::string const & key, std::string const & line);
   /// Whether anything for `key` was said before (as far as the log remembers).
   bool Said(std::string const & key) const
   {
@@ -124,6 +129,7 @@ public:
   /// A note kept with the log, like the driver's answer to a question ("rest"), until forgotten.
   void Remember(std::string const & key, std::string const & value)
   {
+    m_before.erase(key);
     m_recent[key] = {value};
     m_dirty = true;
   }
@@ -135,6 +141,7 @@ public:
   }
   void Forget(std::string const & key)
   {
+    m_before.erase(key);
     if (m_recent.erase(key))
       m_dirty = true;
   }
@@ -148,6 +155,8 @@ public:
 
 private:
   std::map<std::string, std::vector<std::string>> m_recent;
+  /// Per key, the recent list as it was before the latest Pick(), for Unpick().
+  std::map<std::string, std::vector<std::string>> m_before;
   bool m_dirty = false;
 };
 }  // namespace backseat

@@ -2843,6 +2843,9 @@ bool Navigator::Punch(Commentary & line)
   std::optional<BitLine> bit;
   if (line.key == "turnCompleted.onTime")
   {
+    // The engine picked a line from this same pool; the bit picks its own (or none), so the
+    // engine's pick goes back or it would push the turns heard lately out of the rotation.
+    m_said.Unpick(line.key, line.text);
     bit = m_bits.OnTimeTurn(m_engine->Stats(), m_engine->Incidents(), r);
     m_said.SetCounter(kTurnStreakKey, m_bits.Streak());
     if (!bit)

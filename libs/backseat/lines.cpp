@@ -464,6 +464,7 @@ std::string const & SaidLog::Pick(std::string const & key, std::vector<std::stri
   else if (r >= 1)
     r = std::nextafter(1.0, 0.0);
   auto & recent = m_recent[key];
+  m_before[key] = recent;
   // A key's first ever line is its first option, which is Brandon's line where there is one.
   if (recent.empty())
     r = 0;
@@ -495,14 +496,30 @@ std::string SaidLog::Value(std::string const & key) const
 
 void SaidLog::SetValue(std::string const & key, std::string value)
 {
+  m_before.erase(key);
   m_recent[key] = {std::move(value)};
   m_dirty = true;
 }
 
 void SaidLog::Erase(std::string const & key)
 {
+  m_before.erase(key);
   if (m_recent.erase(key))
     m_dirty = true;
+}
+
+void SaidLog::Unpick(std::string const & key, std::string const & line)
+{
+  auto const before = m_before.find(key);
+  auto const now = m_recent.find(key);
+  if (before == m_before.end() || now == m_recent.end() || now->second.empty() || now->second.back() != line)
+    return;
+  if (before->second.empty())
+    m_recent.erase(key);
+  else
+    m_recent[key] = std::move(before->second);
+  m_before.erase(before);
+  m_dirty = true;
 }
 
 std::string SaidLog::Serialize() const
