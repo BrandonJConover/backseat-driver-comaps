@@ -43,6 +43,10 @@ std::string FractionsWithUnits(std::string const & text);
 /// "November sixth", "31/12/1999" "the thirty first of December, ...", "on 12/25" "on December twenty
 /// fifth". Fractions, versions, counts ("May 3 cars") and impossible days are left alone.
 std::string Dates(std::string const & text);
+/// Day abbreviations said as days: "Fri" is "Friday", "Mon-Fri" "Monday to Friday", "Sat/Sun"
+/// "Saturday and Sunday". A lone "Sat" or "Sun" only before a date ("Sun November ninth"), since
+/// "Sat on it" and "Sun's down" are words. Capital only. Part of ForSpeech, after Dates.
+std::string Weekdays(std::string const & text);
 
 /// Just the words spelled the same but said differently, swapped for the sound the sentence needs
 /// ("Where do you live?" reads "liv"). Part of ForSpeech.

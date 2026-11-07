@@ -660,6 +660,28 @@ TEST(DatesMatchTheGoldenCases)
   CHECK_EQUAL(Dates("by 12/31/50"), std::string("by December thirty first, nineteen fifty"));
 }
 
+TEST(WeekdaysAreSaidAsDays)
+{
+  // The pass on its own: day abbreviations only, everything else byte for byte.
+  CHECK_EQUAL(Weekdays("Turn left onto Main St, then I-35 N."), std::string("Turn left onto Main St, then I-35 N."));
+  CHECK_EQUAL(Weekdays("See you Thu"), std::string("See you Thursday"));
+  CHECK_EQUAL(Weekdays("Mon\xE2\x80\x93" "Fri"), std::string("Monday to Friday"));
+  CHECK_EQUAL(Weekdays("Mon, Wed, Fri"), std::string("Monday, Wednesday and Friday"));
+  CHECK_EQUAL(Weekdays("Fri or Sat"), std::string("Friday or Saturday"));
+  CHECK_EQUAL(Weekdays("Fri. 11/7"), std::string("Friday 11/7"));
+  // Longer words, other case and glued letters stay.
+  CHECK_EQUAL(Weekdays("Monday Friar Wedge Sunday's Saturn TUE tue fri ASun Sun\xE2\x80\x99s"),
+              std::string("Monday Friar Wedge Sunday's Saturn TUE tue fri ASun Sun\xE2\x80\x99s"));
+  // A lone "Sat" or "Sun" is a word unless a date follows.
+  CHECK_EQUAL(Weekdays("Sun and rain. Sat down. Sun. The glare. Sun, then"),
+              std::string("Sun and rain. Sat down. Sun. The glare. Sun, then"));
+  CHECK_EQUAL(Weekdays("Sun 9"), std::string("Sunday 9"));
+  CHECK_EQUAL(Weekdays("Sun, November ninth"), std::string("Sunday, November ninth"));
+  // Month and year, inside Dates.
+  CHECK_EQUAL(Dates("Oct 2026"), std::string("October 2026"));
+  CHECK_EQUAL(Dates("Oct 20261 Mar 2026:30 May 2026 oct 2026"), std::string("Oct 20261 Mar 2026:30 May 2026 oct 2026"));
+}
+
 TEST(SymbolsAndLeftoverAbbreviationsMatchTheGoldenCases)
 {
   auto const cases = GoldenCases(BACKSEAT_SPOKEN_SYMBOLS_PATH);

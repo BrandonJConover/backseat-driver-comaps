@@ -159,7 +159,7 @@
   {
    "input": "Dec. 1868 was cold",
    "language": "en",
-   "expected": "Dec. eighteen sixty eight was cold"
+   "expected": "December eighteen sixty eight was cold"
   }
  ]
 }

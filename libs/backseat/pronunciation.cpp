@@ -2537,7 +2537,99 @@ std::string Dates(std::string const & text)
       return std::nullopt;
     return say(month, static_cast<int>(day), m[5].matched ? m.str(5) : "", false);
   });
+  // "Oct 2026", "Jan. 2027", "Sept 2025": an abbreviated month before a year is the month's name; the
+  // year pass reads the year. Capital only, and not glued to more digits ("Oct 20261", "Mar 2026:30").
+  static std::regex const monthYear(
+      "\\b(Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\\.? (1\\d{3}|20\\d{2})(?![\\d/:A-Za-z]|[.,]\\d)");
+  s = Replace(s, monthYear, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
+    static std::map<std::string, int> const kMonth = {
+        {"Jan", 1}, {"Feb", 2}, {"Mar", 3}, {"Apr", 4},   {"Jun", 6},  {"Jul", 7},
+        {"Aug", 8}, {"Sep", 9}, {"Sept", 9}, {"Oct", 10}, {"Nov", 11}, {"Dec", 12}};
+    return MonthName(kMonth.at(m.str(1))) + " " + m.str(2);
+  });
   return s;
+}
+
+std::string Weekdays(std::string const & text)
+{
+  if (!HasAny(text, "MTWFS"))
+    return text;
+  // One day, or a run of days joined by dashes, slashes, commas, "&", "and" or "or". Capital only; never part of a
+  // longer word ("Monday", "Sunday's", "Friar", "Wedge" stay).
+#define BACKSEAT_DAY "(?:Mon|Tues|Tue|Wed|Thurs|Thur|Thu|Fri|Sat|Sun)(?![A-Za-z']|\xE2\x80\x99)\\.?"
+#define BACKSEAT_DAY_SEP "(?:\\s*(?:-|\xE2\x80\x93|/|&|,)\\s*| (?:and|or) )"
+  static std::regex const run("\\b" BACKSEAT_DAY "(?:" BACKSEAT_DAY_SEP BACKSEAT_DAY ")*");
+  static std::regex const part("(Mon|Tues|Tue|Wed|Thurs|Thur|Thu|Fri|Sat|Sun)\\.?|" BACKSEAT_DAY_SEP);
+#undef BACKSEAT_DAY
+#undef BACKSEAT_DAY_SEP
+  static std::map<std::string, std::string> const kDay = {
+      {"Mon", "Monday"},     {"Tue", "Tuesday"},  {"Tues", "Tuesday"},  {"Wed", "Wednesday"},
+      {"Thu", "Thursday"},   {"Thur", "Thursday"}, {"Thurs", "Thursday"}, {"Fri", "Friday"},
+      {"Sat", "Saturday"},   {"Sun", "Sunday"}};
+  std::string const & s = text;
+  return Replace(s, run, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    std::string const all = m.str(0);
+    std::vector<std::string> days, seps;
+    for (std::sregex_iterator it(all.begin(), all.end(), part), end; it != end; ++it)
+    {
+      if ((*it)[1].matched)
+        days.push_back(kDay.at((*it).str(1)));
+      else
+      {
+        std::string sep = (*it).str(0);
+        sep.erase(std::remove_if(sep.begin(), sep.end(), [](char c) { return c == ' ' || c == '\t'; }), sep.end());
+        seps.push_back(sep);
+      }
+    }
+    if (days.empty() || seps.size() + 1 != days.size())
+      return std::nullopt;
+    auto const after = pos + static_cast<size_t>(m.length(0));
+    if (days.size() == 1)
+    {
+      // "Sat" and "Sun" are words too ("Sat on it", "Sun's down", "Sun. The glare"): only a date after
+      // them makes them days ("Sun 11/9" is read "Sun November ninth" by then, "Sat, Nov. 8" too).
+      if (days[0] == "Saturday" || days[0] == "Sunday")
+      {
+        size_t at = after;
+        if (all.back() == '.')
+          return std::nullopt;
+        if (at < s.size() && s[at] == ',')
+          ++at;
+        if (at >= s.size() || s[at] != ' ')
+          return std::nullopt;
+        ++at;
+        bool dated = at < s.size() && Digit(s[at]);
+        for (int month = 1; month <= 12 && !dated; ++month)
+          dated = s.compare(at, MonthName(month).size(), MonthName(month)) == 0;
+        if (!dated)
+          return std::nullopt;
+      }
+    }
+    std::string out = days[0];
+    // The last list joint reads "and" ("Mon/Wed/Fri" is "Monday, Wednesday and Friday") unless a
+    // range follows it ("Thu, Fri-Sun" is "Thursday, Friday to Sunday").
+    auto const isRange = [](std::string const & sep) { return sep == "-" || sep == "\xE2\x80\x93"; };
+    size_t lastList = seps.size();
+    if (!seps.empty() && !isRange(seps.back()))
+      lastList = seps.size() - 1;
+    for (size_t i = 0; i < seps.size(); ++i)
+    {
+      if (isRange(seps[i]))
+        out += " to ";
+      else if (seps[i] == "or")
+        out += " or ";
+      else if (seps[i] == "&" || seps[i] == "and" || i == lastList)
+        out += " and ";
+      else
+        out += ", ";
+      out += days[i + 1];
+    }
+    // "Closed Fri." keeps its full stop; "Fri. 11/7" and "Wed. at noon" lose the abbreviation's.
+    if (all.back() == '.' && (after >= s.size() || (s[after] == ' ' && after + 1 < s.size() &&
+                                                       std::isupper(static_cast<unsigned char>(s[after + 1])))))
+      out += '.';
+    return out;
+  });
 }
 
 std::string ForSpeech(std::string const & text)
@@ -2555,6 +2647,8 @@ std::string ForSpeech(std::string const & text)
   // six", "2026-11-06" too, "Nov. 6" "November sixth".
   if (HasDigit(s))
     s = Dates(s);
+  // Day abbreviations after dates, so "Sun 11/9" sees the date: "Mon-Fri" is "Monday to Friday".
+  s = Weekdays(s);
   // Ranges before dashes become pauses: "3–5" is "3 to 5", not "3, 5".
   if (HasDigit(s))
     s = Ranges(s);
