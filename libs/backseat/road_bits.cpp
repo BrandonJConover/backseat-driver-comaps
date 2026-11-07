@@ -484,7 +484,7 @@ std::vector<RoadRemark> RoadBits::Tick(RoadTick const & k, SaidLog & said, doubl
 
 std::optional<RoadRemark> RoadBits::Ambient(RoadTick const & k, SaidLog & said, double r)
 {
-  if (!k.steady || k.speedMps < kAmbientMinMps || k.tripMs < kAmbientAfterStartMs ||
+  if (!k.steady || k.jam || k.speedMps < kAmbientMinMps || k.tripMs < kAmbientAfterStartMs ||
       k.sinceSpokenMs < kAmbientSilenceMs || k.toTurnS < kAmbientMinToTurnS || m_ambientSaid >= kRoadAmbientPerTrip ||
       k.tMs - m_lastAmbientT < kRoadAmbientEveryMs)
     return std::nullopt;

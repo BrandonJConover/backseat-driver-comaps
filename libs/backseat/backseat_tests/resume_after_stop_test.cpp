@@ -8,7 +8,9 @@
 #include "backseat/navigator.hpp"
 
 #include <cstdio>
+#include <cmath>
 #include <cstdlib>
+#include <vector>
 
 using namespace backseat;
 using namespace backseat_tests;
@@ -76,5 +78,51 @@ TEST(ResumeAfterStopDoesNotPileUp)
                        len, seed, r.arrived, crowded, stale, early);
       }
   CHECK(trips == 120);
+  CHECK_EQUAL(failed, 0);
+}
+
+// Stuck dead in a jam, 3 to 15 minutes, 20 seeds each. As the jam lets go, the small talk about the
+// road (gas, weather, a viewpoint) never lands within 8 s of a traffic line. Before B64 seeds 15
+// and 20 heard "No gas stations for the next 49 miles" two seconds before "Traffic's clearing up".
+TEST(RoadTalkWaitsForTheJamToClear)
+{
+  int trips = 0, failed = 0;
+  for (double const len : {180.0, 600.0, 900.0})
+    for (uint32_t seed = 1; seed <= 20; ++seed)
+    {
+      SimOptions o{TripShape::Town, seed};
+      o.missTurns = false;
+      o.stopFromS = 50 + seed * 5;
+      o.stopS = len;
+      o.stopParked = false;
+      EngineConfig c;
+      c.rng = SeededRng(seed);
+      Navigator nav(c);
+      auto const r = SimulateTrip(nav, o);
+      ++trips;
+      double const back = o.stopFromS + o.stopS;
+      std::vector<double> road, traffic;
+      for (auto const & s : r.spoken)
+      {
+        double const q = (s.queuedMs - kStartMs) / 1000;
+        if (q < back - 10 || q > back + 150)
+          continue;
+        if (s.line.category == Category::Road)
+          road.push_back(q);
+        else if (s.line.category == Category::Traffic)
+          traffic.push_back(q);
+        if (Verbose())
+          std::fprintf(stderr, "  jam len=%.0f seed=%u +%.0fs [%s]\n", len, seed, q - back, s.line.key.c_str());
+      }
+      int crowded = 0;
+      for (double const a : road)
+        for (double const b : traffic)
+          crowded += std::abs(a - b) < 8;
+      bool const bad = !r.arrived || crowded;
+      failed += bad;
+      if (bad)
+        std::fprintf(stderr, "  jam len=%.0f seed=%u arrived=%d crowded=%d\n", len, seed, r.arrived, crowded);
+    }
+  CHECK(trips == 60);
   CHECK_EQUAL(failed, 0);
 }

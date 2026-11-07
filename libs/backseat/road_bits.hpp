@@ -115,6 +115,9 @@ struct RoadTick
   double tripMs = 0;
   /// Something else is still going (a phone call, a punchline waiting): don't start anything.
   bool busy = false;
+  /// A traffic jam hasn't been called over yet: the small talk (gas, weather, viewpoints) waits, or
+  /// "No gas for 50 miles" lands seconds before "Traffic's clearing up" as the jam lets go.
+  bool jam = false;
   /// The sun is down (and the date is known).
   bool night = false;
   /// Local hour 0..23, or -1 when unknown.

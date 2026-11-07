@@ -3518,9 +3518,12 @@ void Navigator::TrackRoadBits(Fix const & fix, RouteSnapshot const & route)
   k.steady = route.state == RouteState::OnRoute && !m_rerouting && route.turnId;
   k.toTurnS = k.steady ? SecondsToTurn(route.distToTurnM, fix.speedMps) : 0;
   // A quiet bit queued on this very fix hasn't reached the speaker yet, but it counts.
-  k.sinceSpokenMs = fix.tMs - std::max({m_lastSpokeT, m_quietTurnSince, m_lastQuietBitT});
+  // So does a remark pushed earlier on this fix ("Traffic's clearing up"): still waiting, it's not
+  // m_lastSpokeT yet (B64).
+  k.sinceSpokenMs = RemarkWaiting() ? 0 : fix.tMs - std::max({m_lastSpokeT, m_quietTurnSince, m_lastQuietBitT});
   k.tripMs = fix.tMs - m_tripStartT;
   k.busy = QuietBitBusy() || !m_punchlines.empty();
+  k.jam = m_inTraffic;
   k.night = KnowsTheDate(fix.tMs) && SunElevationDeg(fix.lat, fix.lon, fix.tMs) < kSunsetElevationDeg;
   k.localHour = KnowsTheDate(fix.tMs) ? LocalTime(fix.tMs).tm_hour : -1;
   if (!InCar(m_travelMode))

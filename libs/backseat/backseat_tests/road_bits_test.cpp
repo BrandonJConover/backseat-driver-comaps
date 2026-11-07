@@ -29,6 +29,7 @@ struct RoadDrive
   bool night = false;
   int hour = 13;
   double r = 0.9;
+  bool jam = false;
   std::vector<RoadRemark> heard;
 
   std::vector<RoadRemark> Run(int seconds, double mps)
@@ -47,6 +48,7 @@ struct RoadDrive
       k.tripMs = tripMs;
       k.night = night;
       k.localHour = hour;
+      k.jam = jam;
       auto const said_ = road.Tick(k, said, r);
       for (auto const & s : said_)
       {
@@ -177,6 +179,21 @@ TEST(NoGasForFiftyMiles)
   d.Run(60, 25);
   CHECK(HasKey(d.heard, "gas.none"));
   CHECK_EQUAL(Find(d.heard, "gas.none").vars.at("distance"), std::string("50 miles"));
+}
+
+// Pulling out of a jam the navigator hasn't called over yet: "No gas for 50 miles" waits for
+// "Traffic's clearing up" instead of landing seconds before it (loop B64).
+TEST(NoGasWaitsForTheJamToClear)
+{
+  RoadDrive d;
+  d.tripMs = 5 * 60000;
+  d.road.SetRouteAheadLookup(Ahead(d, {{Stopover::Coffee, 30000}}));
+  d.jam = true;
+  d.Run(60, 25);
+  CHECK(d.heard.empty());
+  d.jam = false;
+  d.Run(5, 25);
+  CHECK(HasKey(d.heard, "gas.none"));
 }
 
 TEST(GasAheadMeansNoGasLine)
