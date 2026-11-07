@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <climits>
 #include <functional>
 #include <initializer_list>
 #include <limits>
@@ -821,12 +822,18 @@ std::string Ordinal(long long n)
   return head + last + "th";
 }
 
+// Digits as a number. A digit run too long for long long (a garbled street name, "99999999999999999999-5")
+// stops at LLONG_MAX instead of overflowing, which is undefined behaviour; every caller treats that as huge.
 long long ToNumber(std::string const & digits)
 {
   long long n = 0;
   for (char ch : digits)
     if (std::isdigit(static_cast<unsigned char>(ch)))
+    {
+      if (n > (LLONG_MAX - 9) / 10)
+        return LLONG_MAX;
       n = n * 10 + (ch - '0');
+    }
   return n;
 }
 

@@ -4,6 +4,7 @@
 #include "check.hpp"
 
 #include "backseat/lines.hpp"
+#include "backseat/navigator.hpp"
 #include "backseat/onboarding.hpp"
 #include "backseat/plate_game.hpp"
 #include "backseat/pop_quiz.hpp"
@@ -49,6 +50,11 @@ std::vector<std::string> const kPieces = {
   "shut up", "mute", "cancel", "what's the next turn", "a", "b", "option ", "yes", "no", "Texas",
   "\xC3", "\xE2\x80", "\xF0\x9F", "\x80", "\xBF", "\xFF", "\xFE", "\xED\xA0\x80", "\xF4\x90\x80\x80",
   "😀", "\\u", "\\uD83D", "\\", "[", "]", ":", "{\"", "\"say\"", "\t/ə/", "CAPS",
+  // Dates, days, hours, fractions, rates, decades (passes added since the first soak).
+  "1/2/2026", "31/12/1999", "2026-11-06", "11/6/26", "2/30", "Nov. ", "Sept 11, ", "Oct 2026", "Mon-Fri",
+  "Tues-Thurs", "Mon/Wed/Fri", "Sat & Sun", "Sun ", "Sat, ", "Fri.", "9-5", "Open ", "daily", "½", "¼",
+  "1½", "⅔", "1/3", "3/4 mi", "1 1/2 ", "#5", "#", "$3.49/gal", "mi/hr", "km/h", "hrs", "mins", "24/7",
+  "the 90s", "'80s", "mid-70s", "10s",
 };
 
 std::string RandomText(FuzzRng & r, size_t pieces)
@@ -84,6 +90,12 @@ size_t Feed(std::string const & text)
   size_t longest = 0;
   auto keep = [&](std::string const & out) { longest = std::max(longest, out.size()); };
   keep(ForSpeech(text));
+  keep(Symbols(text));
+  keep(Decades(text));
+  keep(FractionsWithUnits(text));
+  keep(Dates(text));
+  keep(Weekdays(text));
+  keep(LocalPlaces(text));
   keep(PickSenses(text));
   keep(Ranges(text));
   keep(Foreign(text));
@@ -120,8 +132,14 @@ size_t Feed(std::string const & text)
   (void)ParseTwentyHeard(text);
   (void)AsksForTwentyQuestions(text);
   (void)TypedPhraseMatches(text, "I agree");
+  (void)DriveComesFirst(text);
+  (void)DriveComesFirst(text, true);
+  (void)AsksForPopQuiz(text);
   for (auto const & q : QuizQuestions())
+  {
     (void)ParseQuizAnswer(q, text);
+    (void)QuizAnswerTakes(q, text);
+  }
   return longest;
 }
 }  // namespace
@@ -175,6 +193,21 @@ TEST(HostileNumbersSpellWithoutOverflow)
   for (std::string d : {"", "0", "000", "99999999999999999999999", "18446744073709551616", "-1"})
     (void)RouteNumber(d);
   CHECK(!ForSpeech("Exit 99999999999999999999999999 in 99999999999999999999 miles").empty());
+}
+
+TEST(HostileDigitRunsDoNotOverflow)
+{
+  // ToNumber used to overflow (undefined behaviour, found by UBSan) on a digit run past 19 digits;
+  // it now stops at LLONG_MAX, so these are never read as opening hours, dates or years.
+  for (char const * text : {"Open 99999999999999999999-5", "Mon-Fri 9-99999999999999999999",
+                            "on 99999999999999999999/12/2026", "the 99999999999999999999s",
+                            "at 99999999999999999999:30", "$99999999999999999999.99"})
+  {
+    std::string const said = ForSpeech(text);
+    CHECK(said.find("nine to five") == std::string::npos);
+    CHECK(said.find(" to five") == std::string::npos);
+    CHECK(said.size() < 2000);
+  }
 }
 
 TEST(HostilePronunciationFilesAreRefused)

@@ -7,6 +7,7 @@ add_executable(${PROJECT_NAME}
   engine_test.cpp
   history_test.cpp
   trip_log_test.cpp
+  hostile_games_test.cpp
   hostile_text_test.cpp
   indoors_test.cpp
   main.cpp
