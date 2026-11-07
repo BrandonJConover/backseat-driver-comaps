@@ -1831,8 +1831,9 @@ TEST(WaterBridgesAreRationed)
     f.tMs = t + 3000;
     bridge = true;
     nav.OnFix(f, Far());
+    // By key: the text can't be matched to the bank once the running gag's tag is dropped.
     for (auto const & l : LinesOf(nav.TakeLines(), Category::Fear))
-      yelps += SaidLineOf(l.text, "fear.bridgeWater") ? 1 : 0;
+      yelps += l.key == "fear.bridgeWater" ? 1 : 0;
   };
   cross(0);
   cross(5 * 60000);

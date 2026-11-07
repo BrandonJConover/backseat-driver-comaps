@@ -768,6 +768,13 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
     m_stopSince.reset();
     // Rest areas and drive-thrus get their own lines when the car pulls out (road_bits.hpp).
     StopSpot const spot = m_road.CurrentStopSpot();
+    // Remarks about the stop still held for a turn ("Why are we stopping here?") are stale now:
+    // said as the car pulls away they'd land on top of this one (BI-046).
+    m_turnHeld.erase(std::remove_if(m_turnHeld.begin(), m_turnHeld.end(), [](TurnHeld const & h)
+    {
+      Category const c = h.line.category;
+      return c == Category::UnplannedStop || c == Category::LongStop || c == Category::PullOver;
+    }), m_turnHeld.end());
     if (spot != StopSpot::RestArea && spot != StopSpot::DriveThru)
       Say(m_engine->OnNav(NavEvent::Resumed(fix.tMs, stoppedMs, stayedInCar)));
     return;
@@ -1807,7 +1814,7 @@ void Navigator::TrackIdle(Fix const & fix, RouteSnapshot const & route)
   if (m_idleGapMs <= 0)
     m_idleGapMs = kIdleMinMs + (m_config.rng ? m_config.rng() : 0.5) * (kIdleMaxMs - kIdleMinMs);
   double const quietSince = std::max(m_lastSpokeT, m_tripStartT);
-  if (fix.tMs - quietSince < m_idleGapMs)
+  if (fix.tMs - quietSince < m_idleGapMs || RemarkWaiting())
     return;
   m_idleGapMs = 0;
   m_lastSpokeT = fix.tMs;
@@ -2102,8 +2109,10 @@ void Navigator::TrackMusic(double tMs, RouteSnapshot const & route)
   if (playing && !m_musicPlaying)
     m_musicStartedT = tMs;
   m_musicPlaying = playing;
+  // Near a turn, or another remark just went out (the car pulling away after a stop often has
+  // two waiting): ask at the next check instead (BI-046).
   bool const quiet = !route.turnId || route.distToTurnM >= kLongDriveQuietM;
-  if (!quiet)
+  if (!quiet || RemarkJustSaid(tMs))
     return;
   // Music's on: give it a song's worth of a chance, then judge it. Once a trip.
   if (playing && !m_musicJudged && tMs - m_musicStartedT >= kMusicJudgeAfterMs)
@@ -2969,7 +2978,7 @@ void Navigator::TrackBends(Fix const & fix, RouteSnapshot const & route)
   if (route.state != RouteState::OnRoute || fix.speedMps < kBendMinMps || m_bendJokes >= kBendJokesPerTrip ||
       QuietBitBusy() || fix.tMs - m_turnSaidAt < kBendAfterTurnMs || fix.tMs - m_lastBendT < kBendEveryMs ||
       fix.tMs - m_lastCurveAheadT < kBendAfterTurnMs || (route.turnId && route.distToTurnM < kIdleQuietM) ||
-      fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+      RemarkJustSaid(fix.tMs))
     return;
   // In the bends now, not just a sharp one on the map ahead (curve.ahead has that).
   if (!SwungLately())
@@ -2982,7 +2991,7 @@ void Navigator::TrackBends(Fix const & fix, RouteSnapshot const & route)
 void Navigator::TrackCold(Fix const & fix, RouteSnapshot const & route)
 {
   if (route.state != RouteState::OnRoute || QuietBitBusy() || (route.turnId && route.distToTurnM < kIdleQuietM) ||
-      fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+      RemarkJustSaid(fix.tMs))
     return;
   double const sinceStart = fix.tMs - m_tripStartT;
   double const tempF = m_tempC ? *m_tempC * 9 / 5 + 32 : 0;
@@ -3045,7 +3054,7 @@ void Navigator::TrackNightOut(Fix const & fix, RouteSnapshot const & route)
   bool const parked = !m_nightMoved && fix.speedMps < 1 && fix.tMs - m_tripStartT >= kNightParkedMs;
   bool const driving = m_nightMoved && route.state == RouteState::OnRoute && fix.tMs - m_tripStartT >= kColdFromMs &&
                        !(route.turnId && route.distToTurnM < kIdleQuietM);
-  if ((!parked && !driving) || QuietBitBusy() || fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+  if ((!parked && !driving) || QuietBitBusy() || RemarkJustSaid(fix.tMs))
     return;
   m_fromNightlife = false;
   std::string const key = parked ? "nightOut.tube" : "nightOut.dd";
@@ -3065,7 +3074,7 @@ void Navigator::TrackClockChange(Fix const & fix, RouteSnapshot const & route)
 {
   if (m_clockChecked || route.state != RouteState::OnRoute || !KnowsTheDate(fix.tMs) ||
       fix.tMs - m_tripStartT < kColdFromMs || QuietBitBusy() || (route.turnId && route.distToTurnM < kIdleQuietM) ||
-      fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+      RemarkJustSaid(fix.tMs))
     return;
   m_clockChecked = true;
   long const shift = UtcOffsetS(fix.tMs) - UtcOffsetS(fix.tMs - kClockChangeDays * 86400000.0);
@@ -3118,6 +3127,13 @@ std::string Navigator::BitText(BitLine const & bit)
   return Fill(tmpl, vars);
 }
 
+bool Navigator::RemarkWaiting() const
+{
+  return m_gate.HasRemark() || !m_turnHeld.empty() || !m_punchlines.empty();
+}
+
+bool Navigator::RemarkJustSaid(double t) const { return t - m_lastSpokeT < kBreathAfterTalkMs || RemarkWaiting(); }
+
 bool Navigator::FixGapAt(double t) const { return m_lastFix && t - m_lastFix->tMs > kUnseenTurnGapMs; }
 
 void Navigator::TrackClean(Fix const & fix, RouteSnapshot const & route)
@@ -3127,7 +3143,8 @@ void Navigator::TrackClean(Fix const & fix, RouteSnapshot const & route)
   if (m_said.Counter(kTurnStreakKey) != m_bits.Streak())
     m_said.SetCounter(kTurnStreakKey, m_bits.Streak());
   if (route.state != RouteState::OnRoute || fix.speedMps < MovingMps() || QuietBitBusy() ||
-      (route.turnId && route.distToTurnM < kIdleQuietM) || fix.tMs - std::max(m_lastSpokeT, m_tripStartT) < kCleanQuietMs)
+      (route.turnId && route.distToTurnM < kIdleQuietM) || fix.tMs - std::max(m_lastSpokeT, m_tripStartT) < kCleanQuietMs ||
+      RemarkWaiting())
     return;
   auto const bit = m_bits.CleanBeatDue(fix.tMs, m_tripStartT, m_engine->Incidents());
   if (!bit)

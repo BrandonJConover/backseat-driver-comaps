@@ -465,6 +465,10 @@ private:
   std::string BitText(BitLine const & bit);
   /// No fix for over 30 s before `t` (m_lastFix is still the one before this OnFix): the GPS was out.
   bool FixGapAt(double t) const;
+  /// A remark is queued, held for a turn, or a punchline is waiting out its pause.
+  bool RemarkWaiting() const;
+  /// A remark went out in the last breath, or one is waiting to (loop B51, BI-046).
+  bool RemarkJustSaid(double t) const;
   /// "You've done everything right for five minutes. I don't like it."
   void TrackClean(Fix const & fix, RouteSnapshot const & route);
   /// Straight nags and the turn reminders before the final call: fewer of them, from bigger pools

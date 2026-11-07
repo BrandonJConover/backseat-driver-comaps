@@ -282,4 +282,11 @@ std::vector<Commentary> RewriteGate::Take()
   m_queue = std::move(kept);
   return out;
 }
+bool RewriteGate::HasRemark() const
+{
+  for (auto const & e : m_queue)
+    if (e.line.priority != Priority::Nav)
+      return true;
+  return false;
+}
 }  // namespace backseat

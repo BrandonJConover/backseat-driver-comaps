@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <random>
+#include <string>
 #include <vector>
 
 int main()
@@ -16,6 +17,11 @@ int main()
     std::shuffle(tests.begin(), tests.end(), std::mt19937(static_cast<unsigned>(std::strtoul(seed, nullptr, 10))));
     std::cout << "shuffled with seed " << seed << "\n";
   }
+  // BACKSEAT_TEST_ONLY=<text> runs only the tests whose name contains it (quick probes).
+  if (char const * only = std::getenv("BACKSEAT_TEST_ONLY"))
+    tests.erase(std::remove_if(tests.begin(), tests.end(),
+                               [only](auto const & t) { return std::string(t.name).find(only) == std::string::npos; }),
+                tests.end());
   for (auto const & test : tests)
   {
     try
@@ -34,6 +40,6 @@ int main()
       std::cout << "FAIL " << test.name << "\n  exception: " << e.what() << "\n";
     }
   }
-  std::cout << backseat_tests::Registry().size() - failed << " passed, " << failed << " failed\n";
+  std::cout << tests.size() - failed << " passed, " << failed << " failed\n";
   return failed ? 1 : 0;
 }
