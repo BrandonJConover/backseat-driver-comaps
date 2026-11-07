@@ -566,3 +566,77 @@ TEST(TwentyHoldScalesWithSpeed)
     }
   }
 }
+
+// Loop B55 (BI-049): give-up, quit and hint cues inside a question about the thing aren't cues.
+TEST(TwentyCuesInsideQuestionsStayQuestions)
+{
+  for (char const * said : {"What is it made of?", "Is it small enough to hold?", "Do I give it food?",
+                            "Does it help me drive?", "Does it have no more than two legs?", "Does it help?",
+                            "Is it what you give someone on a birthday?"})
+  {
+    auto const k = ParseTwentyHeard(said).kind;
+    CHECK(k != Kind::GiveUp);
+    CHECK(k != Kind::Quit);
+    CHECK(k != Kind::Hint);
+  }
+  CHECK_EQUAL(static_cast<int>(ParseTwentyHeard("Is it small enough to hold?").trait), static_cast<int>(Trait::Small));
+  CHECK_EQUAL(static_cast<int>(ParseTwentyHeard("Do I give it food?").trait), static_cast<int>(Trait::Food));
+  struct Case
+  {
+    char const * said;
+    Kind kind;
+  };
+  for (auto const & c : std::vector<Case>{
+           {"I give up", Kind::GiveUp},
+           {"Okay, I give.", Kind::GiveUp},
+           {"just tell me what it is", Kind::GiveUp},
+           {"What is it?", Kind::GiveUp},
+           {"Fine, what is it then?", Kind::GiveUp},
+           {"So what was it", Kind::GiveUp},
+           {"I'm done", Kind::Quit},
+           {"Enough.", Kind::Quit},
+           {"That's enough of this", Kind::Quit},
+           {"No more questions", Kind::Quit},
+           {"give me a hint", Kind::Hint},
+           {"Can you help me?", Kind::Hint},
+           {"help me out here", Kind::Hint},
+           {"Help!", Kind::Hint},
+           {"I need help", Kind::Hint},
+       })
+  {
+    CHECK_EQUAL(static_cast<int>(ParseTwentyHeard(c.said).kind), static_cast<int>(c.kind));
+  }
+}
+
+// "Is it not alive?" asks the opposite; "isn't it alive?" still asks whether it's alive.
+TEST(TwentyNegatedQuestionsFlip)
+{
+  struct Case
+  {
+    char const * said;
+    Trait trait;
+    bool flipped;
+  };
+  for (auto const & c : std::vector<Case>{
+           {"Is it not alive?", Trait::Alive, true},
+           {"It's not an animal?", Trait::Animal, true},
+           {"Does it not have wheels?", Trait::Wheels, true},
+           {"Is it not bigger than a car?", Trait::BiggerThanCar, true},
+           {"Is it not smaller than a car?", Trait::BiggerThanCar, false},
+           {"Is it not safe?", Trait::Dangerous, false},
+           {"Is it not outside?", Trait::InCar, false},
+           {"Isn't it alive?", Trait::Alive, false},
+           {"Doesn't it have wheels?", Trait::Wheels, false},
+       })
+  {
+    auto const h = ParseTwentyHeard(c.said);
+    CHECK_EQUAL(static_cast<int>(h.kind), static_cast<int>(Kind::Question));
+    CHECK_EQUAL(static_cast<int>(h.trait), static_cast<int>(c.trait));
+    CHECK_EQUAL(h.flipped, c.flipped);
+  }
+  // The game answers the flipped question: the deer is alive, so "is it not alive" is a no.
+  auto g = TqGameWith("a deer", {"forest"});
+  auto const r = g.OnDriverSaid("Is it not alive?", 1000, 0);
+  CHECK(r.has_value());
+  CHECK_EQUAL(r->key, std::string("twenty.no"));
+}
