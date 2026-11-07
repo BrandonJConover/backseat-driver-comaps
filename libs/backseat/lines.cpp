@@ -22,6 +22,7 @@ namespace
 std::atomic<TravelMode> g_travelMode{TravelMode::Drive};
 std::atomic<Housing> g_housing{Housing::Unknown};
 std::atomic<bool> g_metric{false};
+std::atomic<bool> g_leftHand{false};
 
 /// `text` lowercased with every run of non-word characters turned into one space, padded with
 /// spaces, so " word " finds whole words.
@@ -172,20 +173,102 @@ std::string MetricWording(std::string const & text)
   return out;
 }
 
+bool DrivesOnLeft(std::string const & country)
+{
+  // The map files' top-level names, their usual spellings, and ISO codes.
+  static char const * const kLeft[] = {
+      "uk", "gb", "united kingdom", "great britain", "england", "scotland", "wales", "northern ireland",
+      "ireland", "ie", "isle of man", "jersey", "guernsey", "australia", "au", "new zealand", "nz", "japan",
+      "jp", "india", "in", "south africa", "za", "indonesia", "id", "thailand", "th", "malaysia", "my",
+      "singapore", "sg", "hong kong", "hk", "macau", "macao", "pakistan", "pk", "bangladesh", "bd",
+      "sri lanka", "lk", "nepal", "np", "bhutan", "kenya", "ke", "tanzania", "uganda", "zambia",
+      "zimbabwe", "botswana", "namibia", "lesotho", "eswatini", "swaziland", "mozambique", "malawi",
+      "mauritius", "cyprus", "cy", "malta", "mt", "jamaica", "jm", "bahamas", "barbados", "trinidad and tobago",
+      "guyana", "suriname", "fiji", "papua new guinea", "brunei", "east timor", "timor-leste", "maldives",
+      "seychelles", "falkland islands", "bermuda", "cayman islands"};
+  std::string name;
+  for (unsigned char const ch : country)
+  {
+    if (ch == '_' || ch == ',')  // "UK_England", "New Zealand_North"
+      break;
+    name += static_cast<char>(std::tolower(ch));
+  }
+  while (!name.empty() && name.back() == ' ')
+    name.pop_back();
+  if (name.empty())
+    return false;
+  // A map region of the country ("New Zealand North") counts; two-letter codes only match whole.
+  return std::any_of(std::begin(kLeft), std::end(kLeft),
+                     [&](char const * c)
+                     {
+                       std::string const code = c;
+                       return name == code ||
+                              (code.size() > 2 && name.rfind(code + " ", 0) == 0);
+                     });
+}
+
+void SetLineDriveSide(bool leftHand) { g_leftHand = leftHand; }
+
+std::string DriveSideWording(std::string const & text)
+{
+  // Whole sentences, so a lane call ("Left lane, please.") or a turn is never touched: only the jokes
+  // that take the driver's seat or the passing lane for granted. The two seat jokes trade places, so
+  // "you turned toward yourself" stays true on the other side of the car.
+  static std::pair<char const *, char const *> const kPhrases[] = {
+      {"Left is the side with the driver. You're sitting on it right now.",
+       "Left is the side with the passenger seat. Usually. You turned toward yourself."},
+      {"Right is the side with the passenger seat. Usually. You turned toward yourself.",
+       "Right is the side with the driver. You're sitting on it right now."},
+      {"The left lane is for passing.", "The right lane is for passing."},
+      {"Like you drive in the left lane.", "Like you drive in the right lane."},
+      {"don't drive in the left lane at forty", "don't drive in the right lane at forty"},
+  };
+  for (auto const & [from, to] : kPhrases)
+  {
+    // One swap per line: the seat jokes map onto each other, so a second pass would undo the first.
+    size_t const at = text.find(from);
+    if (at == std::string::npos)
+      continue;
+    std::string out = text;
+    out.replace(at, std::char_traits<char>::length(from), to);
+    return out;
+  }
+  return text;
+}
+
 namespace
 {
-/// The line table as a metric driver hears it: built once, the first time it's needed.
-LineTable const & MetricLineData()
+/// The line table as a metric and/or left-hand-traffic driver hears it: built once each, the first
+/// time it's needed.
+LineTable const & LineDataFor(bool metric, bool leftHand)
 {
-  static LineTable const table = []
+  auto const build = [](bool m, bool l)
   {
     LineTable t = LineData();
     for (auto & [key, tiers] : t)
       for (auto & lines : tiers)
         for (auto & line : lines)
-          line = MetricWording(line);
+        {
+          if (m)
+            line = MetricWording(line);
+          if (l)
+            line = DriveSideWording(line);
+        }
     return t;
-  }();
+  };
+  if (!metric && !leftHand)
+    return LineData();
+  if (metric && !leftHand)
+  {
+    static LineTable const table = build(true, false);
+    return table;
+  }
+  if (!metric)
+  {
+    static LineTable const table = build(false, true);
+    return table;
+  }
+  static LineTable const table = build(true, true);
   return table;
 }
 
@@ -194,7 +277,8 @@ LineTable const & MetricLineData()
 std::vector<std::string> const & LinesFor(std::string const & key, int tier)
 {
   bool const metric = g_metric;
-  LineTable const & table = metric ? MetricLineData() : LineData();
+  bool const leftHand = g_leftHand;
+  LineTable const & table = LineDataFor(metric, leftHand);
   // A key or tier that isn't in the table (a typo, a key from a newer line bank) says nothing rather
   // than taking the app down mid-drive; the trace shows which one.
   static std::vector<std::string> const kNone;
@@ -221,7 +305,8 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
   std::string const suffix = std::string(".") + TravelModeName(mode);
   std::lock_guard lock(mutex);
   auto const [it, added] =
-      cache.try_emplace(key + suffix + "." + HousingName(housing) + std::to_string(tier) + (metric ? "m" : ""));
+      cache.try_emplace(key + suffix + "." + HousingName(housing) + std::to_string(tier) + (metric ? "m" : "") +
+                         (leftHand ? "L" : ""));
   if (!added)
     return it->second;
   auto & fitting = it->second;

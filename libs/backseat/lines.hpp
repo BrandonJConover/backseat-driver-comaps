@@ -67,6 +67,18 @@ void SetLineMetric(bool metric);
 /// glory") is "Three meters of glory"). Lines without any come back as they are.
 std::string MetricWording(std::string const & text);
 
+/// Whether traffic keeps left in `country`, as the map files name it ("UK", "Australia", "Japan";
+/// "UK_England" and ISO codes like "GB" work too). Unknown or empty is right-hand traffic.
+bool DrivesOnLeft(std::string const & country);
+/// Whether LinesFor() answers for a country that drives on the left: the few lines that assume the
+/// driver sits on the left and passes on the left ("The left lane is for passing") come back
+/// mirrored. Off (right-hand traffic) until told.
+void SetLineDriveSide(bool leftHand);
+/// `text` with its right-hand-traffic assumptions mirrored for left-hand traffic
+/// (DriveSideWording("The left lane is for passing.") is "The right lane is for passing.").
+/// Lines without any come back as they are. Real lane and turn calls are never changed.
+std::string DriveSideWording(std::string const & text);
+
 /// Templates for `key` at `tier` (0..2), for the current travel mode: what fits it, plus `key`.walk,
 /// `key`.bike, `key`.hike (or else `key`.walk) or `key`.offroad if there are any, or mode.generic when
 /// nothing fits. Lines that don't fit the driver's housing are left out too, unless that would leave

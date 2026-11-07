@@ -254,8 +254,13 @@ public:
   Units GetUnits() const { return m_config.units; }
   /// The country the car is in, as the map files name it ("US", "Canada", "UK"). Decides which
   /// holidays get a line: Canada gets Canada Day and its own Thanksgiving, not the Fourth of July.
-  /// Empty (unknown) is treated as the US.
-  void SetCountry(std::string country) { m_country = std::move(country); }
+  /// Empty (unknown) is treated as the US. A country that drives on the left also gets the few
+  /// drive-side jokes mirrored ("The right lane is for passing").
+  void SetCountry(std::string country)
+  {
+    SetLineDriveSide(DrivesOnLeft(country));
+    m_country = std::move(country);
+  }
   /// Lets the navigator name the place of an unplanned stop ("Why are we stopping for gas?").
   void SetPlaceLookup(PlaceLookup lookup) { m_placeLookup = std::move(lookup); }
   /// Lets the license plate game know which state the car is in ("a Colorado plate in Colorado?").
