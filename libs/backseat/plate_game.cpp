@@ -146,10 +146,19 @@ int Excitement(std::string const & code, std::optional<std::string> const & here
 }
 }  // namespace
 
-std::optional<std::string> MatchPlateRegion(std::string const & spoken)
+namespace
 {
-  std::string const words = Words(spoken);
-  std::string best;
+struct RegionMatch
+{
+  std::string code;
+  /// Where the name starts and ends in Words(spoken), at the padding spaces around it.
+  size_t begin = 0;
+  size_t end = 0;
+};
+
+std::optional<RegionMatch> FindRegion(std::string const & words)
+{
+  RegionMatch best;
   size_t bestLen = 0;
   // Longest name wins: "west virginia" over "virginia", "new mexico" over "mexico".
   for (auto const & r : kRegions)
@@ -160,16 +169,78 @@ std::optional<std::string> MatchPlateRegion(std::string const & spoken)
     for (auto const & n : names)
     {
       std::string const w = Words(n.rfind("the ", 0) == 0 ? n.substr(4) : n);
-      if (w.size() > bestLen && words.find(w) != std::string::npos)
+      size_t const at = words.find(w);
+      if (w.size() > bestLen && at != std::string::npos)
       {
-        best = r.code;
+        best = {r.code, at, at + w.size() - 1};
         bestLen = w.size();
       }
     }
   }
-  if (best.empty())
+  if (best.code.empty())
     return {};
   return best;
+}
+
+bool EndsWith(std::string const & s, std::string const & tail)
+{
+  return s.size() >= tail.size() && s.compare(s.size() - tail.size(), tail.size(), tail) == 0;
+}
+}  // namespace
+
+std::optional<std::string> MatchPlateRegion(std::string const & spoken)
+{
+  auto const match = FindRegion(Words(spoken));
+  if (!match)
+    return {};
+  return match->code;
+}
+
+bool NegatedSighting(std::string const & spoken)
+{
+  std::string const words = Words(spoken);
+  auto const match = FindRegion(words);
+  if (!match)
+    return false;
+  // The words before the name, without the filler between a negation and the name ("not a single").
+  std::string before = words.substr(0, match->begin + 1);
+  for (bool trimmed = true; trimmed;)
+  {
+    trimmed = false;
+    for (char const * filler : {" a ", " an ", " any ", " one ", " single ", " more ", " other ", " the "})
+      if (EndsWith(before, filler) && before.size() > std::string(filler).size() - 1)
+      {
+        before.resize(before.size() - std::string(filler).size() + 1);
+        trimmed = true;
+      }
+  }
+  // Apostrophes are dropped by Words(): "haven't" is "havent".
+  for (char const * negation : {" not ", " havent seen ", " hasnt seen ", " hadnt seen ", " didnt see ", " didnt spot ",
+                                " never seen ", " never saw ", " not seen ", " dont see ", " cant see ", " cant find ",
+                                " no sign of ", " yet to see ", " still no ", " without "})
+    if (EndsWith(before, negation))
+      return true;
+  // A bare "no" only when the sentence goes on about plates: "no Texas plates yet", not "No! Texas!".
+  if (EndsWith(before, " no "))
+  {
+    std::string const after = words.substr(match->end);
+    for (char const * tail : {" plate ", " plates ", " yet ", " so far ", " today ", " ones "})
+      if (after.find(tail) != std::string::npos)
+        return true;
+  }
+  return false;
+}
+
+bool QuitsPlateGame(std::string const & spoken)
+{
+  std::string const w = Words(spoken);
+  for (char const * cue : {"stop playing", "quit playing", "done playing", "i'm done", "im done", "i am done",
+                           "i quit", "no more plates", "enough plates", "enough of the plates", "enough with the plates",
+                           "game over", "stop the game", "end the game", "quit the game", "stop the plate game",
+                           "done with the game", "done with plates", "done with the plates"})
+    if (HasWord(w, cue))
+      return true;
+  return false;
 }
 
 std::string PlateRegionName(std::string const & code)
@@ -276,6 +347,7 @@ void PlateGame::NewTrip(std::string routeKey)
   m_state = State::Idle;
   m_trip.clear();
   m_repeatedThisTrip = false;
+  m_lastExchangeMs.reset();
 }
 
 bool PlateGame::ShouldOffer(int tripsOnRoute, double distToManeuverM, int frustration)
@@ -289,16 +361,35 @@ PlateGame::Reply PlateGame::Offer(int tier)
   return Make("plateGame.offer", tier);
 }
 
-std::optional<PlateGame::Reply> PlateGame::OnDriverSaid(std::string const & spoken, int tier, bool parked)
+std::optional<PlateGame::Reply> PlateGame::OnDriverSaid(std::string const & spoken, int tier, bool parked,
+                                                        std::optional<double> tMs)
 {
-  if (m_state == State::Idle || m_state == State::Declined)
+  if (m_state == State::Idle || m_state == State::Declined || m_state == State::Over)
     return {};
-  auto const code = MatchPlateRegion(spoken);
+  bool const recent = !tMs || (m_lastExchangeMs && *tMs - *m_lastExchangeMs <= kChatterWindowMs);
+  auto const answered = [&](Reply r) -> std::optional<Reply>
+  {
+    if (tMs)
+      m_lastExchangeMs = *tMs;
+    return r;
+  };
+  if (m_state == State::Playing && QuitsPlateGame(spoken))
+  {
+    // Called off mid-drive: the tally now, and nothing about plates for the rest of the trip.
+    auto r = Tally(tier);
+    m_state = State::Over;
+    return answered(std::move(r));
+  }
+  auto code = MatchPlateRegion(spoken);
+  // "Haven't seen Ohio yet" is talk about the game, not a plate.
+  bool const negated = code && NegatedSighting(spoken);
+  if (negated)
+    code.reset();
   if (code && parked)
   {
     // Brandon's rule: a parking lot is a buffet of plates. Nothing counts there.
     m_state = State::Playing;
-    return Make("plateGame.parked", tier);
+    return answered(Make("plateGame.parked", tier));
   }
   if (m_state == State::Offered)
   {
@@ -306,34 +397,46 @@ std::optional<PlateGame::Reply> PlateGame::OnDriverSaid(std::string const & spok
     if (code)
     {
       m_state = State::Playing;
-      return Plate(*code, tier);
+      return answered(Plate(*code, tier));
     }
+    if (negated)
+      return {};
     switch (ParseYesNo(spoken))
     {
-    case YesNo::Yes: m_state = State::Playing; return Make("plateGame.accepted", tier);
+    case YesNo::Yes: m_state = State::Playing; return answered(Make("plateGame.accepted", tier));
     case YesNo::No:
     {
       m_state = State::Declined;
       m_log.grudges++;
       auto r = Make("plateGame.declined", tier);
       r.grudge = true;
-      return r;
+      return answered(std::move(r));
     }
     case YesNo::Unclear: return {};
     }
   }
   if (code)
-    return Plate(*code, tier);
-  // "I saw a Narnia plate": a plate, but no such place. Anything else we just didn't catch.
+    return answered(Plate(*code, tier));
+  if (negated)
+    return {};
+  // "I saw a Narnia plate": a plate, but no such place.
   std::string const w = Words(spoken);
   if (HasWord(w, "plate") || HasWord(w, "plates") || HasWord(w, "license"))
   {
     m_log.grudges++;
     auto r = Make("plateGame.madeUp", tier);
     r.grudge = true;
-    return r;
+    return answered(std::move(r));
   }
-  return Make("plateGame.unheard", tier);
+  // A sighting we didn't catch, or anything said right after an exchange: ask again. Other chatter
+  // ("ugh, this traffic") isn't for the game.
+  for (char const * seen : {"saw", "see", "seen", "spotted", "there's one", "theres one", "got one",
+                            "another one"})
+    if (HasWord(w, seen))
+      return answered(Make("plateGame.unheard", tier));
+  if (recent)
+    return answered(Make("plateGame.unheard", tier));
+  return {};
 }
 
 PlateGame::Reply PlateGame::Plate(std::string const & code, int tier)
@@ -364,6 +467,11 @@ std::optional<PlateGame::Reply> PlateGame::WrapUp(int tier)
 {
   if (m_state != State::Playing)
     return {};
+  return Tally(tier);
+}
+
+PlateGame::Reply PlateGame::Tally(int tier)
+{
   if (m_trip.empty())
     return Make("plateGame.wrapUpNone", tier);
   std::string best = m_trip.front();

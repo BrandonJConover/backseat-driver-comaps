@@ -2532,7 +2532,8 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
         return;
       }
   // "Let's play a game": not now. Then, a few minutes later, it's the GPS's idea.
-  if (m_plates.GetState() == PlateGame::State::Idle || m_plates.GetState() == PlateGame::State::Declined)
+  if (m_plates.GetState() == PlateGame::State::Idle || m_plates.GetState() == PlateGame::State::Declined ||
+      m_plates.GetState() == PlateGame::State::Over)
   {
     bool const negated = words.find(" don't ") != std::string::npos || words.find(" dont ") != std::string::npos ||
                          words.find(" not ") != std::string::npos || words.find(" don t ") != std::string::npos;
@@ -2552,7 +2553,7 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
         return;
       }
   }
-  auto const reply = m_plates.OnDriverSaid(text, Tier(), Parked());
+  auto const reply = m_plates.OnDriverSaid(text, Tier(), Parked(), m_lastT);
   if (!reply)
     return;
   if (m_plates.GetState() == PlateGame::State::Playing)

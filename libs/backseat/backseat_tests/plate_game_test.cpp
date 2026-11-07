@@ -321,3 +321,129 @@ TEST(PlateHoldScalesWithSpeed)
     }
   }
 }
+
+namespace
+{
+/// A game on, the driver already playing, at t = 0.
+PlateGame PlayingGame()
+{
+  PlateGame game(SeededRng(3));
+  game.NewTrip("home>work");
+  game.SetHere(Code("CO"));
+  game.Offer(0);
+  game.OnDriverSaid("yes", 0, false, 0.0);
+  return game;
+}
+}  // namespace
+
+TEST(PlateGameCanBeQuit)
+{
+  for (char const * cue : {"stop playing", "I'm done", "no more plates", "enough plates", "game over",
+                           "stop the game", "ok I quit", "Im done with this"})
+  {
+    PlateGame game = PlayingGame();
+    CHECK_EQUAL(game.OnDriverSaid("Texas", 0, false, 1000.0)->key, std::string("plateGame.newFar"));
+    auto r = game.OnDriverSaid(cue, 0, false, 2000.0);
+    CHECK(r.has_value());
+    CHECK_EQUAL(r->key, std::string("plateGame.wrapUp"));
+    CHECK(r->text.find("Texas") != std::string::npos);
+    CHECK(game.GetState() == PlateGame::State::Over);
+    // Nothing more about plates this trip, and no second tally at arrival.
+    CHECK(!game.OnDriverSaid("Ohio", 0, false, 3000.0));
+    CHECK(!game.OnDriverSaid("which state", 0, false, 3500.0));
+    CHECK(!game.WrapUp(0));
+    CHECK(game.Log().lifetime == std::set<std::string>{"TX"});
+    // A new trip starts fresh.
+    game.NewTrip("home>work");
+    CHECK(game.GetState() == PlateGame::State::Idle);
+  }
+  // Quitting before a single plate: the empty tally.
+  PlateGame none = PlayingGame();
+  CHECK_EQUAL(none.OnDriverSaid("game over", 0, false, 1000.0)->key, std::string("plateGame.wrapUpNone"));
+  // "Done" alone, mid-sentence about something else, isn't quitting.
+  CHECK(!QuitsPlateGame("are we done with the highway yet"));
+  CHECK(!QuitsPlateGame("Texas"));
+}
+
+TEST(PlateGameIgnoresLaterChatter)
+{
+  PlateGame game = PlayingGame();
+  CHECK_EQUAL(game.OnDriverSaid("Texas", 0, false, 10000.0)->key, std::string("plateGame.newFar"));
+  // Right after an exchange, a mumble is probably a plate we missed.
+  CHECK_EQUAL(game.OnDriverSaid("hmm what", 0, false, 25000.0)->key, std::string("plateGame.unheard"));
+  // Five minutes later, chatter isn't for the game.
+  CHECK(!game.OnDriverSaid("ugh this traffic", 0, false, 25000.0 + 5 * 60000.0));
+  CHECK(!game.OnDriverSaid("what time is it", 0, false, 25000.0 + 6 * 60000.0));
+  // Unless it sounds like a sighting.
+  CHECK_EQUAL(game.OnDriverSaid("I saw one", 0, false, 25000.0 + 7 * 60000.0)->key, std::string("plateGame.unheard"));
+  CHECK_EQUAL(game.OnDriverSaid("there's one", 0, false, 25000.0 + 9 * 60000.0)->key,
+              std::string("plateGame.unheard"));
+  // Plates themselves still count any time.
+  CHECK_EQUAL(game.OnDriverSaid("Ohio", 0, false, 25000.0 + 20 * 60000.0)->key, std::string("plateGame.newFar"));
+  CHECK_EQUAL(game.OnDriverSaid("a Narnia plate", 0, false, 25000.0 + 40 * 60000.0)->key,
+              std::string("plateGame.madeUp"));
+  // Without a time (old callers) every mumble still gets "which state?".
+  CHECK_EQUAL(game.OnDriverSaid("hmm", 0)->key, std::string("plateGame.unheard"));
+}
+
+TEST(PlateGameDoesntCountNegatedSightings)
+{
+  for (char const * said : {"no Texas plates yet", "haven't seen Ohio", "not a Georgia plate",
+                            "I didn't see a single Utah", "still no Nevada", "never seen an Alaska plate",
+                            "no Hawaii so far"})
+  {
+    CHECK(NegatedSighting(said));
+    PlateGame game = PlayingGame();
+    CHECK(!game.OnDriverSaid(said, 0, false, 30 * 60000.0));
+    CHECK(game.Log().lifetime.empty());
+  }
+  for (char const * said : {"Texas!", "I see a Texas plate", "no way, Hawaii!", "No! Texas!", "nope, Ohio",
+                            "not bad, an Oregon plate", "there's a Utah one"})
+  {
+    CHECK(!NegatedSighting(said));
+    PlateGame game = PlayingGame();
+    auto r = game.OnDriverSaid(said, 0, false, 1000.0);
+    CHECK(r.has_value());
+    CHECK_EQUAL(game.Log().lifetime.size(), size_t(1));
+  }
+  // Negated in the offer: neither a yes nor a plate.
+  PlateGame offered(SeededRng(3));
+  offered.NewTrip("home>work");
+  offered.Offer(0);
+  CHECK(!offered.OnDriverSaid("I haven't seen Texas yet", 0, false, 1000.0));
+  CHECK(offered.GetState() == PlateGame::State::Offered);
+}
+
+TEST(NavigatorPlateGameQuitFreesThanks)
+{
+  EngineConfig c;
+  c.rng = SeededRng(5);
+  Navigator nav(c, Commutes(3));
+  nav.SetRegionLookup([](LatLon const &) { return std::optional<std::string>("Colorado"); });
+  nav.OnFix(PlateFix(0), PlateRoute(5000));
+  nav.OnFix(PlateFix(70000), PlateRoute(4800));
+  CHECK_EQUAL(PlateLines(nav.TakeLines()).size(), size_t(1));
+  nav.OnDriverSaid(85000, "sure");
+  nav.OnDriverSaid(90000, "Texas");
+  nav.TakeLines();
+  nav.OnDriverSaid(95000, "I'm done");
+  auto quit = PlateLines(nav.TakeLines());
+  CHECK_EQUAL(quit.size(), size_t(1));
+  CHECK(quit[0].text.find("Texas") != std::string::npos);
+  // Five minutes on, chatter gets nothing, and "thanks" is thanks again.
+  nav.OnFix(PlateFix(400000), PlateRoute(4000));
+  nav.TakeLines();
+  nav.OnDriverSaid(400500, "Ohio");
+  CHECK(PlateLines(nav.TakeLines()).empty());
+  CHECK(nav.GetPlateLog().lifetime == std::set<std::string>{"TX"});
+  nav.OnDriverSaid(401000, "thanks");
+  bool thanked = false;
+  for (auto const & l : nav.TakeLines())
+    thanked = thanked || l.key == "thanked";
+  CHECK(thanked);
+  // Arrival doesn't tally a second time.
+  RouteSnapshot done = PlateRoute(4000);
+  done.state = RouteState::Finished;
+  nav.OnFix(PlateFix(500000), done);
+  CHECK(PlateLines(nav.TakeLines()).empty());
+}
