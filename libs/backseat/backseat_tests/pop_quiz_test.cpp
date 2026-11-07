@@ -434,3 +434,42 @@ TEST(QuizHearsCurlyApostrophesAndDashes)
                                  "Canberra"),
               2);
 }
+
+TEST(QuizHearsNotAndChangesOfMind)
+{
+  // Ruling a choice out never picks it.
+  CHECK_EQUAL(PqPick("stopSides", "not B"), -1);
+  CHECK_EQUAL(PqPick("canberra", "not Sydney"), -1);
+  CHECK_EQUAL(PqPick("canberra", "it's definitely not Sydney"), -1);
+  CHECK_EQUAL(PqPick("canberra", "I don't think it's C"), -1);
+  CHECK_EQUAL(PqPick("canberra", "it isn't Melbourne"), -1);
+  // Two ruled out never names the third: the driver didn't say it.
+  CHECK_EQUAL(PqPick("canberra", "not A, not B"), -1);
+  CHECK_EQUAL(PqPick("canberra", "not Sydney and not Melbourne"), -1);
+  // Ruled out, then named.
+  CHECK_EQUAL(PqPick("canberra", "not A, B"), 1);
+  CHECK_EQUAL(PqPick("canberra", "it's not Sydney, it's Canberra"), 2);
+  CHECK_EQUAL(PqPick("merge", "it's not the speed of traffic, it's way under"), 0);
+  CHECK_EQUAL(PqPick("merge", "not way under, same as everyone"), 1);
+  CHECK_EQUAL(PqPick("brokenWhite", "never cross it"), 1);
+  CHECK_EQUAL(PqPick("brokenWhite", "not never cross it, you may change lanes"), 0);
+  CHECK_EQUAL(PqPick("stopSides", "can't be six, it's eight"), 1);
+  // Changes of mind: the last pick wins.
+  CHECK_EQUAL(PqPick("canberra", "A, no wait, C"), 2);
+  CHECK_EQUAL(PqPick("canberra", "Sydney. Actually, Canberra"), 2);
+  CHECK_EQUAL(PqPick("canberra", "B. I mean C"), 2);
+  CHECK_EQUAL(PqPick("stopSides", "six, scratch that, eight"), 1);
+  CHECK_EQUAL(PqPick("canberra", "Melbourne, wait, no, Sydney"), 0);
+  CHECK_EQUAL(PqPick("canberra", "B, actually"), 1);
+  CHECK(ParseQuizAnswer(PqQuestion("canberra"), "A, no wait, I don't know").kind == QuizHeard::Kind::GiveUp);
+  // What already worked still does.
+  CHECK(ParseQuizAnswer(PqQuestion("canberra"), "I don't know").kind == QuizHeard::Kind::GiveUp);
+  CHECK(ParseQuizAnswer(PqQuestion("canberra"), "I'm not sure").kind == QuizHeard::Kind::Unclear);
+  CHECK_EQUAL(PqPick("canberra", "I'm not sure, I think it's Canberra"), 2);
+  CHECK_EQUAL(PqPick("canberra", "a or b"), -1);
+  // "Not at all" is a choice of its own.
+  CHECK_EQUAL(PqPick("eiffel", "not at all"), 2);
+  CHECK_EQUAL(PqPick("eiffel", "I think not"), 2);
+  CHECK_EQUAL(PqPick("eiffel", "six inches"), 0);
+  CHECK_EQUAL(PqPick("eiffel", "C"), 2);
+}

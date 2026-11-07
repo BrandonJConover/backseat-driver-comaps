@@ -3,9 +3,11 @@
 #include "backseat/types.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <set>
 #include <utility>
+#include <vector>
 
 namespace backseat
 {
@@ -211,9 +213,11 @@ std::set<std::string> QuizChoiceWords(char const * choice)
 }
 }  // namespace
 
-QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken)
+namespace
 {
-  auto const words = QuizWords(spoken);
+/// One answer with no "not" and no change of mind in it.
+QuizHeard ParsePlainQuizAnswer(QuizQuestion const & q, std::vector<std::string> const & words)
+{
   QuizHeard heard;
   if (words.empty())
     return heard;
@@ -307,6 +311,136 @@ QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken)
     if (padded.find(cue) != std::string::npos)
       return {QuizHeard::Kind::GiveUp, -1};
   return heard;
+}
+
+bool QuizNegationWord(std::string const & w)
+{
+  return QuizAmong(w, {"not", "isnt", "never", "dont", "aint", "wasnt", "cant"});
+}
+
+/// Where the driver changed their mind ("A, no wait, C", "B. Actually, C"): the index just past the last
+/// cue, or 0 when there is none.
+size_t QuizAfterCorrection(std::vector<std::string> const & words)
+{
+  static std::vector<std::vector<char const *>> const kCues = {
+      {"no", "wait"},  {"wait", "no"}, {"wait"},          {"i", "mean"},   {"actually"},     {"scratch", "that"},
+      {"make", "that"}, {"or", "rather"}, {"change", "that", "to"}, {"change", "it", "to"},
+      {"change", "my", "answer", "to"}, {"no", "no"}, {"sorry"}, {"hold", "on"}};
+  size_t after = 0;
+  for (size_t k = 0; k < words.size(); ++k)
+    for (auto const & cue : kCues)
+    {
+      if (k + cue.size() > words.size())
+        continue;
+      bool match = true;
+      for (size_t j = 0; j < cue.size() && match; ++j)
+        match = words[k + j] == cue[j];
+      if (match)
+        after = std::max(after, k + cue.size());
+    }
+  return after;
+}
+
+/// Ruling choices out: "not B", "it's not the speed of traffic, it's the octagon", "I don't think it's C".
+/// The words after each "not" that name one choice are taken out and that choice can't be the pick; with
+/// nothing else named it stays Unclear (two choices ruled out never names the third).
+QuizHeard ParseQuizNegations(QuizQuestion const & q, std::vector<std::string> const & words)
+{
+  // A question whose choice is "not at all" or "never cross it" hears that word as the choice.
+  std::array<std::set<std::string>, 3> own;
+  for (size_t i = 0; i < 3; ++i)
+    own[i] = QuizChoiceWords(q.choices[i]);
+  auto const inChoice = [&own](std::string const & w, int skip)
+  {
+    for (int i = 0; i < 3; ++i)
+      if (i != skip && own[i].count(w))
+        return true;
+    return false;
+  };
+
+  std::vector<std::string> rest;
+  std::array<bool, 3> ruledOut{};
+  bool any = false;
+  for (size_t k = 0; k < words.size();)
+  {
+    bool const negation = QuizNegationWord(words[k]) && !inChoice(words[k], -1);
+    if (!negation)
+    {
+      rest.push_back(words[k++]);
+      continue;
+    }
+    size_t start = k + 1;
+    while (start < words.size() && QuizAmong(words[start], {"think", "its", "it", "is", "be", "say", "going"}))
+      ++start;
+    // The shortest run that names a choice, then as far as it keeps naming the same one.
+    int picked = -1;
+    size_t end = start;
+    for (size_t e = start + 1; e <= words.size() && e <= start + 6; ++e)
+    {
+      if (e > start + 1 &&
+          (QuizAmong(words[e - 1], {"but", "so", "its", "it", "i", "maybe", "probably", "then", "is", "must"}) ||
+           QuizNegationWord(words[e - 1])))
+        break;
+      auto const heard = ParsePlainQuizAnswer(q, {words.begin() + start, words.begin() + e});
+      if (heard.kind != QuizHeard::Kind::Choice)
+        continue;
+      if (picked >= 0 && heard.choice != picked)
+        break;
+      // "not way under, same": a word of another choice starts the next thought.
+      if (picked >= 0 && !heard.named && inChoice(words[e - 1], picked))
+        break;
+      picked = heard.choice;
+      end = e;
+    }
+    if (picked < 0)
+    {
+      // "I'm not sure", "don't know": not ruling anything out.
+      rest.push_back(words[k++]);
+      continue;
+    }
+    ruledOut[picked] = true;
+    any = true;
+    k = end;
+  }
+  if (!any)
+    return ParsePlainQuizAnswer(q, words);
+  auto const heard = ParsePlainQuizAnswer(q, rest);
+  if (heard.kind == QuizHeard::Kind::Choice && ruledOut[heard.choice])
+    return {};
+  return heard;
+}
+}  // namespace
+
+QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken)
+{
+  auto const words = QuizWords(spoken);
+  if (words.empty())
+    return {};
+  // The whole answer said word for word wins first ("not at all" is a choice).
+  auto const whole = ParsePlainQuizAnswer(q, words);
+  if (whole.kind == QuizHeard::Kind::Choice && whole.named)
+  {
+    bool hasCue = QuizAfterCorrection(words) > 0;
+    for (auto const & w : words)
+      hasCue = hasCue || QuizNegationWord(w);
+    if (!hasCue)
+      return whole;
+  }
+  size_t const after = QuizAfterCorrection(words);
+  if (after > 0)
+  {
+    std::vector<std::string> const tail(words.begin() + after, words.end());
+    if (!tail.empty())
+    {
+      auto const heard = ParseQuizNegations(q, tail);
+      if (heard.kind != QuizHeard::Kind::Unclear)
+        return heard;
+    }
+    // "B, actually." The change of mind named nothing new: hear what came before it.
+    std::vector<std::string> const head(words.begin(), words.begin() + after);
+    return ParseQuizNegations(q, head);
+  }
+  return ParseQuizNegations(q, words);
 }
 
 bool AsksToRepeatQuiz(std::string const & spoken)
