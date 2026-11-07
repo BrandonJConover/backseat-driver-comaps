@@ -3716,7 +3716,7 @@ std::optional<Navigator::QuizCard> Navigator::PopQuizCard() const
 namespace
 {
 /// A question about the drive itself: "where do I turn?", "which exit?", "is it this lane?".
-bool AsksAboutTheDrive(std::string const & spoken)
+bool AsksAboutTheDrive(std::string const & spoken, bool aboutIt)
 {
   std::string words = " ";
   for (unsigned char const ch : spoken)
@@ -3730,9 +3730,38 @@ bool AsksAboutTheDrive(std::string const & spoken)
     question = question || words.find(w) != std::string::npos;
   if (!question)
     return false;
+  // "Do you have to go somewhere to get it?" asks about the thing, not the route; "do I go left?" doesn't.
+  bool const looseGo = aboutIt && words.find(" left ") == std::string::npos &&
+                       words.find(" right ") == std::string::npos && words.find(" straight ") == std::string::npos;
   for (char const * w : {" turn ", " turning ", " exit ", " lane ", " lanes ", " merge ", " ramp ", " get off ", " go ",
                          " going ", " way "})
-    if (words.find(w) != std::string::npos)
+    if (words.find(w) != std::string::npos && !(looseGo && (w == std::string(" go ") || w == std::string(" going "))))
+      return true;
+  return false;
+}
+
+/// A yes/no question about "it": "Can you use it on foot?", "Do you have to go to a gas station to get
+/// it?". Mid-game, that's about the thing, whatever else it mentions.
+bool AsksAboutIt(std::string const & spoken)
+{
+  std::string words = " ";
+  for (unsigned char const ch : spoken)
+    if (std::isalnum(ch))
+      words += static_cast<char>(std::tolower(ch));
+    else if (ch != '\'' && ch < 0x80)
+      words += ' ';
+  words += ' ';
+  if (words.find(" it ") == std::string::npos)
+    return false;
+  if (spoken.find('?') != std::string::npos)
+    return true;
+  size_t const first = words.find_first_not_of(' ');
+  if (first == std::string::npos)
+    return false;
+  std::string const lead = words.substr(first, words.find(' ', first) - first);
+  for (char const * aux : {"is", "does", "do", "can", "could", "would", "will", "has", "have", "was", "did",
+                           "should", "are"})
+    if (lead == aux)
       return true;
   return false;
 }
@@ -3747,8 +3776,13 @@ bool QuizAnswerTakes(QuizQuestion const & q, std::string const & spoken)
     return false;
   if (heard.named)
     return true;
-  if (AsksAboutTheDrive(spoken))
-    return false;
+  return !DriveComesFirst(spoken);
+}
+
+bool DriveComesFirst(std::string const & spoken, bool aboutIt)
+{
+  if (AsksAboutTheDrive(spoken, aboutIt))
+    return true;
   for (auto const & command : ParseAppCommands(spoken))
     switch (command.action)
     {
@@ -3763,15 +3797,27 @@ bool QuizAnswerTakes(QuizQuestion const & q, std::string const & spoken)
     case AppAction::ReportPolice:
     case AppAction::NavigateTo:
     case AppAction::DifferentRoute:
-    case AppAction::TakeMeBack: return false;
+    case AppAction::TakeMeBack: return true;
     default: break;
     }
-  return true;
+  return false;
 }
 
 bool Navigator::QuizTakes(std::string const & spoken) const
 {
   return QuizAsking() && QuizAnswerTakes(*m_quiz.Question(), spoken);
+}
+
+bool Navigator::TwentyTakes(std::string const & spoken) const
+{
+  if (!m_twenty.Active())
+    return false;
+  // A question about "it" the game can't place is still the game's ("I didn't catch that"), not
+  // walking directions; but only once playing, when "it" is the thing.
+  bool const aboutIt = m_twenty.GetState() == TwentyQuestions::State::Playing && AsksAboutIt(spoken);
+  if (ParseTwentyHeard(spoken).kind == TwentyHeard::Kind::Unclear && !aboutIt)
+    return false;
+  return !DriveComesFirst(spoken, aboutIt);
 }
 
 bool Navigator::QuizReask(double tMs, std::string const & spoken)

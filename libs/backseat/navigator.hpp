@@ -232,6 +232,10 @@ std::string CompassDirection(LatLon const & from, LatLon const & to);
 
 /// `spoken` answers quiz `q` rather than asking about the drive (see Navigator::QuizTakes).
 bool QuizAnswerTakes(QuizQuestion const & q, std::string const & spoken);
+/// The drive outranks a game: a question about the next turn or exit, or a command such as "cancel the
+/// route", "mute" or "take me to Target". A game can't swallow these, even mid-question.
+/// `aboutIt`: a 20 Questions question about "it", where "go" ("do you go there to get it?") isn't the route.
+bool DriveComesFirst(std::string const & spoken, bool aboutIt = false);
 
 class Navigator
 {
@@ -423,6 +427,11 @@ public:
   /// comes first: "where do I turn?" or "cancel the route" isn't an answer, even when a choice shares
   /// a word with it, unless a choice was named by its letter ("B", "option two").
   bool QuizTakes(std::string const & spoken) const;
+  /// 20 Questions is on and `spoken` is a move in it (a question, a guess, a hint, giving up or
+  /// quitting), so it goes to the game, not the app: "Do you have to go to a gas station to get it?"
+  /// isn't "find a gas station", and "Can you use it on foot?" isn't walking directions. The drive still
+  /// comes first ("what's the next turn", "cancel the route"). Hosts ask this after QuizTakes.
+  bool TwentyTakes(std::string const & spoken) const;
   /// "Can you repeat the question?" while a quiz waits: reads it again (once a quiz) and gives the
   /// driver the full time to answer again. True when it did; hosts ask this before QuizTakes.
   bool QuizReask(double tMs, std::string const & spoken);

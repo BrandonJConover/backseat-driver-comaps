@@ -2207,6 +2207,12 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
     }
     return heard;
   }
+  // Mid 20 Questions, "can you use it on foot?" is a question, not walking directions.
+  if (m_navigator.TwentyTakes(text))
+  {
+    m_navigator.OnDriverSaid(0, text);
+    return heard;
+  }
   // A voice's code phrase ("purple monkey"): the old voice gets the last word.
   if (auto const voice = backseat::VoiceByPhrase(m_voices, text))
   {

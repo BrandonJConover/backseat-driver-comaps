@@ -4,6 +4,7 @@
 #include "backseat/lines.hpp"
 #include "backseat/navigator.hpp"
 #include "backseat/twenty_questions.hpp"
+#include "backseat/voice_command.hpp"
 
 #include <algorithm>
 
@@ -639,4 +640,55 @@ TEST(TwentyNegatedQuestionsFlip)
   auto const r = g.OnDriverSaid("Is it not alive?", 1000, 0);
   CHECK(r.has_value());
   CHECK_EQUAL(r->key, std::string("twenty.no"));
+}
+
+// Mid-game, a question that sounds like a command is still a question: the host hands it to the game
+// before ParseAppCommands can make it "find a gas station" or walking directions. The drive comes first.
+TEST(TwentyTakesQuestionsBeforeAppCommands)
+{
+  Navigator nav = TqNavigator();
+  double t = kTqDayMs;
+  double dist = 60000;
+  TqDrive(nav, t, 30, 1, dist);
+  // No game: nothing is the game's.
+  CHECK(!nav.TwentyTakes("Do you have to go to a gas station to get it?"));
+  CHECK(!nav.TwentyTakes("Is it alive?"));
+  nav.OnDriverSaid(t, "let's play twenty questions");
+  TqDrive(nav, t, 5, 1, dist);
+  // These are why it exists: the app commands parser hears them as app actions.
+  bool sawCommand = false;
+  for (char const * said : {"Do you have to go to a gas station to get it?", "Can you use it on foot?",
+                            "Is it a police car?", "Is it alive?", "Is it a giraffe?", "give me a hint",
+                            "I give up", "Is it bigger than a car?"})
+  {
+    CHECK(nav.TwentyTakes(said));
+    sawCommand = sawCommand || !ParseAppCommands(said).empty();
+  }
+  CHECK(sawCommand);
+  // And the game answers it rather than leaving it to the app.
+  nav.OnDriverSaid(t, "Can you use it on foot?");
+  CHECK_EQUAL(TqGame(TqDrive(nav, t, 5, 1, dist)).size(), size_t{1});
+  // The drive outranks the game, even asked about "it".
+  for (char const * said : {"what's the next turn", "cancel the route", "where do I turn?", "take me to Target",
+                            "which exit is it?", "is it this lane?", "do I get off here, is it this ramp?", "mute"})
+    CHECK(!nav.TwentyTakes(said));
+  // Chatter the game can't read goes the usual way.
+  CHECK(!nav.TwentyTakes("this traffic is ridiculous"));
+  // Once it's over, nothing is the game's.
+  nav.OnDriverSaid(t, "I'm done");
+  TqDrive(nav, t, 5, 1, dist);
+  CHECK(!nav.TwentyTakes("Is it alive?"));
+}
+
+TEST(DriveComesFirstMatchesTheQuiz)
+{
+  CHECK(DriveComesFirst("where do i turn"));
+  CHECK(DriveComesFirst("cancel the route"));
+  CHECK(!DriveComesFirst("option two"));
+  CHECK(!DriveComesFirst("Is it alive?"));
+  // "Go" is the route unless it's a question about the thing.
+  CHECK(DriveComesFirst("do I go straight?"));
+  CHECK(!DriveComesFirst("Do you have to go to a gas station to get it?", true));
+  CHECK(DriveComesFirst("Do I go left to get it?", true));
+  CHECK(DriveComesFirst("which way do I turn to get it?", true));
 }
