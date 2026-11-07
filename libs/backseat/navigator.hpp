@@ -429,6 +429,8 @@ public:
   /// The driver tapped a choice on the card. Ignored on a drive.
   void QuizTapped(double tMs, int choice);
   int BrowniePoints() const { return m_said.Counter(kBrowniesKey); }
+  /// Correct turns in a row, carried across trips (running_bits.hpp).
+  int TurnStreak() const { return m_bits.Streak(); }
   static constexpr char const * kBrowniesKey = "_quiz.brownies";
 
   bool InTrip() const { return m_engine != nullptr; }
@@ -461,6 +463,8 @@ private:
   /// Text for a running-bit line: picked (or its story beat), filled with the driver's details
   /// and the current speed.
   std::string BitText(BitLine const & bit);
+  /// No fix for over 30 s before `t` (m_lastFix is still the one before this OnFix): the GPS was out.
+  bool FixGapAt(double t) const;
   /// "You've done everything right for five minutes. I don't like it."
   void TrackClean(Fix const & fix, RouteSnapshot const & route);
   /// Straight nags and the turn reminders before the final call: fewer of them, from bigger pools

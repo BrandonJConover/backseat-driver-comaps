@@ -141,6 +141,9 @@ double constexpr kCleanBitChance = 0.6;
 double constexpr kCleanQuietMs = 20000;
 /// Correct turns in a row, across trips (RunningBits).
 char const * const kTurnStreakKey = "_turns.streak";
+/// A turn that went by this long after the last fix (GPS out in a tunnel or a garage) wasn't seen:
+/// it neither extends nor breaks the streak.
+double constexpr kUnseenTurnGapMs = 30000;
 /// A speeding story beat waits for the next nag when the phone has more than this left to say.
 double constexpr kStoryBusyMs = 3000;
 /// Town straight nags (Brandon's "Please continue straight." chain) only on one leg a trip, and
@@ -1187,7 +1190,11 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     if (prev == RouteState::OnRoute)
     {
       if (m_turnId && m_lastDistToTurnM < kMissedTurnWithinM)
+      {
+        if (FixGapAt(t))
+          m_bits.TurnUnseen();
         Say(m_engine->OnNav(NavEvent::MissedTurn(t)));
+      }
       m_rerouting = true;
       Trace("nav.offroute", {{"missed", (m_turnId && m_lastDistToTurnM < kMissedTurnWithinM) ? "yes" : "no"},
                              {"reroutes", std::to_string(m_reroutes + 1)}});
@@ -1243,6 +1250,8 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     bool const justTurned = m_turnId && !m_rerouting;
     if (justTurned)
     {
+      if (FixGapAt(t))
+        m_bits.TurnUnseen();
       Say(m_engine->OnNav(NavEvent::TurnCompleted(t, true)));
       CountLefts(t);
     }
@@ -3108,6 +3117,8 @@ std::string Navigator::BitText(BitLine const & bit)
                                       : m_said.Pick(bit.key, LinesFor(bit.key, Tier()), m_config.rng ? m_config.rng() : 0);
   return Fill(tmpl, vars);
 }
+
+bool Navigator::FixGapAt(double t) const { return m_lastFix && t - m_lastFix->tMs > kUnseenTurnGapMs; }
 
 void Navigator::TrackClean(Fix const & fix, RouteSnapshot const & route)
 {
