@@ -346,6 +346,9 @@ public:
   /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate".
   /// Same thread as OnFix.
   void OnDriverSaid(double tMs, std::string const & text);
+  /// Stopped long enough to be a stop the driver chose (not a red light, not a jam), or crawling
+  /// through a parking lot. The plate game and parked-only lines go by this.
+  bool Parked() const;
   /// A line to say right now, outside the queue (e.g. the snarky reply to a voice command), picked
   /// like any other so it doesn't repeat. Works between trips too. The driver's {name} and
   /// pronouns ({theycap} {theyre} {them} {their}) are filled in unless `vars` has them.
@@ -587,7 +590,6 @@ private:
   /// {name}, {gps} and the driver's pronouns, for lines about the driver.
   Vars DriverVars() const;
   int Tier() const;
-  bool Parked() const;
 
   EngineConfig m_config;
   std::vector<TripRecord> m_history;

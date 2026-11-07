@@ -2564,9 +2564,12 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
 }
 
 /// Parked: stopped long enough to be a stop the driver chose, or crawling through a parking lot.
-/// A red light isn't parking, so a short stop on the road doesn't count.
+/// A red light isn't parking, so a short stop on the road doesn't count, and neither is a jam.
 bool Navigator::Parked() const
 {
+  // Stuck in a jam isn't parked, however long it lasts: the games and parked-only lines wait (BI-052).
+  if (m_stopSince && m_stopInTraffic)
+    return false;
   if (m_stopSince && m_lastT - *m_stopSince >= kUnplannedStopAfterMs)
     return true;
   if (!m_lastFix || !m_parkingLookup || m_lastFix->speedMps >= MovingMps())

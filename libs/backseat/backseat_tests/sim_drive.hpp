@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <random>
@@ -189,6 +190,8 @@ struct SimOptions
   /// The stop is in a parking lot (off the road: no speed limit, the parking lookup says yes)
   /// rather than stopped dead in a lane, which reads as traffic.
   bool stopParked = true;
+  /// Called after each fix the navigator gets, with the trip's seconds: tests talk to the GPS here.
+  std::function<void(backseat::Navigator &, double tMs, double tripS)> afterFix;
 };
 
 /// The broken fix the sim slips in before the real one when SimOptions::hostileFixes is set.
@@ -453,6 +456,8 @@ inline SimResult SimulateTrip(backseat::Navigator & nav, SimOptions const & o, d
         nav.OnFix(HostileFix(f, lastFix, step / 5), snap);
       nav.OnFix(f, snap);
       lastFix = f;
+      if (o.afterFix)
+        o.afterFix(nav, t, tripS);
       take();
     }
     // Directions also go out between fixes, right before the phone speaks.

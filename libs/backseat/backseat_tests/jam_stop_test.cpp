@@ -7,9 +7,11 @@
 #include "sim_drive.hpp"
 
 #include "backseat/navigator.hpp"
+#include "backseat/units.hpp"
 
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
 
 using namespace backseat;
 using namespace backseat_tests;
@@ -91,4 +93,106 @@ TEST(ParkedStopStillAbandons)
       abandoned += s.line.category == Category::Abandoned;
   }
   CHECK(abandoned >= 18);
+}
+
+// BI-052: a jam that crawls before it stops is called traffic before the roadside line's 45 s, so
+// "Why are we stopping? It's 50 not 0." never lands in it. (A dead stop straight from cruising speed
+// is exactly what pulling over looks like, so that one still asks: NavigatorAsksWhyWeStoppedAtTheRoadside.)
+TEST(CrawlingIntoAJamNeverHearsTheRoadsideLine)
+{
+  EngineConfig c;
+  c.rng = SeededRng(7);
+  Navigator nav(c);
+  double const limit = FromDisplay(50, Units::Mph);
+  double lat = 39.7;
+  RouteSnapshot route;
+  route.state = RouteState::OnRoute;
+  route.destinationPoint = {40.5, -105};
+  route.distToTurnM = 50000;
+  route.turn = TurnKind::Right;
+  route.turnId = 1;
+  std::vector<Commentary> said;
+  auto feed = [&](int fromS, int toS, double mps)
+  {
+    for (int i = fromS; i < toS; ++i)
+    {
+      Fix f;
+      f.tMs = kJamStartMs + i * 1000.0;
+      lat += mps / 111000;
+      f.lat = lat;
+      f.lon = -105;
+      f.speedMps = mps;
+      f.bearingDeg = 0;
+      f.speedLimitMps = limit;
+      f.accuracyM = 5;
+      nav.OnFix(f, route);
+      for (auto & l : nav.TakeLines())
+        said.push_back(l);
+    }
+  };
+  feed(0, 90, limit);
+  feed(90, 130, 3);
+  feed(130, 330, 0);
+  bool traffic = false;
+  int roadside = 0;
+  for (auto const & l : said)
+  {
+    traffic = traffic || l.category == Category::Traffic;
+    roadside += l.category == Category::PullOver;
+  }
+  CHECK(traffic);
+  CHECK_EQUAL(roadside, 0);
+}
+
+// BI-052: three, five and eight minutes into a jam the car is still not parked, so the plate game
+// counts a plate called out then instead of "Hey that's cheating. New rule, no parking lots."
+// The same stop in a parking lot is parked from the three-minute mark.
+TEST(JamIsNotParked)
+{
+  int jammed = 0, jamParked = 0, lots = 0, lotParked = 0;
+  for (bool const lot : {false, true})
+    for (uint32_t seed = 1; seed <= 30; ++seed)
+    {
+      SimOptions o{TripShape::Town, seed};
+      o.missTurns = false;
+      o.stopFromS = 50 + seed * 5;
+      o.stopS = 600;
+      o.stopParked = lot;
+      int checks = 0, parked = 0;
+      o.afterFix = [&](Navigator & nav, double, double tripS)
+      {
+        double const in = tripS - o.stopFromS;
+        if (in == 180 || in == 300 || in == 480)
+        {
+          ++checks;
+          parked += nav.Parked();
+        }
+      };
+      EngineConfig c;
+      c.rng = SeededRng(seed);
+      Navigator nav(c);
+      auto const r = SimulateTrip(nav, o);
+      bool traffic = false;
+      for (auto const & s : r.spoken)
+      {
+        double const q = (s.queuedMs - kJamStartMs) / 1000;
+        traffic = traffic || (s.line.category == Category::Traffic && q >= o.stopFromS && q < o.stopFromS + 180);
+      }
+      if (checks != 3)
+        continue;
+      if (lot)
+      {
+        ++lots;
+        lotParked += parked == 3;
+      }
+      else if (traffic)
+      {
+        ++jammed;
+        jamParked += parked;
+      }
+    }
+  CHECK(jammed >= 15);
+  CHECK_EQUAL(jamParked, 0);
+  CHECK(lots >= 25);
+  CHECK_EQUAL(lotParked, lots);
 }
