@@ -7,6 +7,7 @@
 #include "backseat/pop_quiz.hpp"
 
 #include <algorithm>
+#include <cstdio>
 
 using namespace backseat;
 
@@ -349,4 +350,126 @@ TEST(PopQuizTenBrowniesMakeATeachersPet)
   CHECK(PqHas(reply[0].text, "10") || !PqHas(reply[0].text, "brownie points"));
   CHECK_EQUAL(reply[1].key, std::string("badge.teacherspet"));
   CHECK(nav.GetAchievements().Has("teacherspet"));
+}
+
+TEST(PopQuizYieldsToNavigationQuestions)
+{
+  // Over every question: asking about the drive is never an answer, even when a choice shares a word.
+  for (auto const & q : QuizQuestions())
+  {
+    for (char const * said : {"where do i turn", "Where do I turn?", "what's the next turn", "turn left here?",
+                              "take me home", "cancel the route", "which exit do I take", "when do I get off"})
+    {
+      if (QuizAnswerTakes(q, said))
+        std::fprintf(stderr, "  quiz %s took \"%s\"\n", q.id, said);
+      CHECK(!QuizAnswerTakes(q, said));
+    }
+    // Choices named outright still count: by letter, by number, word for word.
+    for (int i = 0; i < 3; ++i)
+    {
+      std::string const letter(1, static_cast<char>('A' + i));
+      char const * const number[] = {"option one", "option two", "option three"};
+      for (std::string const & said : {letter, std::string(number[i]), QuizChoiceText(q.choices[i])})
+      {
+        if (!QuizAnswerTakes(q, said))
+          std::fprintf(stderr, "  quiz %s missed \"%s\"\n", q.id, said.c_str());
+        CHECK(QuizAnswerTakes(q, said));
+      }
+    }
+    CHECK(!QuizAnswerTakes(q, "can you repeat the question"));
+  }
+  CHECK(QuizAnswerTakes(PqQuestion("stopSides"), "the octagon"));
+  CHECK(QuizAnswerTakes(PqQuestion("canberra"), "I don't know"));
+}
+
+TEST(PopQuizRepeatTheQuestionReadsItAgainOnce)
+{
+  Navigator nav = PqNavigator();
+  nav.SetPopQuizOn(true);
+  double t = kPqDayMs;
+  double dist = 80000;
+  auto const asked = PqUntilAsked(nav, t, dist);
+  // Most of the time to answer goes by, then the driver asks to hear it again.
+  PqQuiz(PqDrive(nav, t, 20, dist));
+  CHECK(!nav.QuizTakes("can you repeat the question"));
+  CHECK(nav.QuizReask(t, "can you repeat the question"));
+  auto const again = PqQuiz(nav.TakeLines());
+  CHECK_EQUAL(again.size(), size_t{1});
+  CHECK_EQUAL(again[0].key, std::string("quiz.ask"));
+  CHECK(PqHas(again[0].text, "yellow light"));
+  // The clock starts over: what would have timed out the first reading doesn't.
+  auto const waited = PqQuiz(PqDrive(nav, t, 25, dist));
+  CHECK(waited.empty());
+  CHECK(nav.InGame());
+  // Only once a quiz.
+  CHECK(!nav.QuizReask(t, "what was the question"));
+  CHECK(nav.QuizTakes("B"));
+  nav.OnDriverSaid(t, "B");
+  auto const reply = PqQuiz(nav.TakeLines());
+  CHECK_EQUAL(reply.size(), size_t{1});
+  CHECK_EQUAL(reply[0].key, std::string("quiz.right.first"));
+  // No quiz waiting: nothing to re-read.
+  CHECK(!nav.QuizReask(t, "repeat the question"));
+}
+
+TEST(PopQuizNavQuestionIsNotTakenMidQuiz)
+{
+  Navigator nav = PqNavigator();
+  nav.SetPopQuizOn(true);
+  double t = kPqDayMs;
+  double dist = 80000;
+  PqUntilAsked(nav, t, dist);
+  CHECK(!nav.QuizTakes("where do i turn"));
+  CHECK(!nav.QuizTakes("cancel the route"));
+  CHECK(nav.QuizTakes("Stop if you safely can"));
+  CHECK(nav.QuizTakes("option two"));
+}
+
+TEST(QuizHearsCurlyApostrophesAndDashes)
+{
+  CHECK_EQUAL(PqPick("canberra", "I think it\xE2\x80\x99s Sydney"), 0);
+  CHECK(ParseQuizAnswer(PqQuestion("canberra"), "I don\xE2\x80\x99t know").kind == QuizHeard::Kind::GiveUp);
+  // A dash between words is a break, not glue: "um—Canberra" names Canberra.
+  CHECK_EQUAL(PqPick("canberra", "um\xE2\x80\x94"
+                                 "Canberra"),
+              2);
+}
+
+TEST(QuizHearsNotAndChangesOfMind)
+{
+  // Ruling a choice out never picks it.
+  CHECK_EQUAL(PqPick("stopSides", "not B"), -1);
+  CHECK_EQUAL(PqPick("canberra", "not Sydney"), -1);
+  CHECK_EQUAL(PqPick("canberra", "it's definitely not Sydney"), -1);
+  CHECK_EQUAL(PqPick("canberra", "I don't think it's C"), -1);
+  CHECK_EQUAL(PqPick("canberra", "it isn't Melbourne"), -1);
+  // Two ruled out never names the third: the driver didn't say it.
+  CHECK_EQUAL(PqPick("canberra", "not A, not B"), -1);
+  CHECK_EQUAL(PqPick("canberra", "not Sydney and not Melbourne"), -1);
+  // Ruled out, then named.
+  CHECK_EQUAL(PqPick("canberra", "not A, B"), 1);
+  CHECK_EQUAL(PqPick("canberra", "it's not Sydney, it's Canberra"), 2);
+  CHECK_EQUAL(PqPick("merge", "it's not the speed of traffic, it's way under"), 0);
+  CHECK_EQUAL(PqPick("merge", "not way under, same as everyone"), 1);
+  CHECK_EQUAL(PqPick("brokenWhite", "never cross it"), 1);
+  CHECK_EQUAL(PqPick("brokenWhite", "not never cross it, you may change lanes"), 0);
+  CHECK_EQUAL(PqPick("stopSides", "can't be six, it's eight"), 1);
+  // Changes of mind: the last pick wins.
+  CHECK_EQUAL(PqPick("canberra", "A, no wait, C"), 2);
+  CHECK_EQUAL(PqPick("canberra", "Sydney. Actually, Canberra"), 2);
+  CHECK_EQUAL(PqPick("canberra", "B. I mean C"), 2);
+  CHECK_EQUAL(PqPick("stopSides", "six, scratch that, eight"), 1);
+  CHECK_EQUAL(PqPick("canberra", "Melbourne, wait, no, Sydney"), 0);
+  CHECK_EQUAL(PqPick("canberra", "B, actually"), 1);
+  CHECK(ParseQuizAnswer(PqQuestion("canberra"), "A, no wait, I don't know").kind == QuizHeard::Kind::GiveUp);
+  // What already worked still does.
+  CHECK(ParseQuizAnswer(PqQuestion("canberra"), "I don't know").kind == QuizHeard::Kind::GiveUp);
+  CHECK(ParseQuizAnswer(PqQuestion("canberra"), "I'm not sure").kind == QuizHeard::Kind::Unclear);
+  CHECK_EQUAL(PqPick("canberra", "I'm not sure, I think it's Canberra"), 2);
+  CHECK_EQUAL(PqPick("canberra", "a or b"), -1);
+  // "Not at all" is a choice of its own.
+  CHECK_EQUAL(PqPick("eiffel", "not at all"), 2);
+  CHECK_EQUAL(PqPick("eiffel", "I think not"), 2);
+  CHECK_EQUAL(PqPick("eiffel", "six inches"), 0);
+  CHECK_EQUAL(PqPick("eiffel", "C"), 2);
 }

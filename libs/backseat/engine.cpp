@@ -329,7 +329,23 @@ std::vector<Commentary> CritiqueEngine::OnTelemetry(TelemetrySample const & s)
 
     // Ignore gaps (tunnels, app backgrounded): a 30 s gap isn't a hard brake.
     // One continuous hard stop counts once, however many samples it spans.
-    double const accel = dt <= 3 ? (s.speedMps - prev->speedMps) / dt : 0;
+    // A made-up speed (GPS said "unknown") on either side isn't a measurement: a tunnel isn't a stop.
+    bool const measured = s.speedKnown && prev->speedKnown;
+    // Measure from before a glitch when the last step was one, so the snap back isn't a launch.
+    TelemetrySample const & ref = m_beforeGlitch ? *m_beforeGlitch : *prev;
+    double const refDt = (s.t - ref.t) / 1000;
+    double accel = refDt <= 3 && measured && ref.speedKnown ? (s.speedMps - ref.speedMps) / refDt : 0;
+    if (m_config.implausibleMps2 > 0 && std::abs(accel) > m_config.implausibleMps2)
+    {
+      // Keep the last believable sample while the glitch lasts (the 3 s window above ends it).
+      if (!m_beforeGlitch)
+        m_beforeGlitch = *prev;
+      accel = 0;
+    }
+    else
+    {
+      m_beforeGlitch.reset();
+    }
     bool const braking = accel <= -m_config.hardBrakeMps2;
     bool const accelerating = accel >= m_config.hardAccelMps2;
     if (braking && !m_braking)
@@ -463,8 +479,9 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     std::string const said =
         m_pendingTurn ? "I said " + SaidWhat(m_pendingTurn->shape, m_pendingTurn->dir) + "." : "I said nothing about stopping.";
     Log(MakeIncident(e.t, IncidentKind::UnplannedStop, placeName.value_or(PlaceName(kind))), e.at);
-    Roast(out, e.t, Category::UnplannedStop, std::string("unplannedStop.") + PlaceName(kind),
-          {{"said", said}, {"name", placeName.value_or(PlaceFallback(kind))}}, true);
+    if (Roast(out, e.t, Category::UnplannedStop, std::string("unplannedStop.") + PlaceName(kind),
+              {{"said", said}, {"name", placeName.value_or(PlaceFallback(kind))}}, true))
+      m_lastUnplannedStopAt = e.t;
     break;
   }
   case NavEvent::Type::DestinationSet:
@@ -1020,6 +1037,7 @@ void CritiqueEngine::CheckStopped(TelemetrySample const & s, std::vector<Comment
   if (s.speedMps >= 0.5)
   {
     m_stoppedSince.reset();
+    m_longStopRemarks = 0;
     return;
   }
   if (!m_stoppedSince)
@@ -1028,15 +1046,31 @@ void CritiqueEngine::CheckStopped(TelemetrySample const & s, std::vector<Comment
     m_stopCount++;
     return;
   }
-  if (s.t - *m_stoppedSince < m_config.longStopAfterMs)
+  // Stuck in a jam keeps blaming the route every 45 s, as before.
+  if (m_trafficAlternate)
+  {
+    if (s.t - *m_stoppedSince < m_config.longStopAfterMs)
+      return;
+    if (Roast(out, s.t, Category::Traffic, "traffic", {{"alternate", *m_trafficAlternate}}))
+    {
+      m_stoppedSince = s.t;
+      Log(MakeIncident(s.t, IncidentKind::Traffic));
+    }
     return;
-  bool const spoke = m_trafficAlternate
-                         ? Roast(out, s.t, Category::Traffic, "traffic", {{"alternate", *m_trafficAlternate}})
-                         : Roast(out, s.t, Category::LongStop, "longStop", {{"stops", Num(m_stopCount)}});
-  if (spoke)
+  }
+  // Parked mid-route, each remark waits twice as long as the last (45 s, 90, 180), then it gives up.
+  if (m_longStopRemarks >= kLongStopRemarksPerStop)
+    return;
+  if (s.t - *m_stoppedSince < m_config.longStopAfterMs * std::pow(2.0, m_longStopRemarks))
+    return;
+  // The stop was just remarked on by name ("Why are we stopping here?"), so don't pile on.
+  if (s.t - m_lastUnplannedStopAt < m_config.longStopAfterMs)
+    return;
+  if (Roast(out, s.t, Category::LongStop, "longStop", {{"stops", Num(m_stopCount)}}))
   {
     m_stoppedSince = s.t;
-    Log(MakeIncident(s.t, m_trafficAlternate ? IncidentKind::Traffic : IncidentKind::LongStop));
+    ++m_longStopRemarks;
+    Log(MakeIncident(s.t, IncidentKind::LongStop));
   }
 }
 

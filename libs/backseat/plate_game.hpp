@@ -28,6 +28,11 @@ std::optional<std::string> PlateRegionCode(std::string const & name);
 bool PlateNeighbors(std::string const & a, std::string const & b);
 /// Plates that almost never turn up on a mainland commute: Hawaii, Alaska, the territories.
 bool RarePlate(std::string const & code);
+/// "No Texas plates yet", "haven't seen Ohio", "not a Georgia plate": the region is named but not seen.
+/// "No way, Hawaii!" and "No, Texas!" are still sightings.
+bool NegatedSighting(std::string const & spoken);
+/// "I'm done", "game over", "no more plates": the driver wants the plate game to stop.
+bool QuitsPlateGame(std::string const & spoken);
 
 enum class YesNo
 {
@@ -60,7 +65,9 @@ public:
     Idle,
     Offered,
     Playing,
-    Declined
+    Declined,
+    /// The driver called it off mid-game ("I'm done", "game over"). Nothing more until the next trip.
+    Over
   };
 
   struct Reply
@@ -76,8 +83,11 @@ public:
   static double constexpr kQuietStretchM = 3219;
   /// Only when the GPS isn't already fed up (tier 0).
   static int constexpr kMaxFrustration = 33;
-  /// No game talk this close to a maneuver (500 ft); directions come first.
+  /// No game talk this close to a maneuver (500 ft, or 12 s at the current speed if that is farther; the
+  /// navigator scales it); directions come first.
   static double constexpr kHoldNearManeuverM = 152;
+  /// Unmatched talk this soon after the last game exchange is probably a plate we misheard.
+  static double constexpr kChatterWindowMs = 20000;
 
   explicit PlateGame(Rng rng = {});
 
@@ -95,9 +105,13 @@ public:
 
   /// The GPS's invitation. Marks the game offered for this trip.
   Reply Offer(int tier);
-  /// The driver said something. Nothing when it isn't for the game (no game going on).
+  /// The driver said something. Nothing when it isn't for the game (no game going on, a sighting
+  /// that is negated, or chatter that doesn't sound like the game).
   /// `parked`: the car is parked or in a parking lot, where plates are too easy and don't count.
-  std::optional<Reply> OnDriverSaid(std::string const & spoken, int tier, bool parked = false);
+  /// `tMs`: when it was said. Chatter within kChatterWindowMs of the last game exchange gets "which
+  /// state?"; later chatter is ignored. Without a time every unmatched utterance gets "which state?".
+  std::optional<Reply> OnDriverSaid(std::string const & spoken, int tier, bool parked = false,
+                                    std::optional<double> tMs = std::nullopt);
   /// The GPS asked in its own words ("why don't we play that game you just suggested?").
   void MarkOffered() { m_state = State::Offered; }
   void MarkPlayed(double tMs) { m_log.lastPlayedMs = tMs; }
@@ -108,6 +122,7 @@ private:
   Reply Plate(std::string const & code, int tier);
   Reply Make(std::string const & key, int tier, Vars vars = {});
   std::string Pick(std::string const & key, int tier);
+  Reply Tally(int tier);
 
   Rng m_rng;
   PlateLog m_log;
@@ -118,6 +133,8 @@ private:
   std::vector<std::string> m_trip;
   /// The first repeat of a trip always gets Brandon's line ("We already have that one champ...").
   bool m_repeatedThisTrip = false;
+  /// When the game last answered the driver; unset before the first exchange.
+  std::optional<double> m_lastExchangeMs;
   std::map<std::string, std::string> m_lastPicked;
 };
 }  // namespace backseat

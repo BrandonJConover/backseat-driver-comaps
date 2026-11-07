@@ -175,56 +175,27 @@ backseat::LatLon ToBackseatLatLon(m2::PointD const & p)
 
 std::vector<backseat::TripRecord> LoadTrips()
 {
-  std::vector<backseat::TripRecord> trips;
-  std::ifstream in(GetPlatform().SettingsPathForFile(kTripsFile));
-  std::string line;
-  while (std::getline(in, line))
+  auto const path = GetPlatform().SettingsPathForFile(kTripsFile);
+  std::stringstream text;
   {
-    std::istringstream fields(line);
-    backseat::TripRecord r;
-    std::string expected, actual, share, missed, brakes, ended;
-    if (std::getline(fields, r.routeKey, '\t') && std::getline(fields, r.destination, '\t') &&
-        std::getline(fields, ended, '\t') && std::getline(fields, expected, '\t') &&
-        std::getline(fields, actual, '\t') && std::getline(fields, share, '\t') && std::getline(fields, missed, '\t') &&
-        std::getline(fields, brakes, '\t') && std::getline(fields, r.grade, '\t'))
-    {
-      try
-      {
-        r.endedAt = std::stod(ended);
-        r.expectedMinutes = std::stod(expected);
-        r.actualMinutes = std::stod(actual);
-        r.speedingShare = std::stod(share);
-        r.missedTurns = std::stoi(missed);
-        r.hardBrakes = std::stoi(brakes);
-        // Newer lines end with where the trip was headed: "lat,lon".
-        std::string to;
-        if (std::getline(fields, to, '\t'))
-        {
-          auto const comma = to.find(',');
-          if (comma != std::string::npos)
-            r.to = backseat::LatLon{std::stod(to.substr(0, comma)), std::stod(to.substr(comma + 1))};
-        }
-        trips.push_back(r);
-      }
-      catch (std::exception const &)
-      {
-        // A damaged line just gets forgotten.
-      }
-    }
+    std::ifstream in(path);
+    text << in.rdbuf();
   }
-  if (trips.size() > kMaxTrips)
-    trips.erase(trips.begin(), trips.end() - kMaxTrips);
+  size_t lines = 0;
+  auto trips = backseat::ParseTrips(text.str(), kMaxTrips, &lines);
+  // The log only grows; once it holds well over what's kept, rewrite it with just the kept trips.
+  if (lines > 2 * kMaxTrips)
+  {
+    std::ofstream out(path, std::ios::trunc);
+    out << backseat::SerializeTrips(trips);
+  }
   return trips;
 }
 
 void AppendTrip(backseat::TripRecord const & r)
 {
   std::ofstream out(GetPlatform().SettingsPathForFile(kTripsFile), std::ios::app);
-  out << r.routeKey << '\t' << r.destination << '\t' << r.endedAt << '\t' << r.expectedMinutes << '\t'
-      << r.actualMinutes << '\t' << r.speedingShare << '\t' << r.missedTurns << '\t' << r.hardBrakes << '\t' << r.grade;
-  if (r.to)
-    out << '\t' << std::setprecision(9) << r.to->lat << ',' << r.to->lon;
-  out << '\n';
+  out << backseat::TripToLine(r) << '\n';
 }
 backseat::PlateLog LoadPlates()
 {
@@ -2176,6 +2147,9 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
 {
   backseat::Trace("heard.app", {{"text", text}});
   HeardCommand heard;
+  // "Can you repeat the question?" mid-quiz reads it again; it isn't "repeat the instruction".
+  if (m_navigator.QuizReask(0, text))
+    return heard;
   // A pop quiz answer ("pull to the right and stop", "speed up") is an answer, not a command.
   if (m_navigator.QuizTakes(text))
   {
@@ -2231,6 +2205,12 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
       heard.kind = HeardCommand::Kind::Search;
       heard.query = guess->routine.destination;
     }
+    return heard;
+  }
+  // Mid 20 Questions, "can you use it on foot?" is a question, not walking directions.
+  if (m_navigator.TwentyTakes(text))
+  {
+    m_navigator.OnDriverSaid(0, text);
     return heard;
   }
   // A voice's code phrase ("purple monkey"): the old voice gets the last word.
@@ -2436,6 +2416,15 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     m_lastReadTopic.reset();
     return m_navigator.Reply("cmd.forgot", {{"thing", *topic}});
   }
+  case AppAction::Unmute:
+    // Back on is all the way back on, whatever "shut up" did before the mute.
+    m_navigator.SetTalkLevel(backseat::TalkLevel::Full);
+    break;
+  case AppAction::TalkLess: m_navigator.SetTalkLevel(backseat::TalkLevel::Less); return m_navigator.Reply("cmd.talkLess");
+  case AppAction::DirectionsOnly:
+    m_navigator.SetTalkLevel(backseat::TalkLevel::DirectionsOnly);
+    return m_navigator.Reply("cmd.directionsOnly");
+  case AppAction::TalkMore: m_navigator.SetTalkLevel(backseat::TalkLevel::Full); return m_navigator.Reply("cmd.talkMore");
   case AppAction::BeNicer: return NicenessMoved();
   case AppAction::BeMeaner: return m_navigator.Reply("cmd.meaner");
   case AppAction::GradeSoFar:

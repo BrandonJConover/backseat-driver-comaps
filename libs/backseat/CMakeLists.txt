@@ -31,6 +31,8 @@ set(
   plate_game.hpp
   pronunciation.cpp
   pronunciation.hpp
+  pronunciation_backup.cpp
+  pronunciation_backup.hpp
   pop_quiz.cpp
   pop_quiz.hpp
   quiet_bits.cpp

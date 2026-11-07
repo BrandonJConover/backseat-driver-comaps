@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
@@ -138,7 +139,7 @@ std::vector<PastPlace> PastPlaces(std::vector<TripRecord> const & history, size_
   for (auto const & trip : history)
   {
     auto const arrow = trip.routeKey.find('>');
-    if (arrow == std::string::npos || trip.endedAt <= 0)
+    if (arrow == std::string::npos || !(trip.endedAt > 0))  // also skips a NaN end time
       continue;
     auto & g = byPlace[trip.routeKey.substr(arrow + 1)];
     g.trips.push_back(&trip);
@@ -203,7 +204,9 @@ TripPrediction PredictTrip(std::vector<TripRecord> const & history, TripPlan con
   {
     if (r.routeKey == key)
       sameRoute.push_back(&r);
-    if (r.expectedMinutes > 0 && r.actualMinutes > 0)
+    // Damaged records (NaN, infinite or negative minutes) say nothing about the driver.
+    if (r.expectedMinutes > 0 && r.actualMinutes > 0 && std::isfinite(r.expectedMinutes) &&
+        std::isfinite(r.actualMinutes))
     {
       // Same-route trips count triple; the median keeps one road-trip disaster from skewing it.
       double const ratio = r.actualMinutes / r.expectedMinutes;
@@ -223,7 +226,10 @@ TripPrediction PredictTrip(std::vector<TripRecord> const & history, TripPlan con
     auto const big = kBigger.find(&lines);
     if (said && big != kBigger.end())
       return said->Pick(big->second.first, big->second.second, rng());
-    return lines[static_cast<size_t>(std::floor(rng() * lines.size()))];
+    // Same clamp as SaidLog::Pick: NaN or negative -> first line, 1 or more -> last (was out of bounds).
+    double const r = rng();
+    size_t const i = r > 0 ? static_cast<size_t>(std::floor(std::min(r, 1.0) * lines.size())) : 0;
+    return lines[std::min(i, lines.size() - 1)];
   };
 
   TripPrediction p;
@@ -268,9 +274,12 @@ std::vector<Routine> LearnRoutines(std::vector<TripRecord> const & history,
   std::map<std::string, std::vector<Start>> byRoute;
   for (auto const & trip : history)
   {
-    if (trip.routeKey.empty() || trip.endedAt <= 0)
+    if (trip.routeKey.empty() || !(trip.endedAt > 0))
       continue;
-    std::tm const tm = localTime(trip.endedAt - trip.actualMinutes * 60000);
+    double const took = std::isfinite(trip.actualMinutes) && trip.actualMinutes > 0 ? trip.actualMinutes : 0;
+    std::tm const tm = localTime(trip.endedAt - took * 60000);
+    if (tm.tm_wday < 0 || tm.tm_wday > 6)
+      continue;
     byRoute[trip.routeKey].push_back({tm.tm_hour * 60 + tm.tm_min, tm.tm_wday, &trip});
   }
   int constexpr kSameTimeMinutes = 75;
@@ -373,7 +382,128 @@ std::string OneLine(std::string s)
   auto const last = s.find_last_not_of(' ');
   return first == std::string::npos ? std::string() : s.substr(first, last - first + 1);
 }
+
+std::string LogNumber(double x)
+{
+  char buf[40];
+  std::snprintf(buf, sizeof buf, "%.15g", x);
+  return buf;
+}
+
+/// The whole field must be a finite number ("12abc", "nan" and "" are damage).
+std::optional<double> LogDouble(std::string const & s)
+{
+  if (s.empty())
+    return {};
+  char * stop = nullptr;
+  double const x = std::strtod(s.c_str(), &stop);
+  if (stop != s.c_str() + s.size() || !std::isfinite(x))
+    return {};
+  return x;
+}
+
+std::optional<int> LogCount(std::string const & s)
+{
+  auto const x = LogDouble(s);
+  if (!x || *x < 0 || *x > 1e6 || *x != std::floor(*x))
+    return {};
+  return static_cast<int>(*x);
+}
 }  // namespace
+
+std::string TripToLine(TripRecord const & r)
+{
+  std::string line = OneLine(r.routeKey) + "\t" + OneLine(r.destination) + "\t" + LogNumber(r.endedAt) + "\t" +
+                     LogNumber(r.expectedMinutes) + "\t" + LogNumber(r.actualMinutes) + "\t" +
+                     LogNumber(r.speedingShare) + "\t" + std::to_string(r.missedTurns) + "\t" +
+                     std::to_string(r.hardBrakes) + "\t" + OneLine(r.grade);
+  if (r.to && std::isfinite(r.to->lat) && std::isfinite(r.to->lon))
+    line += "\t" + LogNumber(r.to->lat) + "," + LogNumber(r.to->lon);
+  return line;
+}
+
+std::optional<TripRecord> TripFromLine(std::string const & lineIn)
+{
+  std::string line = lineIn;
+  if (!line.empty() && line.back() == '\r')  // saved on Windows or hand-edited
+    line.pop_back();
+  std::vector<std::string> f;
+  size_t start = 0;
+  while (true)
+  {
+    auto const tab = line.find('\t', start);
+    f.push_back(line.substr(start, tab == std::string::npos ? std::string::npos : tab - start));
+    if (tab == std::string::npos)
+      break;
+    start = tab + 1;
+  }
+  if (f.size() < 9 || f[0].empty())
+    return {};
+  auto const ended = LogDouble(f[2]);
+  auto const expected = LogDouble(f[3]);
+  auto const actual = LogDouble(f[4]);
+  auto const share = LogDouble(f[5]);
+  auto const missed = LogCount(f[6]);
+  auto const brakes = LogCount(f[7]);
+  if (!ended || !expected || !actual || !share || !missed || !brakes)
+    return {};
+  TripRecord r;
+  r.routeKey = f[0];
+  r.destination = f[1];
+  r.endedAt = *ended;
+  r.expectedMinutes = *expected;
+  r.actualMinutes = *actual;
+  r.speedingShare = *share;
+  r.missedTurns = *missed;
+  r.hardBrakes = *brakes;
+  r.grade = f[8];
+  if (f.size() > 9)
+  {
+    // A damaged destination point loses only the point, not the trip.
+    auto const comma = f[9].find(',');
+    if (comma != std::string::npos)
+    {
+      auto const lat = LogDouble(f[9].substr(0, comma));
+      auto const lon = LogDouble(f[9].substr(comma + 1));
+      if (lat && lon && std::abs(*lat) <= 90 && std::abs(*lon) <= 180)
+        r.to = LatLon{*lat, *lon};
+    }
+  }
+  return r;
+}
+
+std::vector<TripRecord> ParseTrips(std::string const & text, size_t max, size_t * lines)
+{
+  std::vector<TripRecord> trips;
+  size_t count = 0;
+  size_t start = 0;
+  while (start < text.size())
+  {
+    size_t end = text.find('\n', start);
+    if (end == std::string::npos)
+      end = text.size();
+    std::string const line = text.substr(start, end - start);
+    start = end + 1;
+    if (line.empty() || line == "\r")
+      continue;
+    ++count;
+    if (auto r = TripFromLine(line))
+      trips.push_back(std::move(*r));
+  }
+  if (trips.size() > max)
+    trips.erase(trips.begin(), trips.end() - static_cast<std::ptrdiff_t>(max));
+  if (lines)
+    *lines = count;
+  return trips;
+}
+
+std::string SerializeTrips(std::vector<TripRecord> const & trips)
+{
+  std::string out;
+  for (auto const & r : trips)
+    out += TripToLine(r) + "\n";
+  return out;
+}
 
 bool DriverMemory::Remember(std::string const & topicIn, std::string const & factIn, double nowMs)
 {
@@ -433,8 +563,9 @@ std::string DriverMemory::ForModel(size_t maxChars) const
   std::string out;
   for (auto const & line : lines)
   {
+    // Skip a line that doesn't fit rather than stopping, so one long fact can't crowd out the rest.
     if (out.size() + line.size() + 1 > maxChars)
-      break;
+      continue;
     out += line + "\n";
   }
   return out;
@@ -457,11 +588,13 @@ DriverMemory DriverMemory::Parse(std::string const & text)
     size_t end = text.find('\n', start);
     if (end == std::string::npos)
       end = text.size();
-    std::string const line = text.substr(start, end - start);
+    std::string line = text.substr(start, end - start);
     start = end + 1;
+    if (!line.empty() && line.back() == '\r')  // saved on Windows or hand-edited
+      line.pop_back();
     auto const a = line.find('\t');
     auto const b = a == std::string::npos ? a : line.find('\t', a + 1);
-    if (b == std::string::npos)
+    if (b == std::string::npos || b == a + 1 || b + 1 == line.size())  // no topic or no fact
       continue;
     char * stop = nullptr;
     double const at = std::strtod(line.c_str(), &stop);

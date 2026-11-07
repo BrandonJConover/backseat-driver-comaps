@@ -72,6 +72,9 @@ public:
   /// Lines ready to speak, in order: navigation lines always, roasts once rewritten or out
   /// of time. A roast still waiting holds back the roasts after it, never navigation.
   std::vector<Commentary> Take();
+  /// A remark (not a navigation line) is waiting to go out: pushed this tick or still being
+  /// rewritten. Optional chatter checks it so it doesn't pile on in the same breath.
+  bool HasRemark() const;
   /// Drops anything still waiting (trip over).
   void Clear() { m_queue.clear(); }
 

@@ -1,0 +1,115 @@
+{
+ "about": "Cyrillic romanised the way a reader says it, for map street names and quotes English Kokoro would skip ('улица Ленина' ulitsa Lenina, 'Київ' Kiyiv, 'Здравствуйте' Zdravstvuyte). Same letter table as EpubToM4B text/spoken_foreign_scripts.py (CROSS X-015) plus the Serbian/Macedonian letters map names use (Његошева Nyegosheva, Ђуре Јакшића Jure Yakshicha). Tokens mixing Latin and Cyrillic stay. Backseat Driver: backseat::pronunciation::ForSpeech / Cyrillic (libs/backseat/backseat_tests/spoken_cyrillic.json). Keep both copies in sync.",
+ "cases": [
+  {
+   "input": "Turn left onto улица Ленина.",
+   "language": "en",
+   "expected": "Turn left onto ulitsa Lenina."
+  },
+  {
+   "input": "Turn right onto проспект Мира.",
+   "language": "en",
+   "expected": "Turn right onto prospekt Mira."
+  },
+  {
+   "input": "Keep left toward Невский проспект.",
+   "language": "en",
+   "expected": "Keep left toward Nevskiy prospekt."
+  },
+  {
+   "input": "Turn onto Хрещатик.",
+   "language": "en",
+   "expected": "Turn onto Khreshchatik."
+  },
+  {
+   "input": "Continue on вулиця Шевченка.",
+   "language": "en",
+   "expected": "Continue on vulitsya Shevchenka."
+  },
+  {
+   "input": "Turn left onto Кнеза Михаила.",
+   "language": "en",
+   "expected": "Turn left onto Kneza Mikhaila."
+  },
+  {
+   "input": "Turn right onto Његошева.",
+   "language": "en",
+   "expected": "Turn right onto Nyegosheva."
+  },
+  {
+   "input": "Arriving at Ђуре Јакшића.",
+   "language": "en",
+   "expected": "Arriving at Jure Yakshicha."
+  },
+  {
+   "input": "\"Спасибо,\" she said.",
+   "language": "en",
+   "expected": "\"Spasibo,\" she said."
+  },
+  {
+   "input": "He whispered, \"Здравствуйте.\"",
+   "language": "en",
+   "expected": "He whispered, \"Zdravstvuyte.\""
+  },
+  {
+   "input": "\"Привет, друг!\"",
+   "language": "en",
+   "expected": "\"Privet, drug!\""
+  },
+  {
+   "input": "She signed it Наталья.",
+   "language": "en",
+   "expected": "She signed it Natalya."
+  },
+  {
+   "input": "The sign read ПРИВЕТ.",
+   "language": "en",
+   "expected": "The sign read Privet."
+  },
+  {
+   "input": "\"Ёлка\" means fir tree.",
+   "language": "en",
+   "expected": "\"Yolka\" means fir tree."
+  },
+  {
+   "input": "\"Щи\" is cabbage soup.",
+   "language": "en",
+   "expected": "\"Shchi\" is cabbage soup."
+  },
+  {
+   "input": "Kyiv is Київ in Ukrainian.",
+   "language": "en",
+   "expected": "Kyiv is Kiyiv in Ukrainian."
+  },
+  {
+   "input": "Елена waved.",
+   "language": "en",
+   "expected": "Yelena waved."
+  },
+  {
+   "input": "Москва́ is ahead.",
+   "language": "en",
+   "expected": "Moskva is ahead."
+  },
+  {
+   "input": "\"Мoscow\" was misspelled.",
+   "language": "en",
+   "expected": "\"Мoscow\" was misspelled."
+  },
+  {
+   "input": "Turn left onto Main Street.",
+   "language": "en",
+   "expected": "Turn left onto Main Street."
+  },
+  {
+   "input": "Turn left in 500 feet onto Elm St.",
+   "language": "en",
+   "expected": "Turn left in five hundred feet onto Elm Street."
+  },
+  {
+   "input": "Born in the СССР.",
+   "language": "en",
+   "expected": "Born in the S-S-S-R."
+  }
+ ]
+}

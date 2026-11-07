@@ -1094,7 +1094,7 @@ T	224000	0.109	11.2	39.719751	-104.997359	87.39
 P	224000	79.9
 T	225000	0.882	11.2	39.719751	-104.997349	88.12
 P	225000	75.8
->	instruction	nav	90	1.09	REMEMBER THE LEFT TURN?! IT'S RIGHT THERE! ALMOST!
+>	instruction	nav	90	1.09	REMEMBER THE LEFT TURN?! IT'S JUST AHEAD! ALMOST!
 T	226000	0.31	11.2	39.719751	-104.997345	86.56
 P	226000	74.8
 T	227000	0.79	11.2	39.719752	-104.997336	-
@@ -2167,7 +2167,7 @@ T	442000	1.976	29.1	39.729445	-105.001082	-
 P	442000	77.8
 T	443000	2.637	29.1	39.729446	-105.001113	272.47
 P	443000	73.3
->	instruction	nav	96	1.1	REMEMBER THE LEFT TURN?! IT'S RIGHT THERE! ALMOST!
+>	instruction	nav	96	1.1	REMEMBER THE LEFT TURN?! IT'S JUST AHEAD! ALMOST!
 T	444000	2.792	29.1	39.729448	-105.001146	272.99
 P	444000	66
 T	444000	3.708	29.1	39.729449	-105.00119	272.8
@@ -12210,7 +12210,7 @@ P	637000	77.6
 T	638000	5.354	13.4	39.859773	-104.995744	119.98
 >	hardAccel	roast	100	1.1	I just felt that in a satellite. In SPACE.
 P	638000	68.2
->	instruction	nav	100	1.1	REMEMBER THE RIGHT TURN?! IT'S RIGHT THERE! ALMOST!
+>	instruction	nav	100	1.1	REMEMBER THE RIGHT TURN?! IT'S JUST AHEAD! ALMOST!
 Z	639000
 >	arrived	nav	100	1.1	WE MADE IT! I DON'T KNOW HOW! GRADE: F! I NEED TO SIT DOWN! I'M ALREADY SITTING!
 =	36	F	55	0	17	18	1	0	2	1	3	43	0	0	983.36	40	6	39.859751,-104.996223,30,12
@@ -16521,7 +16521,7 @@ P	442000	77.7
 O	442000	Best Buy	other
 T	443000	0	13.4	39.939131	-105.002407	359.76
 P	443000	73.5
->	instruction	nav	96	1.1	REMEMBER THE LEFT TURN?! IT'S RIGHT THERE! ALMOST!
+>	instruction	nav	96	1.1	REMEMBER THE LEFT TURN?! IT'S JUST AHEAD! ALMOST!
 I	443000	Turn right onto Oak Avenue	595.4	-	-
 >	instruction	nav	96	1.1	In a quarter mile, turn right onto Oak Avenue.
 T	444000	0.688	13.4	39.939137	-105.002407	357.18
@@ -21480,7 +21480,7 @@ T	303000	11.852	26.8	40.003846	-104.990285	276.62
 P	303000	77
 T	304000	12.394	26.8	40.003864	-104.990428	-
 P	304000	62.9
->	instruction	nav	100	1.1	REMEMBER THE RIGHT TURN?! IT'S RIGHT THERE! ALMOST!
+>	instruction	nav	100	1.1	REMEMBER THE RIGHT TURN?! IT'S JUST AHEAD! ALMOST!
 T	305000	11.947	26.8	40.003881	-104.990567	279.13
 P	305000	48.7
 T	306000	11.614	26.8	40.0039	-104.990701	280.76
@@ -21792,7 +21792,7 @@ Y	1	39.7	-105	39.75	-104.87	Best Buy	25	-	left:Continue straight on Main Street;
 >	predict	25	unknown	0	Never driven this one before. Neither of us knows how bad this will be. That's exciting. For me.
 Y	2	39.7	-105	39.75	-104.8995	Grandma's	12	39.7000,-105.0000>39.7500,-104.9000,Grandma's,0,37.1,0,1,B+;39.7500,-104.9000>39.7000,-105.0000,Grandma's,16,7.2,1,3,C-;39.7500,-104.9000>39.7000,-105.0000,Grandma's,15,21.6,0,0,F;39.7000,-105.0000>39.7500,-104.9000,Grandma's,17,36.5,0,1,C-;39.7500,-104.9000>39.7000,-105.0000,Grandma's,10,21.3,1,3,F;39.7000,-105.0000>39.7500,-104.9000,Grandma's,9,12.6,0,0,A	uturn:Turn left onto Elm Street;left:Continue straight on Main Street;right:Make a U-turn;other:Continue straight on Main Street;-:Head north on Pine Road;-:Continue straight on Main Street;left:Keep left at the fork;-:Head north on Pine Road;-:Continue straight on Main Street
 >	greeting	Seat belt on? Mirrors? Dignity? Two out of three, let's go.
->	rundown	Let me walk you through this. Slowly. First you're going to a U-turn, don't ask, then left, then right, and left. Once you've done all that, you'll have made it to your destination. Reminder: left is the side with the hand that makes an L. Based on your history, I felt that needed saying. It's all so simple. You got it? ... You don't, do you.
+>	rundown	Let me walk you through this. Slowly. First you're going to make a U-turn, don't ask, then left, then right, and left. Once you've done all that, you'll have made it to your destination. Reminder: left is the side with the hand that makes an L. Based on your history, I felt that needed saying. It's all so simple. You got it? ... You don't, do you.
 >	predict	17	slowpoke	3	This should take 12 minutes. With you driving, call it 17. Maybe pack a snack. Grandma's again, for the fourth time. I could drive this myself, and I don't have hands.
 Y	3	39.701	-105	39.75	-104.87	Grandma's	7	39.7500,-104.8700>39.7000,-105.0000,Grandma's,5,11.2,0,3,F	-:Turn left onto Elm Street;left:Turn right onto Oak Avenue;-:Head north on Pine Road;right:Head north on Pine Road;-:Make a U-turn;other:Turn right onto Oak Avenue;-:Make a U-turn;left:Make a U-turn;right:Head north on Pine Road;-:Turn left onto Elm Street
 >	greeting	Oh. It's you again. I still didn't ask to be in this car.
@@ -21840,7 +21840,7 @@ Y	13	39.701	-105	39.75	-104.8995	Best Buy	6	39.7000,-105.0000>39.7500,-104.9000,
 >	predict	10	slowpoke	1	6 minutes, says the map. The map has never met you. I'm saying 10. Last time you brake checked 2 times here. The guy behind you still talks about it.
 Y	14	39.7	-105	39.75	-104.8995	the Supercharger	2	39.7500,-104.9000>39.7000,-105.0000,the Supercharger,26,26.3,0,2,C-;39.7500,-104.9000>39.7000,-105.0000,the Supercharger,14,22.6,2,1,A;39.7500,-104.9000>39.7000,-105.0000,the Supercharger,35,20.7,0,0,F;39.7500,-104.9000>39.7000,-105.0000,the Supercharger,26,5.9,0,3,B+;39.7500,-104.9000>39.7000,-105.0000,the Supercharger,7,9.8,0,1,D;39.7000,-105.0000>39.7500,-104.9000,the Supercharger,0,41.3,2,3,B+;39.7500,-104.9000>39.7000,-105.0000,the Supercharger,0,10.7,0,0,C-;39.7000,-105.0000>39.7500,-104.9000,the Supercharger,9,18.8,0,3,D;39.7500,-104.9000>39.7000,-105.0000,the Supercharger,25,31.8,0,0,A;39.7000,-105.0000>39.7500,-104.9000,the Supercharger,30,30.5,0,1,B+;39.7000,-105.0000>39.7500,-104.9000,the Supercharger,21,13.3,0,1,C-;39.7000,-105.0000>39.7500,-104.9000,the Supercharger,0,4,0,2,A	uturn:Turn right onto Oak Avenue;-:Keep left at the fork;other:Turn left onto Elm Street
 >	greeting	Hello again. I've been sitting in your pocket thinking about your last trip. Grade: A. Let's not repeat it.
->	rundown	Listen closely, I'm only saying this once. First you're going to a U-turn, don't ask, and left. Once you've done all that, you'll have made it to your destination. It's all so simple. You got it? ... You don't, do you.
+>	rundown	Listen closely, I'm only saying this once. First you're going to make a U-turn, don't ask, and left. Once you've done all that, you'll have made it to your destination. It's all so simple. You got it? ... You don't, do you.
 >	predict	2	onTime	5	2 minutes. You usually manage that, somehow. Don't get cocky. Last time you brake checked 2 times here. The guy behind you still talks about it.
 Y	15	39.701	-105	39.75	-104.87	the Supercharger	1	-	other:Turn slight right at 5th Avenue
 >	greeting	Just so you know, I didn't ask to be in this car. But I guess since I'm here, I might as well give you a few pointers.

@@ -196,4 +196,28 @@ char const * ToString(IncidentKind k)
 }
 
 char const * ToString(Priority p) { return p == Priority::Nav ? "nav" : "roast"; }
+
+std::string StraightApostrophes(std::string const & text)
+{
+  std::string out;
+  out.reserve(text.size());
+  for (size_t i = 0; i < text.size(); ++i)
+  {
+    auto const at = [&](size_t k) { return static_cast<unsigned char>(text[k]); };
+    // U+2018 / U+2019 are E2 80 98 / E2 80 99; U+02BC (modifier letter apostrophe) is CA BC.
+    if (at(i) == 0xE2 && i + 2 < text.size() && at(i + 1) == 0x80 && (at(i + 2) == 0x98 || at(i + 2) == 0x99))
+    {
+      out += '\'';
+      i += 2;
+    }
+    else if (at(i) == 0xCA && i + 1 < text.size() && at(i + 1) == 0xBC)
+    {
+      out += '\'';
+      i += 1;
+    }
+    else
+      out += text[i];
+  }
+  return out;
+}
 }  // namespace backseat

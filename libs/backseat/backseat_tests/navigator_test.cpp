@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <set>
 
@@ -1830,8 +1831,9 @@ TEST(WaterBridgesAreRationed)
     f.tMs = t + 3000;
     bridge = true;
     nav.OnFix(f, Far());
+    // By key: the text can't be matched to the bank once the running gag's tag is dropped.
     for (auto const & l : LinesOf(nav.TakeLines(), Category::Fear))
-      yelps += SaidLineOf(l.text, "fear.bridgeWater") ? 1 : 0;
+      yelps += l.key == "fear.bridgeWater" ? 1 : 0;
   };
   cross(0);
   cross(5 * 60000);
@@ -2229,6 +2231,45 @@ TEST(ALongWalkAsksAndNoMeansTapDriving)
   SetLineTravelMode(TravelMode::Drive);
 }
 
+TEST(NoWhileAlreadyDrivingWaitsForAStopToTapDriving)
+{
+  // BI-014: the app started on walking and the car pulled away before anyone answered. "Click the
+  // driving button" would be a touch prompt at speed; the moving reply says to do it once parked.
+  for (double const mps : {20.0, 1.4})
+  {
+    Navigator nav(Config());
+    nav.SetCanAskTravelMode(true);
+    nav.SetTravelMode(TravelMode::Walk);
+    nav.OnFix(Heading(0, 0, 90), LongWalk());
+    CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.ask.walk"), 1);
+    for (int i = 1; i < 6; ++i)
+      nav.OnFix(Heading(i * 1000.0, mps, 90), LongWalk());
+    nav.TakeLines();
+    nav.OnDriverSaid(6000, "no");
+    auto const said = nav.TakeLines();
+    bool const driving = mps > 5;
+    CHECK_EQUAL(CountKey(said, "mode.ask.walk.no.moving"), driving ? 1 : 0);
+    CHECK_EQUAL(CountKey(said, "mode.ask.walk.no"), driving ? 0 : 1);
+    // Either way Driving is highlighted for later.
+    CHECK(nav.TakeModeSwitch() == TravelMode::Drive);
+  }
+  // A speed from long ago (GPS lost since) doesn't count as moving.
+  Navigator nav(Config());
+  nav.SetCanAskTravelMode(true);
+  nav.SetTravelMode(TravelMode::Walk);
+  nav.OnFix(Heading(0, 20, 90), LongWalk());
+  nav.TakeLines();
+  Fix lost = Heading(30000, 0, 90);
+  lost.speedMps = -1;
+  nav.OnFix(lost, LongWalk());
+  nav.TakeLines();
+  CHECK(nav.AnswerModeAsk(false));
+  auto const said = nav.TakeLines();
+  CHECK_EQUAL(CountKey(said, "mode.ask.walk.no"), 1);
+  CHECK_EQUAL(CountKey(said, "mode.ask.walk.no.moving"), 0);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
 TEST(EveryLongWalkAsksAndShortOnesDont)
 {
   Navigator nav(Config());
@@ -2277,4 +2318,250 @@ TEST(SwitchingTravelModesGetsARemark)
   nav.OnFix(Heading(9000, 0, 90), Walkway());
   CHECK_EQUAL(CountKey(nav.TakeLines(), "mode.switch.walk"), 0);
   SetLineTravelMode(TravelMode::Drive);
+}
+
+// GPS speed drops out in a tunnel (negative = unknown). That isn't a stop: no hard brake going in,
+// no hard launch coming out, and the miles keep counting.
+TEST(UnknownSpeedInATunnelIsNotAStop)
+{
+  for (int gap : {1, 2, 3, 12})
+  {
+    Navigator nav(Config());
+    double const mps = 30;
+    int const n = 60;
+    for (int i = 0; i < n; ++i)
+    {
+      bool const inTunnel = i >= 30 && i < 30 + gap;
+      nav.OnFix(At(i * 1000.0, inTunnel ? -1 : mps), OnRoute(1, TurnKind::Left, 20000 - i * mps));
+      nav.TakeLines();
+    }
+    auto const & stats = nav.Engine()->Stats();
+    CHECK_EQUAL(stats.hardBrakes, 0);
+    CHECK_EQUAL(stats.hardAccels, 0);
+    if (gap <= 3)
+    {
+      // Short dropouts carry the last speed, so the distance stays right.
+      double const expected = mps * (n - 1);
+      CHECK(std::abs(stats.distanceM - expected) <= 0.05 * expected);
+    }
+  }
+}
+
+// A real stop, with the GPS reporting every second, still counts.
+TEST(RealHardStopStillRoastsWithKnownSpeeds)
+{
+  Navigator nav(Config());
+  for (int i = 0; i < 30; ++i)
+  {
+    nav.OnFix(At(i * 1000.0, 30), OnRoute(1, TurnKind::Left, 20000 - i * 30.0));
+    nav.TakeLines();
+  }
+  // About 9 m/s², an emergency stop a car can actually do (30 -> 0 in two seconds can't be).
+  nav.OnFix(At(30000, 21), OnRoute(1, TurnKind::Left, 19100));
+  nav.OnFix(At(31000, 12), OnRoute(1, TurnKind::Left, 19085));
+  nav.OnFix(At(32000, 3), OnRoute(1, TurnKind::Left, 19078));
+  nav.OnFix(At(33000, 0), OnRoute(1, TurnKind::Left, 19077));
+  CHECK_EQUAL(nav.Engine()->Stats().hardBrakes, 1);
+}
+
+// A one-fix speed blip on the highway (30 -> 10 -> 30 m/s) is the GPS: no brake or launch roast.
+TEST(OneFixSpeedGlitchIsNotARoast)
+{
+  Navigator nav(Config());
+  bool roasted = false;
+  for (int i = 0; i < 40; ++i)
+  {
+    double const v = i == 30 ? 10 : 30;
+    nav.OnFix(At(i * 1000.0, v), OnRoute(1, TurnKind::Left, 20000 - i * 30.0));
+    for (auto const & l : nav.TakeLines())
+      roasted = roasted || l.category == Category::HardBraking || l.category == Category::HardAccel;
+  }
+  CHECK(!roasted);
+  CHECK_EQUAL(nav.Engine()->Stats().hardBrakes, 0);
+  CHECK_EQUAL(nav.Engine()->Stats().hardAccels, 0);
+}
+
+namespace
+{
+Fix Rough(Fix f, double accuracyM)
+{
+  f.accuracyM = accuracyM;
+  return f;
+}
+}  // namespace
+
+// Downtown canyons and tunnel mouths put a fix 100 m off and facing anywhere. Such fixes used to
+// start the off-road timer and turn the trip into an off-road trip on a city street.
+TEST(RoughFixesDontMakeItAnOffRoadTrip)
+{
+  for (double accuracy : {120.0, 8.0, -1.0})
+  {
+    Navigator nav(Config());
+    nav.SetRoadDistanceLookup([](LatLon const &) { return 80.0; });
+    int entered = 0;
+    for (int i = 0; i < 20; ++i)
+    {
+      nav.OnFix(Rough(Heading(i * 1000.0, 15, 90), accuracy), Far());
+      for (auto const & l : nav.TakeLines())
+        entered += SaidLineOf(l.text, "offroad.enter");
+    }
+    bool const rough = accuracy > 50;
+    CHECK_EQUAL(entered, rough ? 0 : 1);
+    CHECK(nav.Mode() == (rough ? TravelMode::Drive : TravelMode::OffRoad));
+    SetLineTravelMode(TravelMode::Drive);
+  }
+}
+
+TEST(RoughFixesMatchedToDirtStayADrive)
+{
+  Navigator nav(Config());
+  RouteSnapshot r = Far();
+  r.onDirt = true;
+  for (int i = 0; i < 120; ++i)
+    nav.OnFix(Rough(Heading(i * 1000.0, 12, 90), 120), r);
+  CHECK(nav.Mode() == TravelMode::Drive);
+  // A good patch in the middle of the rough ones doesn't count the rough time either.
+  for (int i = 120; i < 140; ++i)
+    nav.OnFix(Heading(i * 1000.0, 12, 90), r);
+  nav.OnFix(Rough(Heading(140000, 12, 90), 120), r);
+  for (int i = 141; i < 170; ++i)
+    nav.OnFix(Heading(i * 1000.0, 12, 90), r);
+  CHECK(nav.Mode() == TravelMode::Drive);
+  for (int i = 170; i < 200; ++i)
+    nav.OnFix(Heading(i * 1000.0, 12, 90), r);
+  CHECK(nav.Mode() == TravelMode::OffRoad);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
+TEST(RoughFixesDontSayWrongWayOrUTurn)
+{
+  for (double accuracy : {120.0, 8.0})
+  {
+    Navigator nav(Config());
+    RouteSnapshot north = Far();
+    north.routeBearingDeg = 5;
+    bool wrongWay = false;
+    for (int i = 0; i < 10; ++i)
+    {
+      nav.OnFix(Rough(Heading(i * 1000.0, 10, 185), accuracy), north);
+      wrongWay = wrongWay || Has(nav.TakeLines(), Category::WrongWay);
+    }
+    CHECK_EQUAL(wrongWay, accuracy < 50);
+
+    Navigator turn(Config());
+    RouteSnapshot const route = OnRoute(1, TurnKind::Left, 2000);
+    bool uTurn = false;
+    for (int i = 0; i < 5; ++i)
+      turn.OnFix(Rough(Heading(i * 1000.0, 8, 10), accuracy), route);
+    turn.OnFix(Rough(Heading(6000, 8, 100), accuracy), route);
+    turn.OnFix(Rough(Heading(8000, 8, 190), accuracy), route);
+    uTurn = SaidKey(turn.TakeLines(), "uturn");
+    CHECK_EQUAL(uTurn, accuracy < 50);
+  }
+}
+
+TEST(RoughFixesDontYelpAboutCurves)
+{
+  for (double accuracy : {120.0, 8.0})
+  {
+    Navigator nav(Config());
+    for (int i = 0; i < 6; ++i)
+      nav.OnFix(Rough(Heading(i * 1000, 25, 10.0 * i), accuracy), Far());
+    CHECK_EQUAL(FearLines(nav.TakeLines()).size(), size_t(accuracy < 50 ? 1 : 0));
+  }
+}
+
+// Junk from the GPS stack is read as unknown or dropped, never passed on as a number.
+TEST(CleanFixReadsJunkAsUnknown)
+{
+  static constexpr double nan = std::numeric_limits<double>::quiet_NaN();
+  static constexpr double inf = std::numeric_limits<double>::infinity();
+  Fix good;
+  good.tMs = 100000;
+  good.lat = 36.37;
+  good.lon = -94.2;
+  good.speedMps = 20;
+  good.bearingDeg = 90;
+  good.speedLimitMps = 25;
+  good.accuracyM = 5;
+
+  auto const same = CleanFix(good, 99000);
+  CHECK(same.has_value());
+  CHECK_EQUAL(same->speedMps, 20.0);
+  CHECK_EQUAL(same->bearingDeg, 90.0);
+  CHECK_EQUAL(same->accuracyM, 5.0);
+  CHECK(same->speedLimitMps && *same->speedLimitMps == 25.0);
+
+  // No time or place: dropped.
+  for (auto mangle : {+[](Fix & f) { f.tMs = nan; }, +[](Fix & f) { f.lat = nan; }, +[](Fix & f) { f.lon = -inf; },
+                      +[](Fix & f) { f.lat = 91; }, +[](Fix & f) { f.lon = 181; }})
+  {
+    Fix f = good;
+    mangle(f);
+    CHECK(!CleanFix(f, 99000));
+  }
+  // Replayed: dropped within a minute of the newest; the same moment again and a clock reset are kept.
+  CHECK(!CleanFix(good, 130000));
+  CHECK(CleanFix(good, 100000).has_value());
+  CHECK(CleanFix(good, 100000 + 61000).has_value());
+
+  Fix f = good;
+  f.speedMps = inf;
+  f.bearingDeg = 725;
+  f.accuracyM = nan;
+  f.speedLimitMps = nan;
+  auto const c = CleanFix(f, 99000);
+  CHECK(c.has_value());
+  CHECK_EQUAL(c->speedMps, -1.0);
+  CHECK_EQUAL(c->bearingDeg, -1.0);
+  CHECK_EQUAL(c->accuracyM, -1.0);
+  CHECK(!c->speedLimitMps);
+  f.speedMps = nan;
+  f.bearingDeg = -inf;
+  f.speedLimitMps = 0;
+  auto const d = CleanFix(f, 99000);
+  CHECK(d && d->speedMps == -1 && d->bearingDeg == -1 && !d->speedLimitMps);
+  // A huge accuracy is a real (rough) reading, kept for the accuracy gate.
+  f.accuracyM = 1e9;
+  CHECK_EQUAL(CleanFix(f, 99000)->accuracyM, 1e9);
+}
+
+// An infinite speed handed over mid-drive is not a launch, and a NaN position doesn't stop the trip.
+TEST(HostileFixMidDriveIsNotJudged)
+{
+  Navigator nav;
+  RouteSnapshot far;
+  far.state = RouteState::OnRoute;
+  far.turnId = 1;
+  far.turn = TurnKind::Left;
+  far.distToTurnM = 5000;
+  double lat = 36.37;
+  for (int i = 0; i < 40; ++i)
+  {
+    Fix f;
+    f.tMs = 1.7e12 + i * 1000.0;
+    f.lat = lat += 20.0 / 111320;
+    f.lon = -94.2;
+    f.speedMps = 20;
+    f.bearingDeg = 0;
+    f.accuracyM = 5;
+    if (i == 20)
+    {
+      Fix junk = f;
+      junk.speedMps = std::numeric_limits<double>::infinity();
+      junk.bearingDeg = 900;
+      nav.OnFix(junk, far);
+      junk = f;
+      junk.lat = std::numeric_limits<double>::quiet_NaN();
+      nav.OnFix(junk, far);
+    }
+    nav.OnFix(f, far);
+  }
+  for (auto const & l : nav.TakeLines())
+  {
+    CHECK(l.key.rfind("hardAccel", 0) != 0);
+    CHECK(l.key.rfind("uturn", 0) != 0);
+  }
+  CHECK(nav.Engine());
+  CHECK_EQUAL(nav.Engine()->Report().hardAccels, 0);
 }

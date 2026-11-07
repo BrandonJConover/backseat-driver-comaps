@@ -1,0 +1,129 @@
+{
+ "about": "Regnal numbers after a monarch's or pope's name read as ordinals in map names (BI-023, the English half of CROSS X-017/X-018): 'King George VI Ave' is 'King George the sixth Avenue', 'Pope John Paul II Blvd' 'Pope John Paul the second Boulevard'. Only after a known regnal given name, or any capitalised name after a title (King, Pope, Sultan...); I..XXXIX only. Negatives: World War II, Phase II, Malcolm X, middle initials ('John V. Smith'), the pronoun ('Henry I think'), malformed numerals. Backseat Driver: backseat::pronunciation::ForSpeech / Regnal (libs/backseat/backseat_tests/pronunciation_test.cpp). Port to BookLyre's English text pass with the same cases.",
+ "cases": [
+  {
+   "input": "Keep left on Pope John Paul II Blvd.",
+   "expected": "Keep left on Pope John Paul the second Boulevard."
+  },
+  {
+   "input": "Turn right onto King George VI Ave",
+   "expected": "Turn right onto King George the sixth Avenue"
+  },
+  {
+   "input": "Turn left onto Rue Louis XVI.",
+   "expected": "Turn left onto fxroo Louis the sixteenth."
+  },
+  {
+   "input": "Continue on Av. Henri IV",
+   "expected": "Continue on Av. Henri the fourth"
+  },
+  {
+   "input": "Turn left onto Calle Carlos V.",
+   "expected": "Turn left onto fxkahyeh Carlos the fifth."
+  },
+  {
+   "input": "Turn right onto Via Pio X.",
+   "expected": "Turn right onto fxveeah Pio the tenth."
+  },
+  {
+   "input": "Continue onto Queen Elizabeth II Hwy",
+   "expected": "Continue onto Queen Elizabeth the second Highway"
+  },
+  {
+   "input": "Turn left onto King Kamehameha I Hwy",
+   "expected": "Turn left onto King Kamehameha the first Highway"
+  },
+  {
+   "input": "Henry VIII had six wives.",
+   "expected": "Henry the eighth had six wives."
+  },
+  {
+   "input": "Charles V",
+   "expected": "Charles the fifth"
+  },
+  {
+   "input": "Turn right onto Pope Pius XII St",
+   "expected": "Turn right onto Pope Pius the twelfth Street"
+  },
+  {
+   "input": "Boulevard Mohammed V, then left",
+   "expected": "Boulevard Mohammed the fifth, then left"
+  },
+  {
+   "input": "Pope John XXIII Square",
+   "expected": "Pope John the twenty third Square"
+  },
+  {
+   "input": "Sultan Qaboos I Street",
+   "expected": "Sultan Qaboos the first Street"
+  },
+  {
+   "input": "Avenida Juan Pablo II",
+   "expected": "fxahvehneedah Juan Pablo the second"
+  },
+  {
+   "input": "Louis XIV built Versailles.",
+   "expected": "Louis the fourteenth built Versailles."
+  },
+  {
+   "input": "Pass the Victor Emmanuel II monument.",
+   "expected": "Pass the Victor Emmanuel the second monument."
+  },
+  {
+   "input": "Rua Dom Pedro II",
+   "expected": "fxhooah Dom Pedro the second"
+  },
+  {
+   "input": "World War II memorial ahead.",
+   "expected": "World War II memorial ahead."
+  },
+  {
+   "input": "Phase II construction zone.",
+   "expected": "Phase II construction zone."
+  },
+  {
+   "input": "Turn left onto Malcolm X Blvd.",
+   "expected": "Turn left onto Malcolm X Boulevard."
+  },
+  {
+   "input": "Turn right onto John V. Smith Rd.",
+   "expected": "Turn right onto John V. Smith Road."
+  },
+  {
+   "input": "Then I turn left.",
+   "expected": "Then I turn left."
+  },
+  {
+   "input": "Henry I think you missed it.",
+   "expected": "Henry I think you missed it."
+  },
+  {
+   "input": "Did you see Rocky II?",
+   "expected": "Did you see Rocky II?"
+  },
+  {
+   "input": "Type V charger ahead.",
+   "expected": "Type V charger ahead."
+  },
+  {
+   "input": "I want to go home.",
+   "expected": "I want to go home."
+  },
+  {
+   "input": "Pope John IIII St",
+   "expected": "Pope John IIII Street"
+  },
+  {
+   "input": "Super Bowl LV",
+   "expected": "Super Bowl LV"
+  },
+  {
+   "input": "King George",
+   "expected": "King George"
+  },
+  {
+   "input": "Turn onto Charles VI-X Rd",
+   "expected": "Turn onto Charles VI-X Road"
+  }
+ ]
+}

@@ -26,6 +26,9 @@ struct TelemetrySample
 {
   double t = 0;
   double speedMps = 0;
+  /// False when the GPS gave no speed and `speedMps` is a stand-in (the last known speed carried
+  /// through a tunnel, or 0). The engine doesn't judge braking or acceleration across such samples.
+  bool speedKnown = true;
   /// Posted limit for the current road, if the map knows it.
   std::optional<double> speedLimitMps;
   std::optional<double> lat;
@@ -339,4 +342,8 @@ struct TripStats
 char const * ToString(Category c);
 char const * ToString(IncidentKind k);
 char const * ToString(Priority p);
+
+/// Dictation and keyboards send curly apostrophes: "What’s the next turn", "I‘m walking", "youʼre wrong".
+/// Every word matcher compares against straight-apostrophe cues, so turn ’ ‘ ʼ (UTF-8) into '.
+std::string StraightApostrophes(std::string const & text);
 }  // namespace backseat

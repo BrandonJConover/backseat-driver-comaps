@@ -16,7 +16,7 @@ namespace
 std::string CommandWords(std::string const & text)
 {
   std::string out = " ";
-  for (unsigned char const ch : text)
+  for (unsigned char const ch : StraightApostrophes(text))
   {
     char const c = std::isalnum(ch) || ch == '\'' ? static_cast<char>(std::tolower(ch)) : ' ';
     if (c != ' ' || out.back() != ' ')
@@ -48,7 +48,8 @@ std::string ParseTarget(std::string const & rest)
   for (bool trimmed = true; trimmed;)
   {
     trimmed = false;
-    for (std::string const tail : {" please ", " thanks ", " thank you ", " now ", " asap "})
+    for (std::string const tail : {" please ", " thanks ", " thank you ", " right now ", " now ", " asap ", " instead ",
+                                   " later ", " real quick ", " for me "})
       if (target.size() >= tail.size() && target.compare(target.size() - tail.size(), tail.size(), tail) == 0)
       {
         target.erase(target.size() - tail.size() + 1);
@@ -61,18 +62,138 @@ std::string ParseTarget(std::string const & rest)
       target.erase(0, lead.size());
   return target;
 }
+
+/// Offsets in CommandWords(text) where a clause starts: 0 and each space left by , . ; : ! or ?.
+std::vector<size_t> ClauseStarts(std::string const & text)
+{
+  std::vector<size_t> starts{0};
+  std::string out = " ";
+  for (unsigned char const ch : StraightApostrophes(text))
+  {
+    char const c = std::isalnum(ch) || ch == '\'' ? static_cast<char>(std::tolower(ch)) : ' ';
+    if (c != ' ' || out.back() != ' ')
+      out += c;
+    if (std::string_view(",.;:!?").find(static_cast<char>(ch)) != std::string_view::npos)
+      starts.push_back(out.size() - 1);
+  }
+  return starts;
+}
+
+/// The words of CommandWords(text) between the clause start before `at` and `at`.
+std::vector<std::string> ClauseBefore(std::string const & words, std::vector<size_t> const & starts, size_t at)
+{
+  size_t from = 0;
+  for (size_t const s : starts)
+    if (s <= at)
+      from = std::max(from, s);
+  std::istringstream in(words.substr(from, at - from));
+  std::vector<std::string> out;
+  for (std::string w; in >> w;)
+    out.push_back(w);
+  return out;
+}
+
+/// "Please don't stop navigating", "I don't want to go to work": a negation in the few words before a cue,
+/// in the same clause. "Never mind" and "why don't you" aren't negations.
+bool NegatedAt(std::string const & words, std::vector<size_t> const & starts, size_t at)
+{
+  if (at == std::string::npos)
+    return false;
+  auto const before = ClauseBefore(words, starts, at);
+  size_t const first = before.size() > 4 ? before.size() - 4 : 0;
+  for (size_t i = first; i < before.size(); ++i)
+  {
+    std::string const & w = before[i];
+    bool const why = i > 0 && before[i - 1] == "why";
+    if ((w == "don't" || w == "dont" || w == "didn't" || w == "didnt") && !why)
+      return true;
+    if (w == "not" && i > 0 && before[i - 1] == "do" && !(i > 1 && before[i - 2] == "why"))
+      return true;
+    if (w == "never" && !(i + 1 < before.size() && before[i + 1] == "mind"))
+      return true;
+  }
+  return false;
+}
+
+/// A bare "go to"/"go home" is an order only at the start of a clause or after a word that asks:
+/// "go to work", "okay go to work", "let's go home". Not "should we go to Costco", "she wants to go to Target".
+bool GoIsAnOrder(std::string const & words, std::vector<size_t> const & starts, size_t at)
+{
+  auto const before = ClauseBefore(words, starts, at);
+  if (before.empty())
+    return true;
+  std::string const & last = before.back();
+  for (char const * w : {"let's", "lets", "please", "just", "okay", "ok", "now", "hey", "google", "so", "then"})
+    if (last == w)
+      return true;
+  return last == "you" && before.size() > 1 &&
+         (before[before.size() - 2] == "can" || before[before.size() - 2] == "could" || before[before.size() - 2] == "would");
+}
+
+/// "Kids, be quiet", "shut up Kevin", "Kevin, stop talking": said to someone in the car, not to
+/// the GPS.
+bool HushAimedElsewhere(std::string const & spoken)
+{
+  std::vector<std::string> raw;
+  std::string word;
+  for (char const ch : StraightApostrophes(spoken) + " ")
+  {
+    if (std::isalnum(static_cast<unsigned char>(ch)) || ch == '\'')
+      word += ch;
+    else if (!word.empty())
+    {
+      raw.push_back(word);
+      word.clear();
+    }
+  }
+  std::vector<std::string> low;
+  for (auto const & w : raw)
+  {
+    std::string l;
+    for (char const c : w)
+      l += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    low.push_back(l);
+  }
+  auto const someoneElse = [&](size_t i)
+  {
+    if (i >= low.size())
+      return false;
+    std::string const & l = low[i];
+    for (char const * app : {"backseat", "gps", "app", "computer", "phone", "you", "yourself", "i", "please", "and", "now"})
+      if (l == app)
+        return false;
+    for (char const * who : {"kids", "guys", "everyone", "everybody", "boys", "girls", "children", "y'all", "yall",
+                             "dog", "dogs", "puppy", "buddy", "honey", "babe", "dude", "bro", "sis"})
+      if (l == who)
+        return true;
+    if (l != "will" && PronounsForName(l))
+      return true;
+    // A capital in mid-sentence is a name: "Shut up Kevin", "be quiet Rosalind".
+    return i > 0 && std::isupper(static_cast<unsigned char>(raw[i][0]));
+  };
+  for (size_t i = 0; i + 1 < low.size(); ++i)
+    if ((low[i] == "shut" && low[i + 1] == "up") || (low[i] == "be" && low[i + 1] == "quiet") ||
+        (low[i] == "stop" && low[i + 1] == "talking"))
+      if ((i > 0 && someoneElse(i - 1)) || someoneElse(i + 2))
+        return true;
+  return false;
+}
 }  // namespace
 
 std::optional<DestinationCommand> ParseDestinationCommand(std::string const & spoken)
 {
   std::string const words = CommandWords(spoken);
+  auto const starts = ClauseStarts(spoken);
   std::string target;
   for (char const * cue : {" take me to ", " take us to ", " navigate to ", " drive me to ", " drive us to ",
                            " directions to ", " get me to ", " get us to ", " route to ", " route me to ",
                            " let's go to ", " lets go to ", " head to ", " go to ", " bring me to ", " take me back to ",
                            " take us back to ", " head back to "})
   {
-    auto const at = words.find(cue);
+    bool const bareGo = std::string_view(cue) == " go to ";
+    auto at = words.find(cue);
+    while (at != std::string::npos && bareGo && !GoIsAnOrder(words, starts, at))
+      at = words.find(cue, at + 1);
     if (at != std::string::npos)
     {
       target = ParseTarget(words.substr(at + std::string(cue).size()));
@@ -85,8 +206,12 @@ std::optional<DestinationCommand> ParseDestinationCommand(std::string const & sp
   // "Take me home" needs no "to".
   for (char const * cue : {" take me home ", " take us home ", " go home ", " drive me home ", " drive us home ",
                            " navigate home ", " head home ", " bring me home ", " get me home ", " get us home "})
-    if (target.empty() && words.find(cue) != std::string::npos)
+  {
+    auto const at = words.find(cue);
+    bool const bareGo = std::string_view(cue) == " go home ";
+    if (target.empty() && at != std::string::npos && (!bareGo || GoIsAnOrder(words, starts, at)))
       target = "home";
+  }
   if (target.empty())
     return {};
 
@@ -147,6 +272,9 @@ std::vector<AppTool> const & AppTools()
       {AppAction::WhatDoYouKnow, "what_do_you_know", "Read out what's saved about the driver.", nullptr},
       {AppAction::ForgetThat, "forget_that", "Delete something saved about the driver.", "What to forget; empty for the last thing read out."},
       {AppAction::SetTravelMode, "set_travel_mode", "Change how the trip is being made: walking, biking, driving or off-roading.", "walk, bike, drive or offroad."},
+      {AppAction::TalkLess, "talk_less", "Make fewer comments; directions stay the same.", nullptr},
+      {AppAction::DirectionsOnly, "directions_only", "Only speak directions, lane calls and arrival: no comments, bits or games. What \"shut up\" means.", nullptr},
+      {AppAction::TalkMore, "talk_more", "Go back to the full commentary after talking less.", nullptr},
   };
   return tools;
 }
@@ -186,8 +314,74 @@ std::string VoiceArgument(std::string const & words)
 
 namespace
 {
-/// Where in `words` a stop was asked for, and what for: "find gas", "I need a bathroom", "add a stop at Walmart".
-std::pair<size_t, std::string> StopSearch(std::string const & words)
+/// The kind of stop `target` names, with "a"/"the"/"nearest" taken off: "the nearest gas station" -> "gas station",
+/// "a bite to eat" -> "restaurant". Empty when it isn't a stop kind.
+std::string StopKind(std::string target)
+{
+  for (bool trimmed = true; trimmed;)
+  {
+    trimmed = false;
+    for (char const * lead : {"a ", "an ", "the ", "some ", "nearest ", "closest ", "nearby ", "quick "})
+      if (target.rfind(lead, 0) == 0)
+      {
+        target.erase(0, std::string(lead).size());
+        trimmed = true;
+      }
+  }
+  static std::pair<char const *, char const *> const kKinds[] = {
+      {"gas", "gas station"},         {"gas station", "gas station"}, {"fuel", "gas station"},
+      {"petrol", "gas station"},      {"petrol station", "gas station"},
+      {"food", "restaurant"},         {"something to eat", "restaurant"}, {"restaurant", "restaurant"},
+      {"bite to eat", "restaurant"},  {"bite", "restaurant"},             {"place to eat", "restaurant"},
+      {"somewhere to eat", "restaurant"}, {"lunch", "restaurant"},        {"dinner", "restaurant"},
+      {"breakfast", "restaurant"},    {"coffee", "coffee"},               {"coffee shop", "coffee"},
+      {"cafe", "coffee"},             {"caffeine", "coffee"},             {"restroom", "restroom"},
+      {"bathroom", "restroom"},       {"toilet", "restroom"},             {"potty", "restroom"},
+      {"loo", "restroom"},            {"charger", "charging station"},    {"charging station", "charging station"}};
+  for (auto const & kind : kKinds)
+    if (target == kind.first)
+      return kind.second;
+  return {};
+}
+
+/// What to look for when `target` came after "find a" or "stop at": its stop kind, else the name with
+/// "the nearest" taken off. Empty for things that aren't places: "a different route", "the light".
+std::string StopTarget(std::string const & target)
+{
+  if (auto kind = StopKind(target); !kind.empty())
+    return kind;
+  std::string name = target;
+  for (char const * lead : {"a nearby ", "the nearest ", "the closest ", "nearest ", "closest ", "a ", "an ", "the "})
+    if (name.rfind(lead, 0) == 0)
+    {
+      name.erase(0, std::string(lead).size());
+      break;
+    }
+  std::string const padded = " " + name + " ";
+  for (char const * notAPlace : {" route ", " way ", " voice ", " voices ", " joke ", " song ", " light ", " lights ",
+                                 " sign ", " corner ", " intersection ", " crosswalk ", " line ", " end ", " nothing ",
+                                 " pen ", " keys ", " phone ", " it ", " that ", " this ", " them ", " him ", " her "})
+    if (padded.find(notAPlace) != std::string::npos)
+      return {};
+  return name;
+}
+
+/// What comes after "stop at", ending in a space, as ParseTarget reads it, less "on the way": "target on the way " -> "target".
+std::string StopName(std::string const & rest)
+{
+  std::string target = ParseTarget(rest);
+  for (char const * tail : {" on the way there", " on the way", " on our way", " along the way", " first"})
+  {
+    std::string const t = tail;
+    if (target.size() > t.size() && target.compare(target.size() - t.size(), t.size(), t) == 0)
+      target.erase(target.size() - t.size());
+  }
+  return target;
+}
+
+/// Where in `words` a stop was asked for, and what for: "find gas", "I need a bathroom", "add a stop at Walmart",
+/// "I have to pee", "we're low on gas", "find me a McDonald's", "stop at Target on the way".
+std::pair<size_t, std::string> StopSearch(std::string const & words, std::vector<size_t> const & starts)
 {
   static std::pair<char const *, char const *> const kWants[] = {
       {"gas", "gas station"},          {"gas station", "gas station"}, {"a gas station", "gas station"},
@@ -207,6 +401,44 @@ std::pair<size_t, std::string> StopSearch(std::string const & words)
     auto const at = words.find(cue);
     if (at != std::string::npos)
       return {at, ParseTarget(words.substr(at + std::string(cue).size()))};
+  }
+  // A need said as a need: nobody says "find a restroom" when they have to pee.
+  static std::pair<char const *, char const *> const kNeeds[] = {
+      {" have to pee ", "restroom"},     {" need to pee ", "restroom"},     {" needs to pee ", "restroom"},
+      {" gotta pee ", "restroom"},       {" got to pee ", "restroom"},      {" bathroom break ", "restroom"},
+      {" potty break ", "restroom"},     {" pee break ", "restroom"},       {" low on gas ", "gas station"},
+      {" low on fuel ", "gas station"},  {" out of gas ", "gas station"},   {" running on empty ", "gas station"},
+      {" gas light is on ", "gas station"}, {" gas light came on ", "gas station"},
+      {" i'm starving ", "restaurant"},  {" im starving ", "restaurant"},   {" we're starving ", "restaurant"},
+      {" i'm hungry ", "restaurant"},    {" im hungry ", "restaurant"},     {" we're hungry ", "restaurant"},
+      {" i'm so hungry ", "restaurant"}, {" i'm getting hungry ", "restaurant"}, {" we're getting hungry ", "restaurant"},
+      {" need caffeine ", "coffee"}};
+  for (auto const & need : kNeeds)
+    if (auto const at = words.find(need.first); at != std::string::npos)
+      return {at, need.second};
+  // "I need to go to the bathroom", "we have to stop for lunch": a stop kind after a need.
+  for (char const * cue : {" need to go to ", " needs to go to ", " have to go to ", " has to go to ", " gotta go to ",
+                           " got to go to ", " need to use ", " needs to use ", " have to use ", " need to stop at ",
+                           " have to stop at ", " need to stop for ", " have to stop for ", " need some ", " need to get "})
+    if (auto const at = words.find(cue); at != std::string::npos)
+      if (auto kind = StopKind(StopName(words.substr(at + std::string(cue).size()))); !kind.empty())
+        return {at, kind};
+  // "Find me a McDonald's", "let's stop at Target on the way": an order, about a place.
+  for (char const * cue : {" find me a ", " find me an ", " find a ", " find an ", " find the nearest ", " find the closest ",
+                           " find me the nearest ", " find me the closest ", " stop at ", " stop by "})
+  {
+    auto at = words.find(cue);
+    while (at != std::string::npos && !GoIsAnOrder(words, starts, at))
+      at = words.find(cue, at + 1);
+    if (at == std::string::npos)
+      continue;
+    std::string const rest = words.substr(at + std::string(cue).size());
+    std::string target = StopName(rest);
+    if (std::string_view(cue).find("nearest") != std::string_view::npos ||
+        std::string_view(cue).find("closest") != std::string_view::npos)
+      target = "nearest " + target;
+    if (auto stop = StopTarget(target); !stop.empty())
+      return {at, stop};
   }
   return {0, {}};
 }
@@ -228,8 +460,16 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                                 " cancel directions ", " stop the directions ", " stop directions "}},
       {AppAction::Unmute, {" unmute ", " un mute ", " you can talk again ", " talk to me again ", " start talking again ",
                            " sound back on ", " turn the sound back on ", " you can speak again "}},
-      {AppAction::Mute, {" mute ", " mute yourself ", " be quiet ", " shut up ", " stop talking ", " quiet please ",
-                         " go quiet ", " turn off the sound ", " turn the sound off ", " hush "}},
+      {AppAction::Mute, {" mute ", " mute yourself ", " mute everything ", " turn off the sound ", " turn the sound off "}},
+      // A hush keeps the turns: going silent at the next exit isn't what anyone asked for.
+      {AppAction::DirectionsOnly, {" be quiet ", " shut up ", " stop talking ", " quiet please ", " go quiet ", " hush ",
+                                   " just directions ", " just the directions ", " only directions ", " directions only ",
+                                   " just give me directions ", " just give me the directions ", " just navigate "}},
+      {AppAction::TalkLess, {" talk less ", " less talking ", " not so much talking ", " fewer jokes ", " less jokes ",
+                             " tone it down ", " stop being so chatty ", " not so chatty ", " less chatty ",
+                             " you talk too much "}},
+      {AppAction::TalkMore, {" talk more ", " more talking ", " more jokes ", " you can talk more ", " be chatty ",
+                             " say whatever you want "}},
       {AppAction::RepeatInstruction, {" repeat that ", " say that again ", " what did you say ", " come again ",
                                       " repeat the direction ", " repeat the directions ", " repeat the last ",
                                       " what was that ", " say again ", " repeat yourself "}},
@@ -349,7 +589,8 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                             {" switch to driving ", "drive"}})
     if (auto const at = words.find(mode.first); at != std::string::npos && !heardAction(AppAction::SetTravelMode))
       found.push_back({at, AppCommand{AppAction::SetTravelMode, mode.second}});
-  auto const stop = StopSearch(words);
+  auto const starts = ClauseStarts(spoken);
+  auto const stop = StopSearch(words, starts);
   if (!stop.second.empty())
     found.push_back({stop.first, AppCommand{AppAction::FindAlongRoute, stop.second}});
   // "What other voices do you have?" isn't asking for a particular one.
@@ -358,8 +599,13 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
     { return f.second.action == AppAction::ChangeVoice && f.second.argument.empty(); }), found.end());
   // "Unmute" also contains "mute", and "turn the sound back on" isn't muting.
   bool const unmuted = std::any_of(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::Unmute; });
-  if (unmuted)
+  if (unmuted || (words.find(" mute ") == std::string::npos && HushAimedElsewhere(spoken)))
     found.erase(std::remove_if(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::Mute; }), found.end());
+  if (HushAimedElsewhere(spoken))
+    found.erase(std::remove_if(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::DirectionsOnly; }), found.end());
+  // "Unmute and talk to me": unmuting already brings the full commentary back.
+  if (unmuted)
+    found.erase(std::remove_if(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::TalkMore; }), found.end());
   if (auto const destination = ParseDestinationCommand(spoken))
   {
     // "Go to settings" and "switch to echo" aren't places.
@@ -373,9 +619,19 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       for (char const * cue : {" take ", " navigate ", " drive ", " directions ", " get ", " route ", " let's ",
                                " lets ", " head ", " go ", " bring "})
         at = std::min(at, words.find(cue));
-      found.push_back({at, AppCommand{AppAction::NavigateTo, t}});
+      // "Take me to the nearest gas station" is a stop, not the end of the trip: the host adds it to a route
+      // or, with none, goes there.
+      bool const nearest = t.rfind("nearest ", 0) == 0 || t.rfind("closest ", 0) == 0 || t.rfind("a nearby ", 0) == 0;
+      std::string const stopFor = StopKind(t).empty() && !nearest ? std::string{} : StopTarget(t);
+      if (stopFor.empty())
+        found.push_back({at, AppCommand{AppAction::NavigateTo, t}});
+      else if (!heardAction(AppAction::FindAlongRoute))
+        found.push_back({at, AppCommand{AppAction::FindAlongRoute, stopFor}});
     }
   }
+  // "Don't cancel the route", "I don't want to go to work": heard, but not asked for.
+  found.erase(std::remove_if(found.begin(), found.end(), [&](auto const & f) { return NegatedAt(words, starts, f.first); }),
+              found.end());
   std::stable_sort(found.begin(), found.end(), [](auto const & a, auto const & b) { return a.first < b.first; });
   std::vector<AppCommand> out;
   for (auto & f : found)
@@ -557,7 +813,8 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::StopListening: return saidAny({"listening", "mic", "microphone", "eavesdropping"});
   case AppAction::ListCommands: return saidAny({"commands", "command", "help", "can", "how", "do"});
   case AppAction::FindAlongRoute:
-    return argumentSaid() || saidAny({"find", "need", "stop", "gas", "food", "coffee", "restroom", "bathroom", "fuel", "eat"});
+    return argumentSaid() || saidAny({"find", "need", "stop", "gas", "food", "coffee", "restroom", "bathroom", "fuel", "eat",
+                                      "pee", "hungry", "starving", "toilet", "potty", "nearest", "closest", "charger"});
   case AppAction::SkipStop: return saidAny({"stop", "stops"}) && saidAny({"skip", "remove", "cancel", "no"});
   case AppAction::NextStop: return saidAny({"stop"});
   case AppAction::SpeedLimit: return saidAny({"limit"}) || saidAny({"fast"});
@@ -577,6 +834,9 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::ForgetThat: return saidAny({"forget", "delete"});
   case AppAction::SetTravelMode:
     return saidAny({"walk", "walking", "foot", "hike", "hiking", "bike", "biking", "cycling", "drive", "driving", "off", "offroading", "offroad", "road"});
+  case AppAction::TalkLess: return saidAny({"less", "fewer", "down", "chatty", "much"});
+  case AppAction::DirectionsOnly: return saidAny({"quiet", "shut", "hush", "stop", "directions", "just"});
+  case AppAction::TalkMore: return saidAny({"more", "chatty", "whatever"});
   case AppAction::Count: break;
   }
   return false;

@@ -1,0 +1,129 @@
+{
+ "about": "Street types abroad said in their own language for map turn instructions (BI-008): 'Calle Ocho' KAH-yeh, 'Paseo de la Reforma' with a Spanish 'de la', 'Rue du Bac' French 'du', 'Via della Spiga' Italian, 'Rua do Ouro' Portuguese, 'Hauptstraße' Haupt SHTRAH-seh, as fx dictionary stand-ins (Lexicon() holds their phonemes). Only before a capitalised word, number or name particle (German types after a name), so 'via I-35' and 'rue the day' stay English; the name itself is left to the voice. Backseat Driver: backseat::pronunciation::ForSpeech / ForeignStreets (libs/backseat/backseat_tests/spoken_street_types.json). BookLyre can take the street-type rows (CROSS).",
+ "cases": [
+  {
+   "input": "Turn left onto Calle Ocho.",
+   "expected": "Turn left onto fxkahyeh Ocho."
+  },
+  {
+   "input": "Turn right onto Paseo de la Reforma.",
+   "expected": "Turn right onto fxpahsehoh fxdeh fxlah Reforma."
+  },
+  {
+   "input": "Continue on Avenida de los Insurgentes Sur.",
+   "expected": "Continue on fxahvehneedah fxdeh fxlohs Insurgentes Sur."
+  },
+  {
+   "input": "Turn left onto Rue de Rivoli.",
+   "expected": "Turn left onto fxroo fxduh Rivoli."
+  },
+  {
+   "input": "Turn right onto Rue du Faubourg Saint-Honoré.",
+   "expected": "Turn right onto fxroo fxdew Faubourg Saint-Honoré."
+  },
+  {
+   "input": "Keep left onto Via della Spiga.",
+   "expected": "Keep left onto fxveeah fxdellah Spiga."
+  },
+  {
+   "input": "Turn onto Viale Monza.",
+   "expected": "Turn onto fxveeahleh Monza."
+  },
+  {
+   "input": "Arriving at Piazza Navona.",
+   "expected": "Arriving at fxpeeahtsah Navona."
+  },
+  {
+   "input": "Turn left onto Rua do Ouro.",
+   "expected": "Turn left onto fxhooah fxdoo Ouro."
+  },
+  {
+   "input": "Continue on Avenida dos Aliados.",
+   "expected": "Continue on fxahvehneedah fxdoos Aliados."
+  },
+  {
+   "input": "Turn right onto Hauptstraße.",
+   "expected": "Turn right onto Haupt fxshtrahseh."
+  },
+  {
+   "input": "Turn left onto Bahnhofstrasse.",
+   "expected": "Turn left onto Bahnhof fxshtrahseh."
+  },
+  {
+   "input": "Arriving at Potsdamer Platz.",
+   "expected": "Arriving at Potsdamer fxplahts."
+  },
+  {
+   "input": "Turn onto Berliner Straße.",
+   "expected": "Turn onto Berliner fxshtrahseh."
+  },
+  {
+   "input": "Turn left onto Chemin de la Côte-des-Neiges.",
+   "expected": "Turn left onto fxshehman fxduh fxlah Côte-des-Neiges."
+  },
+  {
+   "input": "Turn left onto Calle 8.",
+   "expected": "Turn left onto fxkahyeh eight."
+  },
+  {
+   "input": "Turn right onto Rue d'Alésia.",
+   "expected": "Turn right onto fxroo d'Alésia."
+  },
+  {
+   "input": "Take El Camino Real.",
+   "expected": "Take El Camino Real."
+  },
+  {
+   "input": "Head south via I-35.",
+   "expected": "Head south via I thirty five."
+  },
+  {
+   "input": "You'll rue the day.",
+   "expected": "You'll rue the day."
+  },
+  {
+   "input": "Rue the day you met me.",
+   "expected": "Rue the day you met me."
+  },
+  {
+   "input": "Calle is a word.",
+   "expected": "Calle is a word."
+  },
+  {
+   "input": "Turn left onto Allée des Cygnes.",
+   "expected": "Turn left onto fxahlay fxday Cygnes."
+  },
+  {
+   "input": "Keep right onto Quai de la Tournelle.",
+   "expected": "Keep right onto fxkay fxduh fxlah Tournelle."
+  },
+  {
+   "input": "Turn onto Travessa da Glória.",
+   "expected": "Turn onto fxtrahvehsah fxdah Glória."
+  },
+  {
+   "input": "Turn left onto Praça da Sé.",
+   "expected": "Turn left onto fxprahsah fxdah Sé."
+  },
+  {
+   "input": "Turn onto Carrera 7.",
+   "expected": "Turn onto fxkahrehrah seven."
+  },
+  {
+   "input": "Turn onto Glorieta de Insurgentes.",
+   "expected": "Turn onto fxglohryehtah fxdeh Insurgentes."
+  },
+  {
+   "input": "Turn onto Callejón del Beso.",
+   "expected": "Turn onto fxkahyehhohn fxdehl Beso."
+  },
+  {
+   "input": "The platz is closed.",
+   "expected": "The platz is closed."
+  },
+  {
+   "input": "Via Veneto, then left.",
+   "expected": "fxveeah Veneto, then left."
+  }
+ ]
+}

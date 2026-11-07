@@ -62,6 +62,16 @@ enum class TurnKind
   Destination
 };
 
+/// How much the GPS says besides directions ("shut up", "talk less", "talk more").
+enum class TalkLevel
+{
+  Full,
+  /// About half the remarks; bits, games and directions as always.
+  Less,
+  /// Directions, lane calls and arrival only: no remarks, bits, games or badges.
+  DirectionsOnly
+};
+
 /// Which side of the road the lanes for the next maneuver are on, when the driver has to move over.
 enum class LaneSide
 {
@@ -201,6 +211,11 @@ struct Fix
   double accuracyM = -1;
 };
 
+/// The fix with junk measurements (NaN/inf speed, a bearing that isn't finite or is past 360, NaN
+/// accuracy, a bad limit) read as unknown, or nothing when it has no usable time or place, or replays a moment
+/// before `newestTMs` (within a minute of it).
+std::optional<Fix> CleanFix(Fix const & raw, double newestTMs);
+
 /// Distance along `ahead` (the route from the car onward) to the first sharp bend: where the heading
 /// has turned at least `minDeg` within 80 m. Negative if none starts within `maxM`.
 double CurveAheadM(std::vector<LatLon> const & ahead, double maxM, double minDeg = 50);
@@ -214,6 +229,13 @@ std::string InstructionText(RouteSnapshot const & route);
 
 /// Which way `to` is from `from`, as said out loud: "northwest".
 std::string CompassDirection(LatLon const & from, LatLon const & to);
+
+/// `spoken` answers quiz `q` rather than asking about the drive (see Navigator::QuizTakes).
+bool QuizAnswerTakes(QuizQuestion const & q, std::string const & spoken);
+/// The drive outranks a game: a question about the next turn or exit, or a command such as "cancel the
+/// route", "mute" or "take me to Target". A game can't swallow these, even mid-question.
+/// `aboutIt`: a 20 Questions question about "it", where "go" ("do you go there to get it?") isn't the route.
+bool DriveComesFirst(std::string const & spoken, bool aboutIt = false);
 
 class Navigator
 {
@@ -236,8 +258,13 @@ public:
   Units GetUnits() const { return m_config.units; }
   /// The country the car is in, as the map files name it ("US", "Canada", "UK"). Decides which
   /// holidays get a line: Canada gets Canada Day and its own Thanksgiving, not the Fourth of July.
-  /// Empty (unknown) is treated as the US.
-  void SetCountry(std::string country) { m_country = std::move(country); }
+  /// Empty (unknown) is treated as the US. A country that drives on the left also gets the few
+  /// drive-side jokes mirrored ("The right lane is for passing").
+  void SetCountry(std::string country)
+  {
+    SetLineDriveSide(DrivesOnLeft(country));
+    m_country = std::move(country);
+  }
   /// Lets the navigator name the place of an unplanned stop ("Why are we stopping for gas?").
   void SetPlaceLookup(PlaceLookup lookup) { m_placeLookup = std::move(lookup); }
   /// Lets the license plate game know which state the car is in ("a Colorado plate in Colorado?").
@@ -319,6 +346,9 @@ public:
   /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate".
   /// Same thread as OnFix.
   void OnDriverSaid(double tMs, std::string const & text);
+  /// Stopped long enough to be a stop the driver chose (not a red light, not a jam), or crawling
+  /// through a parking lot. The plate game and parked-only lines go by this.
+  bool Parked() const;
   /// A line to say right now, outside the queue (e.g. the snarky reply to a voice command), picked
   /// like any other so it doesn't repeat. Works between trips too. The driver's {name} and
   /// pronouns ({theycap} {theyre} {them} {their}) are filled in unless `vars` has them.
@@ -352,6 +382,7 @@ public:
   /// Whether the question still waits for an answer (a spoken one closes it too).
   bool ModeAskOpen() const { return m_modeAskOpen; }
   /// Yes, we really are walking (or no: then it's a drive). False if there was no question open.
+  /// A "no" while the car is already moving gets "pick Driving when we're parked", not a tap prompt.
   bool AnswerModeAsk(bool walking);
   /// The next drive's start says "check the mode now and then, I may swap it on you" (it won't).
   void WarnModeOnNextDrive() { m_modeWarnNextDrive = true; }
@@ -372,6 +403,10 @@ public:
   /// line isn't late.
   std::string const & PhoneCallerVoice() const { return m_call.CallerVoice(); }
 
+  /// "Shut up" keeps the turns (DirectionsOnly); "talk less" halves the remarks. Kept across trips.
+  void SetTalkLevel(TalkLevel level);
+  TalkLevel GetTalkLevel() const { return m_talk; }
+
   /// Pop quizzes (pop_quiz.hpp) need the driver to answer out loud, so they only happen once the
   /// host says it listens after "quiz.ask" lines. Off until then.
   void SetPopQuizOn(bool on) { m_quizOn = on; }
@@ -391,14 +426,23 @@ public:
   };
   std::optional<QuizCard> PopQuizCard() const;
   /// A pop quiz is waiting and `spoken` answers it (a choice, or "I don't know"), so it goes to the
-  /// quiz before anything else: "Pull to the right and stop" isn't "stop navigation".
-  bool QuizTakes(std::string const & spoken) const
-  {
-    return QuizAsking() && ParseQuizAnswer(*m_quiz.Question(), spoken).kind != QuizHeard::Kind::Unclear;
-  }
+  /// quiz before anything else: "Pull to the right and stop" isn't "stop navigation". But the drive
+  /// comes first: "where do I turn?" or "cancel the route" isn't an answer, even when a choice shares
+  /// a word with it, unless a choice was named by its letter ("B", "option two").
+  bool QuizTakes(std::string const & spoken) const;
+  /// 20 Questions is on and `spoken` is a move in it (a question, a guess, a hint, giving up or
+  /// quitting), so it goes to the game, not the app: "Do you have to go to a gas station to get it?"
+  /// isn't "find a gas station", and "Can you use it on foot?" isn't walking directions. The drive still
+  /// comes first ("what's the next turn", "cancel the route"). Hosts ask this after QuizTakes.
+  bool TwentyTakes(std::string const & spoken) const;
+  /// "Can you repeat the question?" while a quiz waits: reads it again (once a quiz) and gives the
+  /// driver the full time to answer again. True when it did; hosts ask this before QuizTakes.
+  bool QuizReask(double tMs, std::string const & spoken);
   /// The driver tapped a choice on the card. Ignored on a drive.
   void QuizTapped(double tMs, int choice);
   int BrowniePoints() const { return m_said.Counter(kBrowniesKey); }
+  /// Correct turns in a row, carried across trips (running_bits.hpp).
+  int TurnStreak() const { return m_bits.Streak(); }
   static constexpr char const * kBrowniesKey = "_quiz.brownies";
 
   bool InTrip() const { return m_engine != nullptr; }
@@ -418,7 +462,7 @@ private:
   void CountLefts(double t);
   /// "In half a mile, turn left onto Elm Street." for the maneuver in route.
   void SayInstruction(double t, RouteSnapshot const & route);
-  void TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot const & route);
+  void TrackPlateGame(double tMs, LatLon const & here, double speedMps, RouteSnapshot const & route);
   void SayPlate(double tMs, PlateGame::Reply const & reply);
   void SayLine(double tMs, Category category, std::string const & key, Vars vars = {},
                Priority priority = Priority::Roast);
@@ -431,6 +475,12 @@ private:
   /// Text for a running-bit line: picked (or its story beat), filled with the driver's details
   /// and the current speed.
   std::string BitText(BitLine const & bit);
+  /// No fix for over 30 s before `t` (m_lastFix is still the one before this OnFix): the GPS was out.
+  bool FixGapAt(double t) const;
+  /// A remark is queued, held for a turn, or a punchline is waiting out its pause.
+  bool RemarkWaiting() const;
+  /// A remark went out in the last breath, or one is waiting to (loop B51, BI-046).
+  bool RemarkJustSaid(double t) const;
   /// "You've done everything right for five minutes. I don't like it."
   void TrackClean(Fix const & fix, RouteSnapshot const & route);
   /// Straight nags and the turn reminders before the final call: fewer of them, from bigger pools
@@ -540,7 +590,6 @@ private:
   /// {name}, {gps} and the driver's pronouns, for lines about the driver.
   Vars DriverVars() const;
   int Tier() const;
-  bool Parked() const;
 
   EngineConfig m_config;
   std::vector<TripRecord> m_history;
@@ -549,6 +598,8 @@ private:
   RewriteGate m_gate;
 
   double m_lastT = 0;
+  /// The newest fix timestamp OnFix took, for dropping replayed fixes.
+  double m_lastFixT = -1e18;
   double m_lastVoiceCommandT = -1e12;
   TravelMode m_travelMode = TravelMode::Drive;
   double m_lastHeadingT = -1e18;
@@ -579,6 +630,10 @@ private:
   LatLon m_stopAt;
   double m_stopWanderM = 0;
   bool m_stopAnnounced = false;
+  /// The navigator called it traffic at some point during this stop: a jam, not a stop the driver chose.
+  bool m_stopInTraffic = false;
+  /// When the car last pulled away from a stop of a minute or more.
+  double m_resumedT = -1e18;
   /// Pulled over at the roadside: said once per stop. The police line once per trip.
   bool m_pullOverSaid = false;
   bool m_policeSaid = false;
@@ -723,6 +778,9 @@ private:
   std::optional<Fix> m_lastFix;
   /// The last fix, trip or not: where the car is when a trip starts.
   std::optional<Fix> m_hereFix;
+  /// Last speed the GPS actually reported, and when; carried through short dropouts (see OnFix).
+  std::optional<double> m_knownSpeedMps;
+  double m_knownSpeedT = 0;
   BuildingLookup m_buildingLookup;
   /// This trip started indoors; the "made it out" line is still to come (key, empty if not).
   std::string m_indoorOutKey;
@@ -745,9 +803,16 @@ private:
   // Pop quizzes.
   PopQuiz m_quiz;
   bool m_quizOn = false;
+  TalkLevel m_talk = TalkLevel::Full;
+  /// TalkLevel::Less: the next remark is the one let through (they alternate).
+  bool m_lessSayNext = true;
+  /// Drops what TalkLevel rules out from lines about to be spoken; `punchlines` were already let through.
+  void FilterForTalkLevel(std::vector<Commentary> & lines, std::set<std::string> const & punchlines);
   int m_quizzes = 0;
   double m_lastQuizT = -1e18;
   int m_quizUnclear = 0;
+  /// The current quiz has been read a second time.
+  bool m_quizReasked = false;
   /// The maneuver whose quiet stretch already had its roll of the dice for a quiz.
   std::optional<uint32_t> m_quizRolledFor;
   std::function<void(TwentyLog const &)> m_onTwentyLog;

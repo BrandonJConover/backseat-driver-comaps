@@ -49,6 +49,11 @@ struct EngineConfig
   double hardBrakeMps2 = 3.5;
   /// Acceleration (m/s²) that counts as a jackrabbit start.
   double hardAccelMps2 = 3.0;
+  /// A one-second speed change past this (m/s²) is a GPS glitch, not driving: no car brakes or launches
+  /// much past 1.2 g, and a real emergency stop is about 9. Such a step isn't judged, and the next one is
+  /// measured from the last believable sample, so a 25 -> 8 -> 25 m/s blip is neither a hard brake nor a
+  /// launch while 25 -> 8 -> 8 still counts (as 8.5 m/s² over two seconds). 0: off (the TS engine's behavior).
+  double implausibleMps2 = 0;
   /// Display units under the limit, sustained for tooSlowAfterMs, to get called slow.
   double tooSlowMargin = 15;
   double tooSlowAfterMs = 20000;
@@ -226,6 +231,8 @@ private:
   EngineConfig m_config;
   double m_frustration = 0;
   std::optional<TelemetrySample> m_lastSample;
+  /// The sample before an implausible speed jump: the next step's acceleration is measured from it.
+  std::optional<TelemetrySample> m_beforeGlitch;
   double FarM() const;
   double FinalM() const;
   /// Where the final call goes with speechAware: FinalM(), or farther out when the call is long or
@@ -251,6 +258,11 @@ private:
   std::optional<double> m_slowSince;
   std::optional<double> m_stoppedSince;
   int m_stopCount = 0;
+  /// longStop remarks during the current stop; each waits twice as long as the last, then they stop.
+  int m_longStopRemarks = 0;
+  static constexpr int kLongStopRemarksPerStop = 3;
+  /// When an unplannedStop remark last spoke, so longStop doesn't land in the same breath.
+  double m_lastUnplannedStopAt = -1e18;
   bool m_braking = false;
   bool m_accelerating = false;
   double m_lastSpeedingLogAt;

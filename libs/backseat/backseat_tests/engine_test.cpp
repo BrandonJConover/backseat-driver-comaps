@@ -379,3 +379,100 @@ TEST(KilometerThresholdsMatchTheMileOnes)
   CHECK_EQUAL(back.wayOver, 10);
   CHECK_EQUAL(back.tooSlowMargin, 15.0);
 }
+
+TEST(StandInSpeedsAreNotJudgedForBrakingOrLaunching)
+{
+  auto engine = MakeEngine();
+  engine.OnTelemetry(Sample(0, 60, std::nullopt));
+  auto stand = Sample(1000, 0, std::nullopt);
+  stand.speedKnown = false;
+  engine.OnTelemetry(stand);
+  engine.OnTelemetry(Sample(2000, 60, std::nullopt));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 0);
+  CHECK_EQUAL(engine.Stats().hardAccels, 0);
+  // Measured speeds on both sides still count.
+  engine.OnTelemetry(Sample(3000, 30, std::nullopt));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 1);
+}
+
+namespace
+{
+CritiqueEngine GlitchAwareEngine()
+{
+  EngineConfig c;
+  c.rng = SeededRng(1);
+  c.implausibleMps2 = 12;
+  return CritiqueEngine(c, 0);
+}
+
+// Speeds in m/s here: the glitch threshold is physics, not display units.
+TelemetrySample Mps(double t, double mps)
+{
+  TelemetrySample s;
+  s.t = t;
+  s.speedMps = mps;
+  return s;
+}
+}  // namespace
+
+// A one-sample speed blip (25 -> 8 -> 25 m/s) is the GPS, not the driver: no brake, no launch.
+TEST(OneSampleSpeedGlitchIsNotAHardBrakeOrLaunch)
+{
+  auto engine = GlitchAwareEngine();
+  engine.OnTelemetry(Mps(0, 25));
+  engine.OnTelemetry(Mps(1000, 25));
+  auto const down = engine.OnTelemetry(Mps(2000, 8));
+  auto const up = engine.OnTelemetry(Mps(3000, 25));
+  engine.OnTelemetry(Mps(4000, 25));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 0);
+  CHECK_EQUAL(engine.Stats().hardAccels, 0);
+  for (auto const * out : {&down, &up})
+    for (auto const & c : *out)
+      CHECK(c.category != Category::HardBraking && c.category != Category::HardAccel);
+  // An upward blip too.
+  engine.OnTelemetry(Mps(5000, 40));
+  engine.OnTelemetry(Mps(6000, 25));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 0);
+  CHECK_EQUAL(engine.Stats().hardAccels, 0);
+}
+
+// A real emergency stop (~9 m/s²) is believable and still roasts at once.
+TEST(EmergencyStopIsStillAHardBrake)
+{
+  auto engine = GlitchAwareEngine();
+  engine.OnTelemetry(Mps(0, 27));
+  auto const out = engine.OnTelemetry(Mps(1000, 18));
+  engine.OnTelemetry(Mps(2000, 9));
+  engine.OnTelemetry(Mps(3000, 0));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 1);
+  bool roasted = false;
+  for (auto const & c : out)
+    roasted = roasted || c.category == Category::HardBraking;
+  CHECK(roasted);
+}
+
+// A drop too sharp for one second that then holds was a real (if blurry) slowdown: counted once, from
+// the last believable speed (25 -> 8 over two seconds).
+TEST(ImplausibleDropThatHoldsCountsOnTheNextSample)
+{
+  auto engine = GlitchAwareEngine();
+  engine.OnTelemetry(Mps(0, 25));
+  engine.OnTelemetry(Mps(1000, 8));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 0);
+  engine.OnTelemetry(Mps(2000, 8));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 1);
+  engine.OnTelemetry(Mps(3000, 8));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 1);
+  CHECK_EQUAL(engine.Stats().hardAccels, 0);
+}
+
+// Off by default: the TS-parity engine still judges every step as before.
+TEST(GlitchFilterIsOffByDefault)
+{
+  auto engine = MakeEngine();
+  engine.OnTelemetry(Mps(0, 25));
+  engine.OnTelemetry(Mps(1000, 8));
+  engine.OnTelemetry(Mps(2000, 25));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 1);
+  CHECK_EQUAL(engine.Stats().hardAccels, 1);
+}

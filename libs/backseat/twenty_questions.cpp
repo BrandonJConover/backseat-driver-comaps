@@ -1,6 +1,7 @@
 #include "backseat/twenty_questions.hpp"
 
 #include "backseat/plate_game.hpp"
+#include "backseat/types.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -17,7 +18,7 @@ using T = Trait;
 std::string TqWords(std::string const & s)
 {
   std::string out = " ";
-  for (unsigned char const c : s)
+  for (unsigned char const c : StraightApostrophes(s))
   {
     if (std::isalnum(c))
       out += static_cast<char>(std::tolower(c));
@@ -34,6 +35,30 @@ bool TqHas(std::string const & words, char const * phrase) { return words.find(T
 bool TqHasAny(std::string const & words, std::vector<char const *> const & phrases)
 {
   return std::any_of(phrases.begin(), phrases.end(), [&](char const * p) { return TqHas(words, p); });
+}
+
+/// Whether the driver ended on one of `phrases`, allowing one trailing filler ("what is it then").
+bool TqEndsWithAny(std::string const & words, std::vector<char const *> const & phrases)
+{
+  for (auto const * p : phrases)
+    for (char const * tail : {"", "then", "already", "anyway", "please", "now"})
+    {
+      std::string const full = TqWords(p) + TqWords(tail).substr(1);
+      if (words.size() >= full.size() && words.compare(words.size() - full.size(), full.size(), full) == 0)
+        return true;
+    }
+  return false;
+}
+
+/// "Does it ...", "do I ...", "is it ...": a yes/no question about the thing.
+bool AsksAboutIt(std::string const & words)
+{
+  for (char const * start : {"is it", "does it", "do i", "do we", "do you", "can it", "can i", "can we", "could it",
+                             "could i", "would it", "would i", "will it", "has it", "was it", "did it", "should i",
+                             "is that", "are they", "it is", "its", "it s"})
+    if (words.rfind(TqWords(start), 0) == 0)
+      return true;
+  return false;
 }
 
 /// Where a thing is, for "I'm thinking of something {where}".
@@ -468,19 +493,30 @@ TwentyHeard ParseTwentyHeard(std::string const & spoken)
 {
   std::string const w = TqWords(spoken);
   TwentyHeard h;
-  if (TqHasAny(w, {"give up", "i give", "just tell me", "tell me what it is", "what is it", "what was it",
-                   "i surrender", "you win"}))
+  // Short cues ("what is it", "i give", "enough", "help me") only count when the driver ends on
+  // them: "what is it made of", "do I give it food", "small enough to hold" and "does it help me
+  // drive" are questions about the thing.
+  bool const aboutIt = AsksAboutIt(w);
+  if (TqHasAny(w, {"give up", "giving up", "i give in", "just tell me", "tell me what it is", "tell me what it was",
+                   "i surrender", "you win"}) ||
+      TqEndsWithAny(w, {"what is it", "what was it", "whats it", "what s it"}) ||
+      (!aboutIt && TqEndsWithAny(w, {"i give"})))
   {
     h.kind = TwentyHeard::Kind::GiveUp;
     return h;
   }
   if (TqHasAny(w, {"stop playing", "stop the game", "end the game", "quit", "im done", "i m done", "never mind",
-                   "nevermind", "no more", "enough", "dont want to play", "don t want to play", "game over"}))
+                   "nevermind", "no more questions", "no more games", "thats enough", "that s enough",
+                   "enough of this", "enough already", "had enough", "enough questions", "dont want to play",
+                   "don t want to play", "game over"}) ||
+      w == TqWords("enough") || (!aboutIt && TqEndsWithAny(w, {"no more"})))
   {
     h.kind = TwentyHeard::Kind::Quit;
     return h;
   }
-  if (TqHasAny(w, {"hint", "clue", "help me"}))
+  if (TqHasAny(w, {"hint", "clue", "help me out", "a little help", "some help", "give me help", "need help",
+                   "get help"}) ||
+      (!aboutIt && TqEndsWithAny(w, {"help me", "help"})))
   {
     h.kind = TwentyHeard::Kind::Hint;
     return h;
@@ -494,25 +530,29 @@ TwentyHeard ParseTwentyHeard(std::string const & spoken)
       h.thing = *t;
       return h;
     }
+  // "Is it not alive?" asks whether it's dead. "Isn't it alive?" still asks whether it's alive.
+  bool const negated = TqHasAny(w, {"is it not", "does it not", "can it not", "can you not", "do you not",
+                                    "would it not", "will it not", "has it not", "was it not", "its not", "it s not",
+                                    "it isnt", "it doesnt", "it can t", "it cant", "it is not", "it does not"});
   if (auto const size = SizeQuestion(w))
   {
     h.kind = TwentyHeard::Kind::Question;
     h.trait = size->first;
-    h.flipped = size->second;
+    h.flipped = size->second != negated;
     return h;
   }
   if (TqHasAny(w, {"outside", "outdoors", "out there"}) && !TqHas(w, "in the car"))
   {
     h.kind = TwentyHeard::Kind::Question;
     h.trait = T::InCar;
-    h.flipped = true;
+    h.flipped = !negated;
     return h;
   }
   if (TqHasAny(w, {"is it safe", "safe"}))
   {
     h.kind = TwentyHeard::Kind::Question;
     h.trait = T::Dangerous;
-    h.flipped = true;
+    h.flipped = !negated;
     return h;
   }
   for (auto const & tw : kTraitWords)
@@ -520,6 +560,7 @@ TwentyHeard ParseTwentyHeard(std::string const & spoken)
     {
       h.kind = TwentyHeard::Kind::Question;
       h.trait = tw.trait;
+      h.flipped = negated;
       return h;
     }
   // "Is it a giraffe": a guess at something it was never going to be.

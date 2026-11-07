@@ -211,3 +211,25 @@ TEST(RewritesThatAreTheModelTalkingAreThrownOut)
   CHECK_EQUAL(AcceptRewrite(r, "Line: Left. The other left.").value_or(""), std::string("Left. The other left."));
   CHECK(AcceptRewrite(r, "Left means left. Wild concept, I know.").has_value());
 }
+
+TEST(GateDropsLinesWithNothingToSay)
+{
+  auto model = std::make_shared<FakeModel>();
+  FakeClock clock;
+  RewriteGate gate(1000ms, clock.Fn());
+  gate.SetRewriter(model);
+  // An empty pool or a template that filled to blanks never reaches the voice or the model.
+  for (char const * blank : {"", " ", " || ", "\n\t", "..."})
+  {
+    gate.Push(Line(blank));
+    gate.Push(Line(blank), false);
+  }
+  CHECK(model->asked.empty());
+  CHECK(gate.Take().empty());
+  // Real lines around them still go out.
+  gate.Push(Line("Ok."), false);
+  gate.Push(Line(""), false);
+  auto const out = gate.Take();
+  CHECK_EQUAL(out.size(), size_t{1});
+  CHECK_EQUAL(out[0].text, std::string("Ok."));
+}

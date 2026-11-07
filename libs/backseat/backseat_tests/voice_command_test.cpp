@@ -5,6 +5,7 @@
 #include "backseat/voice_command.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <set>
 
 using namespace backseat;
@@ -115,7 +116,7 @@ TEST(AppCommandsAreHeardInOrder)
   CHECK(ParseAppCommands("ok cancel the route")[0].action == AppAction::CancelRoute);
   CHECK(ParseAppCommands("please unmute")[0].action == AppAction::Unmute);
   CHECK_EQUAL(ParseAppCommands("please unmute").size(), size_t(1));
-  CHECK(ParseAppCommands("shut up")[0].action == AppAction::Mute);
+  CHECK(ParseAppCommands("shut up")[0].action == AppAction::DirectionsOnly);
   CHECK(ParseAppCommands("How much longer?")[0].action == AppAction::TimeLeft);
   CHECK(ParseAppCommands("what did you say")[0].action == AppAction::RepeatInstruction);
   CHECK(ParseAppCommands("go to settings")[0].action == AppAction::OpenSettings);
@@ -608,4 +609,196 @@ TEST(CommandsDontRunTwice)
   CHECK(!repeats.IsRepeat({AppAction::Mute, ""}, 216000));
   CHECK(!repeats.IsRepeat({AppAction::RepeatInstruction, ""}, 217000));
   CHECK(!repeats.IsRepeat({AppAction::RepeatInstruction, ""}, 218000));
+}
+
+namespace
+{
+/// "what's" with each curly apostrophe dictation and keyboards send: ’ (U+2019), ‘ (U+2018), ʼ (U+02BC).
+std::vector<std::string> CurlyVersions(std::string const & straight)
+{
+  std::vector<std::string> out;
+  for (char const * curly : {"\xE2\x80\x99", "\xE2\x80\x98", "\xCA\xBC"})
+  {
+    std::string s;
+    for (char const c : straight)
+      s += c == '\'' ? std::string(curly) : std::string(1, c);
+    out.push_back(s);
+  }
+  return out;
+}
+
+std::string CommandsSummary(std::vector<AppCommand> const & commands)
+{
+  std::string out;
+  for (auto const & c : commands)
+    out += std::to_string(static_cast<int>(c.action)) + ":" + c.argument + ";";
+  return out;
+}
+}  // namespace
+
+TEST(StraightApostrophesOnlyTouchesApostrophes)
+{
+  CHECK_EQUAL(StraightApostrophes("What\xE2\x80\x99s next"), std::string("What's next"));
+  CHECK_EQUAL(StraightApostrophes("\xE2\x80\x98I\xCA\xBCm\xE2\x80\x99"), std::string("'I'm'"));
+  // Dashes, quotes and other UTF-8 stay as they were.
+  for (char const * keep : {"left\xE2\x80\x94right", "\xE2\x80\x9CHi\xE2\x80\x9D", "caf\xC3\xA9", "\xE2\x80", "\xCA"})
+    CHECK_EQUAL(StraightApostrophes(keep), std::string(keep));
+}
+
+TEST(CurlyApostrophesParseLikeStraightOnes)
+{
+  // Every ParseAppCommands cue with an apostrophe, in a sentence.
+  for (char const * said :
+       {"What's the next turn", "what's my next turn", "When's my next turn?", "What's the speed limit",
+        "what's my speed", "What's the ETA", "what's our arrival time", "What's the next stop", "where's the next stop",
+        "what's my grade", "What's in my file", "I'm walking", "I'm biking now", "I'm hiking", "I'm driving",
+        "we're off road", "you're wrong", "that's on you", "let's go to the airport", "Let's avoid tolls"})
+  {
+    auto const want = CommandsSummary(ParseAppCommands(said));
+    CHECK(!want.empty());
+    for (auto const & curly : CurlyVersions(said))
+      CHECK_EQUAL(CommandsSummary(ParseAppCommands(curly)), want);
+  }
+  for (auto const & curly : CurlyVersions("my wife's"))
+    CHECK(ParseBusinessOwner(curly) == ParseBusinessOwner("my wife's"));
+  for (auto const & curly : CurlyVersions("excuse me, I'm a woman"))
+    CHECK(PronounCorrection(curly) == std::string("she"));
+  for (auto const & curly : CurlyVersions("I'm hungry"))
+    CHECK(!PronounCorrection(curly));
+}
+
+TEST(NegatedAndOverheardCommandsDontRun)
+{
+  // Negated in the same clause: heard, not asked for.
+  for (char const * said : {"don't cancel the route", "please don't stop navigating", "don't mute", "do not take me home",
+                            "I don't want to go to work", "never cancel the route", "don’t mute"})
+    CHECK(ParseAppCommands(said).empty());
+  // Overheard: a bare "go to" that nobody ordered, and a hush aimed at someone in the car.
+  for (char const * said : {"should we go to Costco", "my wife wants to go to Target", "kids be quiet", "shut up Kevin",
+                            "Kevin, be quiet", "be quiet guys", "I want to go home"})
+    CHECK(ParseAppCommands(said).empty());
+
+  for (char const * said : {"go to work", "Go to work.", "okay go to work", "take me to work instead", "hey, go to work",
+                            "could you go to work", "thanks. Go to work"})
+  {
+    auto const c = ParseAppCommands(said);
+    CHECK(c.size() == 1 && c[0].action == AppAction::NavigateTo && c[0].argument == "work");
+  }
+  auto const airport = ParseAppCommands("let's go to the airport");
+  CHECK(airport.size() == 1 && airport[0].argument == "airport");
+  for (char const * tail : {"later", "right now", "real quick", "for me"})
+  {
+    auto const c = ParseAppCommands(std::string("take me to the gym ") + tail);
+    CHECK(c.size() == 1 && c[0].argument == "gym");
+  }
+  CHECK(ParseAppCommands("go home")[0].argument == "home");
+
+  auto const argue = ParseAppCommands("cancel the route, don't argue");
+  CHECK(argue.size() == 1 && argue[0].action == AppAction::CancelRoute);
+  CHECK(ParseAppCommands("never mind, cancel the route")[0].action == AppAction::CancelRoute);
+  CHECK(ParseAppCommands("never mind cancel the route")[0].action == AppAction::CancelRoute);
+  CHECK(ParseAppCommands("why don't you tell me a joke")[0].action == AppAction::TellJoke);
+  // Said to the GPS itself it still hushes it (directions stay on; "mute" is the full mute).
+  for (char const * said : {"shut up", "be quiet", "shut up, Backseat", "be quiet please", "oh shut up"})
+  {
+    auto const c = ParseAppCommands(said);
+    CHECK(!c.empty() && c[0].action == AppAction::DirectionsOnly);
+  }
+  auto const kevin = ParseAppCommands("Kevin, mute");
+  CHECK(!kevin.empty() && kevin[0].action == AppAction::Mute);
+}
+
+TEST(NeedsSaidAsNeedsFindAStop)
+{
+  auto const stopFor = [](char const * said) -> std::string
+  {
+    auto const commands = ParseAppCommands(said);
+    for (auto const & c : commands)
+      CHECK(c.action != AppAction::NavigateTo);
+    for (auto const & c : commands)
+      if (c.action == AppAction::FindAlongRoute)
+        return c.argument;
+    return "<none>";
+  };
+  // Needs said as needs, and "nearest" places: a stop, never the end of the trip.
+  CHECK_EQUAL(stopFor("I need to go to the bathroom"), std::string("restroom"));
+  CHECK_EQUAL(stopFor("my son needs to go to the bathroom"), std::string("restroom"));
+  CHECK_EQUAL(stopFor("I have to pee"), std::string("restroom"));
+  CHECK_EQUAL(stopFor("I gotta pee so bad"), std::string("restroom"));
+  CHECK_EQUAL(stopFor("we need a bathroom break"), std::string("restroom"));
+  CHECK_EQUAL(stopFor("we're low on gas"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("we’re running low on fuel"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("the gas light came on"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("I'm starving"), std::string("restaurant"));
+  CHECK_EQUAL(stopFor("we have to stop for lunch"), std::string("restaurant"));
+  CHECK_EQUAL(stopFor("I need some coffee"), std::string("coffee"));
+  CHECK_EQUAL(stopFor("take me to the nearest gas station"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("take me to a gas station please"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("navigate to the closest Starbucks"), std::string("starbucks"));
+  CHECK_EQUAL(stopFor("find a Starbucks"), std::string("starbucks"));
+  CHECK_EQUAL(stopFor("find me a McDonald's"), std::string("mcdonald's"));
+  CHECK_EQUAL(stopFor("can you find the nearest Walgreens"), std::string("walgreens"));
+  CHECK_EQUAL(stopFor("find a place to eat"), std::string("restaurant"));
+  CHECK_EQUAL(stopFor("stop at Target on the way"), std::string("target"));
+  CHECK_EQUAL(stopFor("let's stop at a gas station"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("okay, stop by the Costco first"), std::string("costco"));
+  // What already worked still does.
+  CHECK_EQUAL(stopFor("find gas"), std::string("gas station"));
+  CHECK_EQUAL(stopFor("I need a bathroom"), std::string("restroom"));
+  CHECK_EQUAL(stopFor("add a stop at Walmart please"), std::string("walmart"));
+
+  // Not a stop: places as destinations, other errands, chatter, negations.
+  CHECK(ParseAppCommands("take me to Starbucks")[0].action == AppAction::NavigateTo);
+  CHECK(ParseAppCommands("take me to the airport")[0].argument == "airport");
+  CHECK(ParseAppCommands("take me to work")[0].action == AppAction::NavigateTo);
+  CHECK(Heard("find a different route", AppAction::DifferentRoute));
+  CHECK(!Heard("find a different route", AppAction::FindAlongRoute));
+  for (char const * said : {"I need to go to work", "I can't find a pen", "stop at the light", "stop at the stop sign",
+                            "should we stop at Target", "we stopped at Target on the way", "I don't have to pee",
+                            "I'm not hungry", "skip the stop at Walmart", "she has to go to the dentist",
+                            "I need to get home", "find a way out of this", "stop at nothing"})
+  {
+    auto const commands = ParseAppCommands(said);
+    CHECK(std::none_of(commands.begin(), commands.end(), [](AppCommand const & c)
+    { return c.action == AppAction::FindAlongRoute || c.action == AppAction::NavigateTo; }));
+  }
+  // The model's pick holds up when the words were a need.
+  CHECK(WordsSupportTool(AppAction::FindAlongRoute, "restroom", "I have to pee"));
+  CHECK(WordsSupportTool(AppAction::FindAlongRoute, "restaurant", "I'm starving"));
+}
+
+TEST(TalkLessKeepsTheTurns)
+{
+  auto const only = [](char const * said, AppAction action)
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == action;
+    if (!ok)
+      std::printf("  heard \"%s\": %zu commands, first %s\n", said, c.size(), c.empty() ? "-" : ToolFor(c[0].action).name);
+    return ok;
+  };
+  // A hush keeps the directions: only "mute" goes fully silent.
+  for (char const * said : {"shut up", "Shut up!", "be quiet", "stop talking", "hush", "just directions please",
+                            "only directions", "directions only", "just give me the directions", "just navigate",
+                            "oh my god just shut up", "can you stop talking", "could you be quiet, please"})
+    CHECK(only(said, AppAction::DirectionsOnly));
+  for (char const * said : {"mute", "mute everything", "mute yourself", "turn the sound off"})
+    CHECK(only(said, AppAction::Mute));
+  for (char const * said : {"talk less", "less talking please", "fewer jokes", "tone it down", "you talk too much",
+                            "stop being so chatty", "less chatty please"})
+    CHECK(!ParseAppCommands(said).empty() && ParseAppCommands(said)[0].action == AppAction::TalkLess);
+  for (char const * said : {"talk more", "more jokes", "you can talk more now", "say whatever you want"})
+    CHECK(only(said, AppAction::TalkMore));
+  // Unmuting brings everything back by itself.
+  for (char const * said : {"you can talk again", "talk to me again", "unmute and talk to me again"})
+    CHECK(only(said, AppAction::Unmute));
+  // Curly apostrophes and negations (B18, B19) work here too.
+  CHECK(only("don\u2019t be so chatty, just directions", AppAction::DirectionsOnly));
+  for (char const * said : {"don't shut up", "please don't stop talking", "never be quiet", "don't talk less",
+                            "kids be quiet", "shut up Kevin", "be quiet guys", "Kevin, stop talking"})
+    CHECK(ParseAppCommands(said).empty());
+  // The tools are there for the on-device model too, by name.
+  CHECK(AppActionNamed("directions_only") == AppAction::DirectionsOnly);
+  CHECK(AppActionNamed("talk_less") == AppAction::TalkLess);
+  CHECK(AppActionNamed("talk_more") == AppAction::TalkMore);
 }

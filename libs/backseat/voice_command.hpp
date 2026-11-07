@@ -78,6 +78,12 @@ enum class AppAction
   WhatDoYouKnow,
   ForgetThat,
   SetTravelMode,
+  /// Fewer remarks; directions as always.
+  TalkLess,
+  /// Directions, lane calls and arrival only: no remarks, bits or games ("shut up").
+  DirectionsOnly,
+  /// Back to the full commentary.
+  TalkMore,
   Count
 };
 
