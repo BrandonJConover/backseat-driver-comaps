@@ -258,6 +258,11 @@ private:
   std::optional<double> m_slowSince;
   std::optional<double> m_stoppedSince;
   int m_stopCount = 0;
+  /// longStop remarks during the current stop; each waits twice as long as the last, then they stop.
+  int m_longStopRemarks = 0;
+  static constexpr int kLongStopRemarksPerStop = 3;
+  /// When an unplannedStop remark last spoke, so longStop doesn't land in the same breath.
+  double m_lastUnplannedStopAt = -1e18;
   bool m_braking = false;
   bool m_accelerating = false;
   double m_lastSpeedingLogAt;

@@ -147,7 +147,7 @@ TEST(SoakLongStopMidRouteDoesNotBunchUp)
       }
       int const undirected = UndirectedOutside(r, -1, 0);
       // One remark per 40 s at most, whatever the backoff ends up being.
-      bool const bad = !r.arrived || bunched > 3 || said > len / 40 + 1 || undirected != 0;
+      bool const bad = !r.arrived || bunched > 0 || said > len / 40 + 1 || undirected != 0;
       failed += bad;
       if (bad || Verbose())
         std::fprintf(stderr, "  stop seed=%u len=%.0f arrived=%d said=%d bunched=%d undirected=%d\n", seed, len,

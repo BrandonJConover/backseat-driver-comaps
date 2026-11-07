@@ -479,8 +479,9 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     std::string const said =
         m_pendingTurn ? "I said " + SaidWhat(m_pendingTurn->shape, m_pendingTurn->dir) + "." : "I said nothing about stopping.";
     Log(MakeIncident(e.t, IncidentKind::UnplannedStop, placeName.value_or(PlaceName(kind))), e.at);
-    Roast(out, e.t, Category::UnplannedStop, std::string("unplannedStop.") + PlaceName(kind),
-          {{"said", said}, {"name", placeName.value_or(PlaceFallback(kind))}}, true);
+    if (Roast(out, e.t, Category::UnplannedStop, std::string("unplannedStop.") + PlaceName(kind),
+              {{"said", said}, {"name", placeName.value_or(PlaceFallback(kind))}}, true))
+      m_lastUnplannedStopAt = e.t;
     break;
   }
   case NavEvent::Type::DestinationSet:
@@ -1036,6 +1037,7 @@ void CritiqueEngine::CheckStopped(TelemetrySample const & s, std::vector<Comment
   if (s.speedMps >= 0.5)
   {
     m_stoppedSince.reset();
+    m_longStopRemarks = 0;
     return;
   }
   if (!m_stoppedSince)
@@ -1044,15 +1046,31 @@ void CritiqueEngine::CheckStopped(TelemetrySample const & s, std::vector<Comment
     m_stopCount++;
     return;
   }
-  if (s.t - *m_stoppedSince < m_config.longStopAfterMs)
+  // Stuck in a jam keeps blaming the route every 45 s, as before.
+  if (m_trafficAlternate)
+  {
+    if (s.t - *m_stoppedSince < m_config.longStopAfterMs)
+      return;
+    if (Roast(out, s.t, Category::Traffic, "traffic", {{"alternate", *m_trafficAlternate}}))
+    {
+      m_stoppedSince = s.t;
+      Log(MakeIncident(s.t, IncidentKind::Traffic));
+    }
     return;
-  bool const spoke = m_trafficAlternate
-                         ? Roast(out, s.t, Category::Traffic, "traffic", {{"alternate", *m_trafficAlternate}})
-                         : Roast(out, s.t, Category::LongStop, "longStop", {{"stops", Num(m_stopCount)}});
-  if (spoke)
+  }
+  // Parked mid-route, each remark waits twice as long as the last (45 s, 90, 180), then it gives up.
+  if (m_longStopRemarks >= kLongStopRemarksPerStop)
+    return;
+  if (s.t - *m_stoppedSince < m_config.longStopAfterMs * std::pow(2.0, m_longStopRemarks))
+    return;
+  // The stop was just remarked on by name ("Why are we stopping here?"), so don't pile on.
+  if (s.t - m_lastUnplannedStopAt < m_config.longStopAfterMs)
+    return;
+  if (Roast(out, s.t, Category::LongStop, "longStop", {{"stops", Num(m_stopCount)}}))
   {
     m_stoppedSince = s.t;
-    Log(MakeIncident(s.t, m_trafficAlternate ? IncidentKind::Traffic : IncidentKind::LongStop));
+    ++m_longStopRemarks;
+    Log(MakeIncident(s.t, IncidentKind::LongStop));
   }
 }
 
