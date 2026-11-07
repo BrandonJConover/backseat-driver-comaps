@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <initializer_list>
 
 namespace backseat
 {
@@ -95,6 +96,64 @@ double RoadGroundM(LatLon const & a, LatLon const & b)
 bool Has(std::vector<std::string> const & v, std::string const & s) { return std::find(v.begin(), v.end(), s) != v.end(); }
 
 bool RoadHasWord(std::string const & words, char const * w) { return words.find(w) != std::string::npos; }
+
+// Whether `w` shows up in `words` with a "not"/"no"/"never" a word or two before it ("definitely not gas
+// stations", "no rest stops"), and whether it shows up at all.
+struct RoadMention
+{
+  bool said = false;
+  bool negated = false;
+};
+
+RoadMention RoadMentioned(std::string const & words, std::initializer_list<char const *> forms)
+{
+  RoadMention m;
+  for (char const * w : forms)
+    for (size_t at = words.find(w); at != std::string::npos; at = words.find(w, at + 1))
+    {
+      m.said = true;
+      // The three words before it ("i don t like gas" counts "t like" as two).
+      size_t from = at;
+      for (int n = 0; n < 4 && from > 0; ++n)
+        from = words.rfind(' ', from - 1);
+      std::string const before = words.substr(from, at - from + 1);
+      for (char const * neg : {" not ", " never ", " don t ", " dont ", " isn t ", " isnt ", " aren t ", " arent ",
+                               " anything but ", " except "})
+      {
+        size_t const n = before.rfind(neg);
+        if (n == std::string::npos)
+          continue;
+        // "not gas stations, rest stops": the "not" belongs to the gas stations.
+        std::string const between = before.substr(n + std::char_traits<char>::length(neg) - 1);
+        bool crossed = false;
+        for (char const * other : {" rest ", " stop ", " stops ", " gas ", " station ", " stations "})
+          crossed = crossed || between.find(other) != std::string::npos;
+        if (!crossed)
+          m.negated = true;
+      }
+    }
+  return m;
+}
+
+// Whether the words read like an answer to "one to five"/"one to ten": a number, a verdict word, or a
+// word or two. "There's a cop behind us" isn't one, so it goes on to the rest of the listening.
+bool RoadLooksLikeRating(std::string const & words)
+{
+  for (char ch : words)
+    if (ch >= '0' && ch <= '9')
+      return true;
+  for (char const * w : {" zero ", " one ", " two ", " three ", " four ", " five ", " six ", " seven ", " eight ",
+                         " nine ", " ten ", " eleven ", " a hundred ", " million ", " negative ", " minus ",
+                         " none ", " nothing ", " infinity ", " terrible ", " awful ", " horrible ", " bad ",
+                         " good ", " great ", " fine ", " okay ", " ok ", " perfect ", " amazing ", " meh ",
+                         " pass ", " no comment ", " stars ", " star ", " out of ", " rating ", " score "})
+    if (words.find(w) != std::string::npos)
+      return true;
+  int spaces = 0;
+  for (char ch : words)
+    spaces += ch == ' ';
+  return spaces <= 3;  // " like whatever " (two words) is still an answer.
+}
 
 std::string RoadLower(std::string s)
 {
@@ -564,21 +623,34 @@ std::optional<RoadRemark> RoadBits::OnAnswer(double tMs, std::string const & wor
 {
   if (!AwaitingAnswer(tMs))
     return std::nullopt;
-  Await const was = m_await;
-  m_await = Await::None;
-  switch (was)
+  switch (m_await)
   {
   case Await::Bathroom:
   {
-    bool const rest = RoadHasWord(words, " rest ");
-    bool const gas = RoadHasWord(words, " gas ") || RoadHasWord(words, " station ") || RoadHasWord(words, " stations ");
-    if (rest == gas)
+    RoadMention const rest = RoadMentioned(words, {" rest "});
+    RoadMention const gas = RoadMentioned(words, {" gas ", " station ", " stations "});
+    // Talk about something else and the question is still open.
+    if (!rest.said && !gas.said)
       return std::nullopt;
-    said.Remember(kBathroomNote, rest ? "rest" : "gas");
-    return RoadRemark{"file.saved", {{"answer", rest ? "Rest stops" : "Gas stations"}}};
+    m_await = Await::None;
+    // "Rest stops", "not gas stations", "rest stops, not gas stations": one side picked. Both or
+    // neither picked ("both are gross", "neither"): muddled, nothing filed.
+    bool const restPicked = (rest.said && !rest.negated) || (gas.said && gas.negated && !rest.said);
+    bool const gasPicked = (gas.said && !gas.negated) || (rest.said && rest.negated && !gas.said);
+    if (restPicked == gasPicked)
+      return std::nullopt;
+    said.Remember(kBathroomNote, restPicked ? "rest" : "gas");
+    return RoadRemark{"file.saved", {{"answer", restPicked ? "Rest stops" : "Gas stations"}}};
   }
-  case Await::Rate: return RoadRemark{"trap.rate.after", {}};
+  case Await::Rate:
+    if (!RoadLooksLikeRating(words))
+      return std::nullopt;
+    m_await = Await::None;
+    return RoadRemark{"trap.rate.after", {}};
   case Await::Survey:
+    if (!RoadLooksLikeRating(words))
+      return std::nullopt;
+    m_await = Await::None;
     if (!m_restPassedOdoM)
       return std::nullopt;
     return RoadRemark{"rest.surveyAfter", {{"distance", Distance(m_odoM - *m_restPassedOdoM)}}};

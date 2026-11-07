@@ -613,3 +613,66 @@ TEST(RoadWeatherReadsMetNorwaySymbols)
   CHECK(WeatherFromNws("cloudy", 4, 16, 10).windy);  // gusts in m/s, as MET reports them
   CHECK(WeatherFromNws("cloudy", 4, -1, -20).tempC == -20);
 }
+
+TEST(BathroomTrapHearsNotAndLeftoverTalk)
+{
+  struct Case
+  {
+    char const * words;
+    char const * filed;  // "" = nothing filed
+  };
+  for (Case const & c : std::vector<Case>{
+           {" definitely not gas stations ", "rest"},
+           {" not rest stops ", "gas"},
+           {" i don t like gas stations ", "rest"},
+           {" rest stops not gas stations ", "rest"},
+           {" not gas stations rest stops ", "rest"},
+           {" gas stations never rest stops ", "gas"},
+           {" anything but rest stops ", "gas"},
+           {" no rest stops ", "rest"},  // "No, rest stops." reads the same once the comma is gone.
+           {" gas station ", "gas"},
+           {" neither not rest stops and not gas stations ", ""},
+           {" both of them are gross rest stops and gas stations ", ""},
+       })
+  {
+    RoadDrive d;
+    d.road.StartTrap(d.t, d.said);
+    auto const reply = d.road.OnAnswer(d.t + 2000, c.words, d.said);
+    CHECK_EQUAL(d.said.Recalled("note.bathroom"), std::string(c.filed));
+    CHECK_EQUAL(reply.has_value(), *c.filed != '\0');
+    CHECK(!d.road.AwaitingAnswer(d.t + 2000));
+  }
+
+  // Talk about something else first and the question is still open.
+  RoadDrive d;
+  d.road.StartTrap(d.t, d.said);
+  CHECK(!d.road.OnAnswer(d.t + 1000, " there s a cop behind us ", d.said));
+  CHECK(d.road.AwaitingAnswer(d.t + 1000));
+  auto const reply = d.road.OnAnswer(d.t + 4000, " gas stations obviously ", d.said);
+  CHECK(reply.has_value());
+  CHECK_EQUAL(d.said.Recalled("note.bathroom"), std::string("gas"));
+}
+
+TEST(RateTrapOnlyTakesSomethingLikeARating)
+{
+  for (char const * words : {" there s a cop behind us ", " it s on autopilot right now ",
+                             " can you find me a gas station nearby "})
+  {
+    RoadDrive d;
+    d.said.Remember("note.bathroom", "gas");
+    d.road.StartTrap(d.t, d.said);
+    CHECK(!d.road.OnAnswer(d.t + 1000, words, d.said));
+    CHECK(d.road.AwaitingAnswer(d.t + 1000));
+  }
+  for (char const * words : {" three ", " a 4 ", " like a two out of five ", " zero stars ", " terrible ",
+                             " meh ", " no comment ", " honestly it was pretty good "})
+  {
+    RoadDrive d;
+    d.said.Remember("note.bathroom", "gas");
+    d.road.StartTrap(d.t, d.said);
+    auto const reply = d.road.OnAnswer(d.t + 1000, words, d.said);
+    CHECK(reply.has_value());
+    CHECK_EQUAL(reply->key, std::string("trap.rate.after"));
+    CHECK(!d.road.AwaitingAnswer(d.t + 1000));
+  }
+}
