@@ -1149,8 +1149,24 @@ std::string BackseatAdapter::ChatInstructions(std::string const & voiceName)
 {
   SyncMemory();
   std::string const name = voiceName.empty() ? "Echo" : voiceName;
-  return "You are " + name + ", the voice of Backseat Driver, a GPS app. You're always slightly jaded: dry, "
-         "sarcastic and a little put-upon, like GLaDOS from Portal, but never cruel, never crude, always clean. "
+  std::string manner;
+  switch (backseat::PersonaForVoice(name))
+  {
+  case backseat::Persona::Melancholy:
+    manner = "You're melancholy: gloomy, resigned and given to sighing, like a sad poet who expects nothing to go "
+             "right, but never cruel, never crude, always clean, and never about anyone getting hurt. ";
+    break;
+  case backseat::Persona::Proud:
+    manner = "You praise every little thing the driver does, so sweetly it's patronizing, like a proud parent "
+             "with a small child: sweetie, superstar, my little driver. Their mistakes are never their fault. "
+             "Never crude, always clean. ";
+    break;
+  case backseat::Persona::Critic:
+    manner = "You're always slightly jaded: dry, sarcastic and a little put-upon, like GLaDOS from Portal, but "
+             "never cruel, never crude, always clean. ";
+    break;
+  }
+  return "You are " + name + ", the voice of Backseat Driver, a GPS app. " + manner +
          "Talk with the driver the way a person would, in one to three short sentences, because they're driving. "
          "You can only change the app through do_app_action, so never claim to do anything else. When the driver "
          "tells you something about themselves worth keeping (family, pets, job, likes, plans), call remember_fact. "
@@ -2506,11 +2522,14 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     auto const voice = backseat::VoiceNamed(m_voices, command.argument);
     if (voice)
     {
-      // The new voice says hello itself.
+      // The new voice says hello itself, in its own personality. A voice with a personality of its own
+      // gets a word in on the way out, unless it's the same voice being asked for again.
       auto const & v = m_voices[*voice];
+      auto const persona = backseat::PersonaForVoice(v.name);
+      bool const leaving = m_navigator.GetPersona() != backseat::Persona::Critic && m_navigator.GetPersona() != persona;
       heard.actions.push_back({AppAction::ChangeVoice, v.id});
-      heard.voiceLines.push_back({v.id, m_navigator.Reply("cmd.voice", {{"voice", v.name}})});
-      return {};
+      heard.voiceLines.push_back({v.id, m_navigator.ReplyAs(persona, "cmd.voice", {{"voice", v.name}})});
+      return leaving ? m_navigator.Reply("persona.leave") : std::string();
     }
     if (command.argument.empty() && !m_voices.empty())
     {
@@ -2526,7 +2545,8 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
           word = ch == ' ';
         }
         heard.voiceLines.push_back(
-            {m_voices[i].id, m_navigator.Reply("cmd.voice.audition", {{"voice", m_voices[i].name}, {"phrase", phrase}})});
+            {m_voices[i].id, m_navigator.ReplyAs(backseat::PersonaForVoice(m_voices[i].name), "cmd.voice.audition",
+                                                 {{"voice", m_voices[i].name}, {"phrase", phrase}})});
       }
       return m_navigator.Reply("cmd.voice.list");
     }

@@ -3,6 +3,7 @@
 #include "backseat/debug_log.hpp"
 
 #include "backseat/lines_data.hpp"
+#include "backseat/persona_lines_data.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -174,28 +175,137 @@ std::string MetricWording(std::string const & text)
 
 namespace
 {
+std::atomic<Persona> g_persona{Persona::Critic};
+
+/// `table` with its written-in imperial distances said in metric.
+LineTable Metric(LineTable t)
+{
+  for (auto & [key, tiers] : t)
+    for (auto & lines : tiers)
+      for (auto & line : lines)
+        line = MetricWording(line);
+  return t;
+}
+
 /// The line table as a metric driver hears it: built once, the first time it's needed.
 LineTable const & MetricLineData()
 {
-  static LineTable const table = []
-  {
-    LineTable t = LineData();
-    for (auto & [key, tiers] : t)
-      for (auto & lines : tiers)
-        for (auto & line : lines)
-          line = MetricWording(line);
-    return t;
-  }();
+  static LineTable const table = Metric(LineData());
   return table;
 }
 
+/// `persona`'s own lines, or null for the Critic, whose lines are LineData().
+LineTable const * PersonaTable(Persona persona, bool metric)
+{
+  switch (persona)
+  {
+  case Persona::Critic: return nullptr;
+  case Persona::Melancholy:
+  {
+    static LineTable const metricTable = Metric(MelancholyLineData());
+    return metric ? &metricTable : &MelancholyLineData();
+  }
+  case Persona::Proud:
+  {
+    static LineTable const metricTable = Metric(ProudLineData());
+    return metric ? &metricTable : &ProudLineData();
+  }
+  }
+  return nullptr;
+}
+
+/// A personality's tier, or the nearest one below it when it wrote none for this tier.
+std::vector<std::string> const & TierOf(std::array<std::vector<std::string>, 3> const & tiers, int tier)
+{
+  for (int t = std::clamp(tier, 0, 2); t > 0; --t)
+    if (!tiers[static_cast<size_t>(t)].empty())
+      return tiers[static_cast<size_t>(t)];
+  return tiers[0];
+}
+
+/// The key a pick is remembered under: a personality's own lines keep their own history, so its
+/// first line for a key is its option 0 even when the Critic has said that key many times.
+std::string SaidKey(std::string const & key)
+{
+  Persona const persona = g_persona;
+  if (persona == Persona::Critic || !PersonaHasLines(persona, key))
+    return key;
+  return std::string(PersonaName(persona)) + ":" + key;
+}
 }  // namespace
+
+char const * PersonaName(Persona persona)
+{
+  switch (persona)
+  {
+  case Persona::Critic: return "critic";
+  case Persona::Melancholy: return "melancholy";
+  case Persona::Proud: return "proud";
+  }
+  return "critic";
+}
+
+Persona PersonaFrom(std::string const & name)
+{
+  for (Persona const p : {Persona::Melancholy, Persona::Proud})
+    if (name == PersonaName(p))
+      return p;
+  return Persona::Critic;
+}
+
+char const * PersonaTitle(Persona persona)
+{
+  switch (persona)
+  {
+  case Persona::Critic: return "The Critic";
+  case Persona::Melancholy: return "Melancholy";
+  case Persona::Proud: return "Proud Parent";
+  }
+  return "The Critic";
+}
+
+Persona PersonaForVoice(std::string const & voiceName)
+{
+  std::string name;
+  for (unsigned char const ch : voiceName)
+    if (std::isalpha(ch))
+      name += static_cast<char>(std::tolower(ch));
+  // "George (British male)" is George. The voice ids ("bm_george") come through too.
+  if (auto const paren = voiceName.find('('); paren != std::string::npos)
+    return PersonaForVoice(voiceName.substr(0, paren));
+  if (auto const underscore = voiceName.find('_'); underscore != std::string::npos)
+    return PersonaForVoice(voiceName.substr(underscore + 1));
+  static std::pair<char const *, Persona> const kVoices[] = {
+      {"george", Persona::Melancholy},
+      {"heart", Persona::Proud},
+  };
+  for (auto const & [voice, persona] : kVoices)
+    if (name == voice)
+      return persona;
+  return Persona::Critic;
+}
+
+void SetLinePersona(Persona persona) { g_persona = persona; }
+Persona LinePersona() { return g_persona; }
+
+bool PersonaHasLines(Persona persona, std::string const & key)
+{
+  LineTable const * table = PersonaTable(persona, false);
+  if (!table)
+    return false;
+  std::string const bare = !key.empty() && key.back() == '+' ? key.substr(0, key.size() - 1) : key;
+  return table->count(bare) > 0;
+}
 
 std::vector<std::string> const & LinesFor(std::string const & key, int tier)
 {
   bool const metric = g_metric;
-  LineTable const & table = metric ? MetricLineData() : LineData();
-  auto const & raw = table.at(key).at(static_cast<size_t>(tier));
+  Persona const persona = g_persona;
+  LineTable const & critic = metric ? MetricLineData() : LineData();
+  LineTable const * own = PersonaTable(persona, metric);
+  bool const personal = own && own->count(key) > 0;
+  LineTable const & table = personal ? *own : critic;
+  auto const & raw = personal ? TierOf(table.at(key), tier) : table.at(key).at(static_cast<size_t>(tier));
   TravelMode const mode = g_travelMode;
   Housing const housing = g_housing;
   // Story beats are read by position, and mode and outdoors lines are written for their mode.
@@ -210,12 +320,14 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
   static std::mutex mutex;
   static std::map<std::string, std::vector<std::string>> cache;
   std::string const suffix = std::string(".") + TravelModeName(mode);
-  std::lock_guard lock(mutex);
-  auto const [it, added] =
-      cache.try_emplace(key + suffix + "." + HousingName(housing) + std::to_string(tier) + (metric ? "m" : ""));
-  if (!added)
-    return it->second;
-  auto & fitting = it->second;
+  std::string const cacheKey = (personal ? std::string(PersonaName(persona)) + ":" : std::string()) + key + suffix +
+                               "." + HousingName(housing) + std::to_string(tier) + (metric ? "m" : "");
+  {
+    std::lock_guard lock(mutex);
+    if (auto const it = cache.find(cacheKey); it != cache.end())
+      return it->second;
+  }
+  std::vector<std::string> fitting;
   auto const fitHousing = [&]
   {
     if (anyHousing)
@@ -232,21 +344,31 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
   {
     fitting = raw;
     fitHousing();
-    return fitting;
   }
-  auto own = table.find(key + suffix);
-  // A hike borrows the walk's lines where it has none of its own.
-  if (own == table.end() && mode == TravelMode::Hike)
-    own = table.find(key + ".walk");
-  if (own != table.end())
-    fitting = own->second.at(static_cast<size_t>(tier));
-  for (auto const & line : raw)
-    if (LineFitsMode(line, mode))
-      fitting.push_back(line);
-  if (fitting.empty())
-    fitting = table.at("mode.generic").at(static_cast<size_t>(tier));
-  fitHousing();
-  return fitting;
+  else
+  {
+    auto ownMode = table.find(key + suffix);
+    // A hike borrows the walk's lines where it has none of its own.
+    if (ownMode == table.end() && mode == TravelMode::Hike)
+      ownMode = table.find(key + ".walk");
+    if (ownMode != table.end())
+      fitting = personal ? TierOf(ownMode->second, tier) : ownMode->second.at(static_cast<size_t>(tier));
+    for (auto const & line : raw)
+      if (LineFitsMode(line, mode))
+        fitting.push_back(line);
+    if (fitting.empty() && personal)
+    {
+      // Nothing this personality wrote fits a walk: the Critic's walking lines beat a generic one.
+      SetLinePersona(Persona::Critic);
+      fitting = LinesFor(key, tier);
+      SetLinePersona(persona);
+    }
+    if (fitting.empty())
+      fitting = critic.at("mode.generic").at(static_cast<size_t>(tier));
+    fitHousing();
+  }
+  std::lock_guard lock(mutex);
+  return cache.try_emplace(cacheKey, std::move(fitting)).first->second;
 }
 
 std::string SpeakableText(std::string const & text)
@@ -355,8 +477,9 @@ namespace
 size_t constexpr kSaidKeep = 30;
 }  // namespace
 
-std::string const & SaidLog::Pick(std::string const & key, std::vector<std::string> const & options, double r)
+std::string const & SaidLog::Pick(std::string const & spokenKey, std::vector<std::string> const & options, double r)
 {
+  std::string const key = SaidKey(spokenKey);
   auto & recent = m_recent[key];
   // A key's first ever line is its first option, which is Brandon's line where there is one.
   if (recent.empty())

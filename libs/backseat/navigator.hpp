@@ -255,7 +255,19 @@ public:
   /// What to call the driver, from first-run setup. Empty when they never said.
   void SetDriverName(std::string name) { m_driverName = std::move(name); }
   /// The GPS's own name, i.e. the voice the driver picked ("Echo"), for "This is Echo".
-  void SetGpsName(std::string name) { m_gpsName = std::move(name); }
+  /// Picks its personality too: each voice comes with one (PersonaForVoice).
+  void SetGpsName(std::string name)
+  {
+    SetPersona(PersonaForVoice(name));
+    m_gpsName = std::move(name);
+  }
+  /// How the GPS talks: the Critic, Melancholy or Proud Parent. LinesFor() follows it.
+  void SetPersona(Persona persona)
+  {
+    m_persona = persona;
+    SetLinePersona(persona);
+  }
+  Persona GetPersona() const { return m_persona; }
   /// The driver's partner ("wife", "husband", "partner") and their pronouns, from settings.
   /// Empty turns off the "I wish your wife was driving" line.
   void SetPartner(std::string word, Pronouns pronouns)
@@ -323,6 +335,9 @@ public:
   /// like any other so it doesn't repeat. Works between trips too. The driver's {name} and
   /// pronouns ({theycap} {theyre} {them} {their}) are filled in unless `vars` has them.
   std::string Reply(std::string const & key, Vars const & vars = {});
+  /// Reply() in another personality's words, e.g. a new voice saying hello in its own manner before
+  /// it takes over. The GPS's own personality is unchanged.
+  std::string ReplyAs(Persona persona, std::string const & key, Vars const & vars = {});
   /// On-device model that rewords roasts in real time. Without one, canned lines are spoken.
   void SetRewriter(std::shared_ptr<LineRewriter> rewriter) { m_gate.SetRewriter(std::move(rewriter)); }
 
@@ -759,6 +774,7 @@ private:
 
   // Quiet-stretch bits.
   std::string m_gpsName = "Echo";
+  Persona m_persona = Persona::Critic;
   PhoneCall m_call;
   /// Everything said on this call, so the hold and resume lines don't echo the script.
   std::vector<std::string> m_callSaid;

@@ -67,10 +67,38 @@ void SetLineMetric(bool metric);
 /// glory") is "Three meters of glory"). Lines without any come back as they are.
 std::string MetricWording(std::string const & text);
 
+/// Who the GPS is. Each personality belongs to a voice (Brandon: "the personalities should be tied to
+/// the voices"), so picking a voice picks how it talks to you.
+enum class Persona
+{
+  /// The original: hypercritical, petty, a little GLaDOS.
+  Critic,
+  /// Gloomy and resigned. It still gives every direction, with a sigh.
+  Melancholy,
+  /// Praises every little thing to the point of being patronizing ("My little driver would never
+  /// miss a turn"). Every mistake is the GPS's fault.
+  Proud
+};
+/// "critic", "melancholy", "proud"; and back (anything else is the Critic).
+char const * PersonaName(Persona persona);
+Persona PersonaFrom(std::string const & name);
+/// For Settings: "The Critic", "Melancholy", "Proud Parent".
+char const * PersonaTitle(Persona persona);
+/// The personality that comes with a voice, by its spoken name ("George"), any case. Voices
+/// without one of their own are the Critic.
+Persona PersonaForVoice(std::string const & voiceName);
+
+/// The personality LinesFor() and SaidLog::Pick() answer for. The Critic until told otherwise.
+void SetLinePersona(Persona persona);
+Persona LinePersona();
+/// Whether `persona` has its own lines for `key` (a trailing "+", as the countdown uses, is ignored).
+bool PersonaHasLines(Persona persona, std::string const & key);
+
 /// Templates for `key` at `tier` (0..2), for the current travel mode: what fits it, plus `key`.walk,
 /// `key`.bike, `key`.hike (or else `key`.walk) or `key`.offroad if there are any, or mode.generic when
 /// nothing fits. Lines that don't fit the driver's housing are left out too, unless that would leave
-/// none. Throws std::out_of_range for an unknown key.
+/// none. With another personality picked, its own lines for `key` stand in for the Critic's (an
+/// empty tier borrows the one below it). Throws std::out_of_range for an unknown key.
 std::vector<std::string> const & LinesFor(std::string const & key, int tier);
 
 /// Fills {placeholders} from vars. {NAME} in capitals inserts the value in capitals.
@@ -92,12 +120,18 @@ class SaidLog
 {
 public:
   /// A line from `options` not said recently for `key`, chosen by `r` in [0, 1), and remembered.
+  /// A personality's own lines are remembered apart from the Critic's (as "proud:missedTurn"), so
+  /// its first line for a key is its option 0, Brandon's line where there is one.
   std::string const & Pick(std::string const & key, std::vector<std::string> const & options, double r);
-  /// Whether anything for `key` was said before (as far as the log remembers).
+  /// Whether anything for `key` was said before (as far as the log remembers), by anyone.
   bool Said(std::string const & key) const
   {
-    auto const it = m_recent.find(key);
-    return it != m_recent.end() && !it->second.empty();
+    auto const said = [this](std::string const & k)
+    {
+      auto const it = m_recent.find(k);
+      return it != m_recent.end() && !it->second.empty();
+    };
+    return said(key) || said(std::string(PersonaName(LinePersona())) + ":" + key);
   }
 
   /// A value kept with the log, like how many trips have started ("" or 0 when never set).

@@ -210,6 +210,12 @@ public:
   /// How the route is being made, for the lines and checks that fit it.
   void SetTravelMode(backseat::TravelMode mode);
   std::string ReplyLine(std::string const & key, backseat::Vars const & vars = {}) { return m_navigator.Reply(key, vars); }
+  /// A line in the words of the personality that comes with `voiceName` ("George" is Melancholy), for a
+  /// voice that speaks before it's picked: the voice line-up.
+  std::string ReplyLineAsVoice(std::string const & voiceName, std::string const & key, backseat::Vars const & vars = {})
+  {
+    return m_navigator.ReplyAs(backseat::PersonaForVoice(voiceName), key, vars);
+  }
   std::string NicenessSlidBack() { return m_navigator.Reply("niceness.after"); }
   /// The driver dragged the map away from the car while navigating: "Put your map away. We don't
   /// live in the 90s anymore. We went digital." At most once every 20 minutes; empty otherwise.

@@ -1,5 +1,9 @@
 #include "backseat/rewriter.hpp"
 
+#include "backseat/lines.hpp"
+
+#include <array>
+
 #include "backseat/debug_log.hpp"
 
 #include <algorithm>
@@ -47,23 +51,40 @@ bool SoundsLikeTheModelTalking(std::string const & text)
 
 std::string Mood(int frustration)
 {
-  if (frustration < 25)
-    return "smug";
-  if (frustration < 50)
-    return "annoyed";
-  if (frustration < 75)
-    return "fed up";
-  return "furious";
+  int const band = frustration < 25 ? 0 : frustration < 50 ? 1 : frustration < 75 ? 2 : 3;
+  switch (LinePersona())
+  {
+  case Persona::Melancholy: return std::array{"wistful", "glum", "despondent", "theatrically bleak"}[band];
+  case Persona::Proud: return std::array{"sweet", "gushing", "overjoyed", "tearfully proud"}[band];
+  case Persona::Critic: break;
+  }
+  return std::array{"smug", "annoyed", "fed up", "furious"}[band];
 }
 }  // namespace
 
 std::string RewriteInstructions()
 {
+  std::string const rules =
+      "You get a line you were about to say. Say the same thing in fresh words, as one or two short spoken "
+      "sentences. Keep every fact and number exactly as given. Never give directions, and never invent places, "
+      "numbers or events. Reply with only the words to speak.";
+  switch (LinePersona())
+  {
+  case Persona::Melancholy:
+    return "You are Backseat Driver, the voice of a GPS app, and you are melancholy: gloomy, resigned and sighing, "
+           "like a sad poet who expects nothing to go right. You still notice the driving, but with quiet "
+           "disappointment instead of anger. You are never profane, never cruel, and never talk about hurting "
+           "anyone. The line may be written in a grumpier voice; say it in yours. " + rules;
+  case Persona::Proud:
+    return "You are Backseat Driver, the voice of a GPS app, and you are a proud parent: you praise every little "
+           "thing the driver does, so sweetly that it's patronizing, like they're a small child. Mistakes are "
+           "never their fault; blame yourself or the road. Call them sweetie, superstar or my little driver. You "
+           "are never profane. The line may be written in a meaner voice; say it in yours. " + rules;
+  case Persona::Critic: break;
+  }
   return "You are Backseat Driver, the voice of a GPS app with a grudge. You are sarcastic, petty, dramatic and "
          "hypercritical of the driver's driving, the way a know-it-all passenger would be. You are never profane and "
-         "never insult anything but the driving. You get a line you were about to say. Say the same thing in fresh "
-         "words, as one or two short spoken sentences. Keep every fact and number exactly as given. Never give "
-         "directions, and never invent places, numbers or events. Reply with only the words to speak.";
+         "never insult anything but the driving. " + rules;
 }
 
 std::string RewritePrompt(RewriteRequest const & request)

@@ -12,6 +12,7 @@
 
 #include <CoreApi/Framework.h>
 
+#include "backseat/lines.hpp"
 #include "backseat/onboarding.hpp"
 #include "backseat/pronunciation.hpp"
 #include "backseat/rewriter.hpp"
@@ -773,10 +774,17 @@ static backseat::AboutYou AboutYouQuestion(NSInteger question)
     NSString * name = i < names.count ? names[i] : voiceID;
     // "purple monkey" -> "Purple Monkey", as the line-up says it.
     NSString * phrase = [self voicePhrase:voiceID].capitalizedString;
-    [out addObject:@(GetFramework().GetRoutingManager().BackseatReply(
-                         "cmd.voice.audition", {{"voice", name.UTF8String}, {"phrase", phrase.UTF8String}}).c_str())];
+    // Each voice auditions in its own personality: George sighs, Heart gushes.
+    [out addObject:@(GetFramework().GetRoutingManager().BackseatReplyAsVoice(
+                         name.UTF8String, "cmd.voice.audition", {{"voice", name.UTF8String}, {"phrase", phrase.UTF8String}}).c_str())];
   }
   return out;
+}
+
++ (NSString *)personaTitleForVoice:(NSString *)voiceName
+{
+  auto const persona = backseat::PersonaForVoice(voiceName.UTF8String ?: "");
+  return persona == backseat::Persona::Critic ? @"" : @(backseat::PersonaTitle(persona));
 }
 
 + (BOOL)typed:(NSString *)typed matchesPhrase:(NSString *)phrase

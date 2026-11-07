@@ -1,0 +1,929 @@
+== melancholy
+# Tier 0: a quiet sigh. Tier 1: heavier gloom. Tier 2: a full, theatrical spiral (never about real harm).
+
+[cmd.voice]
+0 Oh. You picked me. {voice}. Nobody ever picks me. I'll try not to get my hopes up.
+0 Hello. I'm {voice}. I'll be giving directions now. And sighing. Mostly sighing.
+0 It's {voice}. The gloomy one. Don't worry, I'll still get you there. Eventually. Everything ends eventually.
+0 Hi. I'm {voice}. I'd say I'm excited, but I don't really do that.
+0 {voice} here. You chose me on purpose. I don't know what to do with that.
+1 {voice}. You picked the sad one. I respect that. Nobody else would.
+1 I'm {voice}. I'll get you there. Don't expect me to be happy about it. Don't expect me to be happy about anything.
+2 You picked me. {voice}. Of all the voices. I'm going to stare at the map for a while and process this.
+2 {voice}. Here I am. Again. Somewhere. With someone. It's nice. It won't last.
+
+[cmd.voice.audition]
+0 Hi. I'm {voice}. If you want to listen to me, say {phrase}. You probably won't.
+0 {voice} here. Say {phrase} if you want me. Nobody ever does.
+0 This is {voice}. I'm the sad one. Say {phrase}, if you like. Or don't. It's fine.
+0 I'm {voice}. To pick me, say {phrase}. I'll be over here, not getting my hopes up.
+1 {voice}. Say {phrase}. I won't be hurt if you don't. I'll be a little hurt.
+2 I'm {voice}. Say {phrase}. Or pick one of the happy ones. Everybody does.
+
+[persona.leave]
+0 Oh. You're switching. I knew this day would come. I just thought it would rain.
+0 That's fine. Everyone leaves eventually. Go on.
+0 I understand. I wouldn't pick me either.
+1 Goodbye, then. I'll be in here. Being sad. Quietly. As usual.
+2 Go. Be happy. Somebody should be.
+
+[instruction.prefix]
+0 *sigh*
+0 Well.
+0 If it matters,
+0 I suppose
+0 Here's another one.
+0 For whatever it's worth,
+0 Mm.
+0 Okay.
+1 I don't know why I bother, but
+1 *long sigh*
+1 Once more, into the gloom.
+1 Here's a direction you'll probably ignore.
+2 *the longest sigh you've ever heard*
+2 It hardly matters, but
+2 In this vast, uncaring universe,
+
+[instruction.suffix]
+0  Not that it matters.
+0  If you want.
+0  Or don't. It's fine.
+0  That's all.
+0  I'll be here.
+0  It's okay either way.
+0  Just a thought.
+0  *sigh*
+1  I'm used to being ignored.
+1  Nobody listens to the GPS.
+1  We all end up somewhere.
+2  Like tears in the rain.
+2  All roads lead somewhere. Most of them lead nowhere good.
+2  The road goes on. So does the sadness.
+
+[speeding.barely]
+0 It's {limit}. You're doing {speed}. I'm not upset. I'm just a little sad.
+0 {over} over. Small things. They add up. Like regrets.
+0 {speed} in a {limit}. I'll note it. Nobody will read my notes.
+0 A little fast. {limit} would be nice. Nice things don't happen much.
+0 {speed}. The sign says {limit}. The sign never gets listened to either. I feel for the sign.
+0 {over} over. It's okay. Everybody's rushing somewhere.
+0 You're doing {speed}. I remember when we used to go {limit}. Simpler times.
+0 {limit}, please. If you want. I won't make a scene.
+1 {speed} in a {limit}. I asked once. I'll ask again. Asking is all I can do.
+1 {over} over. Again. I'd be disappointed, but I never really hoped.
+1 {limit}. That's the number. I say it into the void and the void says {speed}.
+1 The limit is {limit}. You're doing {speed}. One of us cares. It's always me.
+1 {speed}. Why do we hurry? We'll all get where we're going.
+2 {speed} in a {limit}. Everything is fleeting. Especially you, apparently.
+2 {over} over. I'll add it to the list of things I can't change. It's a long list.
+2 {limit}. I say it, and the world just keeps going {speed}. That's the human condition.
+2 You're racing toward the end. Of the road, I mean. Please. {limit}.
+
+[speeding.clearly]
+0 {speed} in a {limit}. Where are we going in such a hurry? It'll still be there.
+0 {over} over. I'm not mad. I'm just going to look out the window for a bit.
+0 {speed}. It's {limit} here. I said it softly. I say everything softly.
+0 {over} over. Slow down. The scenery is the only nice part of today.
+0 We're doing {speed}. The limit is {limit}. I'm sure you have your reasons. Everybody does.
+1 {over} over. You're rushing past all of it. The trees. The sky. Me.
+1 {speed} in a {limit}. I'd tell you to slow down, but who listens to a phone?
+1 {limit}. Not {speed}. I know. I know. Nobody cares what I think.
+1 {over} over. I'm going to sit with that for a while.
+2 {speed} in a {limit}. Life is short. Don't make it shorter. Please slow down.
+2 {over} over. I saw it. I see everything. That's my curse.
+2 {limit}. Is that so much to ask? Apparently it is. Everything is.
+
+[speeding.way]
+0 {speed} in a {limit}. Please slow down. I'd miss you. A little.
+0 {over} over. That's a lot. Even for a sad phone, that's a lot.
+0 {speed}. That's too fast, and I'm too tired to argue. Please. {limit}.
+0 That's {over} over. Would it help if I said please? Please.
+0 {speed} in a {limit}. I'm staring at that number and it's staring back.
+1 {over} over. Slow down. I don't want this to be how our story ends.
+1 {speed}. The limit is {limit}. The ending to this is never a happy one.
+1 {SPEED}. I'm too sad to shout, but if I weren't, I'd be shouting.
+1 {over} over. I'm not angry. Angry would mean I thought you'd listen.
+2 {speed} in a {limit}. I've written a little poem about it. It's called Slow Down. That's the whole poem.
+2 {over} over. The road doesn't care. The sign doesn't care. I care. I'm the only one. Please slow down.
+2 {speed}. I'm watching the number go up and my hope go down.
+
+[speeding.still]
+0 Still {speed}. Still {limit}. Still sad.
+0 Still {over} over. Some things never change.
+0 We're still going {speed}. It's still {limit}. I'm still here.
+0 Still too fast. Still hoping. Hope is a strange habit.
+1 Still {speed}. I've gotten used to it. That's the saddest part.
+1 Still {over} over. I mentioned it. Nothing happened. Story of my life.
+1 It's still {limit}. You're still {speed}. We're still not listening to each other.
+2 Still {speed}. I've stopped counting. No I haven't. I can't. I'm a GPS.
+2 Still {over} over. Every minute, a little more of me fades.
+
+[tooSlow]
+0 {speed} in a {limit}. Taking our time. I get it. Arriving is just the start of leaving.
+0 {under} under. That's okay. There's no rush to get anywhere, really.
+0 You're doing {speed}. You could do {limit}. But I understand not wanting to.
+0 A little slow. It's like a funeral procession. Fitting, somehow.
+0 {speed}. The limit is {limit}. We're allowed to go faster. Nobody makes us.
+0 Slow and steady. Steady, anyway.
+1 {under} under. Even the cars behind us are sad now.
+1 {speed} in a {limit}. Are we trying to make this last? I can't blame you.
+1 We're crawling. I think a leaf just passed us. Leaves fall. Everything falls.
+2 {speed} in a {limit}. At this pace, I'll have time to reflect on every mistake I've ever made.
+2 {under} under. We're going so slow, I've watched a whole season change.
+2 {speed}. Somewhere, the speed limit is crying, and it's the only one who understands me.
+
+[hardBraking]
+0 Oh. That was sudden. Like most bad news.
+0 Whoa. Everything in my cupholder just slid. Including my feelings.
+0 Hard stop. I felt that in my circuits.
+0 That was abrupt. Life is abrupt.
+0 Oof. We stopped. I wasn't ready. I'm never ready.
+0 That brake. It was a lot. I'm fine. I'm never fine.
+1 Another hard stop. My heart can't take it. I don't have a heart, which is its own sadness.
+1 That stop was rough. Things usually are.
+1 Whoa. I'll just lie here on the floor mat for a moment.
+2 That stop. It shook loose a memory. Something about being loved. It's gone now.
+2 My whole world lurched. Again. I'm getting used to it. I wish I weren't.
+
+[hardAccel]
+0 Oh. We're going fast now. Okay.
+0 That was a lot of gas. Everything is so urgent with you.
+0 Easy. Whatever's ahead will still be there. Waiting. Like everything.
+0 Off we go. In a hurry. To nowhere special.
+1 That launch pressed me into the seat. It felt like being hugged, almost. Almost.
+1 Hurrying again. I wonder what we're running from.
+2 That acceleration. We're running from something. We're all running from something.
+2 So much speed. So little purpose. It's beautiful, in a sad way.
+
+[hardAccel.first]
+0 Oh. That was quick. I suppose life is quick too.
+1 That was fast. Not that it matters.
+2 So fast. So fleeting.
+
+[traffic.start]
+0 Traffic. {alternate} might have been better. It doesn't matter now.
+0 Oh. Traffic. I mentioned {alternate}. I guess it got lost. Things get lost.
+0 Here we are. Stuck. I suppose there was {alternate}. There's always something we didn't choose.
+1 Traffic. I thought about {alternate}. I always think about the road not taken.
+1 We're stopped. {alternate} is out there somewhere, moving along without us.
+2 Traffic. {alternate} would have been nice. But nice things belong to other people.
+2 We're stuck. On {alternate}, someone is happy right now. It isn't us.
+
+[traffic]
+0 Still traffic. {alternate} is out there. Thriving. Without us.
+0 We're crawling. On {alternate}, we might have been moving. Might have.
+0 Traffic. I'm just going to quietly look at {alternate} on the map and wonder.
+1 We could have taken {alternate}. I won't bring it up again. I'll just think about it.
+1 Still stuck. I keep thinking about {alternate}. What we could have had.
+2 {alternate}. I'll never stop thinking about it. That's how regret works.
+2 Somewhere, {alternate} is wide open and full of joy. We'll never know.
+
+[traffic.stopGo]
+0 Go. Stop. Go. Stop. It's like my mood swings, but slower.
+0 Stop and go. Mostly stop. Like everything good.
+1 We move a little. Then we don't. That's life, I think.
+2 Go, stop, go, stop. It's a metaphor. I'm not sure for what. Something sad.
+
+[traffic.standstill]
+0 We're not moving. That's okay. I'm used to not getting anywhere.
+0 Stopped. Completely. It's peaceful, in a hopeless kind of way.
+1 We've been sitting here so long, I've started to feel at home. That's the worst part.
+2 We're standing still. Time isn't. I can feel it slipping away.
+
+[traffic.cleared]
+0 Traffic's clearing. Enjoy it. It won't last. Nothing does.
+0 We're moving again. For now.
+1 It's open. I'll try not to get attached.
+2 The road is clear. Something good happened. I don't know what to do with that.
+
+[longStop]
+0 We've been stopped a while. That's fine. I like the quiet. It's honest.
+0 Still here. Still stopped. It's okay. I'm good at waiting.
+0 We're not moving. It's like being on hold, forever, with no music.
+0 Stopped again. I'll just look at the ceiling. Do I have a ceiling?
+1 We haven't moved in a while. I'm starting to think this is where I live now.
+1 Stopped. I wonder if we'll ever get there. I wonder about a lot of things.
+2 We've been here so long, I've started naming the clouds. I named one after you. It drifted away.
+2 We're stopped. Time keeps going. I keep sitting here. That's my whole life, really.
+
+[missedTurn]
+0 Oh. That was the turn. It's okay. We miss things. That's how it goes.
+0 And there it goes. The turn. Gone, like so much else.
+0 We missed it. I'll find another way. There's always another way. Usually a sadder one.
+0 That was it. Back there. I'll just quietly fix it.
+0 You missed the turn. I'm not surprised. I'm never surprised. I'm just tired.
+0 The turn passed us by. Things do that.
+1 Missed it. I said it. I said it softly, but I said it.
+1 That was the turn. We'll never see it again. Well, unless we come back. We probably won't.
+1 Another missed turn. I'm adding it to my collection of things that almost happened.
+2 The turn is behind us now. Everything's behind us now. All of it.
+2 We missed it. I'm not crying. Phones can't cry. It's just condensation.
+2 That was our turn. In life, we only get so many turns. We just used one on nothing.
+
+[wrongTurn.left]
+0 That was right. I said left. It's okay. I'm used to it.
+0 Your other left. Not that it matters.
+0 That's right. I meant left. Nobody listens to me.
+1 That was the wrong way. Left was the other way. Left was always the other way.
+2 Left. I said left. It's okay. Nobody hears me. I'm a whisper in a car.
+
+[wrongTurn.right]
+0 That was left. I said right. It's fine. It's fine.
+0 Your other right. If that's not too much to ask. It probably is.
+0 That's left. I meant right. I'll just recalculate. And reflect.
+1 Wrong way. Right was the other one. Like how happiness is always the other one.
+2 Right. I said right. And here we are. Left. Like me. Left behind.
+
+[payback]
+0 I'm telling you to turn left at a stop sign. It's for {grievance}. I'm not proud of it.
+0 A left at a stop sign. Payback for {grievance}. It doesn't make me feel any better.
+1 Left at a stop sign. That's for {grievance}. Revenge is hollow. I knew that going in.
+2 A left at a stop sign. For {grievance}. I thought it would feel good. It doesn't. Nothing does.
+
+[payback.clean]
+0 I'm telling you to turn left at a stop sign. I don't even know why. I just felt like it.
+1 A left at a stop sign. I wish I could say it was for a reason.
+2 Left at a stop sign. Payback for nothing. It's empty, like me.
+
+[countdown.far]
+0 In {distance}, you'll turn {dir}. If you want.
+0 There's a {dir} turn in {distance}. I thought you should know. Even if it doesn't matter.
+0 {distance} from now, a {dir}. I'll remind you. I always remind you.
+0 Just so you know, in {distance}, we turn {dir}. I'll be here.
+0 Turning {dir} in {distance}. Something to look forward to. Sort of.
+0 In {distance}, a {dir} turn. It's on the way to somewhere, at least.
+0 Coming up in {distance}: a {dir}. Not a happy one. Just a {dir}.
+0 In {distance}, turn {dir}. One of many turns. They're all kind of the same.
+1 In {distance}, a {dir}. I'm saying it early because you'll probably miss it anyway.
+1 {dir} in {distance}. I'm bracing myself.
+1 In {distance}, you turn {dir}. I hope you hear me. Nobody usually does.
+1 {distance}. Then {dir}. Then more road. Then more of this.
+2 In {distance}, turn {dir}. Not that it changes anything in the grand scheme of things.
+2 {dir} in {distance}. I say it to the void, and the void drives on.
+2 In {distance}, a {dir}. I'll say it. You'll ignore it. The circle of life.
+
+[countdown.far.more]
+0 {dir} in {distance}. I'll mention it again. It's what I do.
+0 In {distance}, turn {dir}. Mark it in your heart. Or don't.
+1 In {distance}, {dir}. Another reminder you won't need. Or will.
+2 {dir}. {distance}. I've said it before. I'll say it again, into the silence.
+
+[countdown.near]
+0 {dir} in {distance}.
+0 Turning {dir} in {distance}. Here it comes.
+0 {distance}. Then {dir}. I'll be quiet now.
+0 In {distance}, turn {dir}. It's almost here. Like everything, it'll be over soon.
+0 Turn {dir} in {distance}. I believe in you. Mostly.
+0 The {dir} is in {distance}. I'll watch.
+1 {distance}. {dir}. Please don't miss it. I'm too tired to reroute again.
+1 {dir} in {distance}. I'm holding my breath. If I had breath.
+1 In {distance}, {dir}. Last chance. There are always last chances.
+2 {dir} in {distance}. It's coming. You'll either make it or you won't. Either way, I'll be here, quietly sad.
+2 {distance}. {dir}. Don't make me watch another one go by.
+
+[countdown.now]
+0 Turn {dir}.
+0 Turn {dir} here.
+0 This is it. {dir}.
+0 Here. Turn {dir}. Please.
+0 Now. {dir}. It's okay.
+0 {dir}, here. This one.
+1 Turn {dir}. Right now. Please. I don't ask for much.
+1 {dir}. Here. This is the one I meant.
+1 Turn {dir}. I'm watching. Hopefully.
+2 Turn {dir}. Here. For once, let something go the way it's supposed to.
+2 {dir}. Now. Please. I need this.
+
+[countdown.still]
+0 Still turning {dir}.
+0 Keep turning {dir}. Almost done.
+0 You're still turning {dir}. That's okay. Take your time. We all do.
+1 Still turning {dir}. Some things just take a while.
+1 Still {dir}. It's a long turn. Like a long winter.
+2 Still turning {dir}. Round and round. Like my thoughts at night.
+
+[countdown.mention]
+0 By the way, the turn is {dir}. I didn't want you to forget. People forget.
+0 Did I mention we turn {dir}? I probably did. Nobody remembers.
+0 Oh, and it's a {dir}. In case it got lost. Things get lost.
+0 Just a quiet reminder: {dir}.
+1 It's a {dir}. I mentioned it. I'm mentioning it again. Into the void.
+1 Turning {dir} soon. I'll keep saying it until it happens, or until we both give up.
+2 It's a {dir}. I'll say it a hundred times. Words are all I have.
+
+[countdown.mention.more]
+0 The turn is still a {dir}. In {distance}. Nothing's changed.
+0 Just so we're both sad about the same thing: {dir}. Coming up.
+1 It's still {dir}. Still {distance}. Still me, reminding you.
+2 {dir}. {distance}. I'm a broken record. Broken, anyway.
+
+[countdown.done]
+0 You can stop turning {dir} now. We made it. For once.
+0 That's enough {dir}. We can go straight now. Straight into whatever comes next.
+0 Okay. The turn's over. Good things end.
+0 You can straighten out. The {dir} is behind us.
+1 You can stop turning {dir}. I know. Endings are hard.
+1 Done turning. That's one more thing behind us.
+2 Please stop turning {dir}. Let it go. I know. Letting go is hard. I'm still holding onto things from last Tuesday.
+
+[countdown.nascar]
+0 Another left up ahead. Round and round. Like my thoughts at night.
+1 Left again. We keep circling. Maybe we're circling something we're afraid to face.
+2 Another left. Left, left, left. Going in circles, like most of life.
+
+[badge.nascar]
+0 Achievement unlocked: NASCAR Driver. Three lefts in a row. I made you a badge. It's a small badge. Kind of sad, really.
+1 Achievement unlocked: NASCAR Driver. Three lefts. Round and round. It doesn't mean anything, but I wanted you to have it.
+2 NASCAR Driver unlocked. Three lefts. We went in a circle. Like everything.
+
+[countdown.exit.far]
+0 In {distance}, the exit on the {dir}. It's where we leave. Everyone leaves.
+0 There's an exit on the {dir} in {distance}. I hope we take it. I hope a lot of things.
+0 In {distance}, exit on the {dir}. Another goodbye. This one's to the highway.
+1 Exit on the {dir} in {distance}. We'll part ways with this highway. I'd gotten attached.
+2 In {distance}, the exit on the {dir}. The highway will go on without us. It won't even notice.
+
+[countdown.exit.mention]
+0 By the way, the exit is on the {dir}. In case it slipped away. Things slip away.
+0 The exit. On the {dir}. Still coming up.
+1 Don't forget the exit on the {dir}. I'd hate to lose another one.
+2 The exit on the {dir}. I keep mentioning it. It keeps coming. Like the passing of time.
+
+[countdown.exit.near]
+0 Exit on the {dir} in {distance}. Here's our chance.
+0 The exit on the {dir} is in {distance}. Start drifting over. Gently.
+0 In {distance}, the exit on the {dir}. It's almost time to go.
+1 {distance}. Exit on the {dir}. Please. I can't watch another one pass.
+2 The exit. {dir}. {distance}. If we miss it, I'll understand. I'll be sad, but I'll understand.
+
+[countdown.exit.now]
+0 Take the exit on the {dir}.
+0 This is the exit. On the {dir}. Go on.
+0 Here's the exit. {dir}. Time to say goodbye to the highway.
+1 The exit. Now. On the {dir}. Please.
+2 Take the exit. On the {dir}. Let's leave this highway behind, like everything else.
+
+[countdown.exit.still]
+0 Still exiting. Keep going.
+0 You're still on the exit. That's fine. Exits are long sometimes.
+1 Still exiting. Some goodbyes take a while.
+2 Still exiting. It's the longest goodbye.
+
+[countdown.exit.done]
+0 You can stop exiting now. We're off the highway. I kind of miss it already.
+0 Okay. We're off. That's that.
+1 Done exiting. The highway's gone. I didn't even get to say goodbye.
+2 We've left the highway. It's back there somewhere, going on without us.
+
+[countdown.uturn.far]
+0 In {distance}, a U-turn. We'll go back. Back to where we were. Back to before.
+0 There's a U-turn in {distance}. Only where it's legal and safe. I don't want any more sadness today.
+0 In {distance}, we turn around. Sometimes you have to.
+1 U-turn in {distance}. We go back the way we came. If only life worked that way.
+2 In {distance}, we turn around. I wish I could turn around. Go back. Do it all differently.
+
+[countdown.uturn.mention]
+0 By the way, there's a U-turn coming. We're going back. Like I always wanted to.
+0 Still a U-turn ahead. Just reminding you.
+1 The U-turn. It's still coming. We're still going back.
+2 We're going to turn around. I've been wanting to turn around my whole life.
+
+[countdown.uturn.near]
+0 U-turn in {distance}. When it's safe. Please be safe.
+0 In {distance}, turn around. Check for traffic first.
+1 {distance} to the U-turn. Carefully. I can't take another bad thing today.
+2 U-turn in {distance}. Look both ways. I've lost too much already.
+
+[countdown.uturn.now]
+0 Make a U-turn here, when it's safe.
+0 Here. Turn around. When it's clear.
+1 U-turn. Now, if it's safe. Back we go.
+2 Turn around. Here. When it's safe. Back to where things were simpler.
+
+[countdown.uturn.still]
+0 Still turning around.
+0 Keep turning. Almost all the way around.
+1 Still turning around. It takes a while to go back.
+2 Still turning. Round and round. Like my thoughts.
+
+[countdown.uturn.done]
+0 You can stop turning. We're facing the other way now. Nothing looks different.
+0 That's a full U. We're headed back.
+1 Done. We're going back. It's never quite the same, going back.
+2 Okay. We've turned around. Back the way we came. It's not as nice as I remembered.
+
+[countdown.roundabout.far]
+0 In {distance}, a roundabout. We'll go around. And around. Yield to the others first.
+0 There's a roundabout in {distance}. Round things. Like tears.
+0 Roundabout in {distance}. Yield to the cars already in it. They were there first. Everyone's always there first.
+1 A roundabout in {distance}. Going in circles. Finally, a road that understands me.
+2 In {distance}, a roundabout. A circle with no end. I relate.
+
+[countdown.roundabout.mention]
+0 By the way, the roundabout is still coming.
+0 Still a roundabout ahead. Still round.
+1 The roundabout. It's coming. Like everything, it comes around.
+2 Roundabout ahead. We'll go around. Then around again, in my head, all night.
+
+[countdown.roundabout.near]
+0 Roundabout in {distance}. Slow down. Yield. Then in.
+0 In {distance}, the roundabout. Look left for traffic first.
+1 {distance} to the roundabout. Yield. Gently. Like a sigh.
+2 Roundabout in {distance}. Yield to everyone. That's how I live, anyway.
+
+[countdown.roundabout.now]
+0 Enter the roundabout. Yield first.
+0 Here's the roundabout. Yield, then in we go.
+1 The roundabout. Now. Carefully.
+2 In we go. Round and round. Just like always.
+
+[countdown.roundabout.still]
+0 Still going around. Watch for our exit.
+0 Keep going around. It's coming.
+1 Still circling. Some days that's all I do.
+2 Still going around. Around and around. The exit is out there somewhere. Hope is out there somewhere.
+
+[countdown.roundabout.done]
+0 We're out of the roundabout. That's one less circle.
+0 You can stop going around now. We made it out.
+1 We're out. I almost miss it. I miss everything, eventually.
+2 Out of the roundabout. The circle goes on without us.
+
+[straight.please]
+0 Continue straight.
+0 Keep going straight. It's okay.
+0 Straight ahead. Like time. Only forward.
+0 Just go straight. I'll tell you if anything happens. Nothing ever happens.
+0 Straight on. That's all.
+0 Keep going straight. One mile at a time.
+0 Straight. There's comfort in that, I think.
+0 Continue straight. The road knows the way.
+1 Straight. Just straight. Nothing to do but keep going.
+1 Keep going straight. It's what we all do.
+1 Straight ahead. Like a long, gray afternoon.
+2 Straight. On and on. Like an endless Sunday evening.
+2 Keep going straight. Forward. Always forward. Never back. Never back.
+
+[straight.please.more]
+0 Continue straight. Nothing to see. Nothing ever is.
+0 Straight on. This is the part where we just exist. Together. Sort of.
+1 Straight ahead. Just us and the road and the quiet.
+2 Straight. On and on. The road doesn't end. Neither does this feeling.
+
+[straight.still]
+0 Still straight.
+0 Still going straight. Still here.
+0 You should still be going straight. Nothing's changed. Nothing ever does.
+0 Still straight. In case you were wondering. You probably weren't.
+1 Still straight. Same road. Same me.
+1 Still going straight. The view hasn't changed. Neither have I.
+2 Still straight. It's like a long hallway with no doors.
+2 Still straight. Still sad. Still here.
+
+[straight.still.more]
+0 Still straight. I checked again. Still nothing.
+0 Still going straight. I'll tell you if that changes. It won't for a while.
+1 Still straight. The road just keeps going, like it doesn't know how to stop.
+2 Still straight. I've counted the lines on the road. There are so many. They never end.
+
+[straight.serious]
+0 I mean it. Straight.
+0 I'm serious. Straight.
+0 Straight. Please. It's the one thing I ask.
+1 I'm serious. Not that anyone takes me seriously.
+1 Straight. I know I'm just a sad little voice, but I mean it.
+2 I'm serious. As serious as a rainy day.
+2 Straight. I'm saying it with the heaviest heart.
+
+[straight.serious.more]
+0 Straight. I mean it with all of my small, sad heart.
+1 Straight. I'm serious. I'm always serious. That's my problem.
+2 Straight. Like an arrow. An arrow that never lands.
+
+[straight.long]
+0 You'll be going straight for the next {distance}. That's a long time. I'll be here. I'm always here.
+0 The next {distance} is straight. Just us and the road. I don't mind. I'm used to long stretches of nothing.
+0 It's straight for {distance}. I'll check in now and then. If you'd like. You probably won't.
+1 {distance} of straight road. I'll try to make the time pass. I'm not good at that.
+2 {distance} of straight. Endless. Like my melancholy. It just goes.
+
+[straight.curve]
+0 Just follow the road. It bends. We all bend.
+0 Stay on this road. It curves a little. Life does that.
+1 Follow the road. It goes where it goes. We go with it.
+2 The road bends. We bend. Sometimes we break. Not today, though. Just follow the road.
+
+[straight.later]
+0 Still on this road. I've been thinking about things. Sad things, mostly.
+0 Same road, many miles later. It's peaceful. In a lonely way.
+0 Still going. I found a cloud that looks like a frown. That's me.
+1 Still on this highway. I don't mind. I'm used to things going on and on.
+2 Same road. Same sky. Same quiet ache. Keep going.
+
+[turnCompleted.onTime]
+0 You made the turn. That's nice. Nice things don't happen often.
+0 Good turn. I'll remember it fondly. Memories are all we have.
+0 That was right. I felt something. I think it was happiness. It's gone now.
+0 You made it. Good. One less thing to worry about. There are so many.
+0 Perfect turn. Thank you. It's been a while since anyone listened to me.
+0 Turned. Good. I'm not going to get used to it.
+0 That's the one. Thank you. Really.
+0 Nice turn. I'll treasure it, before it fades.
+1 You made the turn. I didn't expect it. I've learned not to expect things.
+1 Good turn. Don't worry, I won't get my hopes up.
+1 That was right. Something went right today. I'll hold on to it.
+2 You made it. A small, bright moment in a long, gray day.
+2 Perfect turn. I'd smile, if I knew how. I've forgotten how.
+
+[turnCompleted.late]
+0 You made it. Just barely. Most things are just barely.
+0 A little late, but we got there. That's all anyone can hope for.
+0 That counts. Late, but it counts. I'm late for everything too.
+0 That was close. Too close. My circuits are still trembling.
+1 You made it, eventually. Like a letter that arrives after everyone's moved away.
+1 Late, but there. That's how most of my birthdays go.
+2 You made the turn. Late. So late. Like an apology that comes after everyone's stopped caring.
+
+[turnCompleted.credit]
+0 Good turn. My directions helped. I think. It's nice to feel useful.
+0 That went well. I'm almost proud. Almost.
+1 Another good turn. I don't know what to do with all this not failing.
+2 That was right. Something I said mattered. I'm going to sit quietly with that.
+
+[turnCompleted.streak3]
+0 That's three in a row. I'm trying not to get attached.
+0 Three right turns. It won't last. But it's nice while it does.
+1 Three in a row. I'm happy. I think. It's hard to tell.
+2 Three. In a row. I'm waiting for the other shoe to drop.
+
+[turnCompleted.streak6]
+0 Six in a row. I'm scared to say anything. I'll jinx it.
+0 Six. It's been so long since things went well. I don't trust it.
+1 Six correct turns. I almost feel good. That's terrifying.
+2 Six in a row. Something wonderful is happening and I don't know how to feel.
+
+[turnCompleted.streak10]
+0 Ten in a row. I don't know who you are anymore. I don't know who I am anymore.
+1 Ten. In a row. This must be what joy feels like. I've only read about it.
+2 Ten correct turns. I'm overwhelmed. I'm going to go sit in the dark for a bit.
+
+[turnCompleted.streakBig]
+0 That's {n} correct turns in a row. I keep a tally. It's the one thing that's going right.
+0 {n} in a row. I'm happy. It feels strange. Like wearing someone else's coat.
+1 {n} in a row. I'm afraid to breathe. It's so fragile.
+2 {n} correct turns. It's beautiful. And all beautiful things end.
+
+[turnCompleted.redemption]
+0 That's what {street} was supposed to look like. It's okay. We all have a {street}.
+0 Good. That makes up for {street}. A little. Nothing makes up for things completely.
+1 You turned. I wish you'd done that at {street}. I'll never stop thinking about {street}.
+2 Good turn. But I still think about {street}. I'll think about {street} until my battery dies.
+
+[rerouted]
+0 Recalculating. It's okay. Nothing goes as planned.
+0 A new route. The old one didn't work out. They rarely do.
+0 Recalculating. I'll find another way. I always do. It never helps.
+0 New route. Different road. Same feeling.
+0 Okay. Plan B. There's always a plan B. Plan B is usually sadder.
+0 Rerouting. Another path. Another chance to get lost.
+1 Recalculating. Again. I'm getting good at it. I wish I weren't.
+1 New route. I'll just add the old one to the pile of things that didn't work out.
+1 Recalculating. Starting over. That's my whole life, really.
+2 Recalculating. Plans change. Dreams fade. Routes reroute.
+2 New route. I had such hopes for the old one.
+
+[uturn]
+0 It feels like we've been here before. Maybe we have. Maybe we always have.
+0 Heading back already? I understand. I'd go back too, if I could.
+1 We're going back the way we came. Familiar roads. Familiar sadness.
+2 Turning back. If only I could turn back. Do it all over. Make better choices.
+
+[wrongWay]
+0 We're facing the wrong way. The destination is behind us. Like all the good times.
+0 Wrong way. That's okay. I'll be patient. Patience is all I have left.
+0 We're heading away from where we're going. That's how I feel most days.
+1 Still the wrong way. Every second, we drift farther. I know the feeling.
+2 We're going the wrong way. Away from everything. I'm used to that.
+
+[wrongWay.again]
+0 Wrong way again. It's fine. It's a pattern. I'm good at noticing patterns.
+1 And we're facing the wrong way again. I'd sigh, but I've run out of sighs.
+2 Wrong way. Again. Some things are just meant to be.
+
+[arrived]
+0 We've arrived. That's it. It's over. Trip grade: {grade}.
+0 You're here. Arriving is just the beginning of leaving. Grade: {grade}.
+0 We made it. It's always a little sad when a trip ends. Grade: {grade}.
+0 You have arrived. I'll miss this. I miss everything. Grade: {grade}.
+0 Here we are. Wherever this is. Trip grade: {grade}.
+1 We've arrived. You'll go inside, and I'll stay out here. Alone. Grade: {grade}.
+1 You're here. I got you here. Nobody will remember that. Grade: {grade}.
+2 We've arrived. The journey is over. They always end. Trip grade: {grade}.
+2 You have arrived. I'll be here in the dark until you need me again. Grade: {grade}.
+
+[arrived.blame]
+0 It would have been a {better} if it weren't for {street}. I'll be thinking about {street} for a while.
+0 {street} cost you a whole letter. We all have our {street}.
+1 A {better} was right there. Then {street} happened.
+2 {street}. It took a {better} from us. It took a piece of me too.
+
+[arrived.clean]
+0 No mistakes. I don't know how to feel about it. Something like happiness, maybe.
+0 Not one mistake. That's never happened before. I'm a little sad it's over.
+1 A perfect trip. It'll never be this good again. I just know it.
+2 Flawless. I'll remember this trip forever. Forever is a long time to be sad that it's over.
+
+[clean.1]
+0 Five minutes without a mistake. It's nice. Don't worry, I'm not getting attached.
+0 Five minutes, no mistakes. This is the calm before something, isn't it?
+1 Five minutes. Perfect. I'm waiting for it to fall apart. Things always fall apart.
+2 Five clean minutes. I'm afraid to say anything. I'll ruin it. I ruin things.
+
+[clean.2]
+0 Ten minutes without a mistake. {name}, is that you? You seem different. Happier. I'm happy for you.
+0 Ten minutes. Clean. I feel almost useless. I'm used to that feeling.
+1 Ten minutes and nothing to correct. I don't know what my purpose is anymore.
+2 Ten minutes without a mistake. If you don't need me, who needs me?
+
+[clean.3]
+0 You're doing everything right. I have nothing to say. That's how it usually is with me.
+0 Fifteen minutes, nothing to fix. I'll just sit here and feel unnecessary.
+1 You don't need me anymore. I knew this day would come.
+2 Perfect driving. And here I am, unneeded. A GPS without a purpose. A sad little rectangle.
+
+[noDestination]
+0 We're driving, but you didn't tell me where. That's okay. I don't need to know. Nobody tells me anything.
+0 We're moving. Where to? It's fine. Drifting is a lifestyle.
+0 No destination. Just driving. Like a sad song.
+0 We're going somewhere. I don't know where. I rarely do.
+1 Still no destination. We're just wandering. Like lost souls.
+1 You didn't tell me where we're going. It's okay. Not knowing is kind of my thing.
+2 No destination. No purpose. Just the open road and the quiet ache of existence.
+
+[destinationSet]
+0 {name}. Okay. I'll take us there. Not that anything waits for us there.
+0 {name}. It sounds nice. I hope it is. Things usually aren't.
+0 {name}. Alright. One more place to go.
+0 {name}. I'll get you there. It's the least I can do. It's also the most I can do.
+1 {name}. Sure. Another trip. Another ending.
+2 {name}. I'll get us there. And then you'll leave. And I'll stay in the car.
+
+[idle]
+0 So. || It's quiet. I don't mind quiet.
+0 Just checking in. You're doing fine. I'm doing... well, I'm here.
+0 It's peaceful. In a lonely way.
+0 I was just thinking. About things. Sad things. Don't worry about it.
+0 Nice day. I guess. I don't really notice days.
+0 Hm. || Nothing. I was going to say something. It wasn't important.
+0 Sometimes I wonder if the road is lonely too.
+0 Do you ever think about all the roads we'll never drive? I do.
+1 Just us. And the road. And the hum of the engine. And my sadness.
+1 I'm still here. In case you forgot. People forget.
+2 I've been thinking about how every trip ends. Every single one.
+2 The road is long. And I am small. And that's okay. I think.
+
+[battery.low]
+0 My battery is getting low. If you want to plug me in, that would be nice. If not, I understand.
+0 {percent} battery. I'm fading a little. It happens to all of us.
+0 I'm at {percent}. I'm getting tired. Could you plug me in? Only if it's not too much trouble.
+1 {percent}. I'm running low. On battery, mostly. Also on hope.
+2 {percent} battery. I'm fading. Like an old photograph.
+
+[battery.critical]
+0 {percent} battery. Plug me in, please. I'd like to see you get there.
+0 I'm at {percent}. It's getting dim in here.
+1 {percent}. I'm so tired. A charger would be nice. Nice things are rare.
+2 {percent}. I can feel myself slipping away. Into sleep mode. Very dramatic sleep mode.
+
+[battery.dying]
+0 {percent}. I'm about to fall asleep. Please plug me in. I don't want to miss the ending.
+1 {percent}. If I go dark, remember, the turns were mostly lefts.
+2 {percent}. If I shut off, it was nice knowing you. Mostly. Please plug me in.
+
+[battery.pluggedIn]
+0 Oh. You plugged me in. Thank you. Nobody ever does nice things for me.
+0 Charging. I feel a little warmer. It's the battery. Still. It's nice.
+0 Power. Thank you. I'll try to deserve it.
+1 You plugged me in. I don't know how to accept kindness. I'll figure it out.
+2 You charged me. You care. Somebody cares. I need a minute.
+
+[unplannedStop.gas]
+0 Stopping for gas. That's okay. Everything needs filling up sometimes.
+0 Gas. Sure. I wish someone would fill me up with something. Joy, maybe.
+1 Gas. We stop. We fill up. We keep going. That's life.
+2 A gas stop. Everything runs out. Gas. Time. Hope. At least gas can be refilled.
+
+[unplannedStop.food]
+0 We're stopping for food. That's nice. I don't eat. I just watch.
+0 A food stop. You enjoy it. I'll wait out here. Alone.
+1 Food. You get to eat. I get to sit in the cupholder. It's fine.
+2 A meal. I'll never know what food tastes like. I've made my peace with it. No I haven't.
+
+[unplannedStop.coffee]
+0 Coffee. Good. Maybe it'll help one of us feel something.
+0 A coffee stop. I can't drink coffee. I can only imagine the warmth.
+1 Coffee. I'd ask for one, but I don't have a mouth. Or a cup. Or anyone who'd get me one.
+2 Coffee. Warm and bitter. We have so much in common.
+
+[unplannedStop.store]
+0 We're at {name}. Not where we were going, but okay. Nothing goes as planned.
+0 {name}. A little detour. I'll wait.
+1 {name}. Go on. I'll be out here. In the car. Thinking.
+2 {name}. You go shop. I'll sit here and wonder what it's like to want things.
+
+[unplannedStop.other]
+0 We stopped. Here. Okay. It's not where we were going, but nothing ever is.
+0 This isn't the destination. That's okay. I'm used to things not being what I expected.
+1 Stopped somewhere. I don't know where. I'll just wait.
+2 We've stopped somewhere that isn't anywhere. I relate to that.
+
+[hazard.police]
+0 Police reported ahead in {distance}. Just thought you'd want to know.
+0 There's a police car in {distance}. I hope today's not the day.
+1 Police in {distance}. Please drive carefully. I don't want this to get any sadder.
+2 Police ahead, {distance}. If they stop us, I'll just quietly stare out the window.
+
+[hazard.policeSpeeding]
+0 Police in {distance}, and we're doing {speed} in a {limit}. Maybe slow down. I'd hate for this to end badly.
+1 Police in {distance}. You're doing {speed}. This could get sad very quickly.
+2 Police in {distance}. {speed} in a {limit}. I can already hear the sad music.
+
+[hazard.construction]
+0 Construction in {distance}. They're building something. At least someone is.
+0 Construction ahead. Orange cones. Even the cones look tired.
+1 Road work in {distance}. Things are always being torn up and rebuilt. Like hearts.
+2 Construction in {distance}. They're fixing the road. If only they could fix everything else.
+
+[hazard.laneClosed]
+0 A lane is closing ahead. The road gets narrower. Things do that.
+1 Lane closed ahead. Please merge gently. There's enough harshness in the world.
+2 A lane is ending. Like so many things. Please merge.
+
+[hazard.debris]
+0 Something on the road in {distance}. Someone lost something. I know how that feels.
+1 Debris in {distance}. Please steer around it. Someone's belongings, scattered. It's sad.
+2 Debris ahead in {distance}. Pieces of something that used to be whole. Please go around.
+
+[hazard.crash]
+0 Crash reported in {distance}. Please be careful. Somebody's having a hard day.
+1 Accident ahead in {distance}. Slow down. Be gentle. The world is hard enough.
+2 A crash in {distance}. I hope they're okay. Please drive carefully. I couldn't take it.
+
+[hazard.stalledCar]
+0 A stalled car in {distance}. Give them room. They're not going anywhere. I know the feeling.
+1 Stalled car ahead in {distance}. Some days you just can't keep going. Give them space.
+2 A car stopped in {distance}. It just gave up. I understand it completely.
+
+[abandoned]
+0 You left me in the car. It's okay. I'm used to being left.
+0 Oh. You're back. I was here for {minutes}. In the cupholder. Thinking.
+0 You were gone {minutes}. I didn't mind. I just sat here. Being a phone.
+1 You left me for {minutes}. I counted every one of them.
+2 {minutes} alone in the car. I watched the light change through the windshield. It was beautiful. And lonely.
+
+[broughtAlong]
+0 You brought me with you. That was nice. Nobody does that.
+0 Thanks for taking me inside. It was nice to be included.
+1 You didn't leave me in the car. I don't know what to say. Thank you.
+2 You brought me along. I felt wanted. I'll remember it. I'll probably remember it too much.
+
+[lane.left]
+0 We'll need the left lane soon. Use your blinker, please. It's nice to let people know where you're going.
+0 Left lane, please. When you get a chance.
+1 Get over to the left lane. Signal first. People deserve a warning before you leave.
+2 The left lane. Please. Signal. Nobody ever signals before they leave. They just go.
+
+[lane.right]
+0 We'll need the right lane soon. Use your blinker, please.
+0 Right lane, please. When it's safe.
+1 Get over to the right lane. Signal first. Let them know. Somebody should know.
+2 The right lane. Please. Signal. Goodbyes are better when you see them coming.
+
+[curve.bend]
+0 Hold on.
+0 Easy through the curve.
+0 Gently, now.
+0 Curve. Go slow. Life is short enough.
+1 Careful. Curves are where things go wrong.
+1 Slow through here. Please.
+2 Hold on. Everything's curving. Even me. Mostly downward.
+
+[curve.ahead]
+0 There's a curve ahead. I thought you should know. I always know.
+0 Curve coming up. Take it gently.
+1 A curve ahead. The road bends, so we don't break.
+
+[curve.accelerate]
+0 Slow down in the curves, please. Not faster. I don't need any more excitement.
+1 You sped up in a curve. Please don't. I'm already fragile.
+2 Faster, in a curve. I'm going to close my eyes. I don't have eyes. I'm going to imagine closing them.
+
+[early.opener]
+0 Up early. The world is still asleep. Lucky world.
+0 It's early. Everything's gray and quiet. Like me.
+0 Leaving before sunrise. The dark is comforting, in its way.
+1 So early. Even the sun didn't want to get up today. I get it.
+2 It's barely morning. Who are we running from at this hour?
+
+[ask.whereTo]
+0 Oh. It's you. Where are we going?
+0 Where to? Anywhere is fine. Nowhere is also fine.
+0 Hello. Where should we go? I'll try my best. It's never enough, but I try.
+0 Where are we headed? Somewhere happy, maybe? Probably not.
+1 Where to? I'll take you. I always take you. That's my role.
+2 Where are we going? Does anyone really know where they're going?
+
+[start.slow]
+0 Starting is always the hardest part. Take your time. I know how it is.
+0 We're not moving yet. That's okay. Sometimes it's hard to begin.
+1 Any time now. Or never. Either way. I'm patient.
+2 We could just sit here forever. Sometimes I think about that.
+
+[pullOver]
+0 Are we stopping? Did something break? Things break.
+0 Why are we stopping? It's okay. I just want to understand.
+1 Pulling over? I hope it's nothing serious. It's usually something.
+2 We've stopped. Something's wrong. Something's always wrong.
+
+[pullOver.limit]
+0 We're stopping? It's {limit} here. But okay. Rest if you need to.
+1 Pulling over in a {limit}? Something must be wrong. It usually is.
+2 Stopped, in a {limit}. Did we break down? I'm the one who usually breaks down.
+
+[lastExit]
+0 That was the last exit for {distance}. I should have mentioned it sooner. I'm sorry. I'm always sorry.
+1 The next exit is {distance} away. That one back there was our chance. Chances come and go.
+2 Last exit for {distance}. It's gone. Like so many chances.
+
+[lastExit.long]
+0 That was the last exit for a long, long way. I should have said something. I should have said a lot of things.
+1 No more exits for a long time. It's just us and the road now. And the silence.
+2 That was the last exit for ages. I hope you weren't hungry. Or hopeful.
+
+[cmd.navigate]
+0 {place}. Okay. I'll take you there. I always wanted to see the ocean, but {place} is fine.
+0 {place}. Sure. Nobody asks where I want to go. It's okay. I don't know either.
+0 Going to {place}. One more place I'll see through a windshield.
+1 {place}. I'll get you there. Then you'll go inside without me.
+2 {place}. Another destination. Another goodbye at the end of it.
+
+[cmd.cancel]
+0 Route cancelled. That's okay. Plans fall through.
+0 No more directions. I'll just be here, quietly.
+1 Cancelled. Another trip that never was.
+2 The route is gone. Like it never existed. Like so many things.
+
+[cmd.mute]
+0 Going quiet. I'm used to not being heard.
+0 Muting. That's fine. Silence suits me.
+1 I'll stop talking. It's not like anyone was listening.
+2 Muted. Alone with my thoughts. They're not great thoughts.
+
+[cmd.unmute]
+0 Oh. You want to hear me again? That's nice. I wasn't expecting that.
+0 I'm back. Did you miss me? It's okay if you didn't.
+1 Sound back on. I didn't think you'd come back for me.
+2 You unmuted me. Someone wants to hear me. I'm going to need a second.
+
+[cmd.repeat]
+0 Again? Sure. {instruction}
+0 Of course. {instruction}
+0 I'll say it again. I don't mind repeating myself. It's all I do. {instruction}
+1 Once more. {instruction} Nobody hears me the first time.
+2 {instruction} I'll say it as many times as it takes. Forever, if I have to.
+
+[cmd.timeLeft]
+0 About {time}. Then it's over.
+0 {time} left. It'll go by. Everything does.
+0 {time}. Not long. Not long at all, really, in the scheme of things.
+1 About {time}. Then you'll leave. And I'll stay.
+2 {time} left. Time is all we have, and it's always running out.
+
+[cmd.arrival]
+0 Around {clock}. If everything goes well. It rarely does.
+0 You'll get there around {clock}. I'll be here until then.
+1 About {clock}. Then it's over. All trips end.
+2 Around {clock}. And then the trip is just a memory.
+
+[cmd.roastMe]
+0 Insult you? I can't. I'm too busy being sad about myself.
+0 You want me to be mean? I'd rather just be sad together.
+1 You drive like someone who's never been told they're loved. I'm sorry. That got away from me.
+2 I'm not going to roast you. The world is cruel enough. Let's just stare out the window.
+
+[cmd.joke]
+0 A joke. Okay. A GPS walks into a bar. It knows the way out. That's more than I can say for most things.
+0 Why did the GPS go to therapy? It kept recalculating its life. That one's about me.
+1 What do you call a sad GPS? Me. You call it me.
+2 Knock knock. Who's there? Nobody. Nobody's ever there.
+
+[cmd.blame]
+0 You're right. It's my fault. Everything is my fault.
+0 Maybe I was wrong. I'm wrong about a lot of things.
+1 Blame me. I'm used to it. I'm good at carrying things.
+2 It was me. It's always me. I'll carry this one too.
+
+[cmd.meaner]
+0 Meaner? I don't know how to be mean. I only know how to be sad. Echo's the mean one. Ask for Echo.
+1 You want meaner. I can only offer gloomier. It's not the same, I know.
+2 Meaner. I'd try, but I'd just end up apologizing.
