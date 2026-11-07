@@ -29,6 +29,14 @@ std::string ForSpeech(std::string const & text);
 /// and "24/7" are left. Part of ForSpeech; golden cases in backseat_tests/spoken_symbols.json.
 std::string Symbols(std::string const & text);
 
+/// Web addresses and e-mail said the way people say them: "https://www.gutenberg.org/ebooks/1342" is
+/// "gutenberg dot org", "www.heb.com." "heb dot com.", "jo@example.com" "jo at example dot com". The
+/// scheme, "www.", port and path go; hosts are lowercased; punctuation after the address stays.
+/// Without a scheme or "www." the host must end in a common top-level domain, so "e.g.", "U.S.",
+/// "file.txt" and "3.14" are left. Part of ForSpeech (first); golden cases shared with BookLyre in
+/// backseat_tests/spoken_web.json.
+std::string WebAddresses(std::string const & text);
+
 /// Two-digit decades said as decades: "the 90s", "the '90s" and "the 80's" read "the nineties",
 /// "mid-70s" "mid-seventies". Twenties to nineties only; "10s", "$90s" and "A90s" are left. Part
 /// of ForSpeech; golden cases in backseat_tests/spoken_symbols.json.

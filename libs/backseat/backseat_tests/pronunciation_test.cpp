@@ -735,3 +735,31 @@ TEST(SymbolsAndLeftoverAbbreviationsMatchTheGoldenCases)
   CHECK_EQUAL(FractionsWithUnits("1/2/2026 5/8 mi 1/2 of it 1.1/2 mi -1/2 mi"),
               std::string("1/2/2026 5/8 mi 1/2 of it 1.1/2 mi -1/2 mi"));
 }
+
+TEST(WebAddressesMatchTheGoldenCasesSharedWithBookLyre)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_WEB_PATH);
+  CHECK(cases.size() >= 40);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(WebAddresses(c.input), c.expected);
+  }
+  // Through the whole pipeline: the address comes out as words and nothing later takes it apart.
+  CHECK_EQUAL(ForSpeech("Visit www.heb.com."), std::string("Visit heb dot com."));
+  CHECK_EQUAL(ForSpeech("Mail jo@example.com today."), std::string("Mail jo at example dot com today."));
+  CHECK_EQUAL(ForSpeech("See https://www.gutenberg.org/ebooks/1342 for details."),
+              std::string("See gutenberg dot org for details."));
+  // Lines with no address go through untouched by this pass, whatever else they hold.
+  for (char const * line : {"Turn left onto Main St.", "Exit 238B toward U.S. 183.", "e.g. 3.14 and v1.2.3",
+                            "Meet at 5 @ noon.", "St.Louis", "{street}. Then {instruction}.", ""})
+    CHECK_EQUAL(WebAddresses(line), std::string(line));
+  // Long runs of dots and letters are read in one linear scan (no regex recursion).
+  std::string big;
+  for (int i = 0; i < 4000; ++i)
+    big += "ab.";
+  big += "com";
+  auto const said = WebAddresses(big);
+  CHECK(said.size() > big.size());
+  CHECK_EQUAL(said.substr(said.size() - 7), std::string("dot com"));
+}

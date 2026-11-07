@@ -90,6 +90,7 @@ size_t Feed(std::string const & text)
   size_t longest = 0;
   auto keep = [&](std::string const & out) { longest = std::max(longest, out.size()); };
   keep(ForSpeech(text));
+  keep(WebAddresses(text));
   keep(Symbols(text));
   keep(Decades(text));
   keep(FractionsWithUnits(text));
