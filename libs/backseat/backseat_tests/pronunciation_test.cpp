@@ -395,6 +395,11 @@ TEST(RangesSymbolsAndTemperaturesAreSaid)
   CHECK_EQUAL(Ranges("We lost 3–2."), std::string("We lost 3–2."));
   CHECK_EQUAL(Ranges("We lost 2–3."), std::string("We lost 2–3."));
   CHECK_EQUAL(Ranges("the 9-5 grind"), std::string("the 9-5 grind"));
+  // Opening hours: a bare hyphen between two whole hours after a day or "open" is "to".
+  CHECK_EQUAL(ForSpeech("Mon-Fri 9-5"), std::string("Monday to Friday nine to five"));
+  CHECK_EQUAL(ForSpeech("Open 9-5, closed Sun."), std::string("Open nine to five, closed Sun."));
+  CHECK_EQUAL(ForSpeech("Open 9-5pm"), std::string("Open nine to five peeem"));
+  CHECK_EQUAL(ForSpeech("the 9-5 grind"), std::string("the nine-five grind"));
   CHECK_EQUAL(Ranges("Arrive 2:05-2:30"), std::string("Arrive 2:05-2:30"));
   CHECK_EQUAL(ForSpeech("Arrive at 2:05"), std::string("Arrive at two oh five"));
   CHECK_EQUAL(ForSpeech("Left — no, right."), std::string("Left, no, right."));

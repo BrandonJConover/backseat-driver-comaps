@@ -1039,6 +1039,19 @@ bool ScoreWordBefore(std::string const & w)
   return std::find(words.begin(), words.end(), w) != words.end();
 }
 
+// Words that make a bare hyphen between two hours "to": "Monday to Friday 9-5", "Open 9-5", "Sat 10-4".
+// "the 9-5 grind" and scores stay as written. Lowercase.
+bool HoursWordBefore(std::string const & w)
+{
+  static std::array<std::string_view, 33> const words = {
+      "mon",      "tue",      "tues",      "wed",     "thu",      "fri",     "sat",      "sun",
+      "monday",   "tuesday",  "wednesday", "thursday", "friday",  "saturday", "sunday",  "mondays",
+      "tuesdays", "wednesdays", "thursdays", "fridays", "saturdays", "sundays", "weekdays", "weekends",
+      "daily",    "nightly",  "open",      "opens",   "hours",    "closes",  "closed",   "everyday",
+      "weeknights"};
+  return std::find(words.begin(), words.end(), w) != words.end();
+}
+
 std::string WordBefore(std::string const & s, size_t pos, size_t & start)
 {
   size_t end = pos;
@@ -1277,8 +1290,20 @@ std::string Ranges(std::string const & text)
       size_t wordStart = 0;
       auto const before = WordBefore(s, pos, wordStart);
       bool const counting = CountingWordBefore(before) || CountingWordAfter(WordAfter(s, after));
+      // Opening hours count down too: "Monday to Friday, 9-5" is "9 to 5". Whole hours 1-12 only.
+      size_t commaStart = 0;
+      std::string const hoursWord =
+          before.empty() && wordStart > 0 && s[wordStart - 1] == ',' ? WordBefore(s, wordStart - 1, commaStart) : before;
+      auto const hourA = ToNumber(a);
+      auto const hourB = ToNumber(b);
+      bool const hours = hyphen && HoursWordBefore(hoursWord) && a.size() <= 2 && b.size() <= 2 &&
+                         hourA >= 1 && hourA <= 12 && hourB >= 1 && hourB <= 12 && hourA != hourB &&
+                         a.find_first_not_of("0123456789") == std::string::npos &&
+                         b.find_first_not_of("0123456789") == std::string::npos;
+      if (hours)
+        said = a + " to " + b;
       // Scores and "the 9-5 grind" count down; ranges go up.
-      if (Value(b) > Value(a) && !ScoreWordBefore(before) && (!hyphen || (yearA && yearB) || counting))
+      else if (Value(b) > Value(a) && !ScoreWordBefore(before) && (!hyphen || (yearA && yearB) || counting))
       {
         said = a + (before == "between" ? " and " : " to ") + b;
         if ((before == "pp" || before == "p") && wordStart >= last)

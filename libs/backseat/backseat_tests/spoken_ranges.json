@@ -234,6 +234,60 @@
    "language": "en",
    "expected": "Done 9:00–10:30.",
    "from": "backseat"
+  },
+  {
+   "input": "Open Monday to Friday 9-5.",
+   "language": "en",
+   "expected": "Open Monday to Friday 9 to 5.",
+   "from": "backseat"
+  },
+  {
+   "input": "Monday to Friday, 9-5",
+   "language": "en",
+   "expected": "Monday to Friday, 9 to 5",
+   "from": "backseat"
+  },
+  {
+   "input": "Open 9-5",
+   "language": "en",
+   "expected": "Open 9 to 5",
+   "from": "backseat"
+  },
+  {
+   "input": "Sat 10-4",
+   "language": "en",
+   "expected": "Sat 10 to 4",
+   "from": "backseat"
+  },
+  {
+   "input": "Hours 7-11 daily",
+   "language": "en",
+   "expected": "Hours 7 to 11 daily",
+   "from": "backseat"
+  },
+  {
+   "input": "Open 9-17",
+   "language": "en",
+   "expected": "Open 9-17",
+   "from": "backseat"
+  },
+  {
+   "input": "Open 0-5",
+   "language": "en",
+   "expected": "Open 0-5",
+   "from": "backseat"
+  },
+  {
+   "input": "Friday 5-5",
+   "language": "en",
+   "expected": "Friday 5-5",
+   "from": "backseat"
+  },
+  {
+   "input": "the 7-11 on Main",
+   "language": "en",
+   "expected": "the 7-11 on Main",
+   "from": "backseat"
   }
  ]
 }
