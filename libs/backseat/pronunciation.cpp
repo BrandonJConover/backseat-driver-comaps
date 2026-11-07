@@ -1331,6 +1331,9 @@ constexpr Phrase kPhrases[] = {
     {"Recalculando", "reh-kahl-koo-LAHN-doh"},
     {"Recalcul en cours", "reh-kahl-KOOL ahn KOOR"},
     {"Te lo dije", "teh loh DEE-heh"},
+    {"Je te l'avais dit", "zhuh tuh lah-VEH DEE"},
+    {"Hab ich dir doch gesagt", "HAHP ish DEER DOKH geh-ZAHKT"},
+    {"Route wird neu berechnet", "ROO-teh VEERT NOY beh-RESH-net"},
     // "learn to drive"
     {"Aprende a conducir", "ah-PREN-deh ah kohn-doo-SEER"},
     {"Apprends à conduire", "ah-PRAHN ah kohn-DWEER"},
@@ -1338,11 +1341,14 @@ constexpr Phrase kPhrases[] = {
     {"Impara a guidare", "eem-PAH-rah ah gwee-DAH-reh"},
     {"Aprenda a dirigir", "ah-PREN-dah ah jee-ree-ZHEER"},
     {"運転を習ってください", "OON-tehn oh nah-RAHT-teh koo-dah-SIGH"},
+    {"Leer autorijden", "LAYR OW-toh-ray-den"},
+    {"Научись водить", "nah-oo-CHEES vah-DEET"},
     // "I am an excellent driver"
     {"Soy un conductor excelente", "SOY oon kohn-dook-TOR ehk-seh-LEN-teh"},
     {"Je suis un excellent conducteur", "zhuh SWEE uhn ehk-seh-LAHN kohn-dook-TUR"},
     {"Ich bin ein ausgezeichneter Fahrer", "ISH BIN EYEN OWS-geh-tsighsh-neh-ter FAH-rer"},
     {"Sono un ottimo guidatore", "SOH-noh oon OHT-tee-moh gwee-dah-TOH-reh"},
+    {"Я отличный водитель", "yah aht-LEECH-nee vah-DEE-tyel"},
     {"私は運転がとても上手です", "wah-TAH-shee wah OON-tehn gah toh-TEH-moh JOH-zoo dess"},
 };
 

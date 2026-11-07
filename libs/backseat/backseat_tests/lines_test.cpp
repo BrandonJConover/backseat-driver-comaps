@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <initializer_list>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -75,29 +76,47 @@ TEST(ForeignPhraseLinesAreIdleBanterNeverAtATurn)
 {
   // Brandon's template, "X means 'turn left' in Y.", lives in the idle banter: idle is never
   // said within 600 m of a maneuver, so a "means turn left" line can't land near a real right turn.
+  // It also lives where the car is stopped or the trip is over (traffic.standstill, longStop,
+  // arrived). A translated "turn left" only goes in idle or arrived: a stop can sit right before
+  // a real turn, so a stopped quip never names a direction, even in another language.
   size_t foreignLines = 0;
-  for (auto const & tier : LineData().at("idle"))
-    for (auto const & line : tier)
-    {
-      auto const at = line.find(" means '");
-      if (at == std::string::npos)
-        continue;
-      ++foreignLines;
-      std::string const phrase = Lower(line.substr(0, at));
-      bool known = false;
-      for (auto const & entry : ForeignPhrases())
-        known = known || Lower(entry.first) == phrase;
-      CHECK(known);
-      // The voice says the phrase in its own sounds, never the raw spelling.
-      std::string const said = ForSpeech(SpeakableText(line));
-      CHECK(StartsWith(said, "fx"));
-      // A translated direction is followed at once by a word that it is not an instruction.
-      std::string const lower = Lower(line);
-      if (lower.find("'turn left'") != std::string::npos || lower.find("'turn right'") != std::string::npos)
-        CHECK(lower.find("not now") != std::string::npos || lower.find("not yet") != std::string::npos ||
-              lower.find("don't") != std::string::npos);
-    }
-  CHECK(foreignLines >= 12);
+  size_t idleLines = 0;
+  std::set<std::string> turnLeftPhrases;
+  for (std::string const key : {"idle", "traffic.standstill", "longStop", "arrived"})
+    for (auto const & tier : LineData().at(key))
+      for (auto const & line : tier)
+      {
+        auto const at = line.find(" means '");
+        if (at == std::string::npos)
+          continue;
+        ++foreignLines;
+        idleLines += key == "idle" ? 1 : 0;
+        std::string const lowerLine = Lower(line);
+        bool const direction = lowerLine.find("'turn left'") != std::string::npos ||
+                               lowerLine.find("'turn right'") != std::string::npos ||
+                               lowerLine.find("'please turn left'") != std::string::npos;
+        CHECK(!direction || key == "idle" || key == "arrived");
+        if (lowerLine.find("'turn left'") != std::string::npos || lowerLine.find("'please turn left'") != std::string::npos)
+          turnLeftPhrases.insert(Lower(line.substr(0, at)));
+        std::string const phrase = Lower(line.substr(0, at));
+        bool known = false;
+        for (auto const & entry : ForeignPhrases())
+          known = known || Lower(entry.first) == phrase;
+        CHECK(known);
+        // The voice says the phrase in its own sounds, never the raw spelling.
+        std::string const said = ForSpeech(SpeakableText(line));
+        CHECK(StartsWith(said, "fx"));
+        // A translated direction is followed at once by a word that it is not an instruction.
+        std::string const lower = Lower(line);
+        if (lower.find("'turn left'") != std::string::npos || lower.find("'turn right'") != std::string::npos)
+          CHECK(lower.find("not now") != std::string::npos || lower.find("not yet") != std::string::npos ||
+                lower.find("don't") != std::string::npos);
+      }
+  CHECK(idleLines >= 12);
+  CHECK(foreignLines >= idleLines + 16);
+  // Brandon's "turn left" table (gps-comments.md) is used, not just stored: Spanish, French and
+  // Latin in idle; Portuguese, Dutch, Swedish, Polish, Russian, Korean, Mandarin, Finnish at arrival.
+  CHECK(turnLeftPhrases.size() >= 11);
 
   // No line said at a turn, lane, exit, U-turn or reroute, or as part of an instruction, has a
   // foreign phrase in it.

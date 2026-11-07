@@ -426,6 +426,20 @@ TEST(ForeignPhrasesAreSaidInTheirOwnSounds)
   CHECK_EQUAL(ForSpeech("私は運転がとても上手です"),
               std::string("fxwahtahshee fxwah fxoontehn fxgah fxtohtehmoh fxjohzoo fxdess"));
   CHECK_EQUAL(ForSpeech("Te lo dije. Recalculando."), std::string("fxteh fxloh fxdeeheh. fxrehkahlkoolahndoh."));
+  // The rest of Brandon's tables, said where the car is stopped or the trip is over.
+  CHECK_EQUAL(ForSpeech("Je te l'avais dit means 'I told you so' in French."),
+              std::string("fxzhuh fxtuh fxlahveh fxdee means 'I told you so' in French."));
+  CHECK_EQUAL(Foreign("HAB ICH DIR DOCH GESAGT!"), std::string("fxhahp fxish fxdeer fxdokh fxgehzahkt!"));
+  CHECK_EQUAL(ForSpeech("Route wird neu berechnet."), std::string("fxrooteh fxveert fxnoy fxbehreshnet."));
+  CHECK_EQUAL(ForSpeech("Leer autorijden."), std::string("fxlayr fxowtohrayden."));
+  CHECK_EQUAL(ForSpeech("Научись водить."), std::string("fxnahoochees fxvahdeet."));
+  CHECK_EQUAL(ForSpeech("Я отличный водитель."), std::string("fxyah fxahtleechnee fxvahdeetyel."));
+  CHECK_EQUAL(ForSpeech("Sla linksaf. Not now."), std::string("fxslah fxlinksahf. Not now."));
+  CHECK_EQUAL(ForSpeech("좌회전하세요."), std::string("fxjwahhwehjun fxhahsehyo."));
+  CHECK_EQUAL(ForSpeech("向左转."), std::string("fxshyahng fxdzwoh fxjwahn."));
+  // "Leer" alone is English; the Dutch phrase needs both words.
+  CHECK_EQUAL(Foreign("Don't leer at the car next to us."), std::string("Don't leer at the car next to us."));
+  CHECK_EQUAL(Foreign("The route will be recalculated"), std::string("The route will be recalculated"));
   // Case doesn't matter; word boundaries do; English look-alikes are left alone.
   CHECK_EQUAL(Foreign("GIRE A LA IZQUIERDA!"), std::string("fxheereh fxah fxlah fxeeskeeairdah!"));
   CHECK_EQUAL(Foreign("Click the links above"), std::string("Click the links above"));
