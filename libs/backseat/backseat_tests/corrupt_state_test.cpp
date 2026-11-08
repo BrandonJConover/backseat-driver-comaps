@@ -190,6 +190,59 @@ TEST(CorruptDriverMemoryTimesAreFinite)
   CHECK_EQUAL(memory.Recall("name").value_or(""), std::string("Sam"));
 }
 
+TEST(OversizedSaidLogIsCapped)
+{
+  // A runaway or corrupt said-lines file: 10,000 junk keys, a 1 MB row, Windows line ends.
+  std::string text = "turnLeft.now\tTurn left. Now.\r\n";
+  text += "junk\t" + std::string(1 << 20, 'x') + "\n";
+  for (int i = 0; i < 10000; ++i)
+    text += "junk" + std::to_string(i) + "\tline\n";
+  auto const log = SaidLog::Parse(text);
+  CHECK_EQUAL(log.Value("turnLeft.now"), std::string("Turn left. Now."));  // no stray \r on the line
+  CHECK(log.Value("junk").empty());  // the 1 MB row was dropped
+  CHECK(log.Serialize().size() < 4096 * 32);
+  CHECK(!log.Said("junk9999"));
+}
+
+TEST(SaidLogValueWithLineBreakSurvivesASave)
+{
+  SaidLog log;
+  log.SetValue("trip.to", "Joe's Diner\nand Bait Shop");
+  log.SetValue("mode", "drive");
+  auto const back = SaidLog::Parse(log.Serialize());
+  CHECK_EQUAL(back.Value("trip.to"), std::string("Joe's Diner and Bait Shop"));
+  CHECK_EQUAL(back.Value("mode"), std::string("drive"));
+}
+
+TEST(OversizedBadgeFileKeepsRealBadges)
+{
+  std::string text;
+  for (int i = 0; i < 5000; ++i)
+    text += "fake" + std::to_string(i) + "\t1\n";
+  text += std::string(500, 'y') + "\t1\n";
+  std::string const real = Badges().front().id;
+  text += real + "\t1730000000000\n";
+  auto const a = Achievements::Parse(text);
+  CHECK(a.Unlocked().size() <= 513);
+  CHECK(a.Has(real));
+  CHECK(!a.Has(std::string(500, 'y')));
+}
+
+TEST(OversizedDriverMemoryKeepsNewestFacts)
+{
+  std::string text = "1\tname\tSam\n";
+  text += "2\tnote\t" + std::string(1 << 20, 'z') + "\n";
+  for (int i = 0; i < 3000; ++i)
+    text += std::to_string(10 + i) + "\tnote\tfact " + std::to_string(i) + "\n";
+  text += "9999\thome\tPortland\n";
+  auto const memory = DriverMemory::Parse(text);
+  CHECK(memory.All().size() <= 1000);
+  CHECK_EQUAL(memory.Recall("home").value_or(""), std::string("Portland"));  // newest kept
+  CHECK_EQUAL(memory.All().back().fact, std::string("Portland"));
+  for (auto const & m : memory.All())
+    CHECK(m.fact.size() < 4096);
+}
+
 TEST(CorruptStateSoakNeverThrows)
 {
   StateRng r{33};

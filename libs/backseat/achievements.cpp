@@ -40,6 +40,13 @@ std::string Achievements::Serialize() const
   return out.str();
 }
 
+namespace
+{
+/// Far more than there are badges (renamed ones stay in the file), so only a corrupt file hits it.
+size_t constexpr kBadgesMax = 512;
+size_t constexpr kBadgeIdMax = 64;
+}  // namespace
+
 Achievements Achievements::Parse(std::string const & text)
 {
   Achievements a;
@@ -48,7 +55,10 @@ Achievements Achievements::Parse(std::string const & text)
   while (std::getline(in, row))
   {
     auto const tab = row.find('\t');
-    if (tab == std::string::npos || tab == 0)
+    if (tab == std::string::npos || tab == 0 || tab > kBadgeIdMax)
+      continue;
+    // Past the cap only real badges get in, so junk ahead of them in a corrupt file can't push them out.
+    if (a.m_unlocked.size() >= kBadgesMax && !FindBadge(row.substr(0, tab)))
       continue;
     char const * when = row.c_str() + tab + 1;
     char * end = nullptr;

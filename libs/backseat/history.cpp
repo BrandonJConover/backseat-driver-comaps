@@ -579,6 +579,12 @@ std::string DriverMemory::Serialize() const
   return out;
 }
 
+namespace
+{
+size_t constexpr kMemoryRowMax = 4096;
+size_t constexpr kMemoriesMax = 1000;
+}  // namespace
+
 DriverMemory DriverMemory::Parse(std::string const & text)
 {
   DriverMemory memory;
@@ -600,8 +606,14 @@ DriverMemory DriverMemory::Parse(std::string const & text)
     double const at = std::strtod(line.c_str(), &stop);
     // A hand-edited "nan"/"inf" time keeps the fact but not the time (0 = unknown).
     bool const timeOk = stop != line.c_str() && std::isfinite(at);
+    if (line.size() > kMemoryRowMax)  // a corrupt row, not a fact anyone said
+      continue;
     memory.m_memories.push_back({line.substr(a + 1, b - a - 1), line.substr(b + 1), timeOk ? at : 0});
   }
+  // The file is oldest first; past the cap a corrupt or runaway file keeps its newest facts.
+  if (memory.m_memories.size() > kMemoriesMax)
+    memory.m_memories.erase(memory.m_memories.begin(),
+                            memory.m_memories.end() - static_cast<std::ptrdiff_t>(kMemoriesMax));
   return memory;
 }
 }  // namespace backseat

@@ -467,6 +467,19 @@ namespace
 /// A key's memory holds at most this many lines (and always leaves one fresh option), so a pool
 /// of up to this size is used up before anything in it comes back.
 size_t constexpr kSaidKeep = 30;
+/// A saved log is a few hundred keys of short lines; anything past these is a corrupt or
+/// hand-mangled file, dropped so it can't grow the log (and the save) without end.
+size_t constexpr kSaidKeysMax = 4096;
+size_t constexpr kSaidRowMax = 4096;
+
+/// A value with a line break (a destination name, say) would split its row in the saved file.
+std::string OneRow(std::string text)
+{
+  for (char & c : text)
+    if (c == '\n' || c == '\r')
+      c = ' ';
+  return text;
+}
 }  // namespace
 
 std::string const & SaidLog::Pick(std::string const & key, std::vector<std::string> const & options, double r)
@@ -547,7 +560,7 @@ std::string SaidLog::Serialize() const
   std::string out;
   for (auto const & [key, lines] : m_recent)
     for (auto const & l : lines)
-      out += key + "\t" + l + "\n";
+      out += OneRow(key) + "\t" + OneRow(l) + "\n";
   return out;
 }
 
@@ -558,10 +571,15 @@ SaidLog SaidLog::Parse(std::string const & text)
   std::string row;
   while (std::getline(in, row))
   {
+    if (!row.empty() && row.back() == '\r')  // saved on Windows or hand-edited
+      row.pop_back();
     auto const tab = row.find('\t');
-    if (tab == std::string::npos || tab == 0 || tab + 1 >= row.size())
+    if (tab == std::string::npos || tab == 0 || tab + 1 >= row.size() || row.size() > kSaidRowMax)
       continue;
-    auto & lines = log.m_recent[row.substr(0, tab)];
+    auto key = row.substr(0, tab);
+    if (log.m_recent.size() >= kSaidKeysMax && log.m_recent.count(key) == 0)
+      continue;
+    auto & lines = log.m_recent[std::move(key)];
     if (lines.size() < kSaidKeep)
       lines.push_back(row.substr(tab + 1));
   }
