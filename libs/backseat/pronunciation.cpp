@@ -769,10 +769,31 @@ bool CompassWord(std::string const & w)
   return words.count(w) > 0;
 }
 
+/// USPS street suffixes past the common ones ("Shady Crk", "Forest Hts Dr", "Mesa Ctr Ste 100"). Said only
+/// after a street's own name (StreetNameBefore), so "Sta 4", "the Lk" and "NB: Hl" are left alone.
+std::string const kMoreStreetWords[][2] = {
+    {"Hts", "Heights"},   {"Plz", "Plaza"},     {"Ctr", "Center"},    {"Tpke", "Turnpike"}, {"Hl", "Hill"},
+    {"Vw", "View"},       {"Bnd", "Bend"},      {"Crk", "Creek"},     {"Cyn", "Canyon"},    {"Gln", "Glen"},
+    {"Grv", "Grove"},     {"Hbr", "Harbor"},    {"Holw", "Hollow"},   {"Jct", "Junction"},  {"Lk", "Lake"},
+    {"Mdw", "Meadow"},    {"Mnr", "Manor"},     {"Rdg", "Ridge"},     {"Shr", "Shore"},     {"Spg", "Spring"},
+    {"Sta", "Station"},   {"Smt", "Summit"},    {"Trce", "Trace"},    {"Vly", "Valley"},    {"Vis", "Vista"},
+    {"Vlg", "Village"},   {"Bch", "Beach"},     {"Brg", "Bridge"},    {"Cswy", "Causeway"}, {"Frk", "Fork"},
+    {"Gdns", "Gardens"},  {"Ldg", "Lodge"},     {"Mtn", "Mountain"},  {"Plns", "Plains"},   {"Rnch", "Ranch"},
+    {"Tunl", "Tunnel"},   {"Ests", "Estates"},  {"Pt", "Point"},
+};
+
+std::string MoreStreet(std::string const & abbreviation)
+{
+  for (auto const & w : kMoreStreetWords)
+    if (w[0] == abbreviation)
+      return w[1];
+  return {};
+}
+
 bool StreetTypeWord(std::string const & w)
 {
-  static std::set<std::string> const more = {"Way", "Plaza", "Loop", "Row", "Walk", "Path", "Pike", "Run", "Alley"};
-  return StreetWord(w) || more.count(w) > 0;
+  static std::set<std::string> const more = {"Way", "Plaza", "Loop", "Row", "Walk", "Path", "Pike", "Run", "Alley", "Pass"};
+  return StreetWord(w) || more.count(w) > 0 || !MoreStreet(w).empty();
 }
 
 /// True when what comes right before `pos` ends a street address, so a "Ste"/"Apt"/"Fl" there is a
@@ -810,6 +831,45 @@ std::string AddressTails(std::string const & s)
     if (!AfterStreetPart(s, pos))
       return std::nullopt;
     return TailWords().at(m.str(1)) + " ";
+  });
+}
+
+/// The USPS suffixes in kMoreStreetWords after a street's name: at the end, before punctuation, a
+/// lowercase word, a compass point, a suite or "number 5", or another street type ("Forest Hts Drive",
+/// "Lake Vw Ln"). A period after one stays when it may end the sentence ("Continue on Oak Hl.") and goes
+/// when the sentence plainly carries on ("Elm Crk., then left"). Runs after the street pass.
+std::string MoreStreetTypes(std::string const & s)
+{
+  static std::regex const word(
+      "\\b(Hts|Plz|Ctr|Tpke|Hl|Vw|Bnd|Crk|Cyn|Gln|Grv|Hbr|Holw|Jct|Lk|Mdw|Mnr|Rdg|Shr|Spg|Sta|Smt|Trce|Vly|Vis|"
+      "Vlg|Bch|Brg|Cswy|Frk|Gdns|Ldg|Mtn|Plns|Rnch|Tunl|Ests|Pt)(\\.?)(?=$|[\\s,;:!?.)])");
+  return Replace(s, word, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    if (!StreetNameBefore(s, pos))
+      return std::nullopt;
+    size_t const after = pos + static_cast<size_t>(m.length(0));
+    auto const out = MoreStreet(m.str(1));
+    if (after >= s.size())
+      return out + m.str(2);
+    char const next = s[after];
+    if (next == ',' || next == ';' || next == ':')
+      return out;
+    if (!Space(next))
+      return out + m.str(2);
+    size_t start = after;
+    while (start < s.size() && Space(s[start]))
+      ++start;
+    size_t end = start;
+    while (end < s.size() && std::isalnum(static_cast<unsigned char>(s[end])))
+      ++end;
+    auto const following = s.substr(start, end - start);
+    bool const carriesOn = !following.empty() &&
+                           (std::islower(static_cast<unsigned char>(following[0])) || CompassWord(following) ||
+                            StreetTypeWord(following) || TailWord(following) ||
+                            (following == "number" && end < s.size() && s[end] == ' '));
+    if (carriesOn)
+      return out;
+    // "Oak Hl. Then right" ends a sentence; "Pine Crk Mall" isn't a street type.
+    return m[2].length() > 0 ? std::optional<std::string>(out + ".") : std::nullopt;
   });
 }
 
@@ -2821,6 +2881,8 @@ std::string ForSpeech(std::string const & text)
       return std::nullopt;
     return Street(m.str(1));
   });
+  // "Shady Crk", "Forest Hts Dr", "Mesa Ctr Ste 100": the rarer USPS suffixes, only after a name.
+  s = MoreStreetTypes(s);
   // "Frontage Svc Rd" is a service road; "Ave B" and "Ln 5" name the street after its type.
   static std::regex const service("\\bSvc\\.? (?=(?:Rd|Road|Dr|Drive)\\b)");
   s = std::regex_replace(s, service, "Service ");
@@ -2830,6 +2892,9 @@ std::string ForSpeech(std::string const & text)
   });
   static std::regex const mount("\\bMt\\.? (?=[A-Z])");
   s = std::regex_replace(s, mount, "Mount ");
+  // "Pt Reyes", "Pt. Loma Blvd": Point before a capitalised name.
+  static std::regex const point("\\bPt\\.? (?=[A-Z][a-z])");
+  s = std::regex_replace(s, point, "Point ");
   // Compass points next to a street name: "N Main", "Main St NW".
   static std::regex const compassBefore("(NE|NW|SE|SW|N|S|E|W)\\.?(?= [A-Z0-9])");
   s = Replace(s, compassBefore, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {

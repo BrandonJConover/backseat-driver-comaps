@@ -124,6 +124,136 @@
   {
    "input": "Via Veneto, then left.",
    "expected": "fxveeah Veneto, then left."
+  },
+  {
+   "input": "Turn right onto Shady Crk",
+   "language": "en",
+   "expected": "Turn right onto Shady Creek"
+  },
+  {
+   "input": "Turn left onto Forest Hts Dr",
+   "language": "en",
+   "expected": "Turn left onto Forest Heights Drive"
+  },
+  {
+   "input": "Continue on Oak Hl.",
+   "language": "en",
+   "expected": "Continue on Oak Hill."
+  },
+  {
+   "input": "Turn right onto Lake Vw, then left",
+   "language": "en",
+   "expected": "Turn right onto Lake View, then left"
+  },
+  {
+   "input": "Take Pt Reyes Rd",
+   "language": "en",
+   "expected": "Take Point Reyes Road"
+  },
+  {
+   "input": "Turn right onto Pt. Loma Blvd",
+   "language": "en",
+   "expected": "Turn right onto Point Loma Boulevard"
+  },
+  {
+   "input": "Turn onto Ocean Pt Rd",
+   "language": "en",
+   "expected": "Turn onto Ocean Point Road"
+  },
+  {
+   "input": "Turn onto Mesa Ctr Ste 100",
+   "language": "en",
+   "expected": "Turn onto Mesa Center Suite one hundred"
+  },
+  {
+   "input": "Arrive at Pine Bnd NW",
+   "language": "en",
+   "expected": "Arrive at Pine Bend Northwest"
+  },
+  {
+   "input": "Stay on Lone Star Tpke",
+   "language": "en",
+   "expected": "Stay on Lone Star Turnpike"
+  },
+  {
+   "input": "Elm Crk., then left",
+   "language": "en",
+   "expected": "Elm Creek, then left"
+  },
+  {
+   "input": "Oak Hl. Then right",
+   "language": "en",
+   "expected": "Oak Hill. Then right"
+  },
+  {
+   "input": "Turn onto 5th Sta",
+   "language": "en",
+   "expected": "Turn onto fifth Station"
+  },
+  {
+   "input": "Willow Crk Apt 4",
+   "language": "en",
+   "expected": "Willow Creek Apartment four"
+  },
+  {
+   "input": "Turn onto Bear Crk Pass",
+   "language": "en",
+   "expected": "Turn onto Bear Creek Pass"
+  },
+  {
+   "input": "Turn onto Cedar Rdg Ln",
+   "language": "en",
+   "expected": "Turn onto Cedar Ridge Lane"
+  },
+  {
+   "input": "Turn onto Mill Vly Rd",
+   "language": "en",
+   "expected": "Turn onto Mill Valley Road"
+  },
+  {
+   "input": "Arrive at Bella Vis",
+   "language": "en",
+   "expected": "Arrive at Bella Vista"
+  },
+  {
+   "input": "Turn onto Rio Rnch Rd",
+   "language": "en",
+   "expected": "Turn onto Rio Ranch Road"
+  },
+  {
+   "input": "Turn onto Sunset Gdns Dr",
+   "language": "en",
+   "expected": "Turn onto Sunset Gardens Drive"
+  },
+  {
+   "input": "Sta 4 is closed",
+   "language": "en",
+   "expected": "Sta four is closed"
+  },
+  {
+   "input": "Head to the Lk now",
+   "language": "en",
+   "expected": "Head to the Lk now"
+  },
+  {
+   "input": "go to a Lk mid-text",
+   "language": "en",
+   "expected": "go to a Lk mid-text"
+  },
+  {
+   "input": "the hl is steep",
+   "language": "en",
+   "expected": "the hl is steep"
+  },
+  {
+   "input": "Pine Crk Mall is closed",
+   "language": "en",
+   "expected": "Pine Crk Mall is closed"
+  },
+  {
+   "input": "NB: see below",
+   "language": "en",
+   "expected": "NB: see below"
   }
  ]
 }
