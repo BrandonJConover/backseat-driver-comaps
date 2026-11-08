@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <sstream>
 
 namespace backseat
@@ -319,10 +320,19 @@ PlateLog PlateLog::Parse(std::string const & text)
     std::string kind;
     in >> kind;
     std::set<std::string> * target = nullptr;
+    // Saved counts stay in [0, 1e6] and the time finite and not negative (see TwentyLog::Parse).
     if (kind == "grudges")
-      in >> log.grudges;
+    {
+      long long n = 0;
+      in >> n;
+      log.grudges = static_cast<int>(std::clamp<long long>(n, 0, 1'000'000));
+    }
     else if (kind == "played")
+    {
       in >> log.lastPlayedMs;
+      if (!std::isfinite(log.lastPlayedMs) || log.lastPlayedMs < 0)
+        log.lastPlayedMs = 0;
+    }
     else if (kind == "lifetime")
       target = &log.lifetime;
     else if (kind == "route")

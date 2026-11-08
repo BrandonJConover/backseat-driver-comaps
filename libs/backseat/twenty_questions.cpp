@@ -592,6 +592,18 @@ std::string TwentyLog::Serialize() const
   return out;
 }
 
+namespace
+{
+// A saved counter, kept in [0, 1e6]: a hand-edited "-4" would be spoken as a score, and an
+// overflowing one (stream reads clamp it to INT_MAX) would overflow on the next game's ++.
+void ReadCount(std::istream & in, int & count)
+{
+  long long n = 0;
+  in >> n;
+  count = static_cast<int>(std::clamp<long long>(n, 0, 1'000'000));
+}
+}  // namespace
+
 TwentyLog TwentyLog::Parse(std::string const & text)
 {
   TwentyLog log;
@@ -603,19 +615,21 @@ TwentyLog TwentyLog::Parse(std::string const & text)
     std::string kind;
     in >> kind;
     if (kind == "games")
-      in >> log.games;
+      ReadCount(in, log.games);
     else if (kind == "gpsWins")
-      in >> log.gpsWins;
+      ReadCount(in, log.gpsWins);
     else if (kind == "driverWins")
-      in >> log.driverWins;
+      ReadCount(in, log.driverWins);
     else if (kind == "grudges")
-      in >> log.grudges;
+      ReadCount(in, log.grudges);
     else if (kind == "recent")
     {
       std::string name;
       std::getline(in >> std::ws, name);
       if (!name.empty())
         log.recent.push_back(name);
+      if (log.recent.size() > TwentyQuestions::kRecentKeep)  // the newest are kept
+        log.recent.pop_front();
     }
   }
   return log;

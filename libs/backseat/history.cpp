@@ -598,7 +598,9 @@ DriverMemory DriverMemory::Parse(std::string const & text)
       continue;
     char * stop = nullptr;
     double const at = std::strtod(line.c_str(), &stop);
-    memory.m_memories.push_back({line.substr(a + 1, b - a - 1), line.substr(b + 1), stop == line.c_str() ? 0 : at});
+    // A hand-edited "nan"/"inf" time keeps the fact but not the time (0 = unknown).
+    bool const timeOk = stop != line.c_str() && std::isfinite(at);
+    memory.m_memories.push_back({line.substr(a + 1, b - a - 1), line.substr(b + 1), timeOk ? at : 0});
   }
   return memory;
 }
