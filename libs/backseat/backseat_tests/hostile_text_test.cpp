@@ -16,6 +16,7 @@
 #include <chrono>
 #include <climits>
 #include <cstdint>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -55,6 +56,13 @@ std::vector<std::string> const kPieces = {
   "Tues-Thurs", "Mon/Wed/Fri", "Sat & Sun", "Sun ", "Sat, ", "Fri.", "9-5", "Open ", "daily", "½", "¼",
   "1½", "⅔", "1/3", "3/4 mi", "1 1/2 ", "#5", "#", "$3.49/gal", "mi/hr", "km/h", "hrs", "mins", "24/7",
   "the 90s", "'80s", "mid-70s", "10s",
+  // Address tails, more street types, travel directions, decimal miles, grouped numbers,
+  // Reading and saints' streets (passes added since the games soak, loop B72-B84).
+  "Ste ", "Ste 200", "Apt ", "Apt. 4B", "Bldg ", "Fl ", "Rm ", "Spc ", "#200", "Unit ", "Blvd ",
+  "Hts", "Plz ", "Pt. ", "Pt ", "Tpke", "Crk ", "Sta", "Vly", "Jct ", "NB", "SB", "EB", "WB",
+  " NB / ", "US-290 W", " / TX-71 W", "IH 35 SB", "0.3 mi", "0.25 mi", ".5 mi", "10.0 mi", "0. mi",
+  "1.", "1,000,000", "999,999,999,999,999,999", "1,2,3", ",000", "Reading ", "Reading Rd", ", PA",
+  "St. Louis", "St. Paul St", "Elm St. ", "Main St.,", "Oak Dr. and",
 };
 
 std::string RandomText(FuzzRng & r, size_t pieces)
@@ -93,6 +101,7 @@ size_t Feed(std::string const & text)
   keep(WebAddresses(text));
   keep(Symbols(text));
   keep(Decades(text));
+  keep(DecimalMiles(text));
   keep(FractionsWithUnits(text));
   keep(Dates(text));
   keep(Weekdays(text));
@@ -170,6 +179,99 @@ TEST(HostileTextNeverThrowsOrBlowsUp)
   auto const secs =
       std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
   CHECK(secs < 60.0);
+}
+
+namespace
+{
+// True when the bytes are well-formed UTF-8 (no stray continuation, no truncated sequence,
+// no overlong form, no surrogate). Kokoro's phonemizer chokes on broken bytes mid-line.
+bool ValidUtf8(std::string const & s)
+{
+  size_t i = 0;
+  while (i < s.size())
+  {
+    auto const c = static_cast<unsigned char>(s[i]);
+    size_t n = 0;
+    uint32_t cp = 0;
+    if (c < 0x80)
+    {
+      ++i;
+      continue;
+    }
+    if (c >= 0xC2 && c <= 0xDF)
+    {
+      n = 1;
+      cp = c & 0x1F;
+    }
+    else if (c >= 0xE0 && c <= 0xEF)
+    {
+      n = 2;
+      cp = c & 0x0F;
+    }
+    else if (c >= 0xF0 && c <= 0xF4)
+    {
+      n = 3;
+      cp = c & 0x07;
+    }
+    else
+      return false;
+    if (i + n >= s.size())
+      return false;
+    for (size_t k = 1; k <= n; ++k)
+    {
+      auto const cc = static_cast<unsigned char>(s[i + k]);
+      if ((cc & 0xC0) != 0x80)
+        return false;
+      cp = (cp << 6) | (cc & 0x3F);
+    }
+    if ((n == 2 && (cp < 0x800 || (cp >= 0xD800 && cp <= 0xDFFF))) || (n == 3 && (cp < 0x10000 || cp > 0x10FFFF)))
+      return false;
+    i += n + 1;
+  }
+  return true;
+}
+
+// Random text from the pieces that are themselves valid UTF-8 (no raw bytes).
+std::string RandomValidText(FuzzRng & r, size_t pieces)
+{
+  std::string s;
+  while (pieces > 0)
+  {
+    std::string const & piece = kPieces[r.Below(kPieces.size())];
+    if (!ValidUtf8(piece))
+      continue;
+    s += piece;
+    --pieces;
+  }
+  return s;
+}
+}  // namespace
+
+// A pass that cuts a multi-byte letter in half (byte regexes, substr at a byte offset) hands the
+// voice broken text. Clean input must come out clean from ForSpeech and from every pass.
+TEST(HostileValidUtf8StaysValid)
+{
+  CHECK(ValidUtf8("Straße ありがとう 😀"));
+  CHECK(!ValidUtf8("\xC3"));
+  CHECK(!ValidUtf8(std::string("a\xC3")));
+  CHECK(!ValidUtf8(std::string("\xED\xA0\x80")));
+  FuzzRng r{0xD1B54A32D192ED03ULL};
+  int broken = 0;
+  for (int i = 0; i < 1500; ++i)
+  {
+    std::string const text = RandomValidText(r, 1 + r.Below(16));
+    for (std::string const & out :
+         {ForSpeech(text), WebAddresses(text), Symbols(text), Decades(text), DecimalMiles(text),
+          FractionsWithUnits(text), Dates(text), Weekdays(text), LocalPlaces(text), PickSenses(text),
+          Ranges(text), Foreign(text), ForeignStreets(text), Regnal(text), Cyrillic(text), Kana(text),
+          Roads(text), HouseNumbers(text), Clock(text), Years(text), StraightApostrophes(text),
+          SpeakableText(text), MetricWording(text)})
+    {
+      if (!ValidUtf8(out) && ++broken <= 5)
+        std::printf("  broken UTF-8 from: %s\n", text.c_str());
+    }
+  }
+  CHECK_EQUAL(broken, 0);
 }
 
 TEST(HostileTextVeryLongInputFinishes)
