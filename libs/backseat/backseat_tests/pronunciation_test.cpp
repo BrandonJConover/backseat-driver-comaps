@@ -701,6 +701,17 @@ TEST(WeekdaysAreSaidAsDays)
   CHECK_EQUAL(Dates("Oct 20261 Mar 2026:30 May 2026 oct 2026"), std::string("Oct 20261 Mar 2026:30 May 2026 oct 2026"));
 }
 
+TEST(GroupedNumbersAreQuantitiesWhateverTheirLength)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_NUMBERS_PATH);
+  CHECK(cases.size() >= 10);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+}
+
 TEST(SymbolsAndLeftoverAbbreviationsMatchTheGoldenCases)
 {
   auto const cases = GoldenCases(BACKSEAT_SPOKEN_SYMBOLS_PATH);

@@ -3009,14 +3009,17 @@ std::string ForSpeech(std::string const & text)
       return std::nullopt;
     return Ordinal(ToNumber(m.str(1)));
   });
-  // Decimals and plain numbers ("1,200" too). Long ones (phone numbers, zip codes) digit by digit.
+  // Decimals and plain numbers ("1,200" too). Long bare runs (phone numbers, zip codes) digit by digit,
+  // but a comma-grouped number is a quantity whatever its length: "1,250,000" is one million ...
   static std::regex const number("\\b(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d+))?\\b");
   s = Replace(s, number, [](std::smatch const & m, size_t) -> std::optional<std::string> {
     std::string whole;
     for (char ch : m.str(1))
       if (ch != ',')
         whole += ch;
-    std::string said = whole.size() > 6 ? Digits(whole) : SpellNumber(ToNumber(whole));
+    bool const grouped = whole.size() != static_cast<size_t>(m.length(1));
+    size_t const longest = grouped ? 15 : 6;  // 15 digits: SpellNumber's trillions, well inside long long
+    std::string said = whole.size() > longest ? Digits(whole) : SpellNumber(ToNumber(whole));
     if (m[2].matched)
       said += " point " + Digits(m.str(2));
     return said;
