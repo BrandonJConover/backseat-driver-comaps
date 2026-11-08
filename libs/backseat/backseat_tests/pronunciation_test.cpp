@@ -763,3 +763,27 @@ TEST(WebAddressesMatchTheGoldenCasesSharedWithBookLyre)
   CHECK(said.size() > big.size());
   CHECK_EQUAL(said.substr(said.size() - 7), std::string("dot com"));
 }
+
+// BI-063: a street abbreviation's period mid-sentence isn't a full stop, or Kokoro stops dead
+// halfway through "Oak Drive. and then left".
+TEST(StreetPeriodMidSentenceIsNotAFullStop)
+{
+  CHECK_EQUAL(ForSpeech("Oak Dr. and then left"), std::string("Oak Drive and then left"));
+  CHECK_EQUAL(ForSpeech("Main St., then right"), std::string("Main Street, then right"));
+  CHECK_EQUAL(ForSpeech("Turn onto Pine Ln.; it's narrow"), std::string("Turn onto Pine Lane; it's narrow"));
+  CHECK_EQUAL(ForSpeech("Take Elm Ave.: the slow one"), std::string("Take Elm Avenue: the slow one"));
+  CHECK_EQUAL(ForSpeech("Turn on Ave. B now"), std::string("Turn on Avenue B now"));
+  CHECK_EQUAL(ForSpeech("Stay on Oak Ln. 7 more miles"), std::string("Stay on Oak Lane seven more miles"));
+  CHECK_EQUAL(ForSpeech("Main St. NW is closed"), std::string("Main Street Northwest is closed"));
+  CHECK_EQUAL(ForSpeech("Take Burnet Rd. or don't"), ForSpeech("Take Burnet Rd or don't"));
+  // The period stays where the sentence may end.
+  CHECK_EQUAL(ForSpeech("Elm Ave. Then right."), std::string("Elm Avenue. Then right."));
+  CHECK_EQUAL(ForSpeech("Turn onto Oak Rd."), std::string("Turn onto Oak Road."));
+  CHECK_EQUAL(ForSpeech("Oak Rd. I hate this road."), std::string("Oak Road. I hate this road."));
+  CHECK_EQUAL(ForSpeech("Oak Rd. A truck. Wonderful."), std::string("Oak Road. A truck. Wonderful."));
+  CHECK_EQUAL(ForSpeech("Main St.) Fine."), std::string("Main Street.) Fine."));
+  // Titles keep working: the period after Saint/Doctor is theirs.
+  CHECK_EQUAL(ForSpeech("Take St. Johns Rd. and keep left"), std::string("Take Saint Johns Road and keep left"));
+  CHECK_EQUAL(ForSpeech("Call Dr. Smith"), std::string("Call Doctor Smith"));
+  CHECK_EQUAL(ForSpeech("Mt. Bonnell Rd., then left"), std::string("Mount Bonnell Road, then left"));
+}

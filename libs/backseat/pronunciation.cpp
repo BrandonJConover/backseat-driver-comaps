@@ -2714,10 +2714,15 @@ std::string ForSpeech(std::string const & text)
   s = Titles(s);
 
   // "Main St", "Elm Dr." after a word, at the end or before punctuation, a lowercase word or a
-  // compass point ("Main St NW"). Not "Dr Smith" or "St Louis". A period after it stays: it was
-  // probably the end of the sentence too.
+  // compass point ("Main St NW"). Not "Dr Smith" or "St Louis". A period after it stays when it
+  // may end the sentence ("Elm Ave. Then right.", "onto Oak Rd."); it goes when the sentence plainly
+  // carries on: ",;:" or a lowercase word next ("Oak Dr. and then left", "Main St., then right"), a
+  // compass point, or a lone letter or number naming the street ("on Ave. B now"; not "A"/"I",
+  // which start sentences).
   static std::regex const street(
-      "(St|Ave|Blvd|Rd|Dr|Ln|Ct|Pkwy|Hwy|Pl|Cir|Ter|Trl|Expy|Fwy|Sq|Cv|Xing|Ext)(?=$|[,;:!?.)]|\\s+(?:[a-z]|Ext\\b|(?:NE|NW|SE|SW|N|S|E|W)\\b))");
+      "(St|Ave|Blvd|Rd|Dr|Ln|Ct|Pkwy|Hwy|Pl|Cir|Ter|Trl|Expy|Fwy|Sq|Cv|Xing|Ext)"
+      "(?:\\.(?=[,;:]|\\s+(?:[a-z]|(?:NE|NW|SE|SW|N|S|E|W)\\b|(?:[B-HJ-Z]|\\d+)(?=$|[\\s,;:!?.)])))"
+      "|(?=$|[,;:!?.)]|\\s+(?:[a-z]|Ext\\b|(?:NE|NW|SE|SW|N|S|E|W)\\b)))");
   s = Replace(s, street, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (pos < 2 || s[pos - 1] != ' ' || !IsAsciiLetter(s[pos - 2]))
       return std::nullopt;
