@@ -83,6 +83,9 @@ int constexpr kWaterBridgeYelpsPerTrip = 2;
 double constexpr kRerouteRoastAfterMs = 5000;
 /// The driver asked for a new route, so of course it changed.
 double constexpr kNoRerouteRoastAfterCommandMs = 30000;
+// Leaving the route right at a turn is only a miss once it lasts: a one-second GPS blip that comes back to the
+// same maneuver gets no "you missed it" and doesn't count as a reroute.
+double constexpr kMissConfirmMs = 3000;
 /// Off every mapped road: this far from the nearest one...
 double constexpr kOffRoadM = 60;
 /// ...and back on one within this...
@@ -1253,18 +1256,22 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   {
     if (prev == RouteState::OnRoute)
     {
-      if (m_turnId && m_lastDistToTurnM < kMissedTurnWithinM)
+      bool const nearTurn = m_turnId && m_lastDistToTurnM < kMissedTurnWithinM;
+      bool const asked = t - m_lastVoiceCommandT < kNoRerouteRoastAfterCommandMs;
+      m_missPending.reset();
+      if (nearTurn)
       {
-        if (FixGapAt(t))
-          m_bits.TurnUnseen();
-        Say(m_engine->OnNav(NavEvent::MissedTurn(t)));
+        bool const unseen = FixGapAt(t);
+        if (asked)
+          SayMissedTurn(t, unseen);
+        else
+          m_missPending = PendingMiss{t + kMissConfirmMs, unseen};  // said once it lasts
       }
       m_rerouting = true;
       NotFamiliarAnymore("offroute");
-      Trace("nav.offroute", {{"missed", (m_turnId && m_lastDistToTurnM < kMissedTurnWithinM) ? "yes" : "no"},
-                             {"reroutes", std::to_string(m_reroutes + 1)}});
+      Trace("nav.offroute", {{"missed", nearTurn ? "yes" : "no"}, {"reroutes", std::to_string(m_reroutes + 1)}});
       // Back on the route in a moment, or the route changed because the driver asked: no joke.
-      if (t - m_lastVoiceCommandT < kNoRerouteRoastAfterCommandMs)
+      if (asked)
       {
         ++m_reroutes;
         Say(m_engine->OnNav(NavEvent::Rerouted(t, true)));
@@ -1274,7 +1281,12 @@ void Navigator::Update(double t, RouteSnapshot const & route)
         m_rerouteRoastDueAt = t + kRerouteRoastAfterMs;
       }
     }
-    else if (m_rerouteRoastDueAt && t >= *m_rerouteRoastDueAt)
+    else
+    {
+      if (m_missPending && t >= m_missPending->confirmAt)
+        SayMissedTurn(t, std::exchange(m_missPending, std::nullopt)->unseen);
+    }
+    if (prev != RouteState::OnRoute && m_rerouteRoastDueAt && t >= *m_rerouteRoastDueAt)
     {
       m_rerouteRoastDueAt.reset();
       Say(m_engine->OnNav(NavEvent::Rerouted(t)));
@@ -1300,6 +1312,17 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     return;
   }
 
+  // Back on the same maneuver before the miss was sure: a GPS blip. Nothing missed, nothing rerouted.
+  if (m_missPending && route.turnId && route.turnId == m_turnId)
+  {
+    m_missPending.reset();
+    m_rerouteRoastDueAt.reset();
+    m_rerouting = false;
+    Trace("nav.blip", {});
+  }
+  // Back on a different route before the miss was confirmed: it was a miss after all.
+  else if (m_missPending)
+    SayMissedTurn(t, std::exchange(m_missPending, std::nullopt)->unseen);
   // Back before the joke was due. It still counts, quietly.
   if (std::exchange(m_rerouteRoastDueAt, std::nullopt))
   {
@@ -2299,6 +2322,7 @@ void Navigator::ResetTrip()
   m_turnKind = TurnKind::None;
   m_leftsInARow = 0;
   m_rerouting = false;
+  m_missPending.reset();
   m_arrived = false;
   m_lastState = RouteState::Inactive;
   m_stopSince.reset();
@@ -3265,6 +3289,13 @@ bool Navigator::RemarkWaiting() const
 }
 
 bool Navigator::RemarkJustSaid(double t) const { return t - m_lastSpokeT < kBreathAfterTalkMs || RemarkWaiting(); }
+
+void Navigator::SayMissedTurn(double t, bool unseen)
+{
+  if (unseen)
+    m_bits.TurnUnseen();
+  Say(m_engine->OnNav(NavEvent::MissedTurn(t)));
+}
 
 bool Navigator::FixGapAt(double t) const { return m_lastFix && t - m_lastFix->tMs > kUnseenTurnGapMs; }
 

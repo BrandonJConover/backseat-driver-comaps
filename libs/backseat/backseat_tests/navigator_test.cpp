@@ -114,6 +114,9 @@ TEST(NavigatorCallsOffRouteNearTheTurnAMiss)
   RouteSnapshot off = OnRoute(1, TurnKind::Left, 20);
   off.state = RouteState::OffRoute;
   nav.OnFix(At(2000, 10), off);
+  // A moment off the route could be a GPS blip; once it lasts, it's a miss.
+  CHECK(!Has(nav.TakeLines(), Category::MissedTurn));
+  nav.OnFix(At(5100, 10), off);
   auto const lines = nav.TakeLines();
   CHECK(Has(lines, Category::MissedTurn));
   // Still off the route a few seconds later: now it's a reroute.

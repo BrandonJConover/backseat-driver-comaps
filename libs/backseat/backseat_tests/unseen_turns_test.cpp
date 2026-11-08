@@ -138,6 +138,7 @@ TEST(NavigatorDoesNotBlameAMissNoticedAfterAnOutage)
   RouteSnapshot off = Leg(2, 20);
   off.state = RouteState::OffRoute;
   nav.OnFix(At(152000), off);
+  nav.OnFix(At(155500), off);  // still off once the miss is sure
   nav.TakeLines();
   CHECK_EQUAL(nav.Engine()->Stats().missedTurns, 1);
   CHECK_EQUAL(nav.TurnStreak(), 1);

@@ -472,6 +472,7 @@ private:
   void CountLefts(double t);
   /// "In half a mile, turn left onto Elm Street." for the maneuver in route.
   void SayInstruction(double t, RouteSnapshot const & route);
+  void SayMissedTurn(double t, bool unseen);
   void TrackPlateGame(double tMs, LatLon const & here, double speedMps, RouteSnapshot const & route);
   void SayPlate(double tMs, PlateGame::Reply const & reply);
   void SayLine(double tMs, Category category, std::string const & key, Vars vars = {},
@@ -618,6 +619,13 @@ private:
   double m_lastHeadingT = -1e18;
   std::string m_lastInstructionText;
   std::optional<double> m_rerouteRoastDueAt;
+  // Off the route right at the turn: the miss is said at confirmAt unless a blip brings back the same maneuver.
+  struct PendingMiss
+  {
+    double confirmAt = 0;
+    bool unseen = false;  // the fix gap was at the moment it left the route
+  };
+  std::optional<PendingMiss> m_missPending;
   /// About when the phone is done saying everything handed to it so far.
   double m_talkingUntil = 0;
   /// The trip-time prediction, said a little after the start like a direction but held for turns.
