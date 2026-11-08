@@ -52,6 +52,7 @@ add_executable(${PROJECT_NAME}
   commute_soak_test.cpp
   familiar_commute_test.cpp
   clip_pacing_test.cpp
+  brandon_lines_test.cpp
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
 target_compile_definitions(${PROJECT_NAME} PRIVATE
