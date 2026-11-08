@@ -69,6 +69,7 @@ TEST(TurnWordsDetectorCatchesTheOtherDirection)
   CHECK(!SaysTheOtherWay("countdown.now", "{DIR}! NOW!", "right"));
   CHECK(GivesDirection("lane.left"));
   CHECK(GivesDirection("countdown.exit.mention"));
+  CHECK(GivesDirection("countdown.exit.now"));
   CHECK(GivesDirection("countdown.far.more"));
   CHECK(!GivesDirection("countdown.done"));
   CHECK(!GivesDirection("countdown.exit.done"));
@@ -122,4 +123,31 @@ TEST(RewrittenTurnLinesKeepTheirPlace)
   CHECK(has("countdown.exit.near", 0, "Exit on the {dir}, {distance}. Now would be a great time to be in the lane for it."));
   CHECK(has("lane.left", 2, "LEFT LANE! THE BLINKER! USE IT! IT'S BY THE WHEEL!"));
   CHECK_EQUAL(Fill("Turn {dir}. Here. Now.", {{"dir", "left"}}), std::string("Turn left. Here. Now."));
+}
+
+// Every exit call before the ramp names its side (loop B75, BI-069): "THIS ONE! THIS EXIT! TAKE IT!"
+// at the moment of the exit left the driver guessing, and left exits are the ones people miss.
+// countdown.exit.still is exempt: by then the car is already on the ramp.
+TEST(ExitCallsBeforeTheRampNameTheSide)
+{
+  auto const hasSlot = [](std::string const & line) {
+    return line.find("{dir}") != std::string::npos || line.find("{DIR}") != std::string::npos;
+  };
+  size_t checked = 0;
+  for (TravelMode mode : {TravelMode::Drive, TravelMode::Walk, TravelMode::Bike, TravelMode::Hike, TravelMode::OffRoad})
+  {
+    SetLineTravelMode(mode);
+    for (char const * key : {"countdown.exit.far", "countdown.exit.mention", "countdown.exit.near", "countdown.exit.now"})
+      for (int tier = 0; tier < 3; ++tier)
+        for (auto const & line : LinesFor(key, tier))
+        {
+          ++checked;
+          if (!hasSlot(line))
+            std::printf("    exit call with no side: %s [%d]: %s\n", key, tier, line.c_str());
+          CHECK(hasSlot(line));
+        }
+  }
+  SetLineTravelMode(TravelMode::Drive);
+  CHECK(checked > 200);
+  CHECK_EQUAL(Fill("THIS ONE! {DIR}! THIS EXIT! TAKE IT!", {{"dir", "left"}}), std::string("THIS ONE! LEFT! THIS EXIT! TAKE IT!"));
 }

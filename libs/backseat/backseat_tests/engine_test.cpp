@@ -269,7 +269,8 @@ TEST(ExitsUseExitWordingNotTurnRight)
 {
   std::vector<std::string> const want = {
       "In 500 feet you are going to take the exit on the right.",
-      "By the way, did I mention you should take the exit on the right.", "Hey, you should be taking the exit.",
+      "By the way, did I mention you should take the exit on the right.",
+      "Hey, you should be taking the exit on the right.",
       "You should still be taking the exit.", "Please stop exiting. You've exited."};
   CHECK(CountdownFor("Take the exit on the right onto I-25") == want);
   CHECK(TurnShapeOf("Take the exit on the left") == TurnShape::Exit);
