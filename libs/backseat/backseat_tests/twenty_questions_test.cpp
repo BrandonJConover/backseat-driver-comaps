@@ -568,6 +568,39 @@ TEST(TwentyHoldScalesWithSpeed)
   }
 }
 
+// Loop B82 (BI-073): a tunnel before the exit leaves the speed unknown; the hold keeps the last speed seen.
+TEST(TwentyHoldKeepsItsSpeedInATunnel)
+{
+  Navigator nav = TqNavigator();
+  double t = kTqDayMs;
+  double dist = 60000;
+  TqDrive(nav, t, 30, 1, dist);
+  nav.OnDriverSaid(t, "twenty questions");
+  TqDrive(nav, t, 5, 1, dist);
+  double const speed = 31;
+  double const at = 300;
+  nav.OnFix(TqFix(t, speed), TqRoute(1, at));
+  nav.TakeLines();
+  t += 1000;
+  nav.OnDriverSaid(t, "Is it alive?");
+  std::vector<Commentary> near;
+  for (int i = 0; i < 3; ++i, t += 1000)
+  {
+    nav.OnFix(TqFix(t, -1), TqRoute(1, at - speed * (i + 1)));
+    auto lines = nav.TakeLines();
+    near.insert(near.end(), lines.begin(), lines.end());
+  }
+  CHECK(TqGame(near).empty());
+  std::vector<Commentary> past;
+  for (int i = 0; i < 3; ++i, t += 1000)
+  {
+    nav.OnFix(TqFix(t, -1), TqRoute(2, 30000));
+    auto lines = nav.TakeLines();
+    past.insert(past.end(), lines.begin(), lines.end());
+  }
+  CHECK_EQUAL(TqGame(past).size(), size_t{1});
+}
+
 // Loop B55 (BI-049): give-up, quit and hint cues inside a question about the thing aren't cues.
 TEST(TwentyCuesInsideQuestionsStayQuestions)
 {

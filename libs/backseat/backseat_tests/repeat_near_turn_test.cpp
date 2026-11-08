@@ -137,3 +137,28 @@ TEST(RepeatFarFromTurnUsesWholePool)
   Navigator idle(c);
   CHECK(!idle.Reply("cmd.repeat", {{"instruction", kInstruction}}).empty());
 }
+
+// Loop B82 (BI-073): in a tunnel the speed goes unknown, not zero. 550 m at 30 m/s is still 18 s out.
+TEST(RepeatNearTurnInATunnelKeepsTheHighwaySpeed)
+{
+  EngineConfig c;
+  c.rng = SeededRng(5);
+  Navigator nav(c);
+  nav.OnFix(At(0, 30), Leg(700));
+  nav.OnFix(At(1000, -1), Leg(670));
+  nav.OnFix(At(2000, -1), Leg(550));
+  nav.TakeLines();
+  for (int i = 0; i < 50; ++i)
+  {
+    int const w = WordsBefore(nav.Reply("cmd.repeat", {{"instruction", kInstruction}}));
+    CHECK(w >= 0 && w <= Navigator::kRepeatFirstMaxWords);
+  }
+  CHECK_EQUAL(nav.TimingMps(-1), 30.0);
+  CHECK_EQUAL(nav.TimingMps(12), 12.0);
+  CHECK_EQUAL(nav.TimingMps(0), 0.0);
+  // Never seen moving this trip: unknown is still read as parked.
+  Navigator fresh(c);
+  CHECK_EQUAL(fresh.TimingMps(-1), 0.0);
+  fresh.OnFix(At(0, -1), Leg(550));
+  CHECK_EQUAL(fresh.TimingMps(-1), 0.0);
+}

@@ -642,6 +642,12 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & route)
   // Clocks can step backwards (GPS vs. system time); the engine ignores those samples.
   m_lastT = std::max(m_lastT, fix.tMs);
   m_hereFix = fix;
+  // Recorded before Update so the turn-timing holds below already see this fix's speed (loop B82).
+  if (fix.speedMps >= 0)
+  {
+    m_knownSpeedMps = fix.speedMps;
+    m_knownSpeedT = fix.tMs;
+  }
   Update(m_lastT, route);
   if (!m_engine || m_arrived)
     return;
@@ -653,6 +659,7 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & route)
   if (fix.speedMps >= 0)
   {
     s.speedMps = fix.speedMps;
+    // Again: a trip that started in this Update cleared it.
     m_knownSpeedMps = fix.speedMps;
     m_knownSpeedT = fix.tMs;
   }
@@ -1130,9 +1137,20 @@ std::vector<Commentary> Navigator::KeepTurnsClear(std::vector<Commentary> lines)
   return out;
 }
 
+double Navigator::TimingMps(double speedMps) const
+{
+  if (speedMps >= 0)
+    return speedMps;
+  // Unknown (tunnel, garage): assume the car still goes the last speed it was seen going. Read as 0 or -1,
+  // every "not this close to the exit" hold shrank to its floor right where exits come up fast.
+  return m_knownSpeedMps ? *m_knownSpeedMps : 0;
+}
+
+double Navigator::LastTimingMps() const { return TimingMps(m_lastFix ? m_lastFix->speedMps : 0); }
+
 double Navigator::NavWaitMs(Commentary const & line) const
 {
-  double const mps = m_lastFix ? m_lastFix->speedMps : 0;
+  double const mps = LastTimingMps();
   // Parked, or nowhere near a maneuver: nothing to be late for.
   if (!m_turnId || mps < 0.75 * MovingMps())
     return kNavWaitMaxMs;
@@ -2417,7 +2435,7 @@ void Navigator::TrackPlateGame(double tMs, LatLon const & here, double speedMps,
     auto const name = m_regionLookup(here);
     m_plates.SetHere(name ? MatchPlateRegion(*name) : std::nullopt);
   }
-  bool const nearManeuver = route.turnId && route.distToTurnM < GameHoldM(PlateGame::kHoldNearManeuverM, speedMps);
+  bool const nearManeuver = route.turnId && route.distToTurnM < GameHoldM(PlateGame::kHoldNearManeuverM, TimingMps(speedMps));
   // The game the GPS refused a few minutes ago is now its own idea.
   if (m_gamePitchAt && tMs >= *m_gamePitchAt && !nearManeuver && route.state == RouteState::OnRoute &&
       m_plates.GetState() != PlateGame::State::Playing)
@@ -2675,7 +2693,7 @@ std::string Navigator::Reply(std::string const & key, Vars const & vars)
   // so the short pool doesn't trim the full pool's no-repeat memory.
   std::vector<std::string> nearTurn;
   bool const repeatNearTurn = key == "cmd.repeat" && m_turnId &&
-                              m_lastDistToTurnM < std::max(kRepeatFirstWithinM, 20 * (m_lastFix ? m_lastFix->speedMps : 0));
+                              m_lastDistToTurnM < std::max(kRepeatFirstWithinM, 20 * LastTimingMps());
   if (repeatNearTurn)
   {
     for (auto const & l : lines)
@@ -2867,7 +2885,7 @@ void Navigator::SayPlate(double tMs, PlateGame::Reply const & reply)
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = Priority::Roast;
   c.voiceSpeed = 1 + c.frustration / 1000.0;
-  if (m_turnId && m_lastDistToTurnM < GameHoldM(PlateGame::kHoldNearManeuverM, m_lastFix ? m_lastFix->speedMps : 0) &&
+  if (m_turnId && m_lastDistToTurnM < GameHoldM(PlateGame::kHoldNearManeuverM, LastTimingMps()) &&
       !m_arrived)
     m_heldPlateLines.push_back(std::move(c));
   else
@@ -3573,7 +3591,7 @@ std::vector<Commentary> Navigator::FilterForCall(std::vector<Commentary> lines)
   if (std::any_of(lines.begin(), lines.end(), cutIn) && !m_call.Held())
   {
     m_call.Hold(m_lastT);
-    double const toTurnS = SecondsToTurn(m_lastDistToTurnM, m_lastFix ? m_lastFix->speedMps : 0);
+    double const toTurnS = SecondsToTurn(m_lastDistToTurnM, LastTimingMps());
     Trace("call.hold", {{"to_turn_s", LogNum(toTurnS, 0)}, {"direction", direction ? "yes" : "no"}});
     // "Oh, it looks like I have to give them an update. Just a second." Unless the turn is close.
     // The script just announced its own made-up update? Then the real one is right on cue.
@@ -3630,7 +3648,7 @@ void Navigator::TrackTwentyQuestions(Fix const & fix, RouteSnapshot const & rout
     return;
   }
   // Directions first: nothing from the game this close to a maneuver.
-  if (route.turnId && route.distToTurnM < GameHoldM(TwentyQuestions::kHoldNearManeuverM, fix.speedMps))
+  if (route.turnId && route.distToTurnM < GameHoldM(TwentyQuestions::kHoldNearManeuverM, TimingMps(fix.speedMps)))
     return;
   if (!m_heldTwentyLines.empty())
   {
@@ -3641,7 +3659,7 @@ void Navigator::TrackTwentyQuestions(Fix const & fix, RouteSnapshot const & rout
     m_twentyCutInT.reset();
     return;
   }
-  double const toTurnS = route.turnId ? SecondsToTurn(route.distToTurnM, fix.speedMps) : 1e9;
+  double const toTurnS = route.turnId ? SecondsToTurn(route.distToTurnM, TimingMps(fix.speedMps)) : 1e9;
   if (m_twentyCutInT)
   {
     // "Anyway. Where were we. Oh right, you were losing." Once the direction has had its breath.
@@ -3668,7 +3686,7 @@ void Navigator::SayTwenty(double tMs, TwentyQuestions::Reply const & reply)
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = Priority::Roast;
   c.voiceSpeed = 1 + c.frustration / 250.0;
-  if (m_turnId && m_lastDistToTurnM < GameHoldM(TwentyQuestions::kHoldNearManeuverM, m_lastFix ? m_lastFix->speedMps : 0) &&
+  if (m_turnId && m_lastDistToTurnM < GameHoldM(TwentyQuestions::kHoldNearManeuverM, LastTimingMps()) &&
       !m_arrived)
     m_heldTwentyLines.push_back(std::move(c));
   else
@@ -3746,7 +3764,7 @@ void Navigator::TrackPopQuiz(Fix const & fix, RouteSnapshot const & route)
   if (!steady || t - m_tripStartT < kQuizAfterStartMs || t - m_lastQuizT < kQuizEveryMs ||
       t - m_lastQuietBitT < kQuizAfterQuietBitMs || t - std::max(m_lastSpokeT, m_lastRoadT) < kQuizSilenceMs)
     return;
-  if (SecondsToTurn(route.distToTurnM, fix.speedMps) < kQuizMinToTurnS)
+  if (SecondsToTurn(route.distToTurnM, TimingMps(fix.speedMps)) < kQuizMinToTurnS)
     return;
   // One roll of the dice per stretch, so it stays a surprise.
   if (m_quizRolledFor == route.turnId)

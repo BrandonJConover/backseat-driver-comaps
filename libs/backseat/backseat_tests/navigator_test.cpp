@@ -1548,6 +1548,27 @@ TEST(NavLinesSayHowLongTheyCanWaitForTheGoodVoice)
       CHECK_EQUAL(l.maxWaitMs, 0.0);
 }
 
+// Loop B82 (BI-073): speed unknown in a tunnel isn't parked; the final call still can't wait 4 s.
+TEST(NavLinesInATunnelDontWaitLikeParked)
+{
+  Navigator nav(Config());
+  nav.OnFix(Heading(0, 0, 0), OnRoute(1, TurnKind::Left, 2000));
+  nav.TakeLines();
+  double maxWait = -1;
+  for (int s = 1; s < 120; ++s)
+  {
+    double const dist = 2000 - s * 29;
+    if (dist < 0)
+      break;
+    // GPS speed drops out from 500 m on.
+    nav.OnFix(Heading(s * 1000.0, dist > 500 ? 29 : -1, 0), OnRoute(1, TurnKind::Left, dist));
+    for (auto const & l : nav.TakeLines())
+      if (l.priority == Priority::Nav && dist <= 130)
+        maxWait = l.maxWaitMs;
+  }
+  CHECK(maxWait >= 0 && maxWait < 2000);
+}
+
 TEST(FirstTripBitPlaysOnceEvenIfTheTripNeverArrives)
 {
   SaidLog saved;

@@ -360,6 +360,9 @@ public:
   static int constexpr kRepeatFirstMaxWords = 3;
   /// Whether a line says {instruction} within the first kRepeatFirstMaxWords words.
   static bool InstructionComesFirst(std::string const & line);
+  /// Speed for turn timing (game holds, nav waits, seconds to the turn): the fix's speed when known, else
+  /// the last speed seen this trip (a tunnel doesn't stop the car), 0 if none yet (loop B82).
+  double TimingMps(double speedMps) const;
   /// On-device model that rewords roasts in real time. Without one, canned lines are spoken.
   void SetRewriter(std::shared_ptr<LineRewriter> rewriter) { m_gate.SetRewriter(std::move(rewriter)); }
 
@@ -532,6 +535,7 @@ private:
   void TrackIdle(Fix const & fix, RouteSnapshot const & route);
   void SaySight(double tMs, Sight const & sight);
   double NavWaitMs(Commentary const & line) const;
+  double LastTimingMps() const;
   void TrackWrongWay(Fix const & fix, RouteSnapshot const & route);
   /// "Strange, it feels as if I've been here before." after the car turns around.
   void TrackUTurn(Fix const & fix, RouteSnapshot const & route);
