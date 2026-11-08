@@ -50,6 +50,7 @@ add_executable(${PROJECT_NAME}
   repeat_near_turn_test.cpp
   commute_soak_test.cpp
   familiar_commute_test.cpp
+  clip_pacing_test.cpp
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
 target_compile_definitions(${PROJECT_NAME} PRIVATE

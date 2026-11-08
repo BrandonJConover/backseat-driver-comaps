@@ -9,6 +9,8 @@ set(
   SRC
   achievements.cpp
   achievements.hpp
+  clip_pacing.cpp
+  clip_pacing.hpp
   debug_log.cpp
   debug_log.hpp
   engine.cpp
