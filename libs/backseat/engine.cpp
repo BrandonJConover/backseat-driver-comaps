@@ -25,6 +25,13 @@ double constexpr kCountdownFarS = 12;
 double constexpr kCountdownFarMaxM = 805;
 /// Countdown calls this soon after the instruction are skipped; it just said the distance.
 double constexpr kJustAnnouncedMs = 8000;
+/// A countdown call says its trigger distance ("In 500 feet") unless the car is already well inside
+/// it: more than this many seconds of travel (or a tenth of the distance) short, as after a fix gap
+/// or a merge that grew the far mark. Then it says what is left, so it never overstates.
+double constexpr kSayTriggerWithinS = 2;
+/// The long-leg "In 1 mile" reminder only goes out this close to a real mile; a gap that lands
+/// well short of it leaves the turn to the countdown.
+double constexpr kReminderAtLeast = 0.8;
 /// "Did I mention..." only if the far call was at least this long ago.
 double constexpr kMentionAfterFarMs = 10000;
 /// The plain "Now, turn left onto Elm Street." comes about this many seconds before the turn...
@@ -704,6 +711,8 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   if (!p.reminded && p.stage == 0 && p.legM >= kReminderLegM && distanceM <= reminderM && distanceM > 1.5 * far)
   {
     p.reminded = true;
+    if (distanceM < kReminderAtLeast * reminderM)
+      return;  // "In 1 mile" at 0.4 mi misleads; the countdown says it right soon enough.
     m_straight.reset();
     out.push_back(Make(t, Category::Instruction, DirectionText(p.text, reminderM, m_config.units), Priority::Nav));
     return;
@@ -730,7 +739,7 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
       stage = "nascar";
       m_nascarSaid = true;
     }
-    sayM = far;
+    sayM = SayDistanceM(far, distanceM);
     p.stage = 1;
     p.farAt = t;
   }
@@ -739,7 +748,7 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
            (!p.farAt || t - *p.farAt >= kMentionAfterFarMs))
   {
     stage = "mention";
-    sayM = mention;
+    sayM = SayDistanceM(mention, distanceM);
     p.mentioned = true;
   }
   else if (p.stage <= 1 && distanceM <= finalM && distanceM > 5)
@@ -791,6 +800,14 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   out.push_back(Make(t, Category::Instruction, Capitalize(text), Priority::Nav));
   out.back().key = key;
   out.back().vars = vars;
+}
+
+/// The distance a countdown call says: its trigger, or what is left once the car is well past it.
+double CritiqueEngine::SayDistanceM(double triggerM, double distanceM) const
+{
+  double const mps = m_lastSample ? std::max(0.0, m_lastSample->speedMps) : 0;
+  double const slackM = std::max(kSayTriggerWithinS * mps, 0.1 * triggerM);
+  return distanceM < triggerM - slackM ? distanceM : triggerM;
 }
 
 /// Where the plain final call goes: about 4 seconds out at the current speed, 50 ft at least.

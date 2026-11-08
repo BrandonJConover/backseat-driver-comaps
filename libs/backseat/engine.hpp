@@ -239,6 +239,7 @@ private:
   /// The sample before an implausible speed jump: the next step's acceleration is measured from it.
   std::optional<TelemetrySample> m_beforeGlitch;
   double FarM() const;
+  double SayDistanceM(double triggerM, double distanceM) const;
   double FinalM() const;
   /// Where the final call goes with speechAware: FinalM(), or farther out when the call is long or
   /// the phone is still talking, so it's over before the car gets to the turn.
