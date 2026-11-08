@@ -93,6 +93,12 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier);
 /// again (later calls are cheap). Loop B66: cold first line was ~11 ms on the cloud box, warm ~0.1 ms.
 void Warm(bool metric, bool leftHand);
 
+/// Whether `line` asks the driver to pick up, hold, aim or plug in the phone ("hold me over the vent",
+/// "Plug me in. Now.", "Charger!"): a hands-off-the-wheel ask, fine at a stop, not at speed (loop B74).
+/// Negated asks ("Don't pick me up") and soft hints with no "now" ("You might want to plug me in if
+/// you want to get there") pass.
+bool AsksToHandlePhone(std::string const & line);
+
 /// Fills {placeholders} from vars. {NAME} in capitals inserts the value in capitals.
 /// Unknown placeholders are left as they are.
 std::string Fill(std::string const & tmpl, Vars const & vars);

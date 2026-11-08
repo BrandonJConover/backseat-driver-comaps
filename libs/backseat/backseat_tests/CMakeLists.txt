@@ -27,6 +27,7 @@ add_executable(${PROJECT_NAME}
   road_bits_test.cpp
   voice_command_test.cpp
   warm_test.cpp
+  phone_handling_test.cpp
   rewriter_test.cpp
   route_order_test.cpp
   running_bits_test.cpp

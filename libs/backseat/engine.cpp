@@ -1152,7 +1152,15 @@ std::string CritiqueEngine::Pick(std::string const & key, int tier)
   if (m_config.lineSource)
     if (auto generated = m_config.lineSource->Take(key, tier))
       return *generated;
-  auto const & options = LinesFor(key, tier);
+  auto const & all = LinesFor(key, tier);
+  // At speed, no line that asks the driver to pick up, hold or plug in the phone (loop B74), unless
+  // that would leave nothing to say.
+  std::vector<std::string> handsFree;
+  if (m_lastSample && m_lastSample->speedMps >= m_config.rollingMps)
+    for (auto const & l : all)
+      if (!AsksToHandlePhone(l))
+        handsFree.push_back(l);
+  auto const & options = handsFree.empty() ? all : handsFree;
   if (m_config.saidLog)
     return m_config.saidLog->Pick(key, options, m_config.rng());
   auto & recent = m_recentLines[key];

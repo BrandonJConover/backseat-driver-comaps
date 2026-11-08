@@ -172,6 +172,9 @@ double constexpr kColdC = 4.5;
 double constexpr kColdFromMs = 25000;
 double constexpr kColdUntilMs = 300000;
 double constexpr kColdVentAfterMs = 180000;
+// cold.vent asks to be held up to a vent: it waits for a stop (red light, parked) and gives up this long
+// after cold.start if the car never stops (loop B74).
+double constexpr kColdVentUntilMs = 1200000;
 double constexpr kColdChance = 0.5;
 /// Hot: at or above this (about 86 °F). Groceries bought within the window cook after a while.
 double constexpr kHotC = 30;
@@ -3133,6 +3136,13 @@ void Navigator::TrackCold(Fix const & fix, RouteSnapshot const & route)
     return;
   }
   if (fix.tMs - m_coldSaidT < kColdVentAfterMs)
+    return;
+  if (fix.tMs - m_coldSaidT > kColdVentUntilMs)
+  {
+    m_coldStage = 3;
+    return;
+  }
+  if (fix.speedMps >= MovingMps())
     return;
   m_coldStage = 3;
   m_lastSpokeT = fix.tMs;

@@ -585,4 +585,98 @@ SaidLog SaidLog::Parse(std::string const & text)
   }
   return log;
 }
+namespace
+{
+std::vector<std::string> HandlingClauses(std::string const & line)
+{
+  std::vector<std::string> clauses;
+  std::string cur;
+  auto flush = [&] {
+    size_t const b = cur.find_first_not_of(" ,\"");
+    size_t const e = cur.find_last_not_of(" ,\"");
+    if (b != std::string::npos)
+      clauses.push_back(cur.substr(b, e - b + 1));
+    cur.clear();
+  };
+  for (char ch : line)
+  {
+    if (ch == '.' || ch == '!' || ch == '?' || ch == '|')
+      flush();
+    else
+      cur += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  flush();
+  return clauses;
+}
+
+bool HasWord(std::string const & text, std::string const & word)
+{
+  for (size_t at = text.find(word); at != std::string::npos; at = text.find(word, at + 1))
+  {
+    bool const startOk = at == 0 || !std::isalpha(static_cast<unsigned char>(text[at - 1]));
+    size_t const end = at + word.size();
+    bool const endOk = end >= text.size() || !std::isalpha(static_cast<unsigned char>(text[end]));
+    if (startOk && endOk)
+      return true;
+  }
+  return false;
+}
+}  // namespace
+
+bool AsksToHandlePhone(std::string const & line)
+{
+  static char const * const kAsks[] = {"plug me in", "hold me", "holding me", "pick me up", "find the charger",
+                                       "vent at me", "vents at me", "me over the vent", "me up to the vent",
+                                       "me to the vent"};
+  static char const * const kSoft[] = {"might want", "think about", "if you want"};
+  auto const clauses = HandlingClauses(line);
+  // "PLUG. ME. IN." is one ask, spread over three clauses.
+  std::string squashed;
+  for (auto const & c : clauses)
+    squashed += (squashed.empty() ? "" : " ") + c;
+  if (squashed.find("plug me in") != std::string::npos)
+  {
+    bool split = true;
+    for (auto const & c : clauses)
+      split = split && c.find("plug me in") == std::string::npos;
+    if (split)
+      return true;
+  }
+  bool urgent = false;
+  for (auto const & c : clauses)
+    urgent = urgent || HasWord(c, "now");
+  std::string previous;
+  for (auto const & clause : clauses)
+  {
+    bool const negatedBefore = previous == "don't" || previous == "do not" || previous == "never" || previous == "no";
+    previous = clause;
+    if (negatedBefore)
+      continue;
+    // "Charger. Now." / "CHARGER! CABLE! OUTLET!": the one-word demand.
+    if (clause == "charger" || clause.rfind("charger ", 0) == 0)
+      return true;
+    for (char const * ask : kAsks)
+    {
+      size_t const at = clause.find(ask);
+      if (at == std::string::npos)
+        continue;
+      // "Pick me up a charger while you're in there": an errand, not a hand on the phone.
+      if (clause.compare(at, 12, "pick me up a") == 0 || clause.compare(at, 15, "pick me up some") == 0)
+        continue;
+      std::string const before = " " + clause.substr(0, at);
+      bool negated = false;
+      for (char const * no : {"n't ", " not ", " never ", " no ", " without "})
+        negated = negated || before.find(no) != std::string::npos;
+      if (negated)
+        continue;
+      bool soft = false;
+      for (char const * s : kSoft)
+        soft = soft || clause.find(s) != std::string::npos;
+      if (!soft || urgent)
+        return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace backseat
