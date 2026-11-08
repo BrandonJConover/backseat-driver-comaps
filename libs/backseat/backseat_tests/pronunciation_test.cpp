@@ -138,7 +138,7 @@ TEST(StreetsHighwaysAndNumbersAreWrittenOut)
   CHECK_EQUAL(ForSpeech("Arrive at 2:05"), std::string("Arrive at two oh five"));
   CHECK_EQUAL(ForSpeech("Turn onto 8th Ave"), std::string("Turn onto eighth Avenue"));
   CHECK_EQUAL(ForSpeech("1,250 people"), std::string("one thousand two hundred fifty people"));
-  CHECK_EQUAL(ForSpeech("3.5 miles"), std::string("three point five miles"));
+  CHECK_EQUAL(ForSpeech("3.5 miles"), std::string("three and a half miles"));
   CHECK_EQUAL(ForSpeech("100% sure"), std::string("one hundred percent sure"));
   CHECK_EQUAL(ForSpeech("$4.50 for gas"), std::string("four dollars and fifty cents for gas"));
   CHECK_EQUAL(ForSpeech("Call 5551234567"), std::string("Call five five five one two three four five six seven"));
@@ -710,6 +710,21 @@ TEST(GroupedNumbersAreQuantitiesWhateverTheirLength)
     CHECK(!c.input.empty());
     CHECK_EQUAL(ForSpeech(c.input), c.expected);
   }
+}
+
+TEST(DecimalMilesReadTheWayDriversSayThem)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_DISTANCES_PATH);
+  CHECK(cases.size() >= 12);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // The pass on its own: only decimal miles change.
+  CHECK_EQUAL(DecimalMiles("Turn left onto Main St in 0.5 mi."), std::string("Turn left onto Main St in a half mile."));
+  CHECK_EQUAL(DecimalMiles("In 0.3 km, 4.5 m, 110.5 mi"), std::string("In 0.3 km, 4.5 m, 110.5 mi"));
+  CHECK_EQUAL(DecimalMiles("Version 2.5 minutes"), std::string("Version 2.5 minutes"));
 }
 
 TEST(SymbolsAndLeftoverAbbreviationsMatchTheGoldenCases)

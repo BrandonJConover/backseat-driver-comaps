@@ -391,7 +391,7 @@ void Warm(bool metric, bool leftHand)
   // when their trigger (a digit, a degree sign, $, %, /, :, a dash) is in the line. These lines
   // between them trip every pass, so none is left to build mid-drive.
   static char const * const kProbes[] = {
-      "Turn left onto I-35 N at 5pm, then Exit 12B toward N Main St NW in 1/2 mi.",
+      "Turn left onto I-35 N at 5pm, then Exit 12B toward N Main St NW in 1/2 mi, 0.3 mi.",
       "Mon-Fri 9am-5pm, 3\xE2\x80\x93""5 min, ~20 ft, \xC2\xB1""2 km, -5\xC2\xB0""F \xE2\x80\x94 50% off $1,234.99/gal & #5.",
       "On 11/6/2026 or 2026-11-06 or Nov. 6 in the 1990s and 90s, at 10:30, 24/7, \xC2\xBD.",
       "King George VI Ave to St. John's Svc Rd, Ave B, Mt Hood, 1600 Pennsylvania Ave, US-101, SR 71.",

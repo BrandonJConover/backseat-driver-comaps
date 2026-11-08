@@ -46,6 +46,8 @@ std::string Decades(std::string const & text);
 /// "2/3 hr" "two thirds of an hour", "1 1/2 mi" "1 and a half miles", "2 1/2 years" "2 and a half
 /// years". Dates and other fractions are left. Part of ForSpeech; golden cases in
 /// backseat_tests/spoken_symbols.json.
+/// "0.5 mi" -> "a half mile", "2.25 mi" -> "2 and a quarter miles", "0.3 mi" -> "point three miles".
+std::string DecimalMiles(std::string const & text);
 std::string FractionsWithUnits(std::string const & text);
 /// Dates said as dates: "11/6/2026" and "2026-11-06" are "November sixth, twenty twenty six", "Nov. 6"
 /// "November sixth", "31/12/1999" "the thirty first of December, ...", "on 12/25" "on December twenty

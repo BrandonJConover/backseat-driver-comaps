@@ -2278,6 +2278,32 @@ std::string Decades(std::string const & text)
   });
 }
 
+std::string DecimalMiles(std::string const & text)
+{
+  static std::regex const re("(\\d{1,2})?\\.(\\d{1,2}) ?(?:mi|miles?)\\b");
+  return Replace(text, re, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    // Glued to something before it: "110.5 mi" (only "10.5" matched), "v1.5", "$0.5", "1,0.5".
+    if (pos > 0)
+    {
+      unsigned char const before = static_cast<unsigned char>(text[pos - 1]);
+      if (std::isalnum(before) || std::string_view(".,-/$#_").find(static_cast<char>(before)) != std::string_view::npos)
+        return std::nullopt;
+    }
+    long long const whole = m[1].matched ? ToNumber(m.str(1)) : 0;
+    std::string const frac = m.str(2);
+    if (frac == "5" || frac == "50")
+      return whole == 0 ? std::string("a half mile") : std::to_string(whole) + " and a half miles";
+    if (frac == "25")
+      return whole == 0 ? std::string("a quarter mile") : std::to_string(whole) + " and a quarter miles";
+    if (frac == "75")
+      return whole == 0 ? std::string("three quarters of a mile")
+                        : std::to_string(whole) + " and three quarters miles";
+    if (whole != 0 || frac.find_first_not_of('0') == std::string::npos)
+      return std::nullopt;
+    return "point " + Digits(frac) + " miles";
+  });
+}
+
 std::string FractionsWithUnits(std::string const & text)
 {
   // "1/2 mi" is "a half mile" (not "a half miles"), "3/4 mi" "three quarters of a mile", "2/3 hr"
@@ -2956,6 +2982,11 @@ std::string ForSpeech(std::string const & text)
   // half miles".
   if (HasAny(s, "/"))
     s = FractionsWithUnits(s);
+  // Decimal miles the way drivers say them: "0.5 mi" is "a half mile", "0.25 mi" "a quarter mile",
+  // "0.75 mi" "three quarters of a mile", "2.5 mi" "2 and a half miles", "0.3 mi" "point three miles"
+  // (not "zero point three"). "1.3 mi" keeps "one point three"; km and m are left alone.
+  if (HasAny(s, "."))
+    s = DecimalMiles(s);
   // Units after a number ("1 mile", "3 miles").
   static std::regex const unit("(\\d) ?(ft|mi|mph|km|m|yd|hrs|hr|mins|min|secs|sec)\\b");
   s = Replace(s, unit, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {

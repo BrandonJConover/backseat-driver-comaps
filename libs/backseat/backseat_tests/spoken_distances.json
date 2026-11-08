@@ -1,0 +1,21 @@
+{
+ "about": "Shared expectations for decimal miles: 0.5/0.25/0.75 mi are a half / a quarter mile / three quarters of a mile, N.5/N.25/N.75 mi are 'N and a half/quarter/three quarters miles', other 0.x mi drop the leading zero ('point three miles'); 1.3 mi keeps 'one point three'; km and m untouched; numbers glued to something before them are left. Backseat Driver: backseat::pronunciation::ForSpeech (libs/backseat/backseat_tests/spoken_distances.json). EpubToM4B can port the same rule; keep both copies in sync.",
+ "cases": [
+  {"input": "In 0.5 mi, turn left.", "language": "en", "expected": "In a half mile, turn left."},
+  {"input": "In .5 mi, turn left.", "language": "en", "expected": "In a half mile, turn left."},
+  {"input": "Exit in 0.25 mi", "language": "en", "expected": "Exit in a quarter mile"},
+  {"input": "Keep right for 0.75 miles.", "language": "en", "expected": "Keep right for three quarters of a mile."},
+  {"input": "In 0.3 mi", "language": "en", "expected": "In point three miles"},
+  {"input": "Gas station 0.1 mile ahead", "language": "en", "expected": "Gas station point one miles ahead"},
+  {"input": "In 0.05 mi", "language": "en", "expected": "In point zero five miles"},
+  {"input": "Continue for 2.5 mi", "language": "en", "expected": "Continue for two and a half miles"},
+  {"input": "Continue for 1.25 miles", "language": "en", "expected": "Continue for one and a quarter miles"},
+  {"input": "Continue for 12.75mi", "language": "en", "expected": "Continue for twelve and three quarters miles"},
+  {"input": "Continue for 1.3 mi", "language": "en", "expected": "Continue for one point three miles"},
+  {"input": "In 0.3 km", "language": "en", "expected": "In zero point three kilometers"},
+  {"input": "Speed 0.5 mph", "language": "en", "expected": "Speed zero point five miles an hour"},
+  {"input": "In 110.5 mi", "language": "en", "expected": "In one hundred ten point five miles"},
+  {"input": "2,500,000.5 miles", "language": "en", "expected": "two million five hundred thousand point five miles"},
+  {"input": "In 0.0 mi", "language": "en", "expected": "In zero point zero miles"}
+ ]
+}
