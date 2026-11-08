@@ -120,6 +120,91 @@
    "input": "Suite A1234 Main St",
    "language": "en",
    "expected": "Suite A1234 Main Street"
+  },
+  {
+   "input": "Arrive at 2200 S Lamar Blvd Ste 200",
+   "language": "en",
+   "expected": "Arrive at twenty two hundred South Lamar Boulevard Suite two hundred"
+  },
+  {
+   "input": "Arrive at 500 W 2nd St Bldg 4",
+   "language": "en",
+   "expected": "Arrive at five hundred West second Street Building four"
+  },
+  {
+   "input": "Arrive at 12 Elm Ct Apt B",
+   "language": "en",
+   "expected": "Arrive at twelve Elm Court Apartment B"
+  },
+  {
+   "input": "Arrive at 301 W 2nd St Unit 5",
+   "language": "en",
+   "expected": "Arrive at three oh one West second Street Unit five"
+  },
+  {
+   "input": "Arrive at 4521 Oak St, Ste 110",
+   "language": "en",
+   "expected": "Arrive at forty five twenty one Oak Street, Suite one hundred ten"
+  },
+  {
+   "input": "Arrive at 900 Main St Ste #300",
+   "language": "en",
+   "expected": "Arrive at nine hundred Main Street Suite three hundred"
+  },
+  {
+   "input": "Arrive at 100 Main St #200",
+   "language": "en",
+   "expected": "Arrive at one hundred Main Street number two hundred"
+  },
+  {
+   "input": "Arrive at 700 Pine Ave Fl 3",
+   "language": "en",
+   "expected": "Arrive at seven hundred Pine Avenue Floor three"
+  },
+  {
+   "input": "Arrive at 40 Oak Ln Unit E",
+   "language": "en",
+   "expected": "Arrive at forty Oak Lane Unit E"
+  },
+  {
+   "input": "Arrive at 100 Congress Ave Bldg 2 Ste 300",
+   "language": "en",
+   "expected": "Arrive at one hundred Congress Avenue Building two Suite three hundred"
+  },
+  {
+   "input": "Arrive at 1005 Elm Dr. Ste 4",
+   "language": "en",
+   "expected": "Arrive at ten oh five Elm Drive Suite four"
+  },
+  {
+   "input": "Arrive at 88 Airport Rd Hngr 7",
+   "language": "en",
+   "expected": "Arrive at eighty eight Airport Road Hangar seven"
+  },
+  {
+   "input": "Arrive at 105 N Main St NW Apt C",
+   "language": "en",
+   "expected": "Arrive at one oh five North Main Street Northwest Apartment C"
+  },
+  {
+   "input": "Arriving in Miami, Fl",
+   "language": "en",
+   "expected": "Arriving in Miami, Fl"
+  },
+  {
+   "input": "That is an apt name for Main St",
+   "language": "en",
+   "expected": "That is an apt name for Main Street"
+  },
+  {
+   "input": "Lake Rm 5 is booked",
+   "language": "en",
+   "expected": "Lake Rm five is booked"
+  },
+  {
+   "input": "Arrive at Ste. Genevieve Ave",
+   "language": "en",
+   "expected": "Arrive at Saint Genevieve Avenue"
   }
  ]
 }

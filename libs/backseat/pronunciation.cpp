@@ -727,6 +727,92 @@ std::string Titles(std::string s)
   return s;
 }
 
+// MARK: - Address tails
+
+/// The word that ends right before `end` (spaces, one comma and a period skipped: "Oak St, Ste 4",
+/// "Elm Dr. Ste 4"), or empty; `start` gets where it starts.
+std::string StreetPartBefore(std::string const & s, size_t end, size_t & start)
+{
+  while (end > 0 && Space(s[end - 1]))
+    --end;
+  if (end > 0 && (s[end - 1] == ',' || s[end - 1] == '.'))
+    --end;
+  while (end > 0 && Space(s[end - 1]))
+    --end;
+  start = end;
+  while (start > 0 && std::isalnum(static_cast<unsigned char>(s[start - 1])))
+    --start;
+  return s.substr(start, end - start);
+}
+
+std::map<std::string, std::string> const & TailWords()
+{
+  static std::map<std::string, std::string> const words = {
+      {"Ste", "Suite"},   {"Apt", "Apartment"}, {"Bldg", "Building"},     {"Fl", "Floor"},
+      {"Flr", "Floor"},   {"Rm", "Room"},       {"Spc", "Space"},         {"Dept", "Department"},
+      {"Ofc", "Office"},  {"Trlr", "Trailer"},  {"Hngr", "Hangar"},       {"Unit", "Unit"}};
+  return words;
+}
+
+bool TailWord(std::string const & w)
+{
+  for (auto const & [abbreviation, word] : TailWords())
+    if (w == abbreviation || w == word)
+      return true;
+  return false;
+}
+
+bool CompassWord(std::string const & w)
+{
+  static std::set<std::string> const words = {"N", "S", "E", "W", "NE", "NW", "SE", "SW", "North", "South",
+                                              "East", "West", "Northeast", "Northwest", "Southeast", "Southwest"};
+  return words.count(w) > 0;
+}
+
+bool StreetTypeWord(std::string const & w)
+{
+  static std::set<std::string> const more = {"Way", "Plaza", "Loop", "Row", "Walk", "Path", "Pike", "Run", "Alley"};
+  return StreetWord(w) || more.count(w) > 0;
+}
+
+/// True when what comes right before `pos` ends a street address, so a "Ste"/"Apt"/"Fl" there is a
+/// suite or floor: a street type ("Lamar Blvd Ste 200"), a compass point after one ("Main St NW Ste
+/// 2"), a route number ("Hwy 290 Ste 5") or another tail ("Bldg 4 Ste 200"). "Miami, Fl 33101" and
+/// "Lake Rm 5" are left.
+bool AfterStreetPart(std::string const & s, size_t pos)
+{
+  if (pos < 2 || !Space(s[pos - 1]))
+    return false;
+  size_t start = 0;
+  auto const word = StreetPartBefore(s, pos, start);
+  if (word.empty())
+    return false;
+  if (StreetTypeWord(word))
+    return true;
+  size_t before = 0;
+  auto const previous = StreetPartBefore(s, start, before);
+  if (CompassWord(word))
+    return StreetTypeWord(previous);
+  bool const value = std::isdigit(static_cast<unsigned char>(word[0])) ||
+                     (word.size() == 1 && std::isupper(static_cast<unsigned char>(word[0])));
+  return value && (TailWord(previous) || StreetTypeWord(previous));
+}
+
+/// "Ste 200", "Apt B", "Bldg 4", "Fl 3", "Hngr 7" after a street are Suite, Apartment, Building,
+/// Floor, Hangar; a "#" between goes ("Ste #300" is "Suite 300"; Symbols has already made it "number
+/// "). Runs after Titles, so "Ste.
+/// Genevieve" is already Saint.
+std::string AddressTails(std::string const & s)
+{
+  static std::regex const tail(
+      "\\b(Ste|Apt|Bldg|Flr|Fl|Rm|Spc|Dept|Ofc|Trlr|Hngr|Unit)\\.? (?:#|number )?(?=(?:\\d{1,5}[A-Z]?|[A-Z])(?:$|[\\s,;:!?.)]))");
+  return Replace(s, tail, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    if (!AfterStreetPart(s, pos))
+      return std::nullopt;
+    return TailWords().at(m.str(1)) + " ";
+  });
+}
+
 std::string Ordinal(long long n);
 
 /// I..XXXIX as a number, or 0 when it isn't a well-formed numeral ("IIII", "VX", "IC").
@@ -2712,6 +2798,8 @@ std::string ForSpeech(std::string const & text)
   s = Regnal(s);
   // Saint, Doctor, Fort, Junior before the street pass can take them for street types.
   s = Titles(s);
+  // Suites, apartments and floors after the street: "Lamar Blvd Ste 200" is "Lamar Blvd Suite 200".
+  s = AddressTails(s);
 
   // "Main St", "Elm Dr." after a word, at the end or before punctuation, a lowercase word or a
   // compass point ("Main St NW"). Not "Dr Smith" or "St Louis". A period after it stays when it
@@ -2719,10 +2807,15 @@ std::string ForSpeech(std::string const & text)
   // carries on: ",;:" or a lowercase word next ("Oak Dr. and then left", "Main St., then right"), a
   // compass point, or a lone letter or number naming the street ("on Ave. B now"; not "A"/"I",
   // which start sentences).
+  // A suite, apartment, floor or "#200" after the type: "Lamar Blvd Suite 200", "Main St #200" (Symbols
+  // has made the hash "number ").
+#define BACKSEAT_TAIL_AHEAD \
+  "(?:Suite|Apartment|Building|Floor|Room|Space|Department|Office|Trailer|Hangar|Unit) [0-9A-Z]|number \\d"
   static std::regex const street(
       "(St|Ave|Blvd|Rd|Dr|Ln|Ct|Pkwy|Hwy|Pl|Cir|Ter|Trl|Expy|Fwy|Sq|Cv|Xing|Ext)"
-      "(?:\\.(?=[,;:]|\\s+(?:[a-z]|(?:NE|NW|SE|SW|N|S|E|W)\\b|(?:[B-HJ-Z]|\\d+)(?=$|[\\s,;:!?.)])))"
-      "|(?=$|[,;:!?.)]|\\s+(?:[a-z]|Ext\\b|(?:NE|NW|SE|SW|N|S|E|W)\\b)))");
+      "(?:\\.(?=[,;:]|\\s+(?:[a-z]|(?:NE|NW|SE|SW|N|S|E|W)\\b|(?:[B-HJ-Z]|\\d+)(?=$|[\\s,;:!?.)])|" BACKSEAT_TAIL_AHEAD "))"
+      "|(?=$|[,;:!?.)]|\\s+(?:[a-z]|Ext\\b|(?:NE|NW|SE|SW|N|S|E|W)\\b|" BACKSEAT_TAIL_AHEAD ")))");
+#undef BACKSEAT_TAIL_AHEAD
   s = Replace(s, street, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (pos < 2 || s[pos - 1] != ' ' || !IsAsciiLetter(s[pos - 2]))
       return std::nullopt;
@@ -2753,7 +2846,8 @@ std::string ForSpeech(std::string const & text)
     while (start > 0 && IsAsciiLetter(s[start - 1]))
       --start;
     auto const before = s.substr(start, pos - 1 - start);
-    if (m.str(1).size() == 1 && (before == "Avenue" || before == "Lane" || before == "Circle"))
+    // "Unit E" and "Apartment N" are letters too.
+    if (m.str(1).size() == 1 && (before == "Avenue" || before == "Lane" || before == "Circle" || TailWord(before)))
       return std::nullopt;
     return Compass(m.str(1));
   });
