@@ -1938,11 +1938,21 @@ std::string Roads(std::string const & text)
   // Not when a lowercase word follows that makes it something else ("the I-35 bus stop").
 #define BACKSEAT_ROUTE_PREFIX "Interstate|Highway|Route|Road|Loop|[Ee]xit|I|IH|US|SR|CR|FM|RM|RR|SH|M|[A-Z]{2}"
 #define BACKSEAT_ROUTE_KIND "Bus|BUS|Business|Alt|ALT|Byp|BYP|Bypass"
-  // OSM joins the refs of a road shared by two routes with ';' ("US 290;TX 71"), signs use '/'.
+  // Signs and traffic feeds write the direction of travel as "I-35 NB", "US-290 WB": northbound,
+  // westbound. Only right after a route ref, so "NB: see below" and a lone "WB" stay as they are.
+  static std::regex const bound(
+      "\\b((?:" BACKSEAT_ROUTE_PREFIX ")(?:-| )\\d{1,4}[A-Z]?(?: (?:" BACKSEAT_ROUTE_KIND ")\\.?)?) (N|S|E|W)B"
+      "(?![A-Za-z0-9])");
+  auto s = Replace(text, bound, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return m.str(1) + " " + Compass(m.str(2)) + "bound";
+  });
+  // OSM joins the refs of a road shared by two routes with ';' ("US 290;TX 71"), signs use '/', and
+  // either may carry a direction first ("US-290 W / TX-71 W", already "West" by now).
   static std::regex const pair(
-      "\\b(" BACKSEAT_ROUTE_PREFIX ")(-| )(\\d{1,4}[A-Z]?(?: (?:" BACKSEAT_ROUTE_KIND ")\\.?)?) ?[;/] ?"
+      "\\b(" BACKSEAT_ROUTE_PREFIX ")(-| )(\\d{1,4}[A-Z]?(?: (?:" BACKSEAT_ROUTE_KIND ")\\.?)?"
+      "(?: (?:North|South|East|West)(?:bound)?)?) ?[;/] ?"
       "(?=(" BACKSEAT_ROUTE_PREFIX ")(-| )\\d)");
-  auto s = Replace(text, pair, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
+  s = Replace(s, pair, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
     if (!spoken(m.str(1), m.str(2) == "-") || !spoken(m.str(4), m.str(5) == "-"))
       return std::nullopt;
     return m.str(1) + m.str(2) + m.str(3) + " or ";

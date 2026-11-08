@@ -280,6 +280,66 @@
    "input": "Take US 87 Byp. Then turn left.",
    "language": "en",
    "expected": "Take yooess eighty seven Bypass. Then turn left."
+  },
+  {
+   "input": "Take I-35 NB",
+   "language": "en",
+   "expected": "Take I thirty five Northbound"
+  },
+  {
+   "input": "Merge onto US-290 WB",
+   "language": "en",
+   "expected": "Merge onto yooess two ninety Westbound"
+  },
+  {
+   "input": "Crash on I-10 EB near exit 12",
+   "language": "en",
+   "expected": "Crash on I ten Eastbound near exit twelve"
+  },
+  {
+   "input": "Stay on TX-71 SB.",
+   "language": "en",
+   "expected": "Stay on Texas seventy one Southbound."
+  },
+  {
+   "input": "Take US 183 Alt NB",
+   "language": "en",
+   "expected": "Take yooess one eighty three Alternate Northbound"
+  },
+  {
+   "input": "Take US-290 W / TX-71 W",
+   "language": "en",
+   "expected": "Take yooess two ninety West or Texas seventy one West"
+  },
+  {
+   "input": "Slow traffic on US 290 WB;TX 71 WB",
+   "language": "en",
+   "expected": "Slow traffic on yooess two ninety Westbound or Texas seventy one Westbound"
+  },
+  {
+   "input": "NB: see below",
+   "language": "en",
+   "expected": "NB: see below"
+  },
+  {
+   "input": "WB",
+   "language": "en",
+   "expected": "WB"
+  },
+  {
+   "input": "Watch the NBA game",
+   "language": "en",
+   "expected": "Watch the NBA game"
+  },
+  {
+   "input": "SB 1234 passed",
+   "language": "en",
+   "expected": "SB one thousand two hundred thirty four passed"
+  },
+  {
+   "input": "Take I-35 NBX",
+   "language": "en",
+   "expected": "Take I thirty five NBX"
   }
  ]
 }
