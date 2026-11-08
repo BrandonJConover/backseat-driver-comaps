@@ -142,6 +142,8 @@ TEST(SoakTripStartsDontBuryTheFirstTurn)
 // nothing empty. Town and road trips, by car (miles and km), on foot and by bike.
 TEST(SoakNoUnfilledPlaceholdersInSpokenLines)
 {
+  // Navigators set the process-wide line filters; put them back for the next test (loop B83).
+  struct FiltersBack { ~FiltersBack() { SetLineFilters({}); } } filtersBack;
   struct Setup
   {
     TripShape shape;
@@ -221,6 +223,8 @@ bool IsJudgement(std::string const & key)
 // judgement the same trip without the junk doesn't make.
 TEST(SoakHostileFixesAreHarmless)
 {
+  // Navigators set the process-wide line filters; put them back for the next test (loop B83).
+  struct FiltersBack { ~FiltersBack() { SetLineFilters({}); } } filtersBack;
   int lines = 0;
   int bad = 0;
   for (TravelMode const mode : {TravelMode::Drive, TravelMode::Walk})

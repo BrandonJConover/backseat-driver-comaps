@@ -1,5 +1,7 @@
 #include "check.hpp"
 
+#include "backseat/lines.hpp"
+
 #include <algorithm>
 #include <cstdlib>
 #include <random>
@@ -24,9 +26,17 @@ int main()
                 tests.end());
   for (auto const & test : tests)
   {
+    // Every test starts from the default line filters, and one that leaves them changed fails by
+    // name: in a shuffled order a leaked walk/housing/units setting used to fail some later,
+    // innocent test instead (loop B83: NoHomeJokesForTheStreets under seed 2).
+    backseat::SetLineFilters({});
     try
     {
       test.fn();
+      auto const left = backseat::CurrentLineFilters();
+      if (left != backseat::LineFilters{})
+        throw backseat_tests::Failure{"left the line filters at " + backseat::DescribeLineFilters(left) +
+                                      " (reset them before returning)"};
       std::cout << "ok   " << test.name << "\n";
     }
     catch (backseat_tests::Failure const & f)

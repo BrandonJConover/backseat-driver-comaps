@@ -210,6 +210,31 @@ bool DrivesOnLeft(std::string const & country)
 
 void SetLineDriveSide(bool leftHand) { g_leftHand = leftHand; }
 
+LineFilters CurrentLineFilters()
+{
+  LineFilters filters;
+  filters.mode = g_travelMode;
+  filters.housing = g_housing;
+  filters.metric = g_metric;
+  filters.leftHand = g_leftHand;
+  return filters;
+}
+
+void SetLineFilters(LineFilters const & filters)
+{
+  g_travelMode = filters.mode;
+  g_housing = filters.housing;
+  g_metric = filters.metric;
+  g_leftHand = filters.leftHand;
+}
+
+std::string DescribeLineFilters(LineFilters const & filters)
+{
+  std::string const housing = HousingName(filters.housing);
+  return std::string(TravelModeName(filters.mode)) + "/" + (housing.empty() ? "unknown" : housing) + "/" +
+         (filters.metric ? "metric" : "imperial") + "/" + (filters.leftHand ? "left" : "right");
+}
+
 std::string DriveSideWording(std::string const & text)
 {
   // Whole sentences, so a lane call ("Left lane, please.") or a turn is never touched: only the jokes

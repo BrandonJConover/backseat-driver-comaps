@@ -8,6 +8,7 @@
 #include "backseat/lines_data.hpp"
 #include "backseat/navigator.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <map>
 #include <string>
@@ -145,4 +146,30 @@ TEST(SettingsAfterConstructionStillApply)
   for (auto const & line : LinesFor("road.highway", 0))
     ukWay = ukWay || line.find("The right lane is for passing.") != std::string::npos;
   CHECK(ukWay);
+}
+
+TEST(LineFiltersSaveAndRestoreAsOne)
+{
+  // The test runner resets these before every test and fails a test that leaves them changed
+  // (loop B83); this pins the save / restore it relies on.
+  CHECK(CurrentLineFilters() == LineFilters{});
+  CHECK_EQUAL(DescribeLineFilters(LineFilters{}), std::string("drive/unknown/imperial/right"));
+  LineFilters changed;
+  changed.mode = TravelMode::Walk;
+  changed.housing = Housing::Streets;
+  changed.metric = true;
+  changed.leftHand = true;
+  SetLineFilters(changed);
+  CHECK(CurrentLineFilters() == changed);
+  CHECK_EQUAL(DescribeLineFilters(CurrentLineFilters()), std::string("walk/streets/metric/left"));
+  // Each Set* call moves only its own filter.
+  SetLineHousing(Housing::House);
+  CHECK(CurrentLineFilters().mode == TravelMode::Walk);
+  CHECK(CurrentLineFilters().housing == Housing::House);
+  // A walk filter left behind is what dropped "Staying home? The other drivers..." from the next
+  // test's ask.stayPut pool; restoring the defaults brings it back.
+  SetLineFilters({});
+  CHECK(CurrentLineFilters() == LineFilters{});
+  auto const & pool = LinesFor("ask.stayPut", 1);
+  CHECK(std::any_of(pool.begin(), pool.end(), [](auto const & l) { return l.find("Staying home?") != std::string::npos; }));
 }

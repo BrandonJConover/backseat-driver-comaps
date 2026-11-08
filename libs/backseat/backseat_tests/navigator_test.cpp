@@ -908,6 +908,8 @@ TEST(NavigatorHatesChristmasLights)
 
 TEST(NavigatorKeepsCanadianHolidays)
 {
+  // Navigators set the process-wide line filters; put them back for the next test (loop B83).
+  struct FiltersBack { ~FiltersBack() { SetLineFilters({}); } } filtersBack;
   // wday matters for Thanksgiving: 2026-10-12 is Canada's (second Monday), 2026-11-26 is the US one.
   auto const at = [](int month, int day, int wday)
   {

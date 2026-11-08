@@ -79,6 +79,27 @@ void SetLineDriveSide(bool leftHand);
 /// Lines without any come back as they are. Real lane and turn calls are never changed.
 std::string DriveSideWording(std::string const & text);
 
+/// The process-wide filters LinesFor() answers for (the four Set* calls above), so a caller can
+/// save and restore them or check a test left them as it found them (loop B83).
+struct LineFilters
+{
+  TravelMode mode = TravelMode::Drive;
+  Housing housing = Housing::Unknown;
+  bool metric = false;
+  bool leftHand = false;
+
+  bool operator==(LineFilters const & o) const
+  {
+    return mode == o.mode && housing == o.housing && metric == o.metric && leftHand == o.leftHand;
+  }
+  bool operator!=(LineFilters const & o) const { return !(*this == o); }
+};
+LineFilters CurrentLineFilters();
+/// Puts all four back (default-constructed LineFilters: driving, housing unknown, imperial, right-hand).
+void SetLineFilters(LineFilters const & filters);
+/// "drive/unknown/imperial/right"-style summary, for test failure messages and traces.
+std::string DescribeLineFilters(LineFilters const & filters);
+
 /// Templates for `key` at `tier` (0..2), for the current travel mode: what fits it, plus `key`.walk,
 /// `key`.bike, `key`.hike (or else `key`.walk) or `key`.offroad if there are any, or mode.generic when
 /// nothing fits. Lines that don't fit the driver's housing are left out too, unless that would leave
