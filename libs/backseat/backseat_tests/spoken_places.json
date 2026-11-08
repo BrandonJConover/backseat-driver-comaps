@@ -1,5 +1,5 @@
 {
- "about": "Place names said the local way for map turn instructions (BI-033). Places spelled like an English word (Burnet BURN-it, Humble UM-bul, Manor MAY-nur, Palestine PAL-uh-steen) are swapped for fx dictionary stand-ins only where the sentence says it's the place: before a street type or state, or after to/onto/in/toward (Palestine only before a street type or TX, 'in Palestine' is the country). Unambiguous place names Kokoro's dictionary lacks (Buda BYOO-duh, Manchaca MAN-shak, Pflugerville FLOO-gur-vil, Gruene GREEN, Boerne BUR-nee, Mexia muh-HAY-uh, Refugio, Bexar BAIR, Pedernales, Guadalupe GWAH-duh-loop, Natchitoches NAK-uh-tish, Puyallup pyoo-AL-up, Schuylkill SKOO-kul, Willamette wil-AM-it...) stay in the text and are fixed in the dictionary instead (see 'places'). Backseat Driver: backseat::pronunciation::ForSpeech / LocalPlaces / Lexicon (libs/backseat/backseat_tests/spoken_places.json). BookLyre can take both (CROSS).",
+ "about": "Place names said the local way for map turn instructions (BI-033). Places spelled like an English word (Burnet BURN-it, Humble UM-bul, Manor MAY-nur, Palestine PAL-uh-steen, Reading RED-ing) are swapped for fx dictionary stand-ins only where the sentence says it's the place: before a street type or state, or after to/onto/in/toward (Palestine only before a street type or TX, 'in Palestine' is the country; Reading takes PA/Penn/Pennsylvania/UK/England/Berkshire after a comma, and a capital 'Reading' starting a sentence stays the verb unless a street type follows). Unambiguous place names Kokoro's dictionary lacks (Buda BYOO-duh, Manchaca MAN-shak, Pflugerville FLOO-gur-vil, Gruene GREEN, Boerne BUR-nee, Mexia muh-HAY-uh, Refugio, Bexar BAIR, Pedernales, Guadalupe GWAH-duh-loop, Natchitoches NAK-uh-tish, Puyallup pyoo-AL-up, Schuylkill SKOO-kul, Willamette wil-AM-it...) stay in the text and are fixed in the dictionary instead (see 'places'). Backseat Driver: backseat::pronunciation::ForSpeech / LocalPlaces / Lexicon (libs/backseat/backseat_tests/spoken_places.json). BookLyre can take both (CROSS).",
  "cases": [
   {
    "input": "Turn right onto Burnet Rd",
@@ -72,6 +72,46 @@
   {
    "input": "Merge onto Pflugerville Pkwy",
    "expected": "Merge onto Pflugerville Parkway"
+  },
+  {
+   "input": "Turn right onto Reading Rd",
+   "expected": "Turn right onto fxreding Road"
+  },
+  {
+   "input": "Continue to Reading, PA.",
+   "expected": "Continue to fxreding, PA."
+  },
+  {
+   "input": "Exit toward Reading.",
+   "expected": "Exit toward fxreding."
+  },
+  {
+   "input": "Arriving at Reading Terminal Market.",
+   "expected": "Arriving at fxreding Terminal Market."
+  },
+  {
+   "input": "Advance to Reading Railroad.",
+   "expected": "Advance to fxreding Railroad."
+  },
+  {
+   "input": "We are leaving Reading, England.",
+   "expected": "We are leaving fxreding, England."
+  },
+  {
+   "input": "Reading the map is your job.",
+   "expected": "Reading the map is your job."
+  },
+  {
+   "input": "Stop reading road signs aloud.",
+   "expected": "Stop reading road signs aloud."
+  },
+  {
+   "input": "Back to Reading Rainbow.",
+   "expected": "Back to Reading Rainbow."
+  },
+  {
+   "input": "Reading, writing and arithmetic.",
+   "expected": "Reading, writing and arithmetic."
   }
  ],
  "places": {

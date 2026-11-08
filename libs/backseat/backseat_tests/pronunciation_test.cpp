@@ -643,6 +643,13 @@ TEST(PlaceNamesAreSaidTheLocalWay)
   CHECK_EQUAL(LocalPlaces("Burnetts Rd"), std::string("Burnetts Rd"));
   CHECK_EQUAL(LocalPlaces("in Palestine"), std::string("in Palestine"));
   CHECK_EQUAL(LocalPlaces("Burnet, Rd"), std::string("Burnet, Rd"));
+  // Reading is RED-ing only where it's the place; each place takes its own state after a comma.
+  CHECK(!lexicon["fxreding"].empty());
+  CHECK_EQUAL(LocalPlaces("Reading, PA"), std::string("fxreding, PA"));
+  CHECK_EQUAL(LocalPlaces("Reading, TX"), std::string("Reading, TX"));
+  CHECK_EQUAL(LocalPlaces("Humble, PA"), std::string("Humble, PA"));
+  CHECK_EQUAL(LocalPlaces("Reading glasses, please."), std::string("Reading glasses, please."));
+  CHECK_EQUAL(LocalPlaces("onto reading rd"), std::string("onto reading rd"));
   // The driver's own pronunciation still wins: user words run first.
   SetUserWords("Burnet\tbur-NET\n");
   CHECK(ForSpeech("Turn right onto Burnet Rd").find("fxburnit") == std::string::npos);

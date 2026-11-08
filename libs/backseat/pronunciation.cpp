@@ -155,6 +155,8 @@ struct LocalPlace
   char const * said;
   /// After "to", "onto", "in"... too; false when the word is also a country or common noun there.
   bool afterPreposition;
+  /// The state it's in, which may follow after a comma ("Humble, TX", "Reading, PA").
+  char const * state = "TX";
 };
 
 constexpr LocalPlace kLocalPlaces[] = {
@@ -163,7 +165,11 @@ constexpr LocalPlace kLocalPlaces[] = {
     {"Manor", "MAY-nur", true},
     // "in Palestine" is the country; only "Palestine, TX" or "Palestine Ave".
     {"Palestine", "PAL-uh-steen", false},
+    // Reading PA (and Reading in England, the Reading Railroad) is RED-ing; capitalised mid-sentence it's
+    // the place, lowercase or at the start of a sentence ("Reading the map") it stays the verb.
+    {"Reading", "RED-ing", true, "PA"},
 };
+
 
 // MARK: - Picking the sense
 
@@ -1790,6 +1796,16 @@ std::vector<std::string> ForeignStreetRespellings()
 
 // MARK: - Local place names
 
+namespace
+{
+bool StateWord(std::string const & w, char const * state)
+{
+  if (std::string_view(state) == "PA")
+    return In(w, {"PA", "Penn", "Pennsylvania", "UK", "England", "Berkshire", "Berks"});
+  return In(w, {"TX", "Tex", "Texas"});
+}
+}  // namespace
+
 std::string LocalPlaces(std::string const & text)
 {
   bool any = false;
@@ -1830,7 +1846,7 @@ std::string LocalPlaces(std::string const & text)
   };
   static Set const placeAfter = {"Rd", "Road", "St", "Street", "Ave", "Avenue", "Dr", "Drive", "Ln", "Lane", "Blvd",
                                  "Boulevard", "Hwy", "Highway", "Pkwy", "Parkway", "Ct", "Way", "Loop", "County",
-                                 "TX", "Tex", "Texas", "ISD", "Exit", "Station", "Square", "Plaza", "Center"};
+                                 "ISD", "Exit", "Station", "Square", "Plaza", "Center", "Terminal", "Railroad"};
   static Set const toward = {"to", "onto", "into", "in", "toward", "towards", "near", "from", "via", "through",
                              "past", "outside", "reach", "leaving", "entering"};
   std::string out;
@@ -1848,13 +1864,14 @@ std::string LocalPlaces(std::string const & text)
     {
       auto const next = word(k + 1);
       bool const comma = text.find(',', words[k].end) < words[k + 1].at;
-      here = In(next, placeAfter) && (!comma || In(next, {"TX", "Tex", "Texas"}));
+      here = StateWord(next, place->state) || (!comma && In(next, placeAfter));
     }
     // "onto Burnet", "in Humble": the place unless a capitalised word follows ("to Manor House").
     if (!here && place->afterPreposition && k > 0 && adjacent(k - 1, k) &&
         text.find(',', words[k - 1].end) >= words[k].at && In(word(k - 1), toward))
       here = !(k + 1 < words.size() && adjacent(k, k + 1) && text.find(',', words[k].end) >= words[k + 1].at &&
-               std::isupper(static_cast<unsigned char>(text[words[k + 1].at])) && !In(word(k + 1), placeAfter));
+               std::isupper(static_cast<unsigned char>(text[words[k + 1].at])) && !In(word(k + 1), placeAfter) &&
+               !StateWord(word(k + 1), place->state));
     if (!here)
       continue;
     out.append(text, last, words[k].at - last);
