@@ -86,6 +86,13 @@ std::string DriveSideWording(std::string const & text);
 /// "lines.missing" trace) instead of throwing.
 std::vector<std::string> const & LinesFor(std::string const & key, int tier);
 
+/// Pays the one-time setup the first spoken line would otherwise pay mid-drive: the line table (and
+/// its metric / left-hand copy for `metric` and `leftHand`) and every lazily built speech pattern in
+/// pronunciation::ForSpeech. Call it once from a background thread at app start or route start; it
+/// changes nothing anyone hears and leaves SetLineMetric / SetLineDriveSide as they are. Safe to call
+/// again (later calls are cheap). Loop B66: cold first line was ~11 ms on the cloud box, warm ~0.1 ms.
+void Warm(bool metric, bool leftHand);
+
 /// Fills {placeholders} from vars. {NAME} in capitals inserts the value in capitals.
 /// Unknown placeholders are left as they are.
 std::string Fill(std::string const & tmpl, Vars const & vars);

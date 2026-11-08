@@ -3,6 +3,7 @@
 #include "backseat/debug_log.hpp"
 
 #include "backseat/lines_data.hpp"
+#include "backseat/pronunciation.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -380,6 +381,25 @@ std::string SpeakableText(std::string const & text)
     i = j;
   }
   return out;
+}
+
+void Warm(bool metric, bool leftHand)
+{
+  LineDataFor(metric, leftHand);
+  LineDataFor(false, false);
+  // ForSpeech builds each pass's patterns the first time that pass runs, and most passes only run
+  // when their trigger (a digit, a degree sign, $, %, /, :, a dash) is in the line. These lines
+  // between them trip every pass, so none is left to build mid-drive.
+  static char const * const kProbes[] = {
+      "Turn left onto I-35 N at 5pm, then Exit 12B toward N Main St NW in 1/2 mi.",
+      "Mon-Fri 9am-5pm, 3\xE2\x80\x93""5 min, ~20 ft, \xC2\xB1""2 km, -5\xC2\xB0""F \xE2\x80\x94 50% off $1,234.99/gal & #5.",
+      "On 11/6/2026 or 2026-11-06 or Nov. 6 in the 1990s and 90s, at 10:30, 24/7, \xC2\xBD.",
+      "King George VI Ave to St. John's Svc Rd, Ave B, Mt Hood, 1600 Pennsylvania Ave, US-101, SR 71.",
+      "See www.example.com or jo@example.com about Calle Ocho, rue de la Paix and Burnet Rd.",
+      "\xD1\x83\xD0\xBB\xD0\xB8\xD1\x86\xD0\xB0 \xE3\x83\xA9\xE3\x83\xBC\xE3\x83\xA1\xE3\x83\xB3 lead the way, read it, live here.",
+  };
+  for (char const * probe : kProbes)
+    pronunciation::ForSpeech(probe);
 }
 
 std::string DropRepeatedTags(std::string text, std::set<std::string> & said)
