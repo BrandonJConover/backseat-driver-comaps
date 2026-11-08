@@ -8,6 +8,7 @@ add_executable(${PROJECT_NAME}
   countdown_distance_test.cpp
   exit_after_merge_test.cpp
   offroute_blip_test.cpp
+  then_chaining_test.cpp
   history_test.cpp
   trip_log_test.cpp
   corrupt_state_test.cpp

@@ -224,8 +224,12 @@ double CurveAheadM(std::vector<LatLon> const & ahead, double maxM, double minDeg
 std::string InstructionText(TurnKind turn, std::string const & street, std::string const & destination);
 
 /// The next maneuver's text, with the one after it when that comes right after: "Turn left onto
-/// Winesap Drive, then right onto Cameo Lane".
-std::string InstructionText(RouteSnapshot const & route);
+/// Winesap Drive, then right onto Cameo Lane". "Right after" is 150 m, or 10 s at `speedMps` up to 500 m
+/// (loop B86); exits and roundabouts chain too, going straight never does.
+std::string InstructionText(RouteSnapshot const & route, double speedMps = 0);
+
+/// How close the maneuver after next must be to chain onto the next one's call, at this speed.
+double ChainWithinM(double speedMps);
 
 /// Which way `to` is from `from`, as said out loud: "northwest".
 std::string CompassDirection(LatLon const & from, LatLon const & to);

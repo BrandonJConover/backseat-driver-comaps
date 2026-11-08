@@ -33,6 +33,10 @@ double constexpr kStaleFixWindowMs = 60000;
 double constexpr kLaneSayMaxM = 1500;
 /// Two maneuvers this close together are said as one: "turn left onto X, then right onto Y".
 double constexpr kChainWithinM = 150;
+// At speed, 150 m is five seconds on a highway: the next maneuver comes before its own call could. Chain
+// anything within this many seconds of driving, up to kChainMaxM (loop B86).
+double constexpr kChainWithinS = 10;
+double constexpr kChainMaxM = 500;
 /// After a turn, the next direction waits this long, so the driver is through the turn first...
 double constexpr kInstructionAfterTurnMs = 3000;
 /// ...unless the next maneuver is this close, or this many seconds away at highway speed (an exit
@@ -548,10 +552,16 @@ std::string InstructionText(TurnKind turn, std::string const & street, std::stri
   return text;
 }
 
-std::string InstructionText(RouteSnapshot const & route)
+double ChainWithinM(double speedMps)
+{
+  double const mps = std::isfinite(speedMps) ? std::max(speedMps, 0.0) : 0.0;
+  return std::max(kChainWithinM, std::min(kChainMaxM, kChainWithinS * mps));
+}
+
+std::string InstructionText(RouteSnapshot const & route, double speedMps)
 {
   std::string text = InstructionText(route.turn, route.nextStreet, route.destination);
-  if (route.thenGapM < 0 || route.thenGapM > kChainWithinM)
+  if (route.thenGapM < 0 || route.thenGapM > ChainWithinM(speedMps))
     return text;
   switch (route.turn)
   {
@@ -569,6 +579,9 @@ std::string InstructionText(RouteSnapshot const & route)
   case TurnKind::Right: then = "right"; break;
   case TurnKind::SharpRight: then = "a sharp right"; break;
   case TurnKind::SlightRight: then = "bear right"; break;
+  case TurnKind::ExitLeft: then = "take the exit on the left"; break;
+  case TurnKind::ExitRight: then = "take the exit on the right"; break;
+  case TurnKind::Roundabout: then = "take the roundabout"; break;
   case TurnKind::UTurn: return text + ", then make a U-turn";
   case TurnKind::Destination: return text + ", then you've arrived";
   default: return text;
@@ -1382,7 +1395,8 @@ void Navigator::Update(double t, RouteSnapshot const & route)
 void Navigator::SayInstruction(double t, RouteSnapshot const & route)
 {
   m_turnSaidAt = t;
-  std::string const text = InstructionText(route);
+  // Same speed as the "say it now" window: this fix's, else the last known one (a tunnel).
+  std::string const text = InstructionText(route, TimingMps(m_hereFix ? m_hereFix->speedMps : -1));
   m_lastInstructionText = text;
   Trace("nav.turn", {{"id", std::to_string(*route.turnId)},
                      {"text", text},
