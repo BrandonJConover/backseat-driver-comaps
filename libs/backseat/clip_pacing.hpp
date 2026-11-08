@@ -6,15 +6,15 @@
 // one level, and two lines queued back to back get the gap their punctuation asks for instead of
 // both clips' padding added together.
 //
-// Pure functions; the hosts call them on the samples Kokoro hands back (Android sherpa-onnx floats,
-// iOS FluidAudio floats). This part (loop B70) is the trim / level / pause maths and the pause
-// table; the boundary rules that pick the pause from punctuation come next (B71, checked against
-// BookLyre's golden file).
+// The boundary rules match BookLyre's golden cases (backseat_tests/clip_pacing_boundaries.json,
+// copied unchanged from BookLyre's tests/fixtures). Pure functions; the hosts call them on the
+// samples Kokoro hands back (Android sherpa-onnx floats, iOS FluidAudio floats).
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace backseat::pacing
@@ -38,6 +38,18 @@ enum class Boundary
 int PauseMs(Boundary b);
 /// BookLyre's name for it ("mid_sentence", ..., "chapter_end"), for logs and the shared golden file.
 char const * Name(Boundary b);
+
+/// The boundary after each piece. `pieces` are the clips' texts in reading order; each is looked
+/// up in `content` after the previous one (so paragraph breaks and headings are seen). If one
+/// can't be found, the pieces are laid out on one line instead (punctuation and voice rules still
+/// apply). `speakers` and `voices` are one per piece; when shorter, missing entries count as the
+/// same speaker/voice as the piece before. Never throws on any text.
+std::vector<Boundary> Boundaries(std::string const & content, std::vector<std::string> const & pieces,
+                                 std::vector<std::string> const & speakers = {},
+                                 std::vector<std::string> const & voices = {});
+
+/// Two lines the app speaks back to back (a roast, then the next line in the queue).
+Boundary BetweenLines(std::string const & line, std::string const & next, bool voiceChanged = false);
 
 // Loudness and trimming. Constants match BookLyre's.
 inline constexpr double kTargetDbfs = -23.0;
