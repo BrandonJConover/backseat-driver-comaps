@@ -536,6 +536,8 @@ private:
   void SaySight(double tMs, Sight const & sight);
   double NavWaitMs(Commentary const & line) const;
   double LastTimingMps() const;
+  /// The next instruction goes out at once after a turn when the maneuver is this close (loop B81).
+  double InstructionNowWithinM() const;
   void TrackWrongWay(Fix const & fix, RouteSnapshot const & route);
   /// "Strange, it feels as if I've been here before." after the car turns around.
   void TrackUTurn(Fix const & fix, RouteSnapshot const & route);

@@ -35,8 +35,10 @@ double constexpr kLaneSayMaxM = 1500;
 double constexpr kChainWithinM = 150;
 /// After a turn, the next direction waits this long, so the driver is through the turn first...
 double constexpr kInstructionAfterTurnMs = 3000;
-/// ...unless the next maneuver is this close.
+/// ...unless the next maneuver is this close, or this many seconds away at highway speed (an exit
+/// 350 m after a merge at 33 m/s used to wait for 250 m, 7.5 s out; loop B81).
 double constexpr kInstructionNowWithinM = 250;
+double constexpr kInstructionNowWithinS = 15;
 /// Slower than this counts as stopped.
 double constexpr kStoppedMps = 0.5;
 /// Faster than this means driving again, not walking around with the phone.
@@ -1148,6 +1150,13 @@ double Navigator::TimingMps(double speedMps) const
 
 double Navigator::LastTimingMps() const { return TimingMps(m_lastFix ? m_lastFix->speedMps : 0); }
 
+double Navigator::InstructionNowWithinM() const
+{
+  // m_hereFix is this fix (set before Update); m_lastFix may still be the one before.
+  double const mps = TimingMps(m_hereFix ? m_hereFix->speedMps : 0);
+  return std::max(kInstructionNowWithinM, kInstructionNowWithinS * mps);
+}
+
 double Navigator::NavWaitMs(Commentary const & line) const
 {
   double const mps = LastTimingMps();
@@ -1317,14 +1326,14 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     m_turnId = route.turnId;
     m_turnKind = route.turn;
     m_instructionDueAt.reset();
-    if (justTurned && route.distToTurnM >= kInstructionNowWithinM)
+    if (justTurned && route.distToTurnM >= InstructionNowWithinM())
       m_instructionDueAt = t + kInstructionAfterTurnMs;
     else
       SayInstruction(t, route);
   }
   else if (m_instructionDueAt)
   {
-    if (t >= *m_instructionDueAt || route.distToTurnM < kInstructionNowWithinM)
+    if (t >= *m_instructionDueAt || route.distToTurnM < InstructionNowWithinM())
     {
       m_instructionDueAt.reset();
       SayInstruction(t, route);
