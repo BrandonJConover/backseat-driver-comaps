@@ -1,5 +1,5 @@
 {
- "about": "Street types abroad said in their own language for map turn instructions (BI-008): 'Calle Ocho' KAH-yeh, 'Paseo de la Reforma' with a Spanish 'de la', 'Rue du Bac' French 'du', 'Via della Spiga' Italian, 'Rua do Ouro' Portuguese, 'Hauptstraße' Haupt SHTRAH-seh, as fx dictionary stand-ins (Lexicon() holds their phonemes). Only before a capitalised word, number or name particle (German types after a name), so 'via I-35' and 'rue the day' stay English; the name itself is left to the voice. Backseat Driver: backseat::pronunciation::ForSpeech / ForeignStreets (libs/backseat/backseat_tests/spoken_street_types.json). BookLyre can take the street-type rows (CROSS).",
+ "about": "Street types abroad said in their own language for map turn instructions (BI-008): 'Calle Ocho' KAH-yeh, 'Paseo de la Reforma' with a Spanish 'de la', 'Rue du Bac' French 'du', 'Via della Spiga' Italian, 'Rua do Ouro' Portuguese, 'Hauptstraße' Haupt SHTRAH-seh, as fx dictionary stand-ins (Lexicon() holds their phonemes). Only before a capitalised word, number or name particle (German types after a name), so 'via I-35' and 'rue the day' stay English; the name itself is left to the voice. Backseat Driver: backseat::pronunciation::ForSpeech / ForeignStreets (libs/backseat/backseat_tests/spoken_street_types.json). BookLyre can take the street-type rows (CROSS). Also (CROSS X-039, BookLyre spoken_titles.json last 9 cases): 'St.' after a capitalised word is Saint when 1-3 name words and a street type follow ('Down St. James Street', 'Slight right St. Clair Ave'); 'Main St. Mary was there' and 'Baker St. Then he left' stay Street.",
  "cases": [
   {
    "input": "Turn left onto Calle Ocho.",
@@ -254,6 +254,82 @@
    "input": "NB: see below",
    "language": "en",
    "expected": "NB: see below"
+  },
+  {
+   "input": "Take St. Johns Rd. to the bridge.",
+   "expected": "Take Saint Johns Road to the bridge."
+  },
+  {
+   "input": "Find St. Mary Street.",
+   "expected": "Find Saint Mary Street."
+  },
+  {
+   "input": "Down St. James Street we went.",
+   "expected": "Down Saint James Street we went."
+  },
+  {
+   "input": "Across St. Peter Square.",
+   "expected": "Across Saint Peter Square."
+  },
+  {
+   "input": "Wander St. Johns Road at dusk.",
+   "expected": "Wander Saint Johns Road at dusk."
+  },
+  {
+   "input": "The shop on Cross St. was shut.",
+   "expected": "The shop on Cross Street was shut."
+  },
+  {
+   "input": "Turn left at Church St. and stop.",
+   "expected": "Turn left at Church Street and stop."
+  },
+  {
+   "input": "He lived on Baker St. Then he left.",
+   "expected": "He lived on Baker Street. Then he left."
+  },
+  {
+   "input": "Walk past Main St. Mary was there.",
+   "expected": "Walk past Main Street. Mary was there."
+  },
+  {
+   "input": "Turn onto St. Charles Ave",
+   "expected": "Turn onto Saint Charles Avenue"
+  },
+  {
+   "input": "Turn right onto St Charles Ave.",
+   "expected": "Turn right onto Saint Charles Avenue."
+  },
+  {
+   "input": "Keep left at the fork. Stay on St. Johns Rd",
+   "expected": "Keep left at the fork. Stay on Saint Johns Road"
+  },
+  {
+   "input": "Slight right St. Clair Ave",
+   "expected": "Slight right Saint Clair Avenue"
+  },
+  {
+   "input": "Sharp left St. Paul Blvd",
+   "expected": "Sharp left Saint Paul Boulevard"
+  },
+  {
+   "input": "Make a U-turn at St Augustine Rd",
+   "expected": "Make a U-turn at Saint Augustine Road"
+  },
+  {
+   "input": "Right turn St. Andrews Way, then left",
+   "expected": "Right turn Saint Andrews Way, then left"
+  },
+  {
+   "input": "Exit 12B St. Johns Bluff Rd",
+   "expected": "Exit twelve B Saint Johns Bluff Road"
+  },
+  {
+   "input": "Main St. Then left",
+   "expected": "Main Street. Then left"
+  },
+  {
+   "input": "Turn right on Elm St. Mary is waiting",
+   "expected": "Turn right on Elm Street. Mary is waiting"
   }
  ]
 }

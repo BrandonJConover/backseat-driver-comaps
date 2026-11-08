@@ -677,14 +677,43 @@ bool StreetWord(std::string const & w)
   return false;
 }
 
+bool StreetTypeWord(std::string const & w);
+
+/// True when 1-3 capitalised name words and then a street type follow `pos`, so "St." there is a
+/// saint naming that street even after a capitalised word: "Down St. James Street", "Exit 12B St.
+/// Johns Bluff Rd". "Main St. Mary was there" and "Baker St. Then left" don't end in a type.
+bool SaintStreetAfter(std::string const & s, size_t pos)
+{
+  for (int names = 0; names <= 3; ++names)
+  {
+    while (pos < s.size() && s[pos] == ' ')
+      ++pos;
+    size_t end = pos;
+    while (end < s.size() && (IsAsciiLetter(s[end]) || s[end] == '\''))
+      ++end;
+    if (end == pos || !std::isupper(static_cast<unsigned char>(s[pos])))
+      return false;
+    auto const word = s.substr(pos, end - pos);
+    if (names > 0 && StreetTypeWord(word))
+      return true;
+    if (names == 3 || LeadInWord(Lower(word)) || (end < s.size() && s[end] != ' '))
+      return false;
+    pos = end;
+  }
+  return false;
+}
+
 /// "St. Johns Rd" is "Saint Johns Rd", "Dr Martin Luther King Jr Blvd" is "Doctor Martin Luther
 /// King Junior Blvd", "Ft Worth" is "Fort Worth", "Hwy 290" is "Highway 290", "101 Fwy" is "101
 /// Freeway". "Main St. Then left" and "Elm Dr." stay street types for the street pass.
+/// A "St" after a capitalised word is still Saint when a name and a street type follow ("Down St.
+/// James Street").
 std::string Titles(std::string s)
 {
   static std::regex const title("\\b(St|Ste|Dr|Ft)\\.? (?=[A-Z][a-z])");
   s = Replace(s, title, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
-    if (StreetNameBefore(s, pos))
+    if (StreetNameBefore(s, pos) &&
+        !(m.str(1) == "St" && SaintStreetAfter(s, pos + static_cast<size_t>(m.length(0)))))
       return std::nullopt;
     static std::map<std::string, std::string> const words = {
         {"St", "Saint"}, {"Ste", "Saint"}, {"Dr", "Doctor"}, {"Ft", "Fort"}};
