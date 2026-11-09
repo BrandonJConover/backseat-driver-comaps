@@ -750,6 +750,7 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & route)
     TrackTraffic(fix, route);
     TrackOffRoad(fix);
     TrackLastExit(fix.tMs, route);
+    TrackExitSkip(fix, route);
     TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, fix.speedMps, route);
     TrackLongDrive(fix.tMs, route);
   }
@@ -2860,6 +2861,44 @@ void Navigator::TrackLastExit(double tMs, RouteSnapshot const & route)
   double const unitM = m_config.units == Units::Mph ? 1609.344 : 1000;
   std::string const distance = FormatDistance(JsRound(gap / unitM) * unitM, m_config.units);
   SayLine(tMs, Category::LongDrive, gap >= kLastExitLongM ? "lastExit.long" : "lastExit", {{"distance", distance}});
+}
+
+namespace
+{
+/// "Skip this first exit" (loop B100): said once the earlier exit is this close (seconds of driving,
+/// with a floor), and only while it is still at least kExitSkipMinAheadM ahead.
+double constexpr kExitSkipLeadS = 15;
+double constexpr kExitSkipLeadMinM = 250;
+double constexpr kExitSkipMinAheadM = 60;
+/// Never on top of the final call: the route's exit has to be this many seconds (and meters) away.
+double constexpr kExitSkipBeforeTurnS = 8;
+double constexpr kExitSkipBeforeTurnMinM = 120;
+}  // namespace
+
+double ExitSkipWithinM(double speedMps)
+{
+  double const mps = std::max(0.0, speedMps);
+  return std::clamp(27 * mps, 300.0, 1000.0);
+}
+
+void Navigator::TrackExitSkip(Fix const & fix, RouteSnapshot const & route)
+{
+  // Only with exactly one exit in between: with more, "this first exit" could be the wrong one.
+  if (route.state != RouteState::OnRoute || !route.turnId ||
+      (route.turn != TurnKind::ExitLeft && route.turn != TurnKind::ExitRight) || route.exitsBeforeTurn != 1 ||
+      route.exitBeforeGapM <= 0 || m_exitSkipTurnId == route.turnId)
+    return;
+  double const mps = std::max(0.0, fix.speedMps);
+  if (route.exitBeforeGapM > ExitSkipWithinM(mps))
+    return;
+  double const earlierAheadM = route.distToTurnM - route.exitBeforeGapM;
+  if (earlierAheadM < kExitSkipMinAheadM || earlierAheadM > std::max(kExitSkipLeadMinM, kExitSkipLeadS * mps))
+    return;
+  if (route.distToTurnM < std::max(kExitSkipBeforeTurnMinM, kExitSkipBeforeTurnS * mps))
+    return;
+  m_exitSkipTurnId = route.turnId;
+  Trace("nav.exitSkip", {{"gap_m", LogNum(route.exitBeforeGapM, 0)}, {"ahead_m", LogNum(earlierAheadM, 0)}});
+  SayLine(fix.tMs, Category::Instruction, "countdown.exit.skip", {}, Priority::Nav);
 }
 
 void Navigator::TrackOffRoad(Fix const & fix)

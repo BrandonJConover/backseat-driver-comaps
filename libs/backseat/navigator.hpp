@@ -132,6 +132,11 @@ struct RouteSnapshot
   /// Set on the one update right after the car drives past a highway exit: how far along the route
   /// the next exit is. Negative if the trip ends before another exit.
   std::optional<double> passedExitNextM;
+  /// When the next maneuver is a highway exit: how many other exits the route passes before it
+  /// (0 none, -1 unknown), and how far before it the nearest of them is (-1 unknown). Feeds the
+  /// "skip this first exit, yours is the next one" call (loop B100).
+  int exitsBeforeTurn = -1;
+  double exitBeforeGapM = -1;
   /// The route's current stretch is a dirt track or unpaved.
   bool onDirt = false;
   /// How much of the route (by distance, 0..1) is dirt tracks and unpaved, read when the trip starts.
@@ -247,6 +252,9 @@ std::string RoundaboutExitWords(int exit);
 
 /// How close the maneuver after next must be to chain onto the next one's call, at this speed.
 double ChainWithinM(double speedMps);
+/// How close an earlier exit has to sit before the route's exit for "skip this first exit, yours is
+/// the next one" (loop B100): about 27 s of driving, 300 m to 1 km.
+double ExitSkipWithinM(double speedMps);
 
 /// Which way `to` is from `from`, as said out loud: "northwest".
 std::string CompassDirection(LatLon const & from, LatLon const & to);
@@ -544,6 +552,7 @@ private:
   double MovingMps() const;
   /// "I probably should have told you the exit you just passed is the last one for a hundred miles."
   void TrackLastExit(double tMs, RouteSnapshot const & route);
+  void TrackExitSkip(Fix const & fix, RouteSnapshot const & route);
   void SayPolice(double tMs);
   void SayLemon(double tMs);
   void SayVenue(double tMs, RouteSnapshot const & route);
@@ -790,6 +799,8 @@ private:
   std::set<std::string> m_outdoorBitsSaid;
   double m_lastOffRoadT = -1e18;
   double m_lastExitLineT = -1e18;
+  /// The exit maneuver the "skip this first exit" call was said for (loop B100).
+  std::optional<uint32_t> m_exitSkipTurnId;
   bool m_onBridge = false;
   double m_lastBridgeYelpT = -1e18;
   double m_lastWaterYelpT = -1e18;

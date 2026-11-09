@@ -2211,6 +2211,16 @@ LineTable const & LineData()
        {"THAT WAS THE LAST EXIT FOR {DISTANCE}! I PROBABLY SHOULD HAVE SAID SOMETHING!",
         "NO MORE EXITS! {DISTANCE} OF NOTHING! I HOPE YOU LIKE THIS ROAD!"},
      }}},
+    {"countdown.exit.skip",
+     {{
+       {"Skip this first exit. Yours is the next one.",
+        "Not this exit. Yours is the next one. Patience, for once.",
+        "This exit is a decoy. Yours is the next one."},
+       {"Skip this first exit. Yours is the next one. I'll say it slowly next time.",
+        "Not this one. The next one. I know, two exits in a row, very confusing."},
+       {"NOT THIS EXIT! YOURS IS THE NEXT ONE!",
+        "SKIP THIS ONE! THE NEXT EXIT IS YOURS!"},
+     }}},
     {"lastExit",
      {{
        {"Just so you know, the next exit is {distance} away. That one back there was your chance.",
