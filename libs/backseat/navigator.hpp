@@ -80,6 +80,14 @@ enum class LaneSide
   Right
 };
 
+/// Which part of a roundabout the next maneuver is (the router's Enter/StayOn/LeaveRoundAbout).
+enum class RoundaboutLeg
+{
+  Enter,
+  Stay,
+  Leave
+};
+
 struct RouteSnapshot
 {
   RouteState state = RouteState::Inactive;
@@ -97,6 +105,11 @@ struct RouteSnapshot
   TurnKind thenTurn = TurnKind::None;
   std::string thenStreet;
   double thenGapM = -1;
+  /// For a roundabout: which exit to take (1 is the first), 0 if the host doesn't know, and which
+  /// part of the roundabout the maneuver is. `thenRoundaboutExit` is the same for the maneuver after.
+  int roundaboutExit = 0;
+  RoundaboutLeg roundaboutLeg = RoundaboutLeg::Enter;
+  int thenRoundaboutExit = 0;
   /// What the router estimates for the whole trip, read when the trip starts.
   double etaSeconds = 0;
   /// The whole route's length in meters, read when the trip starts; 0 if unknown.
@@ -225,8 +238,12 @@ std::string InstructionText(TurnKind turn, std::string const & street, std::stri
 
 /// The next maneuver's text, with the one after it when that comes right after: "Turn left onto
 /// Winesap Drive, then right onto Cameo Lane". "Right after" is 150 m, or 10 s at `speedMps` up to 500 m
-/// (loop B86); exits and roundabouts chain too, going straight never does.
+/// (loop B86); exits and roundabouts chain too, going straight never does. A roundabout with a known
+/// exit says which one: "At the roundabout, take the second exit onto Oak Street" (loop B98).
 std::string InstructionText(RouteSnapshot const & route, double speedMps = 0);
+
+/// "the second exit" for 2, "exit 12" past the eighth; empty for 0 or less (unknown).
+std::string RoundaboutExitWords(int exit);
 
 /// How close the maneuver after next must be to chain onto the next one's call, at this speed.
 double ChainWithinM(double speedMps);

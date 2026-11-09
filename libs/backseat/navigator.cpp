@@ -558,9 +558,48 @@ double ChainWithinM(double speedMps)
   return std::max(kChainWithinM, std::min(kChainMaxM, kChainWithinS * mps));
 }
 
+std::string RoundaboutExitWords(int exit)
+{
+  static char const * const kOrdinals[] = {"first", "second", "third", "fourth",
+                                           "fifth", "sixth", "seventh", "eighth"};
+  if (exit <= 0)
+    return {};
+  if (exit <= 8)
+    return std::string("the ") + kOrdinals[exit - 1] + " exit";
+  return "exit " + std::to_string(exit);
+}
+
+namespace
+{
+/// The roundabout call: which exit when known, never "the  exit" or "0th" when not.
+std::string RoundaboutText(RouteSnapshot const & route)
+{
+  std::string text;
+  switch (route.roundaboutLeg)
+  {
+  case RoundaboutLeg::Leave: text = "Exit the roundabout"; break;
+  case RoundaboutLeg::Stay: text = "Stay on the roundabout"; break;
+  case RoundaboutLeg::Enter:
+  {
+    std::string const exit = RoundaboutExitWords(route.roundaboutExit);
+    if (exit.empty())
+      text = "Take the roundabout";
+    else
+      text = "At the roundabout, take " + exit;
+    break;
+  }
+  }
+  if (route.roundaboutLeg != RoundaboutLeg::Stay && !route.nextStreet.empty())
+    text += " onto " + route.nextStreet;
+  return text;
+}
+}  // namespace
+
 std::string InstructionText(RouteSnapshot const & route, double speedMps)
 {
-  std::string text = InstructionText(route.turn, route.nextStreet, route.destination);
+  std::string text = route.turn == TurnKind::Roundabout
+                         ? RoundaboutText(route)
+                         : InstructionText(route.turn, route.nextStreet, route.destination);
   if (route.thenGapM < 0 || route.thenGapM > ChainWithinM(speedMps))
     return text;
   switch (route.turn)
@@ -581,7 +620,10 @@ std::string InstructionText(RouteSnapshot const & route, double speedMps)
   case TurnKind::SlightRight: then = "bear right"; break;
   case TurnKind::ExitLeft: then = "take the exit on the left"; break;
   case TurnKind::ExitRight: then = "take the exit on the right"; break;
-  case TurnKind::Roundabout: then = "take the roundabout"; break;
+  case TurnKind::Roundabout:
+    then = route.thenRoundaboutExit > 0 ? "at the roundabout take " + RoundaboutExitWords(route.thenRoundaboutExit)
+                                        : "take the roundabout";
+    break;
   case TurnKind::UTurn: return text + ", then make a U-turn";
   case TurnKind::Destination: return text + ", then you've arrived";
   default: return text;

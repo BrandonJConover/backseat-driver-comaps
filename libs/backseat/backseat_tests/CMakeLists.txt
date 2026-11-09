@@ -9,6 +9,7 @@ add_executable(${PROJECT_NAME}
   exit_after_merge_test.cpp
   offroute_blip_test.cpp
   then_chaining_test.cpp
+  roundabout_exit_test.cpp
   delivery_test.cpp
   history_test.cpp
   trip_log_test.cpp
