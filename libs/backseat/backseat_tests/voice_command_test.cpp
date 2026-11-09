@@ -538,6 +538,22 @@ TEST(DrivingCommandsAreHeard)
   CHECK(Heard("what's the speed limit", AppAction::SpeedLimit));
   CHECK(Heard("how fast am I going", AppAction::CurrentSpeed));
   CHECK(Heard("what road is this", AppAction::CurrentRoad));
+  // B96: "where am I" says the road first (eyes on the road), then recenters the map.
+  for (char const * said : {"where am I", "Where am I?", "show me where I am", "hey where am i right now"})
+  {
+    auto const c = ParseAppCommands(said);
+    CHECK_EQUAL(c.size(), size_t(2));
+    CHECK(c.size() == 2 && c[0].action == AppAction::CurrentRoad && c[1].action == AppAction::Recenter);
+  }
+  CHECK_EQUAL(ParseAppCommands("recenter").size(), size_t(1));
+  CHECK(ParseAppCommands("recenter")[0].action == AppAction::Recenter);
+  for (char const * said : {"where am I going", "where am I headed", "where am I supposed to turn"})
+    CHECK(!Heard(said, AppAction::CurrentRoad));
+  CHECK(ParseAppCommands("don't tell me where I am").empty());
+  {
+    auto const both = ParseAppCommands("where am I, what road is this");
+    CHECK(std::count_if(both.begin(), both.end(), [](auto const & c) { return c.action == AppAction::CurrentRoad; }) == 1);
+  }
   CHECK(Heard("what's the next turn", AppAction::NextTurn));
   CHECK(!Heard("what's the next turn", AppAction::RepeatInstruction));
   CHECK(Heard("what time will we get there", AppAction::ArrivalTime));

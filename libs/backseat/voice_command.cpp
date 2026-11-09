@@ -568,6 +568,18 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   { return std::any_of(found.begin(), found.end(), [action](auto const & f) { return f.second.action == action; }); };
   if (heardAction(AppAction::NextStop))
     drop(AppAction::TimeLeft);
+  // "Where am I?" wants the road said out loud, not just the map moved (the driver can't look). Say the road
+  // first, then recenter. "Where am I going?" is about the route, not the road under the car.
+  for (char const * where : {" where am i ", " show me where i am "})
+    if (auto const at = words.find(where); at != std::string::npos && !heardAction(AppAction::CurrentRoad))
+    {
+      auto const after = words.substr(at + std::string(where).size() - 1);
+      bool const route = after.rfind(" going ", 0) == 0 || after.rfind(" headed ", 0) == 0 ||
+                         after.rfind(" heading ", 0) == 0 || after.rfind(" supposed to ", 0) == 0;
+      if (!route)
+        found.insert(found.begin(), {at, AppCommand{AppAction::CurrentRoad, {}}});
+      break;
+    }
   // "How far is my next turn?", "how long until I turn?": the turn, not the trip.
   if (heardAction(AppAction::TimeLeft))
   {
