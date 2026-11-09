@@ -721,4 +721,48 @@ bool AsksToHandlePhone(std::string const & line)
   return false;
 }
 
+bool LooksOrPicks(std::string const & line)
+{
+  // "Look at it", "LOOK!", "Pick a voice", "Change anything you like": eyes or a finger on the screen.
+  static char const * const kLook[] = {"look at it", "look at this", "look at that", "look at all", "look at the map",
+                                       "look at the screen", "look at the route", "look closely", "look how",
+                                       "see how", "memorize it", "feel free to look", "have a look", "take a look"};
+  // Picks answered out loud ("Pick one. Say first, second, or third.") are fine.
+  static char const * const kPick[] = {"pick one", "pick a voice", "pick whichever", "choose a voice", "choose one",
+                                       "choose carefully", "choose wisely", "try them all", "try one",
+                                       "change anything", "change whatever", "change the voice"};
+  auto const clauses = HandlingClauses(line);
+  bool saidAloud = false;
+  for (auto const & c : clauses)
+    saidAloud = saidAloud || c.rfind("say ", 0) == 0 || c.find(" say ") != std::string::npos;
+  auto const found = [](std::string const & clause, char const * phrase) {
+    size_t const at = clause.find(phrase);
+    if (at == std::string::npos || (at > 0 && std::isalpha(static_cast<unsigned char>(clause[at - 1]))))
+      return false;
+    std::string const before = " " + clause.substr(0, at);
+    for (char const * no : {"n't ", " not ", " never ", " no ", " without "})
+      if (before.find(no) != std::string::npos)
+        return false;
+    return true;
+  };
+  std::string previous;
+  for (auto const & clause : clauses)
+  {
+    bool const negatedBefore = previous == "don't" || previous == "do not" || previous == "never" || previous == "no";
+    previous = clause;
+    if (negatedBefore)
+      continue;
+    if (clause == "look" || (!saidAloud && (clause == "pick" || clause == "choose")))
+      return true;
+    for (char const * phrase : kLook)
+      if (found(clause, phrase))
+        return true;
+    if (!saidAloud)
+      for (char const * phrase : kPick)
+        if (found(clause, phrase))
+          return true;
+  }
+  return false;
+}
+
 }  // namespace backseat

@@ -2737,7 +2737,17 @@ std::string Navigator::Reply(std::string const & key, Vars const & vars)
   case Pronouns::She: add("theycap", "She"); add("theyre", "She's"); add("them", "her"); add("their", "her"); break;
   case Pronouns::They: add("theycap", "They"); add("theyre", "They're"); add("them", "them"); add("their", "their"); break;
   }
-  auto const & lines = LinesFor(key, Tier());
+  auto const & pool = LinesFor(key, Tier());
+  // At speed, no reply that says look at the screen or pick something on it (loop B92, same rule as
+  // the B74 phone asks in CritiqueEngine::Pick), unless that would leave nothing to say.
+  std::vector<std::string> eyesUp;
+  double const rolling = m_engine ? m_engine->Config().rollingMps : m_config.rollingMps;
+  if (m_lastFix && m_lastFix->speedMps >= rolling)
+    for (auto const & l : pool)
+      if (!LooksOrPicks(l))
+        eyesUp.push_back(l);
+  bool const filtered = !eyesUp.empty() && eyesUp.size() < pool.size();
+  auto const & lines = filtered ? eyesUp : pool;
   // "Repeat that" near a turn: the direction first, the commentary after (loop B58). Own pick log,
   // so the short pool doesn't trim the full pool's no-repeat memory.
   std::vector<std::string> nearTurn;
@@ -2751,7 +2761,7 @@ std::string Navigator::Reply(std::string const & key, Vars const & vars)
     if (nearTurn.empty())
       nearTurn.push_back("{instruction}");
   }
-  std::string text = Fill(repeatNearTurn ? m_said.Pick("cmd.repeat.nearTurn", nearTurn, r) : m_said.Pick(key, lines, r), all);
+  std::string text = Fill(repeatNearTurn ? m_said.Pick("cmd.repeat.nearTurn", nearTurn, r) : m_said.Pick(filtered ? key + ".moving" : key, lines, r), all);
   // Said in one go, so a punchline just gets a beat.
   for (auto pause = text.find(" || "); pause != std::string::npos; pause = text.find(" || "))
     text.replace(pause, 4, " ... ");

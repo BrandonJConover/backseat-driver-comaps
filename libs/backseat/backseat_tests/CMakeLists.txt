@@ -33,6 +33,7 @@ add_executable(${PROJECT_NAME}
   voice_command_test.cpp
   warm_test.cpp
   phone_handling_test.cpp
+  eyes_on_road_test.cpp
   rewriter_test.cpp
   route_order_test.cpp
   running_bits_test.cpp

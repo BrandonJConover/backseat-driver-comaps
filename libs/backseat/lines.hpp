@@ -122,6 +122,12 @@ void Warm(bool metric, bool leftHand);
 /// you want to get there") pass.
 bool AsksToHandlePhone(std::string const & line);
 
+/// Whether `line` tells the driver to look at the screen or pick/change something on it ("Look at it.",
+/// "LOOK!", "Look how simple", "Pick a voice", "Change anything you like"): fine parked, not at speed
+/// (loop B92). Negated ("Don't look at the screen"), "Look, I tried" and picks answered out loud
+/// ("Pick one. Say first, second, or third.") pass.
+bool LooksOrPicks(std::string const & line);
+
 /// How a line from pool `key` with spoken `text` should be delivered (loop B90): Aside for the GPS
 /// muttering to itself (any key with an "aside" part: quiet.aside, partner.aside, outdoors.aside,
 /// and their .walk/.bike variants), unless the line is shouted (has a "!"; the unhinged tier yells
