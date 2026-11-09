@@ -6,6 +6,7 @@
 #include "backseat/units.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <limits>
 #include <random>
@@ -249,6 +250,39 @@ std::string DirectionText(std::string const & text, double distanceM, Units unit
   // they aren't named.
   char const * at = control == Control::TrafficLight ? "at the light, " : "";
   return "In " + distance + ", " + at + LowerFirst(text) + ".";
+}
+
+std::string RoundaboutExitOf(std::string const & instruction)
+{
+  static std::regex const exit(
+      R"(\btake (?:the (first|second|third|fourth|fifth|sixth|seventh|eighth) exit|exit (\d{1,2}))\b)",
+      std::regex::icase);
+  std::string const first = FirstManeuver(instruction);
+  std::smatch m;
+  if (TurnShapeOf(first) != TurnShape::Roundabout || !std::regex_search(first, m, exit))
+    return {};
+  std::string word = m[1].matched ? m[1].str() : m[2].str();
+  for (char & c : word)
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return word == "0" ? std::string() : word;
+}
+
+std::string ExitCallFor(Vars const & vars, int tier)
+{
+  auto const it = vars.find("exit");
+  if (it == vars.end() || it->second.empty())
+    return {};
+  std::string const & word = it->second;
+  bool const number = std::isdigit(static_cast<unsigned char>(word[0])) != 0;
+  std::string text = number ? "Exit " + word : word + " exit";
+  if (tier >= 2)
+  {
+    for (char & c : text)
+      c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    return text + "!";
+  }
+  text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
+  return text + ".";
 }
 
 TurnShape TurnShapeOf(std::string const & text)
@@ -795,9 +829,17 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
     TraceThrottled("roast.held", key + "/turn", {{"key", key}, {"why", "turn"}});
     return;
   }
-  Vars const vars{{"dir", DirName(p.dir)}, {"distance", distance}};
-  std::string const text = Fill(Pick(key, Tier()), vars);
-  out.push_back(Make(t, Category::Instruction, Capitalize(text), Priority::Nav));
+  Vars vars{{"dir", DirName(p.dir)}, {"distance", distance}};
+  // A roundabout with a known exit: the joke, then the exit on its own, so it isn't lost (loop B99).
+  // "still" is past the entry; the exit there would read as a new instruction.
+  if (p.shape == TurnShape::Roundabout && std::string_view(stage) != "still")
+    if (std::string const exit = RoundaboutExitOf(p.text); !exit.empty())
+      vars["exit"] = exit;
+  int const tier = Tier();
+  std::string text = Capitalize(Fill(Pick(key, tier), vars));
+  if (std::string const call = ExitCallFor(vars, tier); !call.empty())
+    text += " " + call;
+  out.push_back(Make(t, Category::Instruction, text, Priority::Nav));
   out.back().key = key;
   out.back().vars = vars;
 }

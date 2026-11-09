@@ -3177,6 +3177,9 @@ bool Navigator::PunchNag(Commentary & line, double r)
   std::string text = Fill(m_said.Pick(key + "+", options, m_config.rng ? m_config.rng() : 0), line.vars);
   if (!text.empty())
     text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
+  // The re-pick keeps a roundabout's exit sentence after the joke (loop B99).
+  if (std::string const call = ExitCallFor(line.vars, Tier()); !call.empty())
+    text += " " + call;
   line.key = key;
   line.text = std::move(text);
   // On a long haul the nags are ten minutes apart, too far for "I'm serious." to land as the

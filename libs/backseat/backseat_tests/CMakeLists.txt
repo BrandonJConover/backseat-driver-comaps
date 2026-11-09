@@ -10,6 +10,7 @@ add_executable(${PROJECT_NAME}
   offroute_blip_test.cpp
   then_chaining_test.cpp
   roundabout_exit_test.cpp
+  roundabout_exit_countdown_test.cpp
   delivery_test.cpp
   history_test.cpp
   trip_log_test.cpp

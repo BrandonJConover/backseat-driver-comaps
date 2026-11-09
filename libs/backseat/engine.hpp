@@ -128,6 +128,14 @@ TurnShape TurnShapeOf(std::string const & text);
 /// "Turn left onto Elm Street, then right onto Oak Lane" -> "Turn left onto Elm Street".
 std::string FirstManeuver(std::string const & text);
 
+/// Which roundabout exit an instruction names: "At the roundabout, take the third exit onto Oak
+/// Street" -> "third", "take exit 12" -> "12", anything else -> "" (loop B99).
+std::string RoundaboutExitOf(std::string const & instruction);
+
+/// The roundabout countdown's exit sentence, from the line's "exit" var: "Third exit.", "Exit 12.";
+/// tier 2 shouts it ("THIRD EXIT!"). Empty when the var is missing or empty (loop B99).
+std::string ExitCallFor(Vars const & vars, int tier);
+
 /// The spoken direction: "In 500 feet, turn left onto Elm Street.", "In a quarter mile, at the light,
 /// turn right onto Oak Lane.", "Your destination, Sundance Lane, is 400 feet ahead."
 std::string DirectionText(std::string const & text, double distanceM, Units units, Control control = Control::None);
