@@ -1,8 +1,10 @@
 #include "check.hpp"
+#include "timing.hpp"
 
 #include "backseat/lines.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <random>
 #include <string>
@@ -24,8 +26,13 @@ int main()
     tests.erase(std::remove_if(tests.begin(), tests.end(),
                                [only](auto const & t) { return std::string(t.name).find(only) == std::string::npos; }),
                 tests.end());
+  // Each test is timed; the 5 slowest print before the count line (loop B102), and
+  // BACKSEAT_TEST_TIMES=all also prints every test's time. The count line stays last.
+  std::vector<backseat_tests::Timing> timings;
+  timings.reserve(tests.size());
   for (auto const & test : tests)
   {
+    auto const start = std::chrono::steady_clock::now();
     // Every test starts from the default line filters, and one that leaves them changed fails by
     // name: in a shuffled order a leaked walk/housing/units setting used to fail some later,
     // innocent test instead (loop B83: NoHomeJokesForTheStreets under seed 2).
@@ -49,7 +56,12 @@ int main()
       ++failed;
       std::cout << "FAIL " << test.name << "\n  exception: " << e.what() << "\n";
     }
+    auto const elapsed = std::chrono::steady_clock::now() - start;
+    timings.push_back({test.name, std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count()});
   }
+  if (char const * times = std::getenv("BACKSEAT_TEST_TIMES"); times && std::string(times) == "all")
+    std::cout << backseat_tests::AllTimesReport(timings);
+  std::cout << backseat_tests::SlowestReport(timings, 5);
   std::cout << tests.size() - failed << " passed, " << failed << " failed\n";
   return failed ? 1 : 0;
 }

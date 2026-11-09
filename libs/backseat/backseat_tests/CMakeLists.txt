@@ -4,6 +4,7 @@ project(backseat_tests)
 # standalone build of libs/backseat without the CoMaps testing framework.
 add_executable(${PROJECT_NAME}
   check.hpp
+  timing.hpp
   engine_test.cpp
   countdown_distance_test.cpp
   exit_after_merge_test.cpp
@@ -20,6 +21,7 @@ add_executable(${PROJECT_NAME}
   hostile_text_test.cpp
   indoors_test.cpp
   main.cpp
+  timing_test.cpp
   mileage_test.cpp
   navigator_test.cpp
   onboarding_test.cpp
