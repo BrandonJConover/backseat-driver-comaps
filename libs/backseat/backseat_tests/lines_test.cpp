@@ -447,21 +447,24 @@ TEST(FlatTierKeysOnlyShrink)
   for (auto const & [key, tiers] : LineData())
     if (tiers[0] == tiers[1] && tiers[1] == tiers[2])
       ++flat;
-  if (flat > 66)
-    std::printf("    %d keys have identical tiers (limit 66)\n", flat);
-  CHECK(flat <= 66);
+  if (flat > 61)
+    std::printf("    %d keys have identical tiers (limit 61)\n", flat);
+  CHECK(flat <= 61);
 }
 
 namespace
 {
 // Lines in a higher tier of a key that are word for word in a lower tier of it. Flat keys (all three tiers the
 // same: facts, name lists, scripted beats) are left out; they are counted by FlatTierKeysOnlyShrink.
-int CrossTierRepeats(std::array<std::vector<std::string>, 3> const & tiers)
+// With `exemptAnchor`, tier 0's first line is not counted: CheckEscalated keeps it in every tier on purpose.
+int CrossTierRepeats(std::array<std::vector<std::string>, 3> const & tiers, bool exemptAnchor = false)
 {
   int repeats = 0;
   for (int tier = 1; tier < 3; ++tier)
     for (auto const & line : tiers[tier])
     {
+      if (exemptAnchor && !tiers[0].empty() && line == tiers[0][0])
+        continue;
       bool lower = false;
       for (int below = 0; below < tier && !lower; ++below)
         for (auto const & l : tiers[below])
@@ -494,15 +497,32 @@ TEST(CrossTierRepeatsBatchOneHasOwnWording)
 
 TEST(CrossTierRepeatsOnlyShrink)
 {
-  // Ratchet: 291 repeats before B87, 234 after. Escalated keys keep their first line in every tier on purpose
-  // (CheckEscalated), so this never reaches 0. Lower it as batches land, never raise it.
+  // Ratchet: 291 repeats before B87, 234 after. Since B89 the count leaves out tier 0's first line, which escalated
+  // keys keep in every tier on purpose (CheckEscalated), so a key leaving the flat list no longer raises it:
+  // 118 after B89. Lower it as batches land, never raise it.
   int repeats = 0;
   for (auto const & [key, tiers] : LineData())
     if (!(tiers[0] == tiers[1] && tiers[1] == tiers[2]))
-      repeats += CrossTierRepeats(tiers);
-  if (repeats > 234)
-    std::printf("    %d lines repeat a lower tier of their key (limit 234)\n", repeats);
-  CHECK(repeats <= 234);
+      repeats += CrossTierRepeats(tiers, true);
+  if (repeats > 118)
+    std::printf("    %d lines repeat a lower tier of their key (limit 118)\n", repeats);
+  CHECK(repeats <= 118);
+}
+
+TEST(FlatTierBatchFourEscalates)
+{
+  // Loop B89 (BI-012 batch 3): the last reactive flat keys outside weather.* (B91). Tier 0 keeps every original
+  // line (Brandon's included, B76); tiers 1 and 2 keep only the first one plus their own new wording, so no
+  // other line repeats across tiers.
+  // plateGame.repeatFirst stays flat: it exists so Brandon's line is the first repeat (plate_game_test).
+  for (char const * key :
+       {"traffic.cleared", "nightOut.tube", "outdoors.aside", "outdoors.effort", "rest.surveyAfter"})
+  {
+    CheckEscalated(key);
+    auto const it = LineData().find(key);
+    if (it != LineData().end())
+      CHECK_EQUAL(CrossTierRepeats(it->second, true), 0);
+  }
 }
 
 TEST(PickNeverCrashesOnAnEmptyPoolOrABadRandom)
