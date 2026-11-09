@@ -83,7 +83,8 @@ bool PlatesNameAState(std::string const & country);
 void SetLineDriveSide(bool leftHand);
 /// `text` with its right-hand-traffic assumptions mirrored for left-hand traffic
 /// (DriveSideWording("The left lane is for passing.") is "The right lane is for passing.").
-/// Lines without any come back as they are. Real lane and turn calls are never changed.
+/// Lines without any come back as they are. Real lane and turn calls are never changed. Roundabout
+/// "look left for traffic" advice becomes "look right" (traffic circulates clockwise there).
 std::string DriveSideWording(std::string const & text);
 
 /// The process-wide filters LinesFor() answers for (the four Set* calls above), so a caller can

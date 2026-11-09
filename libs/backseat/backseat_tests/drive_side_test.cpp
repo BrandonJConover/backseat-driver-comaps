@@ -8,6 +8,7 @@
 #include "backseat/navigator.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -143,4 +144,46 @@ TEST(NavigatorSetCountrySetsTheDriveSide)
   CHECK(Contains(LinesFor("wrongTurn.right", 0), "Right is the side with the driver."));
   nav.SetCountry("");
   CHECK(Contains(LinesFor("wrongTurn.right", 0), "Right is the side with the passenger seat."));
+}
+
+// Roundabout safety advice follows the drive side (loop B97, BI-085): where traffic keeps left the
+// roundabout turns clockwise and the traffic already in it comes from the right, so "look left" would
+// point the driver at the wrong side. Every line in the left-hand table is scanned, both unit settings.
+TEST(RoundaboutLookAdviceFollowsTheDriveSide)
+{
+  DriveSideReset reset;
+  CHECK_EQUAL(DriveSideWording("Roundabout in {distance}. Look left for traffic already going around."),
+              std::string("Roundabout in {distance}. Look right for traffic already going around."));
+  for (bool const metric : {false, true})
+  {
+    SetLineMetric(metric);
+    SetLineDriveSide(false);
+    CHECK(Contains(LinesFor("countdown.roundabout.near", 0), "Look left for traffic already going around."));
+    CHECK(!Contains(LinesFor("countdown.roundabout.near", 0), "Look right"));
+    SetLineDriveSide(true);
+    for (int tier = 0; tier < 3; ++tier)
+      CHECK(!Contains(LinesFor("countdown.roundabout.near", tier), "Look left"));
+    CHECK(Contains(LinesFor("countdown.roundabout.near", 0), "Look right for traffic already going around."));
+    int offending = 0;
+    for (auto const & [key, tiers] : LineData())
+      for (int tier = 0; tier < static_cast<int>(tiers.size()); ++tier)
+        for (auto const & line : LinesFor(key, tier))
+        {
+          std::string lower = line;
+          std::transform(lower.begin(), lower.end(), lower.begin(),
+                         [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+          for (char const * bad : {"look left", "from the left", "from your left", "counterclockwise",
+                                   "counter-clockwise", "anticlockwise"})
+            if (lower.find(bad) != std::string::npos)
+            {
+              std::fprintf(stderr, "right-hand safety phrasing in %s: %s\n", key.c_str(), line.c_str());
+              ++offending;
+            }
+        }
+    CHECK_EQUAL(offending, 0);
+  }
+  SetLineDriveSide(false);
+  SetLineMetric(false);
+  // The right-hand table is untouched.
+  CHECK(LinesFor("countdown.roundabout.near", 0) == LineData().at("countdown.roundabout.near")[0]);
 }

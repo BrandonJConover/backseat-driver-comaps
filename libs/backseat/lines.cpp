@@ -275,6 +275,9 @@ std::string DriveSideWording(std::string const & text)
       {"The left lane is for passing.", "The right lane is for passing."},
       {"Like you drive in the left lane.", "Like you drive in the right lane."},
       {"don't drive in the left lane at forty", "don't drive in the right lane at forty"},
+      // Safety advice, not a joke (loop B97): roundabout traffic comes from the right where traffic
+      // keeps left, so "look left" would point the driver at the wrong side.
+      {"Look left for traffic already going around.", "Look right for traffic already going around."},
   };
   for (auto const & [from, to] : kPhrases)
   {
