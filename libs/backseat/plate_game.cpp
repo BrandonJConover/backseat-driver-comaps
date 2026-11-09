@@ -1,6 +1,7 @@
 #include "backseat/plate_game.hpp"
 
 #include "backseat/lines.hpp"
+#include "backseat/voice_command.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -274,6 +275,8 @@ bool RarePlate(std::string const & code)
 
 YesNo ParseYesNo(std::string const & spoken)
 {
+  if (auto const phrase = AnswerPhrase(spoken))
+    return *phrase ? YesNo::Yes : YesNo::No;
   std::string const w = Words(spoken);
   for (auto const * unsure : {"don't know", "dont know", "not sure", "no idea"})
     if (HasWord(w, unsure))
@@ -285,7 +288,8 @@ YesNo ParseYesNo(std::string const & spoken)
   for (auto const * yes : {"yes", "yeah", "yea", "yep", "yup", "yah", "uh huh", "mm hmm", "mhm", "sure", "ok", "okay",
                            "fine", "alright", "all right", "why not", "let's", "lets", "sounds good", "absolutely",
                            "definitely", "of course", "certainly", "maybe", "perhaps", "i guess", "might as well",
-                           "deal", "i'm in", "im in", "go"})
+                           "deal", "i'm in", "im in", "go", "that's right", "thats right", "you got it", "correct",
+                           "exactly", "affirmative"})
     if (HasWord(w, yes))
       return YesNo::Yes;
   return YesNo::Unclear;

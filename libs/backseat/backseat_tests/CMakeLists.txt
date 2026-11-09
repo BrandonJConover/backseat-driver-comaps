@@ -31,6 +31,7 @@ add_executable(${PROJECT_NAME}
   rundown_test.cpp
   road_bits_test.cpp
   voice_command_test.cpp
+  yes_no_test.cpp
   warm_test.cpp
   phone_handling_test.cpp
   eyes_on_road_test.cpp
@@ -80,5 +81,6 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
   BACKSEAT_SPOKEN_NUMBERS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_numbers.json"
   BACKSEAT_SPOKEN_DATES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_dates.json"
   BACKSEAT_SPOKEN_DISTANCES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_distances.json"
+  BACKSEAT_YES_NO_PATH="${CMAKE_CURRENT_SOURCE_DIR}/yes_no.json"
   BACKSEAT_CLIP_PACING_PATH="${CMAKE_CURRENT_SOURCE_DIR}/clip_pacing_boundaries.json")
 add_test(NAME ${PROJECT_NAME} COMMAND ${PROJECT_NAME})

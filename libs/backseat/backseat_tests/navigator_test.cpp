@@ -2296,6 +2296,38 @@ TEST(NoWhileAlreadyDrivingWaitsForAStopToTapDriving)
   SetLineTravelMode(TravelMode::Drive);
 }
 
+TEST(TheWalkAskIsAnsweredOutLoud)
+{
+  auto const asked = []
+  {
+    auto nav = std::make_unique<Navigator>(Config());
+    nav->SetCanAskTravelMode(true);
+    nav->SetTravelMode(TravelMode::Walk);
+    nav->OnFix(Heading(0, 0, 90), LongWalk());
+    nav->TakeLines();
+    CHECK(nav->ModeAskOpen());
+    return nav;
+  };
+  // A direction question isn't an answer: the ask stays open.
+  auto nav = asked();
+  nav->OnDriverSaid(1000, "turn right");
+  nav->OnDriverSaid(1500, "what's my next right");
+  CHECK(nav->ModeAskOpen());
+  CHECK(!nav->TakeModeSwitch());
+  // "Sure, why not" is walking (the " not " used to make it a no).
+  nav->OnDriverSaid(2000, "sure, why not");
+  CHECK(!nav->ModeAskOpen());
+  CHECK_EQUAL(CountKey(nav->TakeLines(), "mode.ask.walk.yes"), 1);
+  CHECK(!nav->TakeModeSwitch());
+  // "I'm driving" answers it too: the driving reply and the switch.
+  nav = asked();
+  nav->OnDriverSaid(2000, "I'm driving");
+  CHECK(!nav->ModeAskOpen());
+  CHECK_EQUAL(CountKey(nav->TakeLines(), "mode.ask.walk.no"), 1);
+  CHECK(nav->TakeModeSwitch() == TravelMode::Drive);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
 TEST(EveryLongWalkAsksAndShortOnesDont)
 {
   Navigator nav(Config());

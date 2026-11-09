@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <initializer_list>
 #include <iterator>
 #include <map>
 #include <sstream>
@@ -893,13 +894,76 @@ bool CommandRepeats::IsRepeat(AppCommand const & command, double tMs)
   return false;
 }
 
+namespace
+{
+/// CommandWords without apostrophes: "don't" and "dont" are the same answer.
+std::string AnswerWords(std::string const & spoken)
+{
+  std::string words = CommandWords(spoken);
+  words.erase(std::remove(words.begin(), words.end(), '\''), words.end());
+  return words;
+}
+
+bool HasPhrase(std::string const & words, std::initializer_list<char const *> phrases)
+{
+  for (char const * p : phrases)
+    if (words.find(std::string(" ") + p + " ") != std::string::npos)
+      return true;
+  return false;
+}
+
+/// " right " is a yes only on its own or after "that's", "yes", "all"...: "turn right", "my next
+/// right" and "on the right" are directions, not answers.
+bool RightMeansYes(std::string const & words)
+{
+  for (size_t at = words.find(" right "); at != std::string::npos; at = words.find(" right ", at + 1))
+  {
+    size_t const prevStart = at == 0 ? 0 : words.rfind(' ', at - 1);
+    std::string const prev = at == 0 || prevStart == std::string::npos ? "" : words.substr(prevStart + 1, at - prevStart - 1);
+    size_t const nextEnd = words.find(' ', at + 7);
+    std::string const next = nextEnd == std::string::npos ? "" : words.substr(at + 7, nextEnd - at - 7);
+    if (prev.empty())
+    {
+      for (char const * dir : {"turn", "lane", "side", "exit", "hand", "onto", "at", "on", "here", "there"})
+        if (next == dir)
+          return false;
+      return true;
+    }
+    for (char const * agree : {"thats", "yes", "yeah", "yep", "all", "exactly", "quite", "youre", "right"})
+      if (prev == agree)
+        return true;
+  }
+  return false;
+}
+}  // namespace
+
+std::optional<bool> AnswerPhrase(std::string const & spoken)
+{
+  std::string const words = AnswerWords(spoken);
+  // Put off or sent away: a no, even with "maybe", "go" or "sure" in it.
+  if (HasPhrase(words, {"maybe later", "perhaps later", "later", "another time", "some other time", "not right now",
+                        "not now", "not today", "go away", "leave me alone", "not interested", "not a chance",
+                        "no chance", "no way", "not in a million years"}))
+    return false;
+  // A yes with a "not" or a "don't" in it.
+  if (HasPhrase(words, {"i dont mind", "dont mind", "dont see why not", "why not", "go for it", "go ahead",
+                        "cant hurt", "wouldnt hurt", "might as well"}))
+    return true;
+  // "Right" / "that's right", but not "turn right" or "no, not right".
+  if (RightMeansYes(words) && !HasPhrase(words, {"no", "not", "nope", "nah", "dont", "wrong"}))
+    return true;
+  return {};
+}
+
 bool SaidYes(std::string const & spoken)
 {
-  std::string const words = CommandWords(spoken);
+  if (auto const phrase = AnswerPhrase(spoken))
+    return *phrase;
+  std::string const words = AnswerWords(spoken);
   for (char const * no : {" no ", " nope ", " not ", " nah "})
     if (words.find(no) != std::string::npos)
       return false;
-  for (char const * yes : {" yes ", " yeah ", " yep ", " yup ", " sure ", " correct ", " right ", " you got it ",
+  for (char const * yes : {" yes ", " yeah ", " yep ", " yup ", " sure ", " correct ", " you got it ",
                            " uh huh ", " ok ", " okay ", " affirmative ", " exactly ", " you know it ", " of course "})
     if (words.find(yes) != std::string::npos)
       return true;
@@ -908,11 +972,32 @@ bool SaidYes(std::string const & spoken)
 
 bool SaidNo(std::string const & spoken)
 {
-  std::string const words = CommandWords(spoken);
+  if (auto const phrase = AnswerPhrase(spoken))
+    return !*phrase;
+  std::string const words = AnswerWords(spoken);
   for (char const * no : {" no ", " nope ", " nah ", " not ", " negative ", " nuh uh ", " no way "})
     if (words.find(no) != std::string::npos)
       return true;
   return false;
+}
+
+std::optional<bool> WalkAskAnswer(std::string const & spoken)
+{
+  std::string const words = AnswerWords(spoken);
+  // How they're going wins over a yes or no: "no, I'm walking" is walking.
+  if (HasPhrase(words, {"not walking", "not on foot", "not hiking", "dont walk", "wont walk", "not walk"}))
+    return false;
+  if (HasPhrase(words, {"not driving", "not in the car", "not in a car"}))
+    return true;
+  if (HasPhrase(words, {"driving", "in the car", "in my car", "in a car", "by car", "in the truck", "in my truck"}))
+    return false;
+  if (HasPhrase(words, {"walking", "on foot", "hiking", "im walking", "walk"}))
+    return true;
+  if (SaidYes(spoken))
+    return true;
+  if (SaidNo(spoken))
+    return false;
+  return {};
 }
 
 namespace

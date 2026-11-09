@@ -1,0 +1,269 @@
+{
+ "about": "Yes/no answers read the same by Backseat's readers (libs/backseat: ParseYesNo for game offers, SaidYes/SaidNo for confirmations, WalkAskAnswer for 'Are you actually intending to walk there?'). plate = ParseYesNo, said = SaidYes/SaidNo (none = neither), walk = WalkAskAnswer (none = not an answer, the ask stays open). Loop B94 / BI-081.",
+ "cases": [
+  {
+   "input": "Yeah sure",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "okay let's do it",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "no thanks",
+   "plate": "no",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "I don't want to",
+   "plate": "no",
+   "said": "none",
+   "walk": "none"
+  },
+  {
+   "input": "what was that",
+   "plate": "unclear",
+   "said": "none",
+   "walk": "none"
+  },
+  {
+   "input": "yeah",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "uh huh",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "maybe",
+   "plate": "yes",
+   "said": "none",
+   "walk": "none"
+  },
+  {
+   "input": "nope",
+   "plate": "no",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "I don't know",
+   "plate": "unclear",
+   "said": "none",
+   "walk": "none"
+  },
+  {
+   "input": "I'm in",
+   "plate": "yes",
+   "said": "none",
+   "walk": "none"
+  },
+  {
+   "input": "maybe later",
+   "plate": "no",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "perhaps another time",
+   "plate": "no",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "later",
+   "plate": "no",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "not right now",
+   "plate": "no",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "go away",
+   "plate": "no",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "leave me alone",
+   "plate": "no",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "not interested",
+   "plate": "no",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "not a chance",
+   "plate": "no",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "I don't mind",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "I don't see why not",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "sure, why not",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "go for it",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "go ahead",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "that's right",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "right",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "yes, right",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "turn right",
+   "plate": "unclear",
+   "said": "none",
+   "walk": "none"
+  },
+  {
+   "input": "what's my next right",
+   "plate": "unclear",
+   "said": "none",
+   "walk": "none"
+  },
+  {
+   "input": "is it a right turn",
+   "plate": "unclear",
+   "said": "none",
+   "walk": "none"
+  },
+  {
+   "input": "it's on the right",
+   "plate": "unclear",
+   "said": "none",
+   "walk": "none"
+  },
+  {
+   "input": "right turn ahead",
+   "plate": "unclear",
+   "said": "none",
+   "walk": "none"
+  },
+  {
+   "input": "I'm driving",
+   "plate": "unclear",
+   "said": "none",
+   "walk": "drive"
+  },
+  {
+   "input": "we're in the car",
+   "plate": "unclear",
+   "said": "none",
+   "walk": "drive"
+  },
+  {
+   "input": "no, I'm walking",
+   "plate": "no",
+   "said": "no",
+   "walk": "walk"
+  },
+  {
+   "input": "yes, on foot",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "I'm not walking that",
+   "plate": "unclear",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "I'm not driving",
+   "plate": "unclear",
+   "said": "no",
+   "walk": "walk"
+  },
+  {
+   "input": "No, that's not my house",
+   "plate": "no",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "yeah that's home",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "the gym",
+   "plate": "unclear",
+   "said": "none",
+   "walk": "none"
+  },
+  {
+   "input": "yes please",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  },
+  {
+   "input": "no way",
+   "plate": "no",
+   "said": "no",
+   "walk": "drive"
+  },
+  {
+   "input": "I don’t mind",
+   "plate": "yes",
+   "said": "yes",
+   "walk": "walk"
+  }
+ ]
+}

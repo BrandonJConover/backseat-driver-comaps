@@ -188,6 +188,14 @@ private:
 bool SaidYes(std::string const & spoken);
 /// "No", "nope", "nah", "not really"...
 bool SaidNo(std::string const & spoken);
+/// The answers both yes/no readers (SaidYes/SaidNo and ParseYesNo) read the same way, before their own
+/// word lists: "maybe later", "go away", "not interested" -> false; "I don't mind", "sure, why not",
+/// "go ahead" -> true; anything else -> empty.
+std::optional<bool> AnswerPhrase(std::string const & spoken);
+/// "Are you actually intending to walk there?" said out loud: true = walking ("yes", "I'm walking",
+/// "on foot"), false = driving ("no", "I'm driving", "in the car"), empty = not an answer ("turn
+/// right", "what's my next right").
+std::optional<bool> WalkAskAnswer(std::string const & spoken);
 
 /// Whose business the mileage log tracks, said out loud. "Me", "mine", "I do" -> "" (the driver's
 /// own). "My wife", "my wife's" -> "wife" (likewise husband, partner, girlfriend, boyfriend). "Sarah",

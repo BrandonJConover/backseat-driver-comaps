@@ -2570,11 +2570,12 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
       return;
     }
   // "Are you actually intending to walk there?" can be answered out loud too.
-  if (m_modeAskOpen && (SaidYes(text) || SaidNo(text)))
-  {
-    AnswerModeAsk(SaidYes(text));
-    return;
-  }
+  if (m_modeAskOpen)
+    if (auto const walking = WalkAskAnswer(text))
+    {
+      AnswerModeAsk(*walking);
+      return;
+    }
   // "We're getting pulled over": the GPS knows exactly whose fault that is.
   std::string words = " ";
   for (unsigned char const ch : text)
