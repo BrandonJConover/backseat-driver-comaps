@@ -180,6 +180,48 @@ std::string Titles(std::string s)
   return s;
 }
 
+/// A street type spelled out ("Street", "Boulevard", "Loop", "Heights"), as the street pass leaves it.
+bool FullStreetTypeWord(std::string const & w)
+{
+  if (w.size() < 3)
+    return false;
+  for (auto const & sw : kStreetWords)
+    if (w == sw[1])
+      return true;
+  return StreetTypeWord(w) && w != "Pass";
+}
+
+/// " / ", "/" or " - " between two road names is a pause: "Main Street / Elm Street" is "Main Street, Elm
+/// Street", "Grand Avenue / CA-1" "Grand Avenue, CA-1", "US-290 / Ben White Boulevard" too. A road name is a
+/// spelled-out street type on the left, or 1-3 capitalised words and a street type on the right. "24/7",
+/// "and/or", "Dr / Smith" and "1/2 mi" are left. Runs after the street pass.
+std::string RoadSeparators(std::string const & s)
+{
+  if (s.find('/') == std::string::npos && s.find(" - ") == std::string::npos)
+    return s;
+  static std::regex const separator("( ?/ ?| - )(?=[A-Z0-9])");
+  return Replace(s, separator, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    size_t start = pos;
+    while (start > 0 && IsAsciiLetter(s[start - 1]))
+      --start;
+    // "Elm Street / ...": a name, then a spelled-out type, right before the separator.
+    bool const left = start < pos && start > 1 && Space(s[start - 1]) &&
+                      std::isalnum(static_cast<unsigned char>(s[start - 2])) &&
+                      FullStreetTypeWord(s.substr(start, pos - start));
+    // "... / Elm Street": a capitalised word or a route or exit number before it ("US-290", "Exit 12B"),
+    // so "w/ Main St views" is left.
+    size_t token = pos;
+    while (token > 0 && (std::isalnum(static_cast<unsigned char>(s[token - 1])) || s[token - 1] == '-'))
+      --token;
+    bool const right = token < pos && (std::isupper(static_cast<unsigned char>(s[token])) ||
+                                       std::isdigit(static_cast<unsigned char>(s[token]))) &&
+                       SaintStreetAfter(s, pos + static_cast<size_t>(m.length(0)));
+    if (!left && !right)
+      return std::nullopt;
+    return std::string(", ");
+  });
+}
+
 // MARK: - Address tails
 
 /// The word that ends right before `end` (spaces, one comma and a period skipped: "Oak St, Ste 4",

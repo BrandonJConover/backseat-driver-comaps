@@ -820,3 +820,15 @@ TEST(StreetPeriodMidSentenceIsNotAFullStop)
   CHECK_EQUAL(ForSpeech("Call Dr. Smith"), std::string("Call Doctor Smith"));
   CHECK_EQUAL(ForSpeech("Mt. Bonnell Rd., then left"), std::string("Mount Bonnell Road, then left"));
 }
+
+TEST(StreetTypesBeforeASeparatorAreSaid)
+{
+  // Loop B105 (BI-091): "Main St / Elm St" is "Main Street, Elm Street"; "24/7" and "and/or" are left.
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_STREET_SEPARATORS_PATH);
+  CHECK(cases.size() >= 20);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+}

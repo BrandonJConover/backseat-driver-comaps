@@ -2273,13 +2273,20 @@ std::string ForSpeech(std::string const & text)
   // which start sentences).
   // A suite, apartment, floor or "#200" after the type: "Lamar Blvd Suite 200", "Main St #200" (Symbols
   // has made the hash "number ").
+  // A separator or another street type after it: "Main St / Elm St", "Main St - Elm St", "Main St (FM
+  // 1960)", "Pkwy Dr" (loop B105).
+#define BACKSEAT_TYPE_AHEAD \
+  "(?:St|Ave|Blvd|Rd|Dr|Ln|Ct|Pkwy|Pl|Cir|Ter|Trl|Sq|Cv|Street|Avenue|Boulevard|Road|Drive|Lane|Court|" \
+  "Parkway|Place|Circle|Terrace|Trail|Square|Cove)(?=$|[\\s,;:!?.)/])"
 #define BACKSEAT_TAIL_AHEAD \
   "(?:Suite|Apartment|Building|Floor|Room|Space|Department|Office|Trailer|Hangar|Unit) [0-9A-Z]|number \\d"
   static std::regex const street(
       "(St|Ave|Blvd|Rd|Dr|Ln|Ct|Pkwy|Hwy|Pl|Cir|Ter|Trl|Expy|Fwy|Sq|Cv|Xing|Ext)"
       "(?:\\.(?=[,;:]|\\s+(?:[a-z]|(?:NE|NW|SE|SW|N|S|E|W)\\b|(?:[B-HJ-Z]|\\d+)(?=$|[\\s,;:!?.)])|" BACKSEAT_TAIL_AHEAD "))"
-      "|(?=$|[,;:!?.)]|\\s+(?:[a-z]|Ext\\b|(?:NE|NW|SE|SW|N|S|E|W)\\b|" BACKSEAT_TAIL_AHEAD ")))");
+      "|(?=$|[,;:!?.)]|\\s*/|\\s+-\\s|\\s+\\(|\\s+(?:[a-z]|Ext\\b|(?:NE|NW|SE|SW|N|S|E|W)\\b|" BACKSEAT_TAIL_AHEAD "|"
+      BACKSEAT_TYPE_AHEAD ")))");
 #undef BACKSEAT_TAIL_AHEAD
+#undef BACKSEAT_TYPE_AHEAD
   s = Replace(s, street, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (pos < 2 || s[pos - 1] != ' ' || !IsAsciiLetter(s[pos - 2]))
       return std::nullopt;
@@ -2294,6 +2301,9 @@ std::string ForSpeech(std::string const & text)
   s = Replace(s, typeFirst, [](std::smatch const & m, size_t) -> std::optional<std::string> {
     return m.str(1) + Street(m.str(2)) + " ";
   });
+  // "Main Street / Elm Street", "Grand Avenue / CA-1", "Main Street - Elm Street": two road names, so the
+  // slash or dash is a pause (loop B105). "24/7", "and/or" and "1/2 mi" have no road name beside them.
+  s = RoadSeparators(s);
   static std::regex const mount("\\bMt\\.? (?=[A-Z])");
   s = std::regex_replace(s, mount, "Mount ");
   // "Pt Reyes", "Pt. Loma Blvd": Point before a capitalised name.
