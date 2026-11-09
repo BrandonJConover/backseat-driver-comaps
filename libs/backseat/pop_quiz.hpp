@@ -15,6 +15,21 @@
 
 namespace backseat
 {
+/// Where a question is true. Road rules differ: a UK driver passes on the right, has no right on
+/// red and no yellow center lines, and a metric driver signals in metres, not feet.
+enum class QuizPlace
+{
+  Anywhere,
+  /// US and Canada road rules and signs (four way stops, right on red, yellow center lines).
+  NorthAmerica,
+  /// Right-hand traffic ("pull to the right", "the left lane is for passing").
+  RightHandTraffic,
+  /// Read in feet and miles.
+  Imperial,
+  /// Read in metres.
+  Metric
+};
+
 struct QuizQuestion
 {
   /// Stable id, for "not again so soon" across trips.
@@ -27,7 +42,12 @@ struct QuizQuestion
   std::array<char const *, 3> choices;
   /// Index of the right choice.
   int answer;
+  QuizPlace place = QuizPlace::Anywhere;
 };
+
+/// True when the question is right for a drive in `country` (a map name like "UK_England", "US"
+/// or "Canada"; empty means the US) with the GPS in metric units or not.
+bool QuizFits(QuizQuestion const & q, std::string const & country, bool metric);
 
 /// Every question. The first is the first one ever asked.
 std::vector<QuizQuestion> const & QuizQuestions();

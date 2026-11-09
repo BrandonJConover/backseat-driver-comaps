@@ -1,5 +1,6 @@
 #include "backseat/pop_quiz.hpp"
 
+#include "backseat/lines.hpp"
 #include "backseat/types.hpp"
 
 #include <algorithm>
@@ -25,21 +26,21 @@ std::vector<QuizQuestion> const & QuizQuestions()
       {"flashingRed", true, "A flashing red light means what?",
        {"Treat it like a stop sign|stop sign|stop", "Go faster|faster", "The light is broken, ignore it|broken|ignore"}, 0},
       {"fourWay", true, "Two cars reach a four way stop at the same time. Who goes first?",
-       {"The car on the right|right", "The car on the left|left", "The bigger car|bigger"}, 0},
+       {"The car on the right|right", "The car on the left|left", "The bigger car|bigger"}, 0, QuizPlace::NorthAmerica},
       {"followDistance", true, "How many seconds behind the car ahead should you stay, at least?",
        {"1|one", "3|three", "10|ten"}, 1},
       {"schoolBus", true, "A school bus stops with its red lights flashing. What do you do?",
-       {"Stop|stop", "Pass it quickly|pass|quickly", "Honk|honk"}, 0},
+       {"Stop|stop", "Pass it quickly|pass|quickly", "Honk|honk"}, 0, QuizPlace::NorthAmerica},
       {"siren", true, "An ambulance comes up behind you with its siren on. What do you do?",
-       {"Speed up to stay ahead|speed up|ahead", "Pull to the right and stop|pull over|pull|right", "Brake right where you are|brake"}, 1},
+       {"Speed up to stay ahead|speed up|ahead", "Pull to the right and stop|pull over|pull|right", "Brake right where you are|brake"}, 1, QuizPlace::RightHandTraffic},
       {"handsOnWheel", true, "Where do driving instructors now say to put your hands on the wheel?",
        {"10 and 2|ten and two|10|ten", "9 and 3|nine and three|9|nine", "12 and 6|twelve and six|12|twelve"}, 1},
       {"orangeSign", true, "What does an orange diamond sign usually mean?",
-       {"A work zone ahead|work zone|construction|work", "A school ahead|school", "Free parking|free|parking"}, 0},
+       {"A work zone ahead|work zone|construction|work", "A school ahead|school", "Free parking|free|parking"}, 0, QuizPlace::NorthAmerica},
       {"brownSign", true, "What do brown road signs point you to?",
-       {"Parks and attractions|parks|park|attractions|recreation", "Hospitals|hospital", "Speed traps|speed trap|traps"}, 0},
+       {"Parks and attractions|parks|park|attractions|recreation", "Hospitals|hospital", "Speed traps|speed trap|traps"}, 0, QuizPlace::NorthAmerica},
       {"blueSign", true, "What do blue road signs tell you about?",
-       {"Gas, food and lodging|gas|food|lodging|services", "Road work|road work|work", "School zones|school"}, 0},
+       {"Gas, food and lodging|gas|food|lodging|services", "Road work|road work|work", "School zones|school"}, 0, QuizPlace::NorthAmerica},
       {"hydroplane", true, "Your car starts hydroplaning. What should you do?",
        {"Slam the brakes|slam|brakes", "Ease off the gas and steer straight|ease|steer straight|ease off", "Turn hard|turn hard|hard"}, 1},
       {"fog", true, "In thick fog, which headlights should you use?",
@@ -47,11 +48,11 @@ std::vector<QuizQuestion> const & QuizQuestions()
       {"merge", true, "When you merge onto a highway, what speed should you aim for?",
        {"Way under the speed of traffic|under|slow", "The speed of traffic|same|match", "Double the speed limit|double"}, 1},
       {"leftLane", true, "On the highway, what is the left lane for?",
-       {"Passing|passing|pass", "Cruising forever|cruising|forever", "Texting|texting|text"}, 0},
+       {"Passing|passing|pass", "Cruising forever|cruising|forever", "Texting|texting|text"}, 0, QuizPlace::RightHandTraffic},
       {"brokenWhite", true, "What does a broken white line between lanes mean?",
        {"You may change lanes|change lanes|change|may", "Never cross it|never", "The road is under construction|construction"}, 0},
       {"solidYellow", true, "A solid yellow line on your side of the center means what?",
-       {"Pass whenever you want|whenever", "No passing|no passing|no", "Bike lane|bike"}, 1},
+       {"Pass whenever you want|whenever", "No passing|no passing|no", "Bike lane|bike"}, 1, QuizPlace::NorthAmerica},
       {"crosswalk", true, "Someone is walking in the crosswalk. Who has the right of way?",
        {"The walker|walker|person walking|walking|them", "You, you're in a car|car|me|you", "Whoever is louder|louder"}, 0},
       {"blindSpot", true, "Before changing lanes, what checks your blind spot?",
@@ -59,11 +60,14 @@ std::vector<QuizQuestion> const & QuizQuestions()
       {"uphillCurb", true, "Parking uphill next to a curb, which way do you turn the front wheels?",
        {"Away from the curb|away", "Toward the curb|toward|towards", "Straight ahead|straight"}, 0},
       {"bac", true, "In most of the US, what blood alcohol level makes it illegal to drive at 21 and over?",
-       {"0.02|point oh two|point zero two|02", "0.08|point oh eight|point zero eight|08", "0.20|point two|point two zero|20"}, 1},
+       {"0.02|point oh two|point zero two|02", "0.08|point oh eight|point zero eight|08", "0.20|point two|point two zero|20"}, 1, QuizPlace::NorthAmerica},
       {"turnSignal", true, "How far before a turn should you signal, in town?",
-       {"About 100 feet|100|hundred|feet", "Halfway through the turn|halfway", "Signals are optional|optional"}, 0},
+       {"About 100 feet|100|hundred|feet", "Halfway through the turn|halfway", "Signals are optional|optional"}, 0, QuizPlace::Imperial},
+      {"turnSignalMetric", true, "How far before a turn should you signal, in town?",
+       {"About 30 metres|30|thirty|metres|meters", "Halfway through the turn|halfway", "Signals are optional|optional"}, 0,
+       QuizPlace::Metric},
       {"rightOnRed", true, "Where it's allowed, what do you have to do before turning right on red?",
-       {"Come to a full stop|full stop|stop", "Honk twice|honk|twice", "Nothing, just go|nothing|go"}, 0},
+       {"Come to a full stop|full stop|stop", "Honk twice|honk|twice", "Nothing, just go|nothing|go"}, 0, QuizPlace::NorthAmerica},
       {"skid", true, "When the back of the car skids, where do you steer?",
        {"Where you want to go|want|want to go", "The opposite way|opposite", "Let go of the wheel|let go"}, 0},
       {"headlightsDusk", true, "When should your headlights be on?",
@@ -137,6 +141,19 @@ QuizQuestion const * FindQuizQuestion(std::string const & id)
     if (id == q.id)
       return &q;
   return nullptr;
+}
+
+bool QuizFits(QuizQuestion const & q, std::string const & country, bool metric)
+{
+  switch (q.place)
+  {
+  case QuizPlace::Anywhere: return true;
+  case QuizPlace::NorthAmerica: return InNorthAmerica(country);
+  case QuizPlace::RightHandTraffic: return !DrivesOnLeft(country);
+  case QuizPlace::Imperial: return !metric;
+  case QuizPlace::Metric: return metric;
+  }
+  return true;
 }
 
 std::string QuizChoiceText(char const * choice)

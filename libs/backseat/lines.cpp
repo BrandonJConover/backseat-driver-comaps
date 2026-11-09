@@ -10,6 +10,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <initializer_list>
 #include <string>
 #include <utility>
 #include <map>
@@ -174,6 +175,40 @@ std::string MetricWording(std::string const & text)
   return out;
 }
 
+namespace
+{
+/// "UK_England" -> "uk", "New Zealand_North " -> "new zealand north": the country part, lower case.
+std::string CountryKey(std::string const & country)
+{
+  std::string name;
+  for (unsigned char const ch : country)
+  {
+    if (ch == '_' || ch == ',')  // "UK_England", "New Zealand_North"
+      break;
+    name += static_cast<char>(std::tolower(ch));
+  }
+  while (!name.empty() && name.back() == ' ')
+    name.pop_back();
+  return name;
+}
+
+bool CountryIsOneOf(std::string const & country, std::initializer_list<char const *> names)
+{
+  std::string const key = CountryKey(country);
+  return std::any_of(names.begin(), names.end(), [&](char const * n) { return key == n; });
+}
+}  // namespace
+
+bool InNorthAmerica(std::string const & country)
+{
+  return CountryIsOneOf(country, {"", "us", "usa", "united states", "united states of america", "ca", "canada"});
+}
+
+bool PlatesNameAState(std::string const & country)
+{
+  return InNorthAmerica(country) || CountryIsOneOf(country, {"mx", "mexico"});
+}
+
 bool DrivesOnLeft(std::string const & country)
 {
   // The map files' top-level names, their usual spellings, and ISO codes.
@@ -187,15 +222,7 @@ bool DrivesOnLeft(std::string const & country)
       "mauritius", "cyprus", "cy", "malta", "mt", "jamaica", "jm", "bahamas", "barbados", "trinidad and tobago",
       "guyana", "suriname", "fiji", "papua new guinea", "brunei", "east timor", "timor-leste", "maldives",
       "seychelles", "falkland islands", "bermuda", "cayman islands"};
-  std::string name;
-  for (unsigned char const ch : country)
-  {
-    if (ch == '_' || ch == ',')  // "UK_England", "New Zealand_North"
-      break;
-    name += static_cast<char>(std::tolower(ch));
-  }
-  while (!name.empty() && name.back() == ' ')
-    name.pop_back();
+  std::string const name = CountryKey(country);
   if (name.empty())
     return false;
   // A map region of the country ("New Zealand North") counts; two-letter codes only match whole.

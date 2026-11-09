@@ -23,6 +23,7 @@ add_executable(${PROJECT_NAME}
   parity_test.cpp
   plate_game_test.cpp
   pop_quiz_test.cpp
+  quiz_country_test.cpp
   pronunciation_backup_test.cpp
   pronunciation_test.cpp
   quiet_bits_test.cpp

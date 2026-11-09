@@ -2502,6 +2502,9 @@ void Navigator::TrackPlateGame(double tMs, LatLon const & here, double speedMps,
   // Offer once a trip, after the opening rundown has had its minute, on a long quiet stretch.
   if (route.state != RouteState::OnRoute || m_plates.OfferedThisTrip() || tMs - m_tripStartT < 60000 || !route.turnId)
     return;
+  // US and Mexican plates name a state; a UK or German plate says nothing about where the car is from.
+  if (!PlatesNameAState(m_country))
+    return;
   if (PlateGame::ShouldOffer(m_tripsOnRoute, route.distToTurnM, m_engine->Frustration()))
     SayPlate(tMs, m_plates.Offer(Tier()));
 }
@@ -3783,8 +3786,10 @@ bool Navigator::StartPopQuiz(double t, bool asked)
   // Road rules on car trips only; trivia anywhere.
   bool const car = InCar(m_travelMode);
   std::vector<std::string> ids;
+  // Road rules from the country being driven: no right on red in the UK, no feet where it's metres.
+  bool const metric = m_config.units == Units::Kmh;
   for (auto const & q : QuizQuestions())
-    if (car || !q.road)
+    if ((car || !q.road) && QuizFits(q, m_country, metric))
       ids.push_back(q.id);
   if (ids.empty())
     return false;

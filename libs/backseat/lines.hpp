@@ -72,6 +72,11 @@ std::string MetricWording(std::string const & text);
 /// Whether traffic keeps left in `country`, as the map files name it ("UK", "Australia", "Japan";
 /// "UK_England" and ISO codes like "GB" work too). Unknown or empty is right-hand traffic.
 bool DrivesOnLeft(std::string const & country);
+/// The US, Canada, or no country yet (empty): where four way stops, right on red, yellow center
+/// lines and the US sign colours are the rules. Same names as DrivesOnLeft.
+bool InNorthAmerica(std::string const & country);
+/// Where license plates name a state or province, so the plate game makes sense: North America and Mexico.
+bool PlatesNameAState(std::string const & country);
 /// Whether LinesFor() answers for a country that drives on the left: the few lines that assume the
 /// driver sits on the left and passes on the left ("The left lane is for passing") come back
 /// mirrored. Off (right-hand traffic) until told.
