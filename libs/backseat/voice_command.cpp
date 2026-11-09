@@ -567,6 +567,23 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   { return std::any_of(found.begin(), found.end(), [action](auto const & f) { return f.second.action == action; }); };
   if (heardAction(AppAction::NextStop))
     drop(AppAction::TimeLeft);
+  // "How far is my next turn?", "how long until I turn?": the turn, not the trip.
+  if (heardAction(AppAction::TimeLeft))
+  {
+    size_t ask = std::string::npos;
+    for (char const * how : {" how far ", " how long ", " how much longer ", " how much further ", " how much farther "})
+      ask = std::min(ask, words.find(how));
+    if (ask != std::string::npos)
+      for (char const * turn : {" next turn ", " my turn ", " the turn ", " i turn ", " we turn ", " my exit ",
+                                " the exit ", " our exit ", " next exit "})
+        if (words.find(turn, ask) != std::string::npos)
+        {
+          drop(AppAction::TimeLeft);
+          if (!heardAction(AppAction::NextTurn))
+            found.push_back({ask, AppCommand{AppAction::NextTurn, {}}});
+          break;
+        }
+  }
   if (words.find(" back to ") != std::string::npos && words.find(" back to where ") == std::string::npos &&
       words.find(" back to the start ") == std::string::npos)
     drop(AppAction::TakeMeBack);

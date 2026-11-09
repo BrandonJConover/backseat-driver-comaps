@@ -502,6 +502,30 @@ bool Heard(std::string const & spoken, AppAction action)
 }
 }  // namespace
 
+TEST(HowFarIsTheTurnIsNextTurn)
+{
+  auto const onlyTurn = [](std::string const & spoken)
+  {
+    auto const commands = ParseAppCommands(spoken);
+    return commands.size() == 1 && commands[0].action == AppAction::NextTurn;
+  };
+  CHECK(onlyTurn("how far is the next turn"));
+  CHECK(onlyTurn("how far to my exit"));
+  CHECK(onlyTurn("how long until I turn"));
+  CHECK(onlyTurn("how long till my next turn"));
+  CHECK(onlyTurn("how much further to the exit"));
+  // The trip and the stop questions are unchanged.
+  CHECK(Heard("how far", AppAction::TimeLeft));
+  CHECK(!Heard("how far", AppAction::NextTurn));
+  CHECK(Heard("how long until we get there", AppAction::TimeLeft));
+  CHECK(!Heard("how long until we get there", AppAction::NextTurn));
+  CHECK(Heard("how far is the next stop", AppAction::NextStop));
+  CHECK(!Heard("how far is the next stop", AppAction::NextTurn));
+  CHECK(Heard("what's the next turn", AppAction::NextTurn));
+  // Not asked for.
+  CHECK(ParseAppCommands("don't tell me how far the turn is").empty());
+}
+
 TEST(DrivingCommandsAreHeard)
 {
   auto const gas = ParseAppCommands("find gas");
