@@ -5,6 +5,7 @@
 #include "backseat/pronunciation.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
@@ -449,6 +450,59 @@ TEST(FlatTierKeysOnlyShrink)
   if (flat > 66)
     std::printf("    %d keys have identical tiers (limit 66)\n", flat);
   CHECK(flat <= 66);
+}
+
+namespace
+{
+// Lines in a higher tier of a key that are word for word in a lower tier of it. Flat keys (all three tiers the
+// same: facts, name lists, scripted beats) are left out; they are counted by FlatTierKeysOnlyShrink.
+int CrossTierRepeats(std::array<std::vector<std::string>, 3> const & tiers)
+{
+  int repeats = 0;
+  for (int tier = 1; tier < 3; ++tier)
+    for (auto const & line : tiers[tier])
+    {
+      bool lower = false;
+      for (int below = 0; below < tier && !lower; ++below)
+        for (auto const & l : tiers[below])
+          lower = lower || l == line;
+      repeats += lower ? 1 : 0;
+    }
+  return repeats;
+}
+}  // namespace
+
+TEST(CrossTierRepeatsBatchOneHasOwnWording)
+{
+  // Loop B87 (BI-071): these keys had tier 1 as a copy of tier 0, so a driver at mid frustration heard the calm
+  // wording. Now every line lives in one tier of its key, and tier 0 is untouched.
+  auto const & data = LineData();
+  for (char const * key :
+       {"straight.later", "turnCompleted.streak3", "turnCompleted.streak6", "turnCompleted.streak10",
+        "turnCompleted.streakBig", "hot.groceries", "clock.springForward", "clock.fallBack", "arrived.blame"})
+  {
+    auto const it = data.find(key);
+    CHECK(it != data.end());
+    if (it == data.end())
+      continue;
+    if (CrossTierRepeats(it->second) != 0)
+      std::printf("    %s still repeats a lower tier\n", key);
+    CHECK_EQUAL(CrossTierRepeats(it->second), 0);
+    CHECK(it->second[1].size() >= 4);
+  }
+}
+
+TEST(CrossTierRepeatsOnlyShrink)
+{
+  // Ratchet: 291 repeats before B87, 234 after. Escalated keys keep their first line in every tier on purpose
+  // (CheckEscalated), so this never reaches 0. Lower it as batches land, never raise it.
+  int repeats = 0;
+  for (auto const & [key, tiers] : LineData())
+    if (!(tiers[0] == tiers[1] && tiers[1] == tiers[2]))
+      repeats += CrossTierRepeats(tiers);
+  if (repeats > 234)
+    std::printf("    %d lines repeat a lower tier of their key (limit 234)\n", repeats);
+  CHECK(repeats <= 234);
 }
 
 TEST(PickNeverCrashesOnAnEmptyPoolOrABadRandom)
