@@ -340,6 +340,126 @@
    "input": "Take I-35 NBX",
    "language": "en",
    "expected": "Take I thirty five NBX"
+  },
+  {
+   "input": "Turn onto County Rd K",
+   "language": "en",
+   "expected": "Turn onto County Road K"
+  },
+  {
+   "input": "Turn onto Co Rd K",
+   "language": "en",
+   "expected": "Turn onto County Road K"
+  },
+  {
+   "input": "Turn onto CR-K",
+   "language": "en",
+   "expected": "Turn onto County Road K"
+  },
+  {
+   "input": "Turn onto CR K",
+   "language": "en",
+   "expected": "Turn onto County Road K"
+  },
+  {
+   "input": "Take Hwy KK",
+   "language": "en",
+   "expected": "Take Highway K K"
+  },
+  {
+   "input": "Take County Rd KK west",
+   "language": "en",
+   "expected": "Take County Road K K west"
+  },
+  {
+   "input": "Take County Hwy PD.",
+   "language": "en",
+   "expected": "Take County Highway P D."
+  },
+  {
+   "input": "Turn onto Twp Rd 12",
+   "language": "en",
+   "expected": "Turn onto Township Road twelve"
+  },
+  {
+   "input": "Turn onto Twp. Rd. 5",
+   "language": "en",
+   "expected": "Turn onto Township Road five"
+  },
+  {
+   "input": "Turn onto Co Rd 45",
+   "language": "en",
+   "expected": "Turn onto County Road forty five"
+  },
+  {
+   "input": "Turn onto Co. Rd. 45",
+   "language": "en",
+   "expected": "Turn onto County Road forty five"
+  },
+  {
+   "input": "Turn onto County Road N",
+   "language": "en",
+   "expected": "Turn onto County Road N"
+  },
+  {
+   "input": "Turn onto County Rd N, then left",
+   "language": "en",
+   "expected": "Turn onto County Road N, then left"
+  },
+  {
+   "input": "Take County Road E toward Ely",
+   "language": "en",
+   "expected": "Take County Road E toward Ely"
+  },
+  {
+   "input": "Arrive at N1234 County Rd K",
+   "language": "en",
+   "expected": "Arrive at N twelve thirty four County Road K"
+  },
+  {
+   "input": "Arrive at W5678 State Hwy 29",
+   "language": "en",
+   "expected": "Arrive at W fifty six seventy eight State Highway twenty nine"
+  },
+  {
+   "input": "Arrive at W12345 Main Street",
+   "language": "en",
+   "expected": "Arrive at W one twenty three forty five Main Street"
+  },
+  {
+   "input": "Arrive at S102 Oak St",
+   "language": "en",
+   "expected": "Arrive at S one oh two Oak Street"
+  },
+  {
+   "input": "Smith & Sons Co.",
+   "language": "en",
+   "expected": "Smith and Sons Co."
+  },
+  {
+   "input": "Take I-35 W",
+   "language": "en",
+   "expected": "Take I thirty five West"
+  },
+  {
+   "input": "Take Exit 12B",
+   "language": "en",
+   "expected": "Take Exit twelve B"
+  },
+  {
+   "input": "Take Hwy N",
+   "language": "en",
+   "expected": "Take Highway North"
+  },
+  {
+   "input": "Park the CR-V",
+   "language": "en",
+   "expected": "Park the CR-V"
+  },
+  {
+   "input": "Exit E123 Terminal",
+   "language": "en",
+   "expected": "Exit E123 Terminal"
   }
  ]
 }

@@ -832,3 +832,18 @@ TEST(StreetTypesBeforeASeparatorAreSaid)
     CHECK_EQUAL(ForSpeech(c.input), c.expected);
   }
 }
+
+TEST(LetteredCountyRoadsAreSaidAsLetters)
+{
+  // Loop B106 (BI-092): "Co Rd K" is "County Road K", "Hwy KK" "Highway K K", grid house numbers keep
+  // their letter. The road letter is never read as a compass point, and a second pass changes nothing.
+  CHECK_EQUAL(ForSpeech("Turn onto County Rd N, then left"), std::string("Turn onto County Road N, then left"));
+  CHECK_EQUAL(ForSpeech("Turn onto Co Rd K"), std::string("Turn onto County Road K"));
+  CHECK_EQUAL(ForSpeech("Arrive at N1234 County Rd K"), std::string("Arrive at N twelve thirty four County Road K"));
+  // Not a county road: the company, the Honda, a direction after a bare highway.
+  CHECK_EQUAL(ForSpeech("Smith & Sons Co."), std::string("Smith and Sons Co."));
+  CHECK_EQUAL(ForSpeech("Park the CR-V"), std::string("Park the CR-V"));
+  CHECK_EQUAL(ForSpeech("Take Hwy N"), std::string("Take Highway North"));
+  for (std::string const once : {"Take County Road K K west", "Turn onto Township Road twelve", "Take County Highway P D."})
+    CHECK_EQUAL(ForSpeech(once), once);
+}

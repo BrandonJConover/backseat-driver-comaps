@@ -121,6 +121,65 @@ bool SaintStreetAfter(std::string const & s, size_t pos)
   return false;
 }
 
+// MARK: - County and township roads
+
+/// "County Road K" and "County Highway N" name the road by a letter, not a compass point. True when the word
+/// "Road"/"Highway" that starts at `start` follows "County " or "Township " (loop B106).
+bool CountyRoadBefore(std::string const & s, size_t start)
+{
+  for (std::string_view const prefix : {"County ", "Township "})
+    if (start >= prefix.size() && s.compare(start - prefix.size(), prefix.size(), prefix) == 0)
+      return true;
+  return false;
+}
+
+/// Lettered county roads and the Co/Twp prefixes the Midwest signs use (loop B106): "County Rd K" is
+/// "County Road K", "Co Rd K" and "CR-K" too, "Hwy KK" "Highway K K", "Twp Rd 12" "Township Road 12",
+/// "Co. Rd. 45" "County Road 45". "Smith & Sons Co.", "CR-V", "Hwy US 10" and "Hwy N" are left.
+std::string CountyRoads(std::string s)
+{
+  if (s.find("Co") == std::string::npos && s.find("Twp") == std::string::npos &&
+      s.find("CR") == std::string::npos && s.find("Hwy") == std::string::npos &&
+      s.find("Highway") == std::string::npos)
+    return s;
+  // A road letter (or two) as a whole word: not a route ("US 10", "I-35"), not the start of a word.
+#define BACKSEAT_ROAD_LETTERS "([A-Z]{1,2})(?![A-Za-z0-9'-]| ?-? ?\\d)"
+  // "Co Rd", "Co. Rd.", "Twp Hwy": the prefix only counts right before a road type.
+  static std::regex const prefix("\\b(Co|Twp)\\.? (?=(?:Rd|Road|Hwy|Highway)\\b)");
+  s = Replace(s, prefix, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return std::string(m.str(1) == "Co" ? "County " : "Township ");
+  });
+  // "County Rd 45", "Township Hwy 7": the road type in full once the prefix says what it is.
+  static std::regex const type("\\b(County|Township) (Rd|Hwy)\\.?(?= )");
+  s = Replace(s, type, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return m.str(1) + (m.str(2) == "Rd" ? " Road" : " Highway");
+  });
+  // Spell a road's letters apart: "KK" is "K K".
+  auto const letters = [](std::string const & l) {
+    return l.size() == 2 ? std::string(1, l[0]) + " " + l[1] : l;
+  };
+  // "CR-K", "CR K": County Road by letter (by number is the route pass's). Not the Honda "CR-V"/"CR-Z".
+  static std::regex const cr("\\bCR(?:-| )" BACKSEAT_ROAD_LETTERS);
+  s = Replace(s, cr, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
+    if (m.str(1) == "V" || m.str(1) == "Z")
+      return std::nullopt;
+    return "County Road " + letters(m.str(1));
+  });
+  // "County Road KK", "County Highway PD", "Hwy KK": the letters apart. A bare highway with a compass
+  // point after it ("Hwy N", "Highway SW") may be a direction, so it is left.
+  static std::regex const lettered("\\b((?:County|Township) (?:Road|Highway)|Hwy|Highway) " BACKSEAT_ROAD_LETTERS);
+#undef BACKSEAT_ROAD_LETTERS
+  s = Replace(s, lettered, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
+    auto const road = m.str(1), l = m.str(2);
+    bool const bare = road == "Hwy" || road == "Highway";
+    static std::set<std::string> const compass = {"N", "S", "E", "W", "NE", "NW", "SE", "SW"};
+    if (bare && compass.count(l) > 0)
+      return std::nullopt;
+    return (road == "Hwy" ? std::string("Highway") : road) + " " + letters(l);
+  });
+  return s;
+}
+
 /// "St. Johns Rd" is "Saint Johns Rd", "Dr Martin Luther King Jr Blvd" is "Doctor Martin Luther
 /// King Junior Blvd", "Ft Worth" is "Fort Worth", "Hwy 290" is "Highway 290", "101 Fwy" is "101
 /// Freeway". "Main St. Then left" and "Elm Dr." stay street types for the street pass.

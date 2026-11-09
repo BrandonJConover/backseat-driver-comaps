@@ -1367,12 +1367,25 @@ std::string HouseNumbers(std::string const & text)
       "\\b(\\d{3,4})(?= (?:(?:North|South|East|West|Northeast|Northwest|Southeast|Southwest) )?"
       "(?:(?:[A-Z][A-Za-z'.-]*|\\d+(?:st|nd|rd|th)) ){1,4}"
       "(?:Street|Avenue|Boulevard|Road|Drive|Lane|Court|Parkway|Place|Circle|Terrace|Trail|Square|Way|Plaza)\\b)");
-  return Replace(text, address, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+  auto const out = Replace(text, address, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     // Part of a bigger number ("1,600", "2.500") or a word ("A123"): leave it.
     if (pos > 0 && (std::isalnum(static_cast<unsigned char>(text[pos - 1])) || text[pos - 1] == ',' ||
                     text[pos - 1] == '.' || text[pos - 1] == '-' || text[pos - 1] == '#' || text[pos - 1] == '$'))
       return std::nullopt;
     return RouteNumber(m.str(1));
+  });
+  // Wisconsin and Illinois grid addresses: a compass letter glued to the number, then a road name.
+  // "N1234 County Road K" is "N twelve thirty four County Road K", "W12345 State Highway 29" "W one twenty
+  // three forty five ..." (loop B106). The letter stays a letter: it is the grid, not a direction to drive.
+  static std::regex const grid(
+      "(^|[\\s,(])([NSEW])(\\d{3,5})(?= (?:[A-Z][A-Za-z'.]* ){0,4}"
+      "(?:Road|Highway|Street|Avenue|Drive|Lane|Route|Court|Parkway|Trail|Way|Circle|Place)\\b)");
+  return Replace(out, grid, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    auto const digits = m.str(3);
+    std::string spoken = RouteNumber(digits);
+    if (digits.size() == 5)
+      spoken = digits[1] == '0' ? Digits(digits) : SpellNumber(digits[0] - '0') + " " + RouteNumber(digits.substr(1));
+    return m.str(1) + m.str(2) + " " + spoken;
   });
 }
 
@@ -2260,6 +2273,8 @@ std::string ForSpeech(std::string const & text)
   s = PickSenses(s);
   // Regnal numbers after a name: "King George VI Ave" is "King George the sixth Ave".
   s = Regnal(s);
+  // Lettered county roads before the title and street passes take Rd/Hwy: "Co Rd K" is "County Road K".
+  s = CountyRoads(s);
   // Saint, Doctor, Fort, Junior before the street pass can take them for street types.
   s = Titles(s);
   // Suites, apartments and floors after the street: "Lamar Blvd Ste 200" is "Lamar Blvd Suite 200".
@@ -2326,7 +2341,8 @@ std::string ForSpeech(std::string const & text)
       --start;
     auto const before = s.substr(start, pos - 1 - start);
     // "Unit E" and "Apartment N" are letters too.
-    if (m.str(1).size() == 1 && (before == "Avenue" || before == "Lane" || before == "Circle" || TailWord(before)))
+    if (m.str(1).size() == 1 && (before == "Avenue" || before == "Lane" || before == "Circle" || TailWord(before) ||
+                                 ((before == "Road" || before == "Highway") && CountyRoadBefore(s, start))))
       return std::nullopt;
     return Compass(m.str(1));
   });
