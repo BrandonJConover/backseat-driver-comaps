@@ -37,6 +37,7 @@ set(
   pronunciation_backup.hpp
   pronunciation_scripts.cpp
   pronunciation_senses.hpp
+  pronunciation_streets.hpp
   pronunciation_text.hpp
   pop_quiz.cpp
   pop_quiz.hpp
