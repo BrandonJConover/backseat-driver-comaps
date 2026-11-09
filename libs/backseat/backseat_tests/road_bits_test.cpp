@@ -558,6 +558,10 @@ TEST(QuietStretchAsideIsBrandonsFirstLine)
   double dist = 60000;
   auto const lines = RoadNav(nav, t, 600, 25, dist);
   CHECK(SaidText(lines, LinesFor("quiet.aside", 0).front()));
+  // Muttered to itself: tagged for the whisper delivery (loop B90).
+  for (auto const & l : lines)
+    if (l.text == LinesFor("quiet.aside", 0).front())
+      CHECK(l.delivery == Delivery::Aside);
 }
 
 TEST(QuietStretchTrapAsksAndFilesTheAnswer)

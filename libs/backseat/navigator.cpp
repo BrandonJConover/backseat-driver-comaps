@@ -979,6 +979,8 @@ std::vector<Commentary> Navigator::TakeLines()
       m_lastCutInT = m_lastT;
   for (auto & line : lines)
   {
+    // Before SpeakableText: the shouted capitals are still there to see (the "!" survives either way).
+    line.delivery = line.priority == Priority::Nav ? Delivery::Normal : DeliveryFor(line.key, line.text);
     line.text = SpeakableText(line.text);
     if (line.priority == Priority::Nav)
       line.maxWaitMs = NavWaitMs(line);

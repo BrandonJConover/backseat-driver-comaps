@@ -197,6 +197,8 @@ char const * ToString(IncidentKind k)
 
 char const * ToString(Priority p) { return p == Priority::Nav ? "nav" : "roast"; }
 
+char const * ToString(Delivery d) { return d == Delivery::Aside ? "aside" : "normal"; }
+
 std::string StraightApostrophes(std::string const & text)
 {
   std::string out;

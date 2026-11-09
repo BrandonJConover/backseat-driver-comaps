@@ -3,6 +3,8 @@
 // The lines themselves are generated from engine/src/lines.ts into lines_data.cpp.
 #pragma once
 
+#include "backseat/types.hpp"
+
 #include <cstdlib>
 #include <map>
 #include <set>
@@ -119,6 +121,13 @@ void Warm(bool metric, bool leftHand);
 /// Negated asks ("Don't pick me up") and soft hints with no "now" ("You might want to plug me in if
 /// you want to get there") pass.
 bool AsksToHandlePhone(std::string const & line);
+
+/// How a line from pool `key` with spoken `text` should be delivered (loop B90): Aside for the GPS
+/// muttering to itself (any key with an "aside" part: quiet.aside, partner.aside, outdoors.aside,
+/// and their .walk/.bike variants), unless the line is shouted (has a "!"; the unhinged tier yells
+/// its asides). Everything else, and every built line with no key, is Normal. Directions never ask:
+/// TakeLines() keeps Priority::Nav lines Normal whatever their key.
+Delivery DeliveryFor(std::string const & key, std::string const & text);
 
 /// Fills {placeholders} from vars. {NAME} in capitals inserts the value in capitals.
 /// Unknown placeholders are left as they are.

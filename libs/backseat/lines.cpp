@@ -449,6 +449,23 @@ std::string DropRepeatedTags(std::string text, std::set<std::string> & said)
   return text;
 }
 
+Delivery DeliveryFor(std::string const & key, std::string const & text)
+{
+  if (key.empty() || text.empty() || text.find('!') != std::string::npos)
+    return Delivery::Normal;
+  for (size_t start = 0; start <= key.size();)
+  {
+    size_t const dot = key.find('.', start);
+    size_t const end = dot == std::string::npos ? key.size() : dot;
+    if (key.compare(start, end - start, "aside") == 0)
+      return Delivery::Aside;
+    if (dot == std::string::npos)
+      break;
+    start = dot + 1;
+  }
+  return Delivery::Normal;
+}
+
 std::string Fill(std::string const & tmpl, Vars const & vars)
 {
   std::string out;
