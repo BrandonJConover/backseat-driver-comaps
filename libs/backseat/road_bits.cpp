@@ -171,7 +171,9 @@ Weather WeatherFromNws(std::string const & description, double windMps, double g
   std::string const d = RoadLower(description);
   auto const has = [&d](char const * w) { return d.find(w) != std::string::npos; };
   Weather w;
-  w.snow = has("snow") || has("sleet") || has("ice pellets") || has("freezing");
+  w.ice = has("sleet") || has("ice pellets") || has("freezing rain") || has("freezing drizzle") ||
+          has("freezingrain") || has("freezingdrizzle") || has("glaze");
+  w.snow = w.ice || has("snow");
   w.rain = !w.snow && (has("rain") || has("drizzle") || has("shower") || has("thunderstorm"));
   w.fog = has("fog") || has("haze") || has("mist") || has("smoke");
   // Breezy starts around 20 mph; gusts past 35 mph push a car around.
@@ -511,7 +513,8 @@ std::optional<RoadRemark> RoadBits::Ambient(RoadTick const & k, SaidLog & said, 
   if (m_weather && m_weatherSaid.size() < 2)
   {
     Weather const & w = *m_weather;
-    std::string key = w.snow    ? "weather.snow"
+    std::string key = w.ice     ? "weather.ice"
+                      : w.snow  ? "weather.snow"
                       : w.fog   ? "weather.fog"
                       : w.rain  ? "weather.wet"
                       : w.windy ? "weather.wind"

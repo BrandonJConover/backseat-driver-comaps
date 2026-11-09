@@ -525,6 +525,44 @@ TEST(FlatTierBatchFourEscalates)
   }
 }
 
+TEST(WeatherKeysEscalateAndStaySincere)
+{
+  // Loop B91 (BI-013 leftover): every weather key has at least four lines in each tier and escalates like the
+  // B89 batches; weather.ice (freezing rain, sleet) is new. The road advice is never the joke: every ice and
+  // snow line still tells the driver to slow down, ease off or leave room, and none of them shouts.
+  for (char const * key : {"weather.wet", "weather.fog", "weather.snow", "weather.ice", "weather.clear", "weather.wind"})
+  {
+    CheckEscalated(key);
+    auto const it = LineData().find(key);
+    if (it == LineData().end())
+      continue;
+    CHECK_EQUAL(CrossTierRepeats(it->second, true), 0);
+    for (int tier = 0; tier < 3; ++tier)
+      CHECK(LinesFor(key, tier).size() >= 4);
+  }
+  for (char const * key : {"weather.snow", "weather.ice"})
+    for (int tier = 0; tier < 3; ++tier)
+      for (auto const & line : LinesFor(key, tier))
+      {
+        std::string lower;
+        bool shouts = false;
+        for (size_t i = 0; i < line.size(); ++i)
+        {
+          lower += static_cast<char>(std::tolower(static_cast<unsigned char>(line[i])));
+          shouts = shouts || (i + 2 < line.size() && std::isupper(static_cast<unsigned char>(line[i])) &&
+                              std::isupper(static_cast<unsigned char>(line[i + 1])) &&
+                              std::isupper(static_cast<unsigned char>(line[i + 2])));
+        }
+        bool advice = false;
+        for (char const * w : {"slow", "gentle", "brake", "room", "easy on", "smooth"})
+          advice = advice || lower.find(w) != std::string::npos;
+        if (!advice || shouts)
+          std::printf("    weather line not sincere enough: %s [%d]: %s\n", key, tier, line.c_str());
+        CHECK(advice);
+        CHECK(!shouts);
+      }
+}
+
 TEST(PickNeverCrashesOnAnEmptyPoolOrABadRandom)
 {
   SaidLog log;

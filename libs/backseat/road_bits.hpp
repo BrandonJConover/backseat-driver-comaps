@@ -76,6 +76,8 @@ struct Weather
 {
   bool rain = false;
   bool snow = false;
+  /// Freezing rain or drizzle, sleet, ice pellets: the road may be ice (also counts as snow).
+  bool ice = false;
   bool fog = false;
   bool windy = false;
   /// Clear or sunny, nothing falling, no fog.

@@ -473,7 +473,7 @@ TEST(EveryRoadKeyHasLinesInEveryTier)
         "rest.survey", "rest.surveyAfter", "gas.none", "coffee.far", "viewpoint.ahead", "viewpoint.passed",
         "driveThru.in", "driveThru.long", "driveThru.leaving", "signal.lost", "signal.back", "road.smallTown",
         "road.nature", "road.farm", "road.gravel", "night.sunset", "night.dark", "night.late", "weather.wet",
-        "weather.fog", "weather.snow", "weather.clear", "weather.wind", "traffic.cleared", "trap.bathroom.ask",
+        "weather.fog", "weather.snow", "weather.ice", "weather.clear", "weather.wind", "traffic.cleared", "trap.bathroom.ask",
         "trap.bathroom.caught", "trap.rate.ask", "trap.rate.after"})
     for (int tier = 0; tier < 3; ++tier)
       CHECK(!LinesFor(key, tier).empty());
@@ -633,6 +633,30 @@ TEST(RoadWeatherReadsMetNorwaySymbols)
   CHECK(!cloudy.rain && !cloudy.snow && !cloudy.fog && !cloudy.clear && !cloudy.windy);
   CHECK(WeatherFromNws("cloudy", 4, 16, 10).windy);  // gusts in m/s, as MET reports them
   CHECK(WeatherFromNws("cloudy", 4, -1, -20).tempC == -20);
+}
+
+TEST(RoadWeatherTellsIceFromSnow)
+{
+  // Loop B91: freezing rain, freezing drizzle, sleet and ice pellets are ice (and still snow for anything that
+  // asks); plain snow is not ice, and freezing fog is fog, not snow.
+  for (char const * d : {"Freezing Rain", "Light Freezing Drizzle", "Ice Pellets", "Snow and Sleet",
+                         "heavysleetshowersandthunder_day", "lightsleet"})
+  {
+    Weather const w = WeatherFromNws(d, -1, -1);
+    CHECK(w.ice && w.snow && !w.rain);
+  }
+  Weather const snow = WeatherFromNws("Light Snow", -1, -1);
+  CHECK(snow.snow && !snow.ice);
+  Weather const fog = WeatherFromNws("Freezing Fog", -1, -1);
+  CHECK(fog.fog && !fog.snow && !fog.ice);
+
+  RoadDrive d;
+  d.tripMs = 5 * 60000;
+  d.road.OnWeather(d.t, WeatherFromNws("Freezing Rain", -1, -1));
+  d.Run(20 * 60, 20);
+  CHECK(HasKey(d.heard, "weather.ice"));
+  CHECK(!HasKey(d.heard, "weather.snow"));
+  CHECK(!HasKey(d.heard, "weather.wet"));
 }
 
 TEST(BathroomTrapHearsNotAndLeftoverTalk)
