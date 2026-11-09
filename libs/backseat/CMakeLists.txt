@@ -76,6 +76,13 @@ else()
   add_library(${PROJECT_NAME} ${SRC})
   # Includes are written "backseat/engine.hpp", relative to libs/.
   target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+  # Standalone builds keep the library warning-clean; the CoMaps build above keeps its own flags.
+  if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wshadow -Wparentheses)
+    if (NOT BACKSEAT_NO_WERROR)
+      target_compile_options(${PROJECT_NAME} PRIVATE -Werror)
+    endif()
+  endif()
   enable_testing()
   add_subdirectory(backseat_tests)
 endif()

@@ -859,7 +859,7 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::GradeSoFar: return saidAny({"grade", "doing", "driving", "card"});
   case AppAction::RoastMe: return saidAny({"roast", "insult", "fun"});
   case AppAction::TellJoke: return saidAny({"joke", "jokes", "funny"});
-  case AppAction::BlameGps: return saidAny({"fault", "wrong", "blame", "messed"}) || saidAny({"on"}) && saidAny({"you"});
+  case AppAction::BlameGps: return saidAny({"fault", "wrong", "blame", "messed"}) || (saidAny({"on"}) && saidAny({"you"}));
   case AppAction::WhatDoYouKnow: return saidAny({"know", "remember", "file", "saved"});
   case AppAction::ForgetThat: return saidAny({"forget", "delete"});
   case AppAction::SetTravelMode:
@@ -893,7 +893,7 @@ bool CommandRepeats::IsRepeat(AppCommand const & command, double tMs)
   if (command.action == AppAction::NavigateTo)
   {
     bool const building = m_buildingSince && tMs - *m_buildingSince < kBuildingMaxMs;
-    if ((building || m_lastNavigateAt && tMs - *m_lastNavigateAt < kRepeatMs) && SameDestination(m_buildingTo, command.argument))
+    if ((building || (m_lastNavigateAt && tMs - *m_lastNavigateAt < kRepeatMs)) && SameDestination(m_buildingTo, command.argument))
       return true;
     m_buildingSince = tMs;
     m_lastNavigateAt = tMs;

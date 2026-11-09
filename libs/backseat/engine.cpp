@@ -437,9 +437,7 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     {
       m_pendingTurn =
           PendingTurn{dir == Maneuver::Right ? TurnDirection::Right : TurnDirection::Left, shape, e.t, stage, {}, false,
-                      {}, e.distanceM};
-      m_pendingTurn->legM = e.distanceM;
-      m_pendingTurn->text = e.text;
+                      {}, e.distanceM, e.distanceM, e.text};
     }
     // The heading swing from the turn just finished isn't about this one.
     m_headings.clear();

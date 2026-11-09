@@ -95,8 +95,6 @@ double RoadGroundM(LatLon const & a, LatLon const & b)
 
 bool Has(std::vector<std::string> const & v, std::string const & s) { return std::find(v.begin(), v.end(), s) != v.end(); }
 
-bool RoadHasWord(std::string const & words, char const * w) { return words.find(w) != std::string::npos; }
-
 // Whether `w` shows up in `words` with a "not"/"no"/"never" a word or two before it ("definitely not gas
 // stations", "no rest stops"), and whether it shows up at all.
 struct RoadMention

@@ -242,7 +242,7 @@ std::string KanaWord(std::u32string const & run)
       syl = (stem == "sh" || stem == "ch" || stem == "j" ? stem : stem + "y") + v;
       ++i;
     }
-    else if (char const v = SmallVowel(next); v && !syl.empty())
+    else if (char const small = SmallVowel(next); small && !syl.empty())
     {
       // Katakana loan sounds: ティ ti, ファ fa, ウィ wi, チェ che, ヴァ va.
       std::string stem = syl.substr(0, syl.size() - 1);
@@ -250,7 +250,7 @@ std::string KanaWord(std::u32string const & run)
         stem = syl == "fu" ? "f" : syl == "vu" ? "v" : "w";
       else if (syl == "te" || syl == "de")
         stem = syl.substr(0, 1);
-      syl = stem + v;
+      syl = stem + small;
       ++i;
     }
     if (twice && !syl.empty() && std::string_view("aeiou").find(syl[0]) == std::string_view::npos)
