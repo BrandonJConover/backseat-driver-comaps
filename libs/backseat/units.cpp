@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 
 namespace backseat
@@ -98,6 +99,18 @@ std::string ToFixed(double x, int digits)
     x = 0;  // (-0).toFixed(2) is "0.00", not "-0.00"
   bool const negative = x < 0;
   double const a = std::fabs(x);
+  // Cheap screen first: an exact tie prints as 5 then only 0s in the 30 digits after the cut, so
+  // anything else is not a tie and skips the 1,100-digit print below (~90k instructions a call; it was
+  // most of a simulated drive via RoundTo in the trip report's heat map). Near-ties still go exact.
+  char quick[200];
+  std::snprintf(quick, sizeof quick, "%.*f", digits + 30, a);
+  char const * const cut = std::strchr(quick, '.') + 1 + digits;
+  if (*cut != '5' || cut[1 + std::strspn(cut + 1, "0")] != '\0')
+  {
+    std::vector<char> buf(160);
+    std::snprintf(buf.data(), buf.size(), "%.*f", digits, a);
+    return negative ? "-" + std::string(buf.data()) : std::string(buf.data());
+  }
   // Exact decimal value of the double (it always terminates), so a true tie is visible.
   std::vector<char> exact(1200);
   std::snprintf(exact.data(), exact.size(), "%.1100f", a);

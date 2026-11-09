@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <unordered_map>
 
 namespace backseat
@@ -53,6 +55,35 @@ std::string Quip(double score)
   if (score >= 60) return "A D. The D stands for 'Did you even listen'.";
   return "An F. I'd write more, but the heat map says it all.";
 }
+
+// A heat-map cell's floored row/col, matched the way the old JsNumber(row) + ":" + JsNumber(col) string
+// key matched them (-0 is 0, every NaN is one cell), without printing two doubles per incident: that
+// printing was ~78% of a simulated drive (BuildReport runs several times at each arrival).
+std::uint64_t CellBits(double x)
+{
+  if (x == 0)
+    x = 0;
+  if (std::isnan(x))
+    return 0x7ff8000000000000ULL;
+  std::uint64_t bits;
+  std::memcpy(&bits, &x, sizeof bits);
+  return bits;
+}
+
+struct CellKey
+{
+  std::uint64_t row;
+  std::uint64_t col;
+  bool operator==(CellKey const & o) const { return row == o.row && col == o.col; }
+};
+
+struct CellKeyHash
+{
+  std::size_t operator()(CellKey const & k) const
+  {
+    return std::hash<std::uint64_t>{}(k.row ^ (k.col * 0x9e3779b97f4a7c15ULL));
+  }
+};
 }  // namespace
 
 double IncidentWeight(Incident const & i)
@@ -66,17 +97,16 @@ std::vector<HeatCell> BuildHeatmap(std::vector<Incident> const & incidents, doub
 {
   // Insertion order matters for ties in the final sort, so keep it like a JS Map.
   std::vector<HeatCell> cells;
-  std::unordered_map<std::string, size_t> index;
+  std::unordered_map<CellKey, size_t, CellKeyHash> index;
+  double const latStep = cellMeters / 111320;
   for (auto const & i : incidents)
   {
     if (!i.lat || !i.lon)
       continue;
-    double const latStep = cellMeters / 111320;
     double const lonStep = cellMeters / (111320 * std::cos(*i.lat * M_PI / 180));
     double const row = std::floor(*i.lat / latStep);
     double const col = std::floor(*i.lon / lonStep);
-    std::string const key = JsNumber(row) + ":" + JsNumber(col);
-    auto [it, inserted] = index.emplace(key, cells.size());
+    auto [it, inserted] = index.emplace(CellKey{CellBits(row), CellBits(col)}, cells.size());
     if (inserted)
     {
       HeatCell c;
