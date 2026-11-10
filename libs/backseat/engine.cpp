@@ -389,20 +389,27 @@ std::vector<Commentary> CritiqueEngine::OnTelemetry(TelemetrySample const & s)
     }
     bool const braking = accel <= -m_config.hardBrakeMps2;
     bool const accelerating = accel >= m_config.hardAccelMps2;
+    // Steady means a believable, measured step with little speed change (a stop counts).
+    bool const steady = measured && !m_beforeGlitch && std::abs(accel) < m_config.jerkSettleMps2;
+    if (!steady)
+      m_steadySince.reset();
+    else if (!m_steadySince)
+      m_steadySince = prev->t;
     if (braking && !m_braking)
     {
       m_stats.hardBrakes++;
       Log(MakeIncident(s.t, IncidentKind::HardBraking));
-      Roast(out, s.t, Category::HardBraking, "hardBraking", {}, true);
+      JerkRoast(out, s.t, Category::HardBraking, "hardBraking");
     }
     if (accelerating && !m_accelerating)
     {
       m_stats.hardAccels++;
       Log(MakeIncident(s.t, IncidentKind::HardAccel));
-      Roast(out, s.t, Category::HardAccel, "hardAccel", {}, true);
+      JerkRoast(out, s.t, Category::HardAccel, "hardAccel");
     }
     m_braking = braking;
     m_accelerating = accelerating;
+    ReleaseJerk(out, s.t);
   }
 
   CheckSpeeding(s, prev ? &*prev : nullptr, out);
@@ -1178,6 +1185,44 @@ void CritiqueEngine::CheckStopped(TelemetrySample const & s, std::vector<Comment
 }
 
 // --- plumbing ----------------------------------------------------------
+
+/// A hard brake or launch: roasted now (TS behavior) or held until the car settles (jerkSettleMs).
+/// One held at a time: a second jolt during the hold is still counted but gets no second roast.
+void CritiqueEngine::JerkRoast(std::vector<Commentary> & out, double t, Category category, std::string const & key)
+{
+  if (m_config.jerkSettleMs <= 0)
+  {
+    Roast(out, t, category, key, {}, true);
+    return;
+  }
+  if (m_pendingJerk)
+  {
+    TraceThrottled("roast.held", key + "/settle", {{"key", key}, {"why", "settle.again"}});
+    return;
+  }
+  m_pendingJerk = PendingJerk{category, key, t, m_stats.turnsCompleted};
+  Trace("roast.held", {{"key", key}, {"why", "settle"}});
+}
+
+void CritiqueEngine::ReleaseJerk(std::vector<Commentary> & out, double t)
+{
+  if (!m_pendingJerk)
+    return;
+  PendingJerk const & p = *m_pendingJerk;
+  if (m_stats.turnsCompleted > p.turnsDone || t - p.since > m_config.jerkSettleGiveUpMs)
+  {
+    Trace("roast.dropped", {{"key", p.key}, {"why", m_stats.turnsCompleted > p.turnsDone ? "turn" : "unsettled"}});
+    m_pendingJerk.reset();
+    return;
+  }
+  bool const settled = !m_braking && !m_accelerating && m_steadySince && *m_steadySince >= p.since &&
+                       t - *m_steadySince >= m_config.jerkSettleMs;
+  if (!settled || m_bending || TurnNeedsQuiet(t, kRoastSpeakMs))
+    return;
+  PendingJerk const held = std::move(*m_pendingJerk);
+  m_pendingJerk.reset();
+  Roast(out, t, held.category, held.key, {}, true);
+}
 
 /// Emit a roast if cooldowns allow. `urgent` roasts (missed turns etc.) skip the global
 /// gap because they react to a specific moment. Returns whether anything was emitted.

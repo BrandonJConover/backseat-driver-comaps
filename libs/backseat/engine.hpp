@@ -54,6 +54,13 @@ struct EngineConfig
   /// measured from the last believable sample, so a 25 -> 8 -> 25 m/s blip is neither a hard brake nor a
   /// launch while 25 -> 8 -> 8 still counts (as 8.5 m/s² over two seconds). 0: off (the TS engine's behavior).
   double implausibleMps2 = 0;
+  /// Hold a hard-brake / hard-launch roast until the car has settled: |accel| under jerkSettleMps2 (or
+  /// stopped) for this long, not in a bend and not near a turn call. The stats and incident log still
+  /// count it at the onset. Dropped after jerkSettleGiveUpMs or once a turn is completed. A roast in the
+  /// middle of an emergency stop is the last thing a driver needs. 0: off (the TS engine's behavior).
+  double jerkSettleMs = 0;
+  double jerkSettleMps2 = 1.0;
+  double jerkSettleGiveUpMs = 20000;
   /// Display units under the limit, sustained for tooSlowAfterMs, to get called slow.
   double tooSlowMargin = 15;
   double tooSlowAfterMs = 20000;
@@ -175,6 +182,10 @@ public:
 
   /// The phone is busy saying what it was handed until about `t` (speechAware only).
   void SetTalkingUntil(double t) { m_talkingUntil = std::max(m_talkingUntil, t); }
+  /// The road is curving or the car is swinging round (Navigator::Bending): a held brake roast waits.
+  void SetBending(bool bending) { m_bending = bending; }
+  /// A hard brake/launch roast is waiting for the car to settle (jerkSettleMs).
+  bool JerkRoastWaiting() const { return m_pendingJerk.has_value(); }
   /// A line that takes `speakMs` to say would get in the way of the next turn: it would still be
   /// playing when the final call is due, or the final call is out and the turn isn't done yet.
   /// Always false unless speechAware.
@@ -295,6 +306,20 @@ private:
   double m_longStopHoldUntil = 0;
   bool m_braking = false;
   bool m_accelerating = false;
+  /// A hard brake/launch roast held until the car settles (jerkSettleMs).
+  struct PendingJerk
+  {
+    Category category;
+    std::string key;
+    double since;
+    int turnsDone;
+  };
+  std::optional<PendingJerk> m_pendingJerk;
+  /// Since when |accel| has stayed under jerkSettleMps2.
+  std::optional<double> m_steadySince;
+  bool m_bending = false;
+  void JerkRoast(std::vector<Commentary> & out, double t, Category category, std::string const & key);
+  void ReleaseJerk(std::vector<Commentary> & out, double t);
   double m_lastSpeedingLogAt;
   std::optional<std::string> m_lastInstructionText;
   std::optional<double> m_lastInstructionDistanceM;

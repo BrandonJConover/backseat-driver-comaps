@@ -251,6 +251,8 @@ double constexpr kFirstTurnFirstWithinM = 350;
 double constexpr kSpeedingRenagMaxMs = 300000;
 // A one-second speed change past this is a GPS glitch, not driving (about 1.2 g; see EngineConfig).
 double constexpr kImplausibleMps2 = 12;
+/// A hard-brake roast waits until the car has been steady this long (EngineConfig::jerkSettleMs).
+double constexpr kJerkSettleMs = 3000;
 int constexpr kSpeedingTolerance = 2;
 int constexpr kSpeedingToleranceFast = 3;
 double constexpr kSpeedingBarelyEveryMs = 5 * 60000;
@@ -824,6 +826,7 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & rawRoute)
   s.lon = fix.lon;
   if (fix.bearingDeg >= 0)
     s.headingDeg = fix.bearingDeg;
+  m_engine->SetBending(Bending());
   Say(m_engine->OnTelemetry(s));
   if (!m_plan.origin.lat && !m_plan.origin.lon)
     m_plan.origin = {fix.lat, fix.lon};
@@ -1591,6 +1594,8 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
     config.speedingRenagMaxMs = kSpeedingRenagMaxMs;
   if (config.implausibleMps2 == 0)
     config.implausibleMps2 = kImplausibleMps2;
+  if (config.jerkSettleMs == 0)
+    config.jerkSettleMs = kJerkSettleMs;
   // A phone in a pocket jolts and jumps, and that's not hard braking.
   if (!InCar(m_travelMode))
   {
