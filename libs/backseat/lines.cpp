@@ -164,6 +164,11 @@ std::string MetricWording(std::string const & text)
       {"moved three feet", "moved one meter"},
       {"three miles an hour", "five kilometers an hour"},
       {"It's miles.", "It's kilometers."},
+      // Loop B113: the last four a word scan found (lines_test MetricDriverHearsNoImperialUnitAnywhere).
+      {"UP TO A MILE.", "UP TO A KILOMETER."},
+      {"I want MILES.", "I want KILOMETERS."},
+      {"about twenty feet ahead", "about six meters ahead"},
+      {"AT TWO MILES AN HOUR", "AT THREE KILOMETERS AN HOUR"},
   };
   std::string out = text;
   for (auto const & [from, to] : kPhrases)

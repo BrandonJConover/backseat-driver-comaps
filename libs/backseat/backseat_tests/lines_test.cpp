@@ -60,6 +60,63 @@ TEST(MetricWordingSaysMetersAndLeavesFeetAlone)
   SetLineMetric(false);
 }
 
+TEST(MetricDriverHearsNoImperialUnitAnywhere)
+{
+  // Loop B113: the word scan behind the phrase list above. Every line a metric driver can hear is
+  // checked for a whole-word mile, miles, feet, yard, yards or mph. Feet as body parts, an altitude
+  // and the facts and mileage log (in miles on purpose) are the only ones allowed.
+  static char const * const kAllowed[] = {
+      "pick up your feet", "move your feet", "your feet", "their feet", "thirty thousand feet",
+      "feet. you have two", "}. feet."};
+  auto const words = [](std::string const & text)
+  {
+    std::string lower;
+    for (char const c : text)
+      lower += std::isalpha(static_cast<unsigned char>(c)) ? static_cast<char>(std::tolower(static_cast<unsigned char>(c))) : ' ';
+    return " " + lower + " ";
+  };
+  int found = 0;
+  SetLineMetric(true);
+  for (auto const & [key, tiers] : LineData())
+  {
+    if (key == "fact" || key.rfind("fact.", 0) == 0 || key.rfind("mileage.", 0) == 0)
+      continue;
+    for (int tier = 0; tier < 3; ++tier)
+      for (auto const & line : LinesFor(key, tier))
+      {
+        std::string lower;
+        for (char const c : line)
+          lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        for (char const * ok : kAllowed)
+          for (size_t at = lower.find(ok); at != std::string::npos; at = lower.find(ok))
+            lower.replace(at, std::char_traits<char>::length(ok), " ");
+        std::string const w = words(lower);
+        for (char const * unit : {" mile ", " miles ", " feet ", " yard ", " yards ", " mph "})
+          if (w.find(unit) != std::string::npos)
+          {
+            std::fprintf(stderr, "imperial for a metric driver in %s: %s\n", key.c_str(), line.c_str());
+            ++found;
+          }
+      }
+  }
+  SetLineMetric(false);
+  CHECK_EQUAL(found, 0);
+
+  // The imperial table is the bank itself, byte for byte.
+  for (auto const & [key, tiers] : LineData())
+    for (int tier = 0; tier < 3; ++tier)
+      CHECK(LinesFor(key, tier) == tiers[tier]);
+
+  CHECK_EQUAL(MetricWording("STOP AT {NAME} OR I START ROUNDING ALL DISTANCES UP TO A MILE."),
+              std::string("STOP AT {NAME} OR I START ROUNDING ALL DISTANCES UP TO A KILOMETER."));
+  CHECK_EQUAL(MetricWording("{PLATE}. That's NEXT DOOR. I want MILES. Logged."),
+              std::string("{PLATE}. That's NEXT DOOR. I want KILOMETERS. Logged."));
+  CHECK_EQUAL(MetricWording("More fog. The world ends about twenty feet ahead. Drive like it does."),
+              std::string("More fog. The world ends about six meters ahead. Drive like it does."));
+  CHECK_EQUAL(MetricWording("HOW DO YOU MISS A TURN AT TWO MILES AN HOUR?!"),
+              std::string("HOW DO YOU MISS A TURN AT THREE KILOMETERS AN HOUR?!"));
+}
+
 
 namespace
 {
