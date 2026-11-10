@@ -338,7 +338,11 @@ std::string StopKind(std::string target)
       {"breakfast", "restaurant"},    {"coffee", "coffee"},               {"coffee shop", "coffee"},
       {"cafe", "coffee"},             {"caffeine", "coffee"},             {"restroom", "restroom"},
       {"bathroom", "restroom"},       {"toilet", "restroom"},             {"potty", "restroom"},
-      {"loo", "restroom"},            {"charger", "charging station"},    {"charging station", "charging station"}};
+      {"loo", "restroom"},            {"charger", "charging station"},    {"charging station", "charging station"},
+      // Someone needing help (B126): understood in every phrasing a stop kind is, and answered plainly.
+      {"hospital", "hospital"},       {"er", "emergency room"},           {"e r", "emergency room"},
+      {"emergency room", "emergency room"}, {"urgent care", "urgent care"}, {"police station", "police station"},
+      {"pharmacy", "pharmacy"},       {"drugstore", "pharmacy"},          {"drug store", "pharmacy"}};
   for (auto const & kind : kKinds)
     if (target == kind.first)
       return kind.second;
@@ -389,7 +393,9 @@ std::pair<size_t, std::string> StopSearch(std::string const & words, std::vector
       {"fuel", "gas station"},         {"food", "restaurant"},         {"something to eat", "restaurant"},
       {"a restaurant", "restaurant"},  {"coffee", "coffee"},           {"a coffee shop", "coffee"},
       {"a restroom", "restroom"},      {"a bathroom", "restroom"},     {"restroom", "restroom"},
-      {"bathroom", "restroom"}};
+      {"bathroom", "restroom"},        {"a hospital", "hospital"},     {"the hospital", "hospital"},
+      {"an emergency room", "emergency room"}, {"the emergency room", "emergency room"}, {"an er", "emergency room"},
+      {"the er", "emergency room"},    {"urgent care", "urgent care"}, {"a pharmacy", "pharmacy"}};
   for (char const * cue : {" find ", " need ", " stop for ", " add a stop for ", " find me ", " need to find "})
     for (auto const & want : kWants)
     {
@@ -420,10 +426,22 @@ std::pair<size_t, std::string> StopSearch(std::string const & words, std::vector
   // "I need to go to the bathroom", "we have to stop for lunch": a stop kind after a need.
   for (char const * cue : {" need to go to ", " needs to go to ", " have to go to ", " has to go to ", " gotta go to ",
                            " got to go to ", " need to use ", " needs to use ", " have to use ", " need to stop at ",
-                           " have to stop at ", " need to stop for ", " have to stop for ", " need some ", " need to get "})
+                           " have to stop at ", " need to stop for ", " have to stop for ", " need some ", " need to get ",
+                           " need to get to ", " needs to get to ", " have to get to ", " gotta get to "})
     if (auto const at = words.find(cue); at != std::string::npos)
       if (auto kind = StopKind(StopName(words.substr(at + std::string(cue).size()))); !kind.empty())
         return {at, kind};
+  // "Where's the nearest hospital?", "closest gas station?", "nearest ER": a nearest stop kind asked after, or
+  // said on its own. A named place stays out ("where's the nearest exit" isn't a stop).
+  for (char const * cue : {" where's the nearest ", " wheres the nearest ", " where is the nearest ", " where's the closest ",
+                           " wheres the closest ", " where is the closest ", " where's a ", " where is a "})
+    if (auto const at = words.find(cue); at != std::string::npos)
+      if (auto kind = StopKind(StopName(words.substr(at + std::string(cue).size()))); !kind.empty())
+        return {at, kind};
+  for (char const * lead : {" nearest ", " the nearest ", " closest ", " the closest "})
+    if (words.rfind(lead, 0) == 0)
+      if (auto kind = StopKind(StopName(words.substr(std::string(lead).size()))); !kind.empty())
+        return {0, kind};
   // "Find me a McDonald's", "let's stop at Target on the way": an order, about a place.
   for (char const * cue : {" find me a ", " find me an ", " find a ", " find an ", " find the nearest ", " find the closest ",
                            " find me the nearest ", " find me the closest ", " stop at ", " stop by "})
@@ -874,6 +892,21 @@ bool IsFiller(std::string const & spoken)
   { return std::find_if(std::begin(kFiller), std::end(kFiller), [&word](char const * f) { return word == f; }) != std::end(kFiller); });
 }
 
+bool UrgentPlace(std::string const & place)
+{
+  std::string const words = CommandWords(place);
+  for (char const * help : {" hospital ", " hospitals ", " er ", " e r ", " emergency room ", " emergency ", " urgent care ",
+                            " police ", " police station ", " pharmacy ", " pharmacies ", " drugstore ", " drug store "})
+    if (words.find(help) != std::string::npos)
+      return true;
+  return false;
+}
+
+std::string SearchLineKey(std::string const & base, std::string const & place)
+{
+  return UrgentPlace(place) ? base + ".urgent" : base;
+}
+
 bool WordsSupportTool(AppAction action, std::string const & argument, std::string const & spoken)
 {
   auto const said = WordsOf(spoken);
@@ -922,7 +955,8 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::ListCommands: return saidAny({"commands", "command", "help", "can", "how", "do"});
   case AppAction::FindAlongRoute:
     return argumentSaid() || saidAny({"find", "need", "stop", "gas", "food", "coffee", "restroom", "bathroom", "fuel", "eat",
-                                      "pee", "hungry", "starving", "toilet", "potty", "nearest", "closest", "charger"});
+                                      "pee", "hungry", "starving", "toilet", "potty", "nearest", "closest", "charger",
+                                      "hospital", "er", "emergency", "urgent", "pharmacy", "where's", "where"});
   case AppAction::SkipStop: return saidAny({"stop", "stops"}) && saidAny({"skip", "remove", "cancel", "no"});
   case AppAction::NextStop: return saidAny({"stop"});
   case AppAction::SpeedLimit: return saidAny({"limit"}) || saidAny({"fast"});

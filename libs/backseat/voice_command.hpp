@@ -117,6 +117,13 @@ struct AppCommand
 /// which already listens for them.
 std::vector<AppCommand> ParseAppCommands(std::string const & spoken);
 
+/// Whether a search for `place` is someone needing help: a hospital, emergency room, urgent care, police station
+/// or pharmacy (loop B126). Those searches get plain answers, never a joke about the driver or the place.
+bool UrgentPlace(std::string const & place);
+/// The line key for a search answer: `base` ("search.none", "search.one", "search.results"), with ".urgent" added
+/// when UrgentPlace(place).
+std::string SearchLineKey(std::string const & base, std::string const & place);
+
 /// Whether `heard` is the GPS's own `line` coming back through the mic: most of its meaningful words
 /// are in the line, or three words in a row are. One word isn't enough to tell ("work", "yes").
 bool IsEchoOf(std::string const & heard, std::string const & line);

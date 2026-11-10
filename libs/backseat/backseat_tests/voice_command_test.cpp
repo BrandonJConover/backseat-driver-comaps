@@ -1,10 +1,14 @@
 #include "check.hpp"
 
 #include "backseat/lines.hpp"
+#include "backseat/lines_data.hpp"
 #include "backseat/navigator.hpp"
 #include "backseat/voice_command.hpp"
 
 #include <algorithm>
+#include <cctype>
+#include <initializer_list>
+#include <utility>
 #include <cstdio>
 #include <set>
 
@@ -931,4 +935,88 @@ TEST(DistanceQuestions)
   CHECK(only("how far is the next stop", AppAction::NextStop, ""));
   CHECK(!Heard("how far until the next one", AppAction::FindAlongRoute));
   CHECK(ParseAppCommands("don't tell me how far the next gas station is").empty());
+}
+
+TEST(EmergencySearchesAreHeardAndAnsweredPlainly)
+{
+  // B126: someone asking for a hospital gets it found, and no joke about whether it exists.
+  auto const only = [](char const * said, char const * argument)
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == AppAction::FindAlongRoute && c[0].argument == argument;
+    if (!ok)
+      std::printf("  heard \"%s\": %zu commands, first %s \"%s\"\n", said, c.size(), c.empty() ? "-" : ToolFor(c[0].action).name,
+                  c.empty() ? "" : c[0].argument.c_str());
+    return ok;
+  };
+  for (auto const & [said, place] : std::initializer_list<std::pair<char const *, char const *>>{
+           {"nearest hospital", "hospital"},
+           {"closest hospital", "hospital"},
+           {"the nearest hospital please", "hospital"},
+           {"where's the nearest hospital?", "hospital"},
+           {"Where is the closest hospital", "hospital"},
+           {"I need a hospital", "hospital"},
+           {"we need to get to the hospital", "hospital"},
+           {"find a hospital", "hospital"},
+           {"take me to the nearest hospital", "hospital"},
+           {"nearest ER", "emergency room"},
+           {"where's the nearest E.R.?", "emergency room"},
+           {"I need the ER", "emergency room"},
+           {"find the nearest emergency room", "emergency room"},
+           {"nearest urgent care", "urgent care"},
+           {"we need urgent care", "urgent care"},
+           {"where's the nearest police station", "police station"},
+           {"closest pharmacy", "pharmacy"},
+           {"where is a drugstore", "pharmacy"},
+           {"how far is the nearest hospital", "hospital"},
+           // Ordinary stop kinds get the same new phrasings.
+           {"nearest gas station", "gas station"},
+           {"where's the closest bathroom", "restroom"}})
+  {
+    CHECK(only(said, place));
+    CHECK(WordsSupportTool(AppAction::FindAlongRoute, place, said));
+  }
+  // A named hospital is still a destination, and a nearest thing that isn't a stop is nothing to find.
+  auto const named = ParseAppCommands("take me to Mercy Hospital");
+  CHECK(named.size() == 1 && named[0].action == AppAction::NavigateTo);
+  CHECK(!Heard("where's the nearest exit", AppAction::FindAlongRoute));
+  CHECK(!Heard("police", AppAction::FindAlongRoute));
+  CHECK(!Heard("my sister works at the hospital", AppAction::FindAlongRoute));
+
+  for (char const * place : {"hospital", "Mercy Hospital", "emergency room", "ER", "urgent care", "police station",
+                             "pharmacy", "CVS Pharmacy", "drugstore"})
+    CHECK(UrgentPlace(place));
+  for (char const * place : {"gas station", "restaurant", "coffee", "Walmart", "restroom", "Herbert Street", ""})
+    CHECK(!UrgentPlace(place));
+  CHECK_EQUAL(SearchLineKey("search.none", "hospital"), std::string("search.none.urgent"));
+  CHECK_EQUAL(SearchLineKey("search.one", "Mercy Hospital"), std::string("search.one.urgent"));
+  CHECK_EQUAL(SearchLineKey("search.results", "pharmacy"), std::string("search.results.urgent"));
+  CHECK_EQUAL(SearchLineKey("search.none", "coffee"), std::string("search.none"));
+
+  // The urgent lines exist at every tier and carry none of the plain search lines' jabs or shouting.
+  for (char const * key : {"search.none.urgent", "search.one.urgent", "search.results.urgent"})
+  {
+    auto const it = LineData().find(key);
+    CHECK(it != LineData().end());
+    if (it == LineData().end())
+      continue;
+    for (auto const & tier : it->second)
+    {
+      CHECK(!tier.empty());
+      for (auto const & line : tier)
+      {
+        std::string lower;
+        for (char const c : line)
+          lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        for (char const * jab : {"sure", "real place", "correctly", "imaginary", "make it up", "made it up", "lucky",
+                                 "even you", "wisely", "carefully", "quickly", "try something", "!", "don't make me"})
+          if (lower.find(jab) != std::string::npos)
+          {
+            std::printf("  jab \"%s\" in %s: %s\n", jab, key, line.c_str());
+            CHECK(false);
+          }
+        CHECK(line.find("{place}") != std::string::npos || line.find("{list}") != std::string::npos);
+      }
+    }
+  }
 }
