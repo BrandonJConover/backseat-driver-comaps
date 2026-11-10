@@ -2309,37 +2309,11 @@ std::string WebAddresses(std::string const & text)
   return out;
 }
 
-std::string ForSpeech(std::string const & text)
+namespace
 {
-  std::string s = ReplaceAll(text, "\xC2\xA0", " ");
-  // Web addresses and e-mail first, before the symbol, date and street passes take them apart:
-  // "www.heb.com" is "heb dot com", "jo@example.com" "jo at example dot com".
-  s = WebAddresses(s);
-  // Foreign phrases first, before anything reads their letters as English abbreviations.
-  s = Foreign(s);
-  // Cyrillic map names and quotes the English voice would skip: "улица Ленина" is "ulitsa Lenina".
-  s = Cyrillic(s);
-  // Kana by Hepburn, the same way: "ラーメン" is "ramen", "さくら通り" "sakura 通 ri".
-  s = Kana(s);
-  // Symbols the voice would skip or spell: "½" is "1/2", "#5" "number 5", "/gal" "per gallon".
-  s = Symbols(s);
-  // Dates before ranges and fractions take their parts: "11/6/2026" is "November sixth, twenty twenty
-  // six", "2026-11-06" too, "Nov. 6" "November sixth".
-  if (HasDigit(s))
-    s = Dates(s);
-  // Day abbreviations after dates, so "Sun 11/9" sees the date: "Mon-Fri" is "Monday to Friday".
-  s = Weekdays(s);
-  // Ranges before dashes become pauses: "3–5" is "3 to 5", not "3, 5".
-  if (HasDigit(s))
-    s = Ranges(s);
-  // Clock times before the dash pass can split "9am-5pm".
-  s = Clock(s);
-  // Years as years: "in 1868" is "in eighteen sixty eight", "the 1990s" "the nineteen nineties".
-  if (HasDigit(s))
-    s = Years(s);
-  // Two-digit decades: "the 90s" is "the nineties".
-  if (HasDigit(s))
-    s = Decades(s);
+// ForSpeech: degrees, "~5", plus-minus, dashes as pauses and " & " (moved out of ForSpeech, loop B111).
+std::string DegreesAndDashes(std::string s)
+{
   // Temperatures and approximations: "-5°F" is "minus 5 degrees Fahrenheit", "~5" "about 5".
   // "\xB0" is the second byte of the UTF-8 degree sign, "\xB1" of plus-minus, "\x80" of both dashes.
   bool const degreeSign = HasDigit(s) && HasAny(s, "\xB0");
@@ -2364,26 +2338,12 @@ std::string ForSpeech(std::string const & text)
   if (HasAny(s, "\x80"))
     s = std::regex_replace(s, dash, ", ");
   s = ReplaceAll(s, " & ", " and ");
+  return s;
+}
 
-  // The driver's own words first: they know best.
-  s = ApplyUserWords(s);
-  // Street types abroad: "Calle Ocho" is "KAH-yeh Ocho", "Paseo de la Reforma" keeps its Spanish.
-  s = ForeignStreets(s);
-  // Places said the local way: "Burnet Rd" is BURN-it, "Humble, TX" UM-bul.
-  s = LocalPlaces(s);
-  s = PickSenses(s);
-  // Regnal numbers after a name: "King George VI Ave" is "King George the sixth Ave".
-  s = Regnal(s);
-  // Lettered county roads before the title and street passes take Rd/Hwy: "Co Rd K" is "County Road K".
-  s = CountyRoads(s);
-  // Saint, Doctor, Fort, Junior before the street pass can take them for street types.
-  s = Titles(s);
-  // Suites, apartments and floors after the street: "Lamar Blvd Ste 200" is "Lamar Blvd Suite 200".
-  s = AddressTails(s);
-  // Place-name abbreviations before the street passes: "St. Luke's Med. Ctr." is "Saint Luke's Medical
-  // Center", "Austin-Bergstrom Intl Airport" International, "Acme Inc." Incorporated (loop B108).
-  s = PlaceNameWords(s);
-
+// ForSpeech: street types after a name, type-first streets, road separators, Mount/Point and compass points (moved out of ForSpeech, loop B111).
+std::string StreetsAndCompass(std::string s)
+{
   // "Main St", "Elm Dr." after a word, at the end or before punctuation, a lowercase word or a
   // compass point ("Main St NW"). Not "Dr Smith" or "St Louis". A period after it stays when it
   // may end the sentence ("Elm Ave. Then right.", "onto Oak Rd."); it goes when the sentence plainly
@@ -2450,19 +2410,12 @@ std::string ForSpeech(std::string const & text)
       return std::nullopt;
     return Compass(m.str(1));
   });
-  // Store names as one word or letters: "Buc-ee's" is "Buckees", "H-E-B" "H E B" (after the compass
-  // passes, which would make that E east).
-  s = Brands(s);
-  // Highways, routes and exits the way drivers say them: "I-405" is "I four oh five", "FM 1431"
-  // "F M fourteen thirty one", "TX-71" "Texas seventy one", "Exit 238B" "Exit two thirty eight B".
-  if (HasDigit(s))
-    s = Roads(s);
-  // House numbers in pairs: "1600 Pennsylvania Avenue" is "sixteen hundred ...".
-  if (HasDigit(s))
-    s = HouseNumbers(s);
-  // Everything from here on reads numbers: no digit, nothing left to do.
-  if (!HasDigit(s))
-    return Ellipses(s);
+  return s;
+}
+
+// ForSpeech: money, percent, units, fractions, clock times, ordinals and plain numbers; runs only when a digit is left (moved out of ForSpeech, loop B111).
+std::string NumberWords(std::string s)
+{
   // Money and percentages.
   static std::regex const money("\\$(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d{2}))?\\b");
   if (HasAny(s, "$"))
@@ -2557,8 +2510,78 @@ std::string ForSpeech(std::string const & text)
       said += " point " + Digits(m.str(2));
     return said;
   });
+  return s;
+}
 
-  return Ellipses(s);
+}  // namespace
+
+std::string ForSpeech(std::string const & text)
+{
+  std::string s = ReplaceAll(text, "\xC2\xA0", " ");
+  // Web addresses and e-mail first, before the symbol, date and street passes take them apart:
+  // "www.heb.com" is "heb dot com", "jo@example.com" "jo at example dot com".
+  s = WebAddresses(s);
+  // Foreign phrases first, before anything reads their letters as English abbreviations.
+  s = Foreign(s);
+  // Cyrillic map names and quotes the English voice would skip: "улица Ленина" is "ulitsa Lenina".
+  s = Cyrillic(s);
+  // Kana by Hepburn, the same way: "ラーメン" is "ramen", "さくら通り" "sakura 通 ri".
+  s = Kana(s);
+  // Symbols the voice would skip or spell: "½" is "1/2", "#5" "number 5", "/gal" "per gallon".
+  s = Symbols(s);
+  // Dates before ranges and fractions take their parts: "11/6/2026" is "November sixth, twenty twenty
+  // six", "2026-11-06" too, "Nov. 6" "November sixth".
+  if (HasDigit(s))
+    s = Dates(s);
+  // Day abbreviations after dates, so "Sun 11/9" sees the date: "Mon-Fri" is "Monday to Friday".
+  s = Weekdays(s);
+  // Ranges before dashes become pauses: "3–5" is "3 to 5", not "3, 5".
+  if (HasDigit(s))
+    s = Ranges(s);
+  // Clock times before the dash pass can split "9am-5pm".
+  s = Clock(s);
+  // Years as years: "in 1868" is "in eighteen sixty eight", "the 1990s" "the nineteen nineties".
+  if (HasDigit(s))
+    s = Years(s);
+  // Two-digit decades: "the 90s" is "the nineties".
+  if (HasDigit(s))
+    s = Decades(s);
+  s = DegreesAndDashes(s);
+
+  // The driver's own words first: they know best.
+  s = ApplyUserWords(s);
+  // Street types abroad: "Calle Ocho" is "KAH-yeh Ocho", "Paseo de la Reforma" keeps its Spanish.
+  s = ForeignStreets(s);
+  // Places said the local way: "Burnet Rd" is BURN-it, "Humble, TX" UM-bul.
+  s = LocalPlaces(s);
+  s = PickSenses(s);
+  // Regnal numbers after a name: "King George VI Ave" is "King George the sixth Ave".
+  s = Regnal(s);
+  // Lettered county roads before the title and street passes take Rd/Hwy: "Co Rd K" is "County Road K".
+  s = CountyRoads(s);
+  // Saint, Doctor, Fort, Junior before the street pass can take them for street types.
+  s = Titles(s);
+  // Suites, apartments and floors after the street: "Lamar Blvd Ste 200" is "Lamar Blvd Suite 200".
+  s = AddressTails(s);
+  // Place-name abbreviations before the street passes: "St. Luke's Med. Ctr." is "Saint Luke's Medical
+  // Center", "Austin-Bergstrom Intl Airport" International, "Acme Inc." Incorporated (loop B108).
+  s = PlaceNameWords(s);
+
+  s = StreetsAndCompass(s);
+  // Store names as one word or letters: "Buc-ee's" is "Buckees", "H-E-B" "H E B" (after the compass
+  // passes, which would make that E east).
+  s = Brands(s);
+  // Highways, routes and exits the way drivers say them: "I-405" is "I four oh five", "FM 1431"
+  // "F M fourteen thirty one", "TX-71" "Texas seventy one", "Exit 238B" "Exit two thirty eight B".
+  if (HasDigit(s))
+    s = Roads(s);
+  // House numbers in pairs: "1600 Pennsylvania Avenue" is "sixteen hundred ...".
+  if (HasDigit(s))
+    s = HouseNumbers(s);
+  // Everything from here on reads numbers: no digit, nothing left to do.
+  if (!HasDigit(s))
+    return Ellipses(s);
+  return Ellipses(NumberWords(s));
 }
 
 std::vector<std::pair<std::string, std::string>> Lexicon()

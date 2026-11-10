@@ -913,3 +913,14 @@ TEST(CompactDurationsZeroDecimalsAndSplitExitsAreSaid)
   CHECK_EQUAL(CompactUnits("45m, v2.0 mi, 1.2.0 km, a+12 min, version 2.0"),
               std::string("45m, v2.0 mi, 1.2.0 km, a+12 min, version 2.0"));
 }
+
+TEST(ForSpeechPassOrderSurvivesTheSplit)
+{
+  // Loop B111 split ForSpeech's inline passes into DegreesAndDashes, StreetsAndCompass and NumberWords.
+  // One line crossing all three must read as before: degrees and the dash first, the street type and
+  // compass after the name, then the numbers.
+  CHECK_EQUAL(ForSpeech("It's -5°F — turn onto Main St NW in 0.5 mi, then $3.50 at 2:30"),
+              std::string("It's minus five degrees Fahrenheit, turn onto Main Street Northwest in a half mile, then "
+                          "three dollars and fifty cents at two thirty"));
+  CHECK_EQUAL(ForSpeech("Ave B & Oak Dr. and then left"), std::string("Avenue B and Oak Drive and then left"));
+}
