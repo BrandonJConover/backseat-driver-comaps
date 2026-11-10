@@ -895,3 +895,21 @@ TEST(LetteredCountyRoadsAreSaidAsLetters)
   for (std::string const once : {"Take County Road K K west", "Turn onto Township Road twelve", "Take County Highway P D."})
     CHECK_EQUAL(ForSpeech(once), once);
 }
+
+TEST(CompactDurationsZeroDecimalsAndSplitExitsAreSaid)
+{
+  // Loop B109 (BI-095): "2h 15m" is hours and minutes, "+12 min" more minutes, "2.0 mi" two miles,
+  // "Exit 12B-C" twelve B and C. A second pass changes nothing.
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_DURATIONS_PATH);
+  CHECK(cases.size() >= 20);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+    CHECK_EQUAL(ForSpeech(c.expected), c.expected);
+  }
+  // The pass on its own: only compact units change, digits stay for the number pass.
+  CHECK_EQUAL(CompactUnits("2h 15m, +3 mins, 2.0 mi"), std::string("2 hours 15 minutes, 3 more minutes, 2 mi"));
+  CHECK_EQUAL(CompactUnits("45m, v2.0 mi, 1.2.0 km, a+12 min, version 2.0"),
+              std::string("45m, v2.0 mi, 1.2.0 km, a+12 min, version 2.0"));
+}

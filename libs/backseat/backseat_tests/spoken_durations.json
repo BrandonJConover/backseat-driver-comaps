@@ -1,0 +1,125 @@
+{
+ "about": "Compact durations, .0 decimals and split exits (BI-095, loop B109): an m after an hour count is minutes ('2h 15m' two hours fifteen minutes) while '45m' alone stays meters; glued '1h' is one hour; '+12 min' is 'twelve more minutes'; a '.0' before a unit goes ('2.0 mi' two miles, '1.0 km' one kilometer) but 'version 2.0' stays 'two point zero'; split exits '12B-C' are 'twelve B and C'. Negatives: 'Apt 2h', glued 'x1h', a bare '+'. Backseat Driver: backseat::pronunciation::ForSpeech / CompactUnits (libs/backseat/backseat_tests/spoken_durations.json). EpubToM4B can port the rule; keep both copies in sync.",
+ "cases": [
+  {
+   "input": "2h 15m remaining",
+   "language": "en",
+   "expected": "two hours fifteen minutes remaining"
+  },
+  {
+   "input": "Arrive in 1h 1m",
+   "language": "en",
+   "expected": "Arrive in one hour one minute"
+  },
+  {
+   "input": "1h 5m to go",
+   "language": "en",
+   "expected": "one hour five minutes to go"
+  },
+  {
+   "input": "About 1h left",
+   "language": "en",
+   "expected": "About one hour left"
+  },
+  {
+   "input": "3h of traffic. Fun.",
+   "language": "en",
+   "expected": "three hours of traffic. Fun."
+  },
+  {
+   "input": "In 45m, turn left",
+   "language": "en",
+   "expected": "In forty five meters, turn left"
+  },
+  {
+   "input": "Traffic: +12 min",
+   "language": "en",
+   "expected": "Traffic: twelve more minutes"
+  },
+  {
+   "input": "Delay (+1 min)",
+   "language": "en",
+   "expected": "Delay (one more minute)"
+  },
+  {
+   "input": "Crash ahead, +1 hr",
+   "language": "en",
+   "expected": "Crash ahead, one more hour"
+  },
+  {
+   "input": "In 2.0 mi, keep left",
+   "language": "en",
+   "expected": "In two miles, keep left"
+  },
+  {
+   "input": "Continue for 10.0 miles",
+   "language": "en",
+   "expected": "Continue for ten miles"
+  },
+  {
+   "input": "In 1.0 km, turn right",
+   "language": "en",
+   "expected": "In one kilometer, turn right"
+  },
+  {
+   "input": "In 1.0 mi, take the exit",
+   "language": "en",
+   "expected": "In one mile, take the exit"
+  },
+  {
+   "input": "Exit 12B-C",
+   "language": "en",
+   "expected": "Exit twelve B and C"
+  },
+  {
+   "input": "Take exits 12B-C toward I-10",
+   "language": "en",
+   "expected": "Take exits twelve B and C toward I ten"
+  },
+  {
+   "input": "Use the left 2 lanes to take exit 12B-C",
+   "language": "en",
+   "expected": "Use the left two lanes to take exit twelve B and C"
+  },
+  {
+   "input": "Exits 12A-B",
+   "language": "en",
+   "expected": "Exits twelve A and B"
+  },
+  {
+   "input": "Exit 238B",
+   "language": "en",
+   "expected": "Exit two thirty eight B"
+  },
+  {
+   "input": "Upgrade to version 2.0",
+   "language": "en",
+   "expected": "Upgrade to version two point zero"
+  },
+  {
+   "input": "In 1.05 mi",
+   "language": "en",
+   "expected": "In one point zero five miles"
+  },
+  {
+   "input": "2 hr 15 min",
+   "language": "en",
+   "expected": "two hours fifteen minutes"
+  },
+  {
+   "input": "3 + 4 = 7",
+   "language": "en",
+   "expected": "three + four = seven"
+  },
+  {
+   "input": "Apt 2h",
+   "language": "en",
+   "expected": "Apt 2h"
+  },
+  {
+   "input": "x1h",
+   "language": "en",
+   "expected": "x1h"
+  }
+ ]
+}

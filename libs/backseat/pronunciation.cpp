@@ -1367,6 +1367,11 @@ std::string Roads(std::string const & text)
       return std::nullopt;
     return m.str(1) + m.str(2) + m.str(3) + " or ";
   });
+  // Split exits: "Exit 12B-C" is "Exit twelve B and C", "exits 12A-B" "exits twelve A and B".
+  static std::regex const split("\\b([Ee]xits?|EXITS?) (\\d{1,4})([A-Z])-([A-Z])(?![A-Za-z0-9])");
+  s = Replace(s, split, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return m.str(1) + " " + RouteNumber(m.str(2)) + " " + m.str(3) + " and " + m.str(4);
+  });
   static std::regex const road(
       "\\b(" BACKSEAT_ROUTE_PREFIX ")(-| )(\\d{1,4})([A-Z]?)"
       "(?![A-Za-z0-9]|[.,:/]\\d| ?(?:ft|mi|mph|km|m|yd)\\b)"
@@ -1725,6 +1730,60 @@ std::string DecimalMiles(std::string const & text)
       return std::nullopt;
     return "point " + Digits(frac) + " miles";
   });
+}
+
+std::string CompactUnits(std::string const & text)
+{
+  // A number glued to something before it ("v2.0 mi", "x1h", "1.2.0 km") is left.
+  auto const glued = [](std::string const & t, size_t pos) {
+    if (pos == 0)
+      return false;
+    unsigned char const before = static_cast<unsigned char>(t[pos - 1]);
+    return std::isalnum(before) || std::string_view(".,-/$#_").find(static_cast<char>(before)) != std::string_view::npos;
+  };
+  auto s = text;
+  // "2.0 mi", "10.00 miles", "1.0 km": the ".0" says nothing. Only before a unit, so "version 2.0" stays.
+  static std::regex const zero(
+      "\\b(\\d{1,4})\\.0+(?= ?(?:mi|miles?|km|kilometers?|ft|feet|m|meters?|yd|yards?|mph|kph|hrs?|hours?|"
+      "mins?|minutes?|gal|gallons?)\\b)");
+  if (HasAny(s, "."))
+    s = Replace(s, zero, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+      // "0.0 mi" keeps its point (the distance golden reads "zero point zero miles").
+      if (glued(s, pos) || m.str(1).find_first_not_of('0') == std::string::npos)
+        return std::nullopt;
+      return m.str(1);
+    });
+  // "2h 15m", "1h5m", "2 hr 15 m": an m after an hour count is minutes, not meters.
+  static std::regex const hm("\\b(\\d{1,3}) ?(?:h|hr|hrs) ?(\\d{1,2}) ?(?:m|min|mins)\\b");
+  s = Replace(s, hm, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    if (glued(s, pos))
+      return std::nullopt;
+    auto const h = m.str(1), mins = m.str(2);
+    return h + (h == "1" ? " hour " : " hours ") + mins + (mins == "1" ? " minute" : " minutes");
+  });
+  // "1h", "3h left": glued h is hours ("5 h" with a space stays, it may be a letter).
+  static std::regex const hours("\\b(\\d{1,3})h\\b");
+  s = Replace(s, hours, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    if (glued(s, pos))
+      return std::nullopt;
+    // "Apt 2h", "Gate 3h", "Room 12h" name a place, not a time.
+    static std::regex const place("(?:^|\\s)(?:Apt|Apartment|Unit|Suite|Ste|Room|Rm|Gate|Exit|Bay|Box|Lot|Platform)\\.? $",
+                                  std::regex::icase);
+    if (std::regex_search(s.substr(pos >= 12 ? pos - 12 : 0, pos >= 12 ? 12 : pos), place))
+      return std::nullopt;
+    return m.str(1) + (m.str(1) == "1" ? " hour" : " hours");
+  });
+  // Traffic delays: "+12 min" is "12 more minutes", "+1 hr" "1 more hour".
+  static std::regex const plus("\\+(\\d{1,3}) ?(mins?|minutes?|hrs?|hours?)\\b");
+  if (HasAny(s, "+"))
+    s = Replace(s, plus, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+      if (pos > 0 && !std::isspace(static_cast<unsigned char>(s[pos - 1])) && std::string_view("(:").find(s[pos - 1]) == std::string_view::npos)
+        return std::nullopt;
+      bool const one = m.str(1) == "1";
+      bool const hour = m.str(2)[0] == 'h';
+      return m.str(1) + (hour ? (one ? " more hour" : " more hours") : (one ? " more minute" : " more minutes"));
+    });
+  return s;
 }
 
 std::string FractionsWithUnits(std::string const & text)
@@ -2422,6 +2481,7 @@ std::string ForSpeech(std::string const & text)
     s = std::regex_replace(s, percent, "$1 percent");
   // Fractions before a unit and after a whole number: "1/2 mi" is "a half mile", "1 1/2 mi" "1 and a
   // half miles".
+  s = CompactUnits(s);
   if (HasAny(s, "/"))
     s = FractionsWithUnits(s);
   // Decimal miles the way drivers say them: "0.5 mi" is "a half mile", "0.25 mi" "a quarter mile",

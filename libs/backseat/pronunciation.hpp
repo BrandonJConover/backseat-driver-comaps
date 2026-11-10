@@ -49,6 +49,11 @@ std::string Decades(std::string const & text);
 /// "0.5 mi" -> "a half mile", "2.25 mi" -> "2 and a quarter miles", "0.3 mi" -> "point three miles".
 std::string DecimalMiles(std::string const & text);
 std::string FractionsWithUnits(std::string const & text);
+/// Compact traffic and ETA units: "2h 15m" is "2 hours 15 minutes" (an m after an hour is minutes;
+/// "45m" alone stays meters), "1h" "1 hour", "+12 min" "12 more minutes", and a ".0" before a unit
+/// goes ("2.0 mi" "2 miles", "1.0 km" "1 kilometer"). "version 2.0" and "+12" are left. Part of
+/// ForSpeech; golden cases in backseat_tests/spoken_durations.json.
+std::string CompactUnits(std::string const & text);
 /// Dates said as dates: "11/6/2026" and "2026-11-06" are "November sixth, twenty twenty six", "Nov. 6"
 /// "November sixth", "31/12/1999" "the thirty first of December, ...", "on 12/25" "on December twenty
 /// fifth". Fractions, versions, counts ("May 3 cars") and impossible days are left alone.
