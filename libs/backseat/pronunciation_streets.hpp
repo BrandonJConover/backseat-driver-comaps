@@ -7,6 +7,7 @@
 
 #include <cctype>
 #include <functional>
+#include <initializer_list>
 #include <map>
 #include <optional>
 #include <regex>
@@ -20,6 +21,7 @@ namespace
 {
 // Text helpers these passes share with the rest of pronunciation.cpp, defined there.
 bool IsAsciiLetter(char ch);
+bool HasLetterWord(std::string_view s, std::initializer_list<std::string_view> words);
 std::string Lower(std::string_view w);
 std::string Replace(std::string const & s, std::regex const & re,
                     std::function<std::optional<std::string>(std::smatch const &, size_t)> const & fn);
@@ -188,7 +190,8 @@ std::string CountyRoads(std::string s)
 std::string Titles(std::string s)
 {
   static std::regex const title("\\b(St|Ste|Dr|Ft)\\.? (?=[A-Z][a-z])");
-  s = Replace(s, title, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+  if (HasLetterWord(s, {"St", "Ste", "Dr", "Ft"}))
+    s = Replace(s, title, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (StreetNameBefore(s, pos) &&
         !(m.str(1) == "St" && SaintStreetAfter(s, pos + static_cast<size_t>(m.length(0)))))
       return std::nullopt;
@@ -199,7 +202,8 @@ std::string Titles(std::string s)
   // Jr and Sr after a name. The period goes when the sentence carries on ("King Jr. Blvd",
   // "Jr. was"), and stays when it may end the sentence ("Sammy Davis Jr.").
   static std::regex const suffix("(,? )(Jr|Sr)(\\.?)(?=$|[\\s,;:!?)])");
-  s = Replace(s, suffix, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+  if (HasLetterWord(s, {"Jr", "Sr"}))
+    s = Replace(s, suffix, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (pos == 0 || !IsAsciiLetter(s[pos - 1]))
       return std::nullopt;
     size_t start = pos;
@@ -226,6 +230,8 @@ std::string Titles(std::string s)
   // Road types next to a route number.
   // "Ranch Rd 2222", "County Rd 12": a capitalised word, then Rd and a number.
   static std::regex const roadBefore("\\b(Hwy|Fwy|Expy|Pkwy|Rte|Rd)\\.? (?=\\d)");
+  if (!HasLetterWord(s, {"Hwy", "Fwy", "Expy", "Pkwy", "Rte", "Rd"}))
+    return s;
   s = Replace(s, roadBefore, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (m.str(1) == "Rd" && (pos < 2 || s[pos - 1] != ' ' || !std::isupper(static_cast<unsigned char>(
                                                                     s[s.find_last_of(' ', pos - 2) + 1]))))
@@ -381,6 +387,8 @@ std::string AddressTails(std::string const & s)
 {
   static std::regex const tail(
       "\\b(Ste|Apt|Bldg|Flr|Fl|Rm|Spc|Dept|Ofc|Trlr|Hngr|Unit)\\.? (?:#|number )?(?=(?:\\d{1,5}[A-Z]?|[A-Z])(?:$|[\\s,;:!?.)]))");
+  if (!HasLetterWord(s, {"Ste", "Apt", "Bldg", "Flr", "Fl", "Rm", "Spc", "Dept", "Ofc", "Trlr", "Hngr", "Unit"}))
+    return s;
   return Replace(s, tail, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (!AfterStreetPart(s, pos))
       return std::nullopt;
@@ -397,6 +405,10 @@ std::string MoreStreetTypes(std::string const & s)
   static std::regex const word(
       "\\b(Hts|Plz|Ctr|Tpke|Hl|Vw|Bnd|Crk|Cyn|Gln|Grv|Hbr|Holw|Jct|Lk|Mdw|Mnr|Rdg|Shr|Spg|Sta|Smt|Trce|Vly|Vis|"
       "Vlg|Bch|Brg|Cswy|Frk|Gdns|Ldg|Mtn|Plns|Rnch|Tunl|Ests|Pt)(\\.?)(?=$|[\\s,;:!?.)])");
+  if (!HasLetterWord(s, {"Hts", "Plz", "Ctr", "Tpke", "Hl", "Vw", "Bnd", "Crk", "Cyn", "Gln", "Grv", "Hbr", "Holw",
+                          "Jct", "Lk", "Mdw", "Mnr", "Rdg", "Shr", "Spg", "Sta", "Smt", "Trce", "Vly", "Vis", "Vlg",
+                          "Bch", "Brg", "Cswy", "Frk", "Gdns", "Ldg", "Mtn", "Plns", "Rnch", "Tunl", "Ests", "Pt"}))
+    return s;
   return Replace(s, word, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (!StreetNameBefore(s, pos))
       return std::nullopt;
@@ -493,6 +505,9 @@ std::string PlaceNameWords(std::string const & s)
 {
   static std::regex const word(
       "\\b(Intl|Natl|Univ|Med|Mem|Elem|Comm|Dept|Hosp|Sch|Arpt|Inc|Corp|Co)(\\.?)(?=$|[\\s,;:!?)])");
+  if (!HasLetterWord(s, {"Intl", "Natl", "Univ", "Med", "Mem", "Elem", "Comm", "Dept", "Hosp", "Sch", "Arpt", "Inc",
+                          "Corp", "Co"}))
+    return s;
   return Replace(s, word, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (pos > 0 && (s[pos - 1] == '-' || s[pos - 1] == '.' || s[pos - 1] == '/'))
       return std::nullopt;

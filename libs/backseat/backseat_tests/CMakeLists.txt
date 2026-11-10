@@ -61,6 +61,7 @@ add_executable(${PROJECT_NAME}
   units_test.cpp
   pronunciation_scripts_test.cpp
   speech_fast_path_test.cpp
+  word_screen_test.cpp
   turn_words_test.cpp
   drive_side_test.cpp
   line_filters_test.cpp

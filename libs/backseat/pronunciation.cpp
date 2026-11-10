@@ -199,6 +199,30 @@ bool IsAsciiLetter(char ch)
   return std::isalpha(static_cast<unsigned char>(ch)) != 0;
 }
 
+/// True when one of `words` is a whole run of ASCII letters in `s` ("St" in "Main St.", not in "Stop").
+/// The street, title and day passes screen with it before their regexes (loop B122): each regex only
+/// changes text at a word that is a whole letter run, so a line without one comes back as it went in.
+bool HasLetterWord(std::string_view s, std::initializer_list<std::string_view> words)
+{
+  for (size_t i = 0; i < s.size();)
+  {
+    if (!IsAsciiLetter(s[i]))
+    {
+      ++i;
+      continue;
+    }
+    size_t j = i;
+    while (j < s.size() && IsAsciiLetter(s[j]))
+      ++j;
+    auto const run = s.substr(i, j - i);
+    for (auto const w : words)
+      if (run == w)
+        return true;
+    i = j;
+  }
+  return false;
+}
+
 // ’ (U+2019) as UTF-8.
 constexpr std::string_view kCurly = "\xE2\x80\x99";
 
@@ -1436,13 +1460,19 @@ std::string HouseNumbers(std::string const & text)
   });
 }
 
+bool HasDigit(std::string const & s);
+
 std::string Clock(std::string const & text)
 {
   // "9am-5pm", "9-5pm", "9:30 a.m.–noon": a dash next to a clock time is "to".
   static std::regex const span(
       "(\\b\\d{1,2}(?::[0-5]\\d)?(?: ?[AaPp]\\.? ?[Mm]\\.?)?) ?(?:-|\xE2\x80\x93|\xE2\x80\x94) ?"
       "(?=\\d{1,2}(?::[0-5]\\d)? ?[AaPp]\\.? ?[Mm](?![A-Za-z])|noon\\b|midnight\\b)");
-  auto const s = Replace(text, span, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+  if (!HasDigit(text) && text.find("a.") == std::string::npos && text.find("p.") == std::string::npos &&
+      text.find("A.") == std::string::npos && text.find("P.") == std::string::npos &&
+      text.find("AM") == std::string::npos && text.find("PM") == std::string::npos)
+    return text;
+  auto const s = !HasDigit(text) ? text : Replace(text, span, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     // Only when one side really is a clock time: "9am-5pm", "9-5pm", not "3-5pm" inside "13-5pm".
     if (pos > 0 && (std::isalnum(static_cast<unsigned char>(text[pos - 1])) || text[pos - 1] == '.' ||
                     text[pos - 1] == ',' || text[pos - 1] == '$'))
@@ -2009,6 +2039,8 @@ std::string Weekdays(std::string const & text)
       {"Mon", "Monday"},     {"Tue", "Tuesday"},  {"Tues", "Tuesday"},  {"Wed", "Wednesday"},
       {"Thu", "Thursday"},   {"Thur", "Thursday"}, {"Thurs", "Thursday"}, {"Fri", "Friday"},
       {"Sat", "Saturday"},   {"Sun", "Sunday"}};
+  if (!HasLetterWord(text, {"Mon", "Tues", "Tue", "Wed", "Thurs", "Thur", "Thu", "Fri", "Sat", "Sun"}))
+    return text;
   std::string const & s = text;
   return Replace(s, run, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     std::string const all = m.str(0);
@@ -2392,7 +2424,9 @@ std::string StreetsAndCompass(std::string s)
       BACKSEAT_TYPE_AHEAD ")))");
 #undef BACKSEAT_TAIL_AHEAD
 #undef BACKSEAT_TYPE_AHEAD
-  s = Replace(s, street, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+  if (HasLetterWord(s, {"St", "Ave", "Blvd", "Rd", "Dr", "Ln", "Ct", "Pkwy", "Hwy", "Pl", "Cir", "Ter", "Trl", "Expy",
+                        "Fwy", "Sq", "Cv", "Xing", "Ext"}))
+    s = Replace(s, street, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (pos < 2 || s[pos - 1] != ' ' || !IsAsciiLetter(s[pos - 2]))
       return std::nullopt;
     return Street(m.str(1));
@@ -2401,20 +2435,26 @@ std::string StreetsAndCompass(std::string s)
   s = MoreStreetTypes(s);
   // "Frontage Svc Rd" is a service road; "Ave B" and "Ln 5" name the street after its type.
   static std::regex const service("\\bSvc\\.? (?=(?:Rd|Road|Dr|Drive)\\b)");
-  s = std::regex_replace(s, service, "Service ");
+  if (HasLetterWord(s, {"Svc"}))
+    s = std::regex_replace(s, service, "Service ");
   static std::regex const typeFirst("(^|\\s)(Ave|Cir|Ln)\\.? (?=(?:[A-Z]|\\d+)(?:$|[\\s,;:!?.)]))");
-  s = Replace(s, typeFirst, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+  if (HasLetterWord(s, {"Ave", "Cir", "Ln"}))
+    s = Replace(s, typeFirst, [](std::smatch const & m, size_t) -> std::optional<std::string> {
     return m.str(1) + Street(m.str(2)) + " ";
   });
   // "Main Street / Elm Street", "Grand Avenue / CA-1", "Main Street - Elm Street": two road names, so the
   // slash or dash is a pause (loop B105). "24/7", "and/or" and "1/2 mi" have no road name beside them.
   s = RoadSeparators(s);
   static std::regex const mount("\\bMt\\.? (?=[A-Z])");
-  s = std::regex_replace(s, mount, "Mount ");
+  if (HasLetterWord(s, {"Mt"}))
+    s = std::regex_replace(s, mount, "Mount ");
   // "Pt Reyes", "Pt. Loma Blvd": Point before a capitalised name.
   static std::regex const point("\\bPt\\.? (?=[A-Z][a-z])");
-  s = std::regex_replace(s, point, "Point ");
+  if (HasLetterWord(s, {"Pt"}))
+    s = std::regex_replace(s, point, "Point ");
   // Compass points next to a street name: "N Main", "Main St NW".
+  if (!HasLetterWord(s, {"NE", "NW", "SE", "SW", "N", "S", "E", "W"}))
+    return s;
   static std::regex const compassBefore("(NE|NW|SE|SW|N|S|E|W)\\.?(?= [A-Z0-9])");
   s = Replace(s, compassBefore, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (pos > 0 && !Space(s[pos - 1]))
