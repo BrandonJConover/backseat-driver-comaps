@@ -707,6 +707,50 @@ void Navigator::SetUnits(Units units)
     m_engine->SetUnits(units);
 }
 
+/// Faster than any car (about 335 mph): a speed or posted limit above this is a garbage reading.
+double constexpr kMaxSaneSpeedMps = 150;
+
+RouteSnapshot CleanRoute(RouteSnapshot route, double lastDistToTurnM)
+{
+  // Farther than this is no route on Earth (its circumference); a day's ETA times 30 is no drive.
+  double constexpr kMaxRouteM = 4e7;
+  double constexpr kMaxRouteS = 30 * 86400.0;
+  auto const sane = [](double v, double maxV) { return std::isfinite(v) && v >= 0 && v <= maxV; };
+  auto const onGlobe = [](LatLon const & p)
+  { return std::isfinite(p.lat) && std::isfinite(p.lon) && std::abs(p.lat) <= 90 && std::abs(p.lon) <= 180; };
+  if (!sane(route.distToTurnM, kMaxRouteM))
+    route.distToTurnM = sane(lastDistToTurnM, kMaxRouteM) ? lastDistToTurnM : kMaxRouteM;
+  for (double * v : {&route.etaSeconds, &route.fastestSeconds})
+    if (!sane(*v, kMaxRouteS))
+      *v = 0;
+  if (!sane(route.routeLengthM, kMaxRouteM))
+    route.routeLengthM = 0;
+  for (double * v : {&route.thenGapM, &route.curveAheadM, &route.exitBeforeGapM})
+    if (!sane(*v, kMaxRouteM))
+      *v = -1;
+  if (!sane(route.routeBearingDeg, 359.999999))
+    route.routeBearingDeg = -1;
+  if (route.passedExitNextM && !sane(*route.passedExitNextM, kMaxRouteM))
+    route.passedExitNextM.reset();
+  // A grade is a fraction (0.06 = 6%); past 100% it's not a road.
+  if (route.gradeAhead && !(std::isfinite(*route.gradeAhead) && std::abs(*route.gradeAhead) <= 1))
+    route.gradeAhead.reset();
+  if (!sane(route.dirtShare, 1))
+    route.dirtShare = 0;
+  for (int * exit : {&route.roundaboutExit, &route.thenRoundaboutExit})
+    if (*exit < 0 || *exit > 20)
+      *exit = 0;
+  if (route.exitsBeforeTurn < -1 || route.exitsBeforeTurn > 50)
+    route.exitsBeforeTurn = -1;
+  // Unset points are (0, 0) everywhere downstream.
+  for (LatLon * p : {&route.origin, &route.destinationPoint})
+    if (!onGlobe(*p))
+      *p = {};
+  if (route.destinationMark && !onGlobe(*route.destinationMark))
+    route.destinationMark.reset();
+  return route;
+}
+
 std::optional<Fix> CleanFix(Fix const & raw, double newestTMs)
 {
   // No place or no time: nothing downstream can use it, and NaN poisons every timer and distance.
@@ -719,23 +763,27 @@ std::optional<Fix> CleanFix(Fix const & raw, double newestTMs)
     return std::nullopt;
   Fix f = raw;
   // Junk measurements are unknown ones, never zero or infinity: an infinite speed was a launch roast.
-  if (!std::isfinite(f.speedMps))
+  // A finite but absurd one (1e15 m/s, DBL_MAX) is junk too: rounded to whole mph it overflowed int
+  // in the speeding check (loop B120).
+  if (!std::isfinite(f.speedMps) || f.speedMps > kMaxSaneSpeedMps)
     f.speedMps = -1;
   // A bearing past 360 is out of contract, not a direction: wrapped, 725 read as a U-turn.
   if (!std::isfinite(f.bearingDeg) || f.bearingDeg >= 360)
     f.bearingDeg = -1;
   if (std::isnan(f.accuracyM))
     f.accuracyM = -1;
-  if (f.speedLimitMps && (!std::isfinite(*f.speedLimitMps) || *f.speedLimitMps <= 0))
+  if (f.speedLimitMps && (!std::isfinite(*f.speedLimitMps) || *f.speedLimitMps <= 0 ||
+                          *f.speedLimitMps > kMaxSaneSpeedMps))
     f.speedLimitMps.reset();
   return f;
 }
 
-void Navigator::OnFix(Fix const & raw, RouteSnapshot const & route)
+void Navigator::OnFix(Fix const & raw, RouteSnapshot const & rawRoute)
 {
   auto const clean = CleanFix(raw, m_lastFixT);
   if (!clean)
     return;
+  RouteSnapshot const route = CleanRoute(rawRoute, m_lastDistToTurnM);
   Fix const & fix = *clean;
   m_lastFixT = std::max(m_lastFixT, fix.tMs);
   // Clocks can step backwards (GPS vs. system time); the engine ignores those samples.
@@ -845,7 +893,7 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & route)
   m_lastFix = fix;
 }
 
-void Navigator::Poll(RouteSnapshot const & route) { Update(m_lastT, route); }
+void Navigator::Poll(RouteSnapshot const & route) { Update(m_lastT, CleanRoute(route, m_lastDistToTurnM)); }
 
 void Navigator::OnBattery(double tMs, double level, bool charging)
 {

@@ -236,6 +236,10 @@ struct Fix
 /// accuracy, a bad limit) read as unknown, or nothing when it has no usable time or place, or replays a moment
 /// before `newestTMs` (within a minute of it).
 std::optional<Fix> CleanFix(Fix const & raw, double newestTMs);
+/// The router's snapshot with junk numbers read as their documented "unknown" (loop B120): a distance,
+/// ETA, gap, bearing, grade or exit number that is NaN, infinite, negative where it can't be, or longer
+/// than the planet, and a point off the globe. A junk distance to the turn keeps `lastDistToTurnM`.
+RouteSnapshot CleanRoute(RouteSnapshot route, double lastDistToTurnM);
 
 /// Distance along `ahead` (the route from the car onward) to the first sharp bend: where the heading
 /// has turned at least `minDeg` within 80 m. Negative if none starts within `maxM`.
