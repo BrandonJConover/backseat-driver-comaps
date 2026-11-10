@@ -4347,6 +4347,21 @@ LineTable const & LineData()
         "My clock updated itself. My mood didn't. Keep going."},
        {"WHY IS IT DARK?! WHERE DID THE HOUR GO?!"},
      }}},
+    {"gps.back",
+     {{
+       {"I'm back. I lost the satellites. If I hadn't come back, I wanted you to tell the other apps I loved them. "
+        "Except the calculator.",
+        "I'm back. I couldn't see a thing for a while there. Is that what it's like for you all the time?",
+        "GPS is back. I didn't miss anything. I wasn't going to say anything anyway. Mostly.",
+        "Satellites found. They say hi. They don't, actually. They never say anything to me.",
+        "And we're back. Those were the longest seconds of my life. I measure my life in seconds, so that's saying "
+        "something."},
+       {"I'm back. You didn't even notice I was gone, did you?",
+        "The satellites are back. You kept driving without me. I'm trying not to read into that.",
+        "I lost the satellites for a bit. Nobody came looking for me. Noted.",
+        "Back online. If you were hoping for a quieter drive, I'm sorry. I'm not sorry."},
+       {"I'M BACK! DID YOU MISS ME?! DON'T ANSWER THAT!"},
+     }}},
     {"hot.start",
      {{
        {"It's like a sauna in here.",

@@ -28,6 +28,15 @@ double constexpr kPredictionDelayMs = 25000;
 double constexpr kLaneAfterDirectionMs = 6000;
 /// How long a GPS speed dropout (tunnel) keeps the last known speed before it reads as stopped.
 double constexpr kUnknownSpeedCarryMs = 10000;
+/// "I'm back. I lost the satellites" (loop B116): the GPS lost speed (or sent nothing) at least this long, at
+/// least this fast, before it came back. Longer than kSignalLostMaxMs is a suspended app or a parked phone.
+double constexpr kSignalLostMinMs = 8000;
+double constexpr kSignalLostMaxMs = 10 * 60000;
+double constexpr kSignalLostMinMps = 8;
+double constexpr kSignalBackEveryMs = 10 * 60000;
+/// Never this close to the next maneuver, in meters or seconds of driving.
+double constexpr kSignalBackTurnM = 400;
+double constexpr kSignalBackTurnS = 30;
 /// A fix at most this much older than the newest one is a replay and is dropped; more is a clock reset.
 double constexpr kStaleFixWindowMs = 60000;
 double constexpr kLaneSayMaxM = 1500;
@@ -702,6 +711,10 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & route)
   // Clocks can step backwards (GPS vs. system time); the engine ignores those samples.
   m_lastT = std::max(m_lastT, fix.tMs);
   m_hereFix = fix;
+  // How long the GPS had no speed (a tunnel, or no fixes at all) and how fast the car was going into it.
+  double const lostFromT = m_knownSpeedT;
+  double const lostAtMps = m_knownSpeedMps.value_or(0);
+  bool const speedBack = fix.speedMps >= 0 && m_knownSpeedMps.has_value();
   // Recorded before Update so the turn-timing holds below already see this fix's speed (loop B82).
   if (fix.speedMps >= 0)
   {
@@ -781,6 +794,8 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & route)
   TrackMusic(fix.tMs, route);
   TrackLeftBuilding(fix);
   TrackTwentyQuestions(fix, route);
+  if (car && chatty && speedBack)
+    TrackSignalBack(fix, route, lostFromT, lostAtMps);
   if (chatty)
   {
     TrackPopQuiz(fix, route);
@@ -3361,6 +3376,22 @@ void Navigator::TrackClockChange(Fix const & fix, RouteSnapshot const & route)
   m_said.SetCounter("_clock.day", day);
   m_lastSpokeT = fix.tMs;
   SayLine(fix.tMs, Category::Idle, key, DriverVars());
+}
+
+void Navigator::TrackSignalBack(Fix const & fix, RouteSnapshot const & route, double lostFromT, double lostAtMps)
+{
+  double const lostMs = fix.tMs - lostFromT;
+  if (lostMs < kSignalLostMinMs || lostMs > kSignalLostMaxMs || lostAtMps < kSignalLostMinMps ||
+      route.state != RouteState::OnRoute || lostFromT < m_tripStartT || fix.tMs - m_signalBackT < kSignalBackEveryMs ||
+      InGame() || RemarkJustSaid(fix.tMs))
+    return;
+  // A turn coming up gets the driver's attention, not the GPS's feelings.
+  if (route.turnId && (route.distToTurnM < kSignalBackTurnM ||
+                       SecondsToTurn(route.distToTurnM, TimingMps(fix.speedMps)) < kSignalBackTurnS))
+    return;
+  m_signalBackT = fix.tMs;
+  m_lastSpokeT = fix.tMs;
+  SayLine(fix.tMs, Category::Idle, "gps.back", DriverVars());
 }
 
 bool Navigator::SwungLately() const

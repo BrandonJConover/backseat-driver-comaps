@@ -580,6 +580,8 @@ private:
   /// The trip started indoors: say so, and maybe remark on it once the car gets out.
   void SayIndoorStart(double tMs, RouteSnapshot const & route);
   void TrackLeftBuilding(Fix const & fix);
+  /// "I'm back" on the first fix with a speed after a GPS dropout at road speed (loop B116).
+  void TrackSignalBack(Fix const & fix, RouteSnapshot const & route, double lostFromT, double lostAtMps);
   /// Dead stretch with nothing to say about directions: a phone call, I spy, or a useless fact.
   void TrackQuietBits(Fix const & fix, RouteSnapshot const & route);
   void StartCall(double tMs);
@@ -914,6 +916,8 @@ private:
   double m_groceryT = -1e18;
   bool m_groceriesSaid = false;
   bool m_clockChecked = false;
+  /// When "gps.back" was last said; kept across trips (once per 10 minutes).
+  double m_signalBackT = -1e18;
   /// The trip started at a bar late at night and its night-out line is still to come; whether the car has left the lot.
   bool m_fromNightlife = false;
   bool m_nightMoved = false;
