@@ -1217,6 +1217,77 @@ TEST(UTurnsFeelFamiliar)
   CHECK(!SaidKey(nav.TakeLines(), "uturn"));
 }
 
+TEST(InstructedUTurnIsNotMocked)
+{
+  Navigator nav(Config());
+  RouteSnapshot route = OnRoute(1, TurnKind::UTurn, 200);
+  route.routeBearingDeg = 10;
+  for (int i = 0; i < 5; ++i)
+    nav.OnFix(Heading(i * 1000, 8, 10), route);
+  // The route turns around and the car follows it.
+  route.routeBearingDeg = 100;
+  nav.OnFix(Heading(6000, 8, 100), route);
+  route.routeBearingDeg = 190;
+  nav.OnFix(Heading(8000, 8, 190), route);
+  for (int i = 0; i < 5; ++i)
+    nav.OnFix(Heading(9000 + i * 1000, 8, 190), route);
+  CHECK(!SaidKey(nav.TakeLines(), "uturn"));
+}
+
+TEST(HairpinSwitchbacksOnTheRouteAreNotUTurns)
+{
+  Navigator nav(Config());
+  RouteSnapshot route = OnRoute(1, TurnKind::Left, 3000);
+  double t = 0;
+  bool said = false;
+  // Three switchbacks up a mountain, the route bearing following each one.
+  for (int bend = 0; bend < 3; ++bend)
+  {
+    double const from = bend % 2 == 0 ? 10 : 190;
+    for (int i = 0; i < 6; ++i, t += 1000)
+    {
+      route.routeBearingDeg = from;
+      nav.OnFix(Heading(t, 8, from), route);
+    }
+    for (double d : {from + 60, from + 120, from + 180})
+    {
+      route.routeBearingDeg = std::fmod(d, 360.0);
+      nav.OnFix(Heading(t, 8, std::fmod(d, 360.0)), route);
+      t += 1500;
+    }
+    said = said || SaidKey(nav.TakeLines(), "uturn");
+  }
+  CHECK(!said);
+}
+
+TEST(TurningBackAgainstTheRouteIsStillAUTurn)
+{
+  Navigator nav(Config());
+  RouteSnapshot route = OnRoute(1, TurnKind::Left, 2000);
+  route.routeBearingDeg = 10;
+  for (int i = 0; i < 5; ++i)
+    nav.OnFix(Heading(i * 1000, 8, 10), route);
+  nav.OnFix(Heading(6000, 8, 100), route);
+  nav.OnFix(Heading(8000, 8, 190), route);
+  CHECK(SaidKey(nav.TakeLines(), "uturn"));
+}
+
+TEST(OffRouteUTurnIsStillMentioned)
+{
+  Navigator nav(Config());
+  // Off the route, waiting on a reroute: a stale route bearing that happens to match doesn't count.
+  RouteSnapshot route = OnRoute(1, TurnKind::Left, 2000);
+  for (int i = 0; i < 2; ++i)
+    nav.OnFix(Heading(i * 1000, 8, 10), route);
+  route.state = RouteState::OffRoute;
+  route.routeBearingDeg = 190;
+  for (int i = 2; i < 5; ++i)
+    nav.OnFix(Heading(i * 1000, 8, 10), route);
+  nav.OnFix(Heading(6000, 8, 100), route);
+  nav.OnFix(Heading(8000, 8, 190), route);
+  CHECK(SaidKey(nav.TakeLines(), "uturn"));
+}
+
 TEST(CurvesAheadAreFoundOnTheRouteLine)
 {
   // North 300 m, then a 90-degree bend east.

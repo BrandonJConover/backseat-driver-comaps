@@ -271,6 +271,8 @@ int constexpr kWrongWayMaxPerTrip = 3;
 double constexpr kUTurnDeg = 160;
 double constexpr kUTurnMinAgoMs = 4000;
 double constexpr kUTurnMaxAgoMs = 30000;
+// A reversal whose new heading is this close to the route's bearing follows the route.
+double constexpr kUTurnOnRouteDeg = 45;
 // ...counting headings only while actually moving.
 double constexpr kUTurnMinMps = 1.5;
 double constexpr kUTurnEveryMs = 120000;
@@ -2046,6 +2048,15 @@ void Navigator::TrackUTurn(Fix const & fix, RouteSnapshot const & route)
       break;
     if (std::fabs(std::fmod(fix.bearingDeg - deg + 540.0, 360.0) - 180.0) >= kUTurnDeg)
     {
+      // The route itself turned back (an instructed U-turn, a hairpin switchback): the
+      // driver did what they were told, so there's nothing to mock. Consume the reversal.
+      if (route.state == RouteState::OnRoute && route.routeBearingDeg >= 0 &&
+          std::fabs(std::fmod(fix.bearingDeg - route.routeBearingDeg + 540.0, 360.0) - 180.0) <= kUTurnOnRouteDeg)
+      {
+        Trace("say.dropped", {{"key", "uturn"}, {"why", "route"}});
+        m_headings.clear();
+        return;
+      }
       SayLine(fix.tMs, Category::UTurn, "uturn");
       ++m_uTurnsSaid;
       m_lastUTurnT = fix.tMs;
