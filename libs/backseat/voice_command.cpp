@@ -615,6 +615,22 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       break;
     }
   }
+  // "Sorry?", "pardon me?", "one more time": a whole utterance asking for the direction again. Only the whole
+  // thing counts, so "sorry I missed the exit" or "excuse me while I sneeze" stay chatter, and a bare "huh" or
+  // "what" (said at the radio as often as at the app) is left alone.
+  if (found.empty())
+  {
+    std::string whole = words;
+    for (std::string const tail : {" please ", " thanks "})
+      if (whole.size() > tail.size() && whole.compare(whole.size() - tail.size(), tail.size(), tail) == 0)
+        whole.erase(whole.size() - tail.size() + 1);
+    static char const * const kSayAgain[] = {" sorry ", " sorry what ", " pardon ", " pardon me ", " excuse me ",
+                                             " repeat ", " repeat it ", " again ", " one more time ",
+                                             " say it again ", " what was it ", " i missed that ", " didn't catch that ",
+                                             " i didn't catch that ", " didnt catch that ", " i didnt catch that "};
+    if (std::any_of(std::begin(kSayAgain), std::end(kSayAgain), [&whole](char const * s) { return whole == s; }))
+      found.push_back({0, AppCommand{AppAction::RepeatInstruction, {}}});
+  }
   // "Use the echo voice" / "switch to heart voice": a voice named without the cue words above.
   if (voiceNamed && std::none_of(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::ChangeVoice; }))
     if (auto name = VoiceArgument(words); !name.empty())

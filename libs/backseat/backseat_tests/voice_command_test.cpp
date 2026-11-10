@@ -1020,3 +1020,26 @@ TEST(EmergencySearchesAreHeardAndAnsweredPlainly)
     }
   }
 }
+
+TEST(SayAgainFormsRepeatTheDirection)
+{
+  // B127: short "say again" utterances repeat the last direction; the same words inside chatter don't.
+  for (char const * said : {"Sorry?", "sorry what?", "Pardon?", "pardon me?", "Excuse me?", "repeat", "Repeat, please.",
+                            "repeat that", "repeat that please", "again please", "Again?", "one more time",
+                            "one more time please", "say it again", "I didn't catch that.", "didn't catch that"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == AppAction::RepeatInstruction;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(ok);
+  }
+  for (char const * said : {"sorry I missed the exit", "excuse me while I sneeze", "I'm sorry", "huh", "what", "what?",
+                            "again with the traffic", "repeat after me", "pardon my french", "sorry not sorry",
+                            "one more time and I'm turning you off please", "thanks"})
+    CHECK(!Heard(said, AppAction::RepeatInstruction));
+  // Still the plain direction cues, unchanged.
+  CHECK(Heard("say that again", AppAction::RepeatInstruction));
+  CHECK(Heard("sorry, what's the next turn", AppAction::NextTurn));
+  CHECK(!Heard("sorry, what's the next turn", AppAction::RepeatInstruction));
+}
