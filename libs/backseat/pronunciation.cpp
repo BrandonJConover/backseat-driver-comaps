@@ -2696,15 +2696,28 @@ namespace detail
 {
 std::u32string Decode(std::string const & s)
 {
+  // A byte that can't start a sequence (a stray continuation byte, 0xF8-0xFF) or a lead byte
+  // whose continuation bytes are missing becomes one U+FFFD and only that byte is used up, so a
+  // bad byte in a street name never swallows the letters after it ("\x80Main" kept "Main").
+  // Surrogates (CESU-8 from JNI) still decode as they are and Encode writes them back unchanged.
   std::u32string out;
   for (size_t i = 0; i < s.size();)
   {
     auto const c = static_cast<unsigned char>(s[i]);
-    int len = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : 4;
+    int const len = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : (c >> 3) == 30 ? 4 : 0;
+    bool ok = len > 0 && i + len <= s.size();
+    for (int k = 1; ok && k < len; ++k)
+      ok = (static_cast<unsigned char>(s[i + k]) & 0xC0) == 0x80;
+    if (!ok)
+    {
+      out += U'\uFFFD';
+      ++i;
+      continue;
+    }
     char32_t cp = len == 1 ? c : len == 2 ? (c & 0x1F) : len == 3 ? (c & 0x0F) : (c & 0x07);
-    for (int k = 1; k < len && i + k < s.size(); ++k)
+    for (int k = 1; k < len; ++k)
       cp = (cp << 6) | (static_cast<unsigned char>(s[i + k]) & 0x3F);
-    out += cp;
+    out += cp > 0x10FFFF ? U'\uFFFD' : cp;
     i += len;
   }
   return out;
@@ -2715,6 +2728,8 @@ std::string Encode(std::u32string const & s)
   std::string out;
   for (char32_t cp : s)
   {
+    if (cp > 0x10FFFF)
+      cp = 0xFFFD;
     if (cp < 0x80)
       out += static_cast<char>(cp);
     else if (cp < 0x800)

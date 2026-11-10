@@ -59,6 +59,7 @@ add_executable(${PROJECT_NAME}
   stop_go_test.cpp
   twenty_questions_test.cpp
   units_test.cpp
+  pronunciation_scripts_test.cpp
   speech_fast_path_test.cpp
   turn_words_test.cpp
   drive_side_test.cpp
