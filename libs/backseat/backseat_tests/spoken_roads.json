@@ -434,7 +434,7 @@
   {
    "input": "Smith & Sons Co.",
    "language": "en",
-   "expected": "Smith and Sons Co."
+   "expected": "Smith and Sons Company."
   },
   {
    "input": "Take I-35 W",

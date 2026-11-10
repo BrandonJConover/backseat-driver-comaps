@@ -866,6 +866,20 @@ TEST(StreetTypesBeforeASeparatorAreSaid)
   }
 }
 
+TEST(PlaceNameAbbreviationsAreSaidInFull)
+{
+  // Loop B108 (BI-094): "Intl", "Med. Ctr.", "Univ. of", "Inc." inside place names are said in full; lowercase
+  // words, county roads and a "Co" with a name after it are left. A second pass changes nothing.
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_PLACE_NAMES_PATH);
+  CHECK(cases.size() >= 20);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+    CHECK_EQUAL(ForSpeech(c.expected), c.expected);
+  }
+}
+
 TEST(LetteredCountyRoadsAreSaidAsLetters)
 {
   // Loop B106 (BI-092): "Co Rd K" is "County Road K", "Hwy KK" "Highway K K", grid house numbers keep
@@ -874,7 +888,8 @@ TEST(LetteredCountyRoadsAreSaidAsLetters)
   CHECK_EQUAL(ForSpeech("Turn onto Co Rd K"), std::string("Turn onto County Road K"));
   CHECK_EQUAL(ForSpeech("Arrive at N1234 County Rd K"), std::string("Arrive at N twelve thirty four County Road K"));
   // Not a county road: the company, the Honda, a direction after a bare highway.
-  CHECK_EQUAL(ForSpeech("Smith & Sons Co."), std::string("Smith and Sons Co."));
+  // (Loop B108 says the company's "Co." in full.)
+  CHECK_EQUAL(ForSpeech("Smith & Sons Co."), std::string("Smith and Sons Company."));
   CHECK_EQUAL(ForSpeech("Park the CR-V"), std::string("Park the CR-V"));
   CHECK_EQUAL(ForSpeech("Take Hwy N"), std::string("Take Highway North"));
   for (std::string const once : {"Take County Road K K west", "Turn onto Township Road twelve", "Take County Highway P D."})

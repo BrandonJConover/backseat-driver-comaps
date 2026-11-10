@@ -2321,6 +2321,9 @@ std::string ForSpeech(std::string const & text)
   s = Titles(s);
   // Suites, apartments and floors after the street: "Lamar Blvd Ste 200" is "Lamar Blvd Suite 200".
   s = AddressTails(s);
+  // Place-name abbreviations before the street passes: "St. Luke's Med. Ctr." is "Saint Luke's Medical
+  // Center", "Austin-Bergstrom Intl Airport" International, "Acme Inc." Incorporated (loop B108).
+  s = PlaceNameWords(s);
 
   // "Main St", "Elm Dr." after a word, at the end or before punctuation, a lowercase word or a
   // compass point ("Main St NW"). Not "Dr Smith" or "St Louis". A period after it stays when it

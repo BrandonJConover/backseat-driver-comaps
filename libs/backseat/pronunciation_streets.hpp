@@ -426,5 +426,113 @@ std::string MoreStreetTypes(std::string const & s)
     return m[2].length() > 0 ? std::optional<std::string>(out + ".") : std::nullopt;
   });
 }
+
+// MARK: - Place-name abbreviations (loop B108)
+
+/// Abbreviations inside place names: "Austin-Bergstrom Intl Airport", "St. Luke's Med. Ctr.", "Univ. of
+/// Texas", "Acme Inc.". Lead words sit inside a name and drop their period before the next name word;
+/// tail words end one and keep a period that may end the sentence ("Arriving at Acme Inc.").
+struct PlaceWord
+{
+  char const * abbreviation;
+  char const * word;
+  bool tail;
+};
+
+PlaceWord const kPlaceWords[] = {
+    {"Intl", "International", false}, {"Natl", "National", false},  {"Univ", "University", false},
+    {"Med", "Medical", false},         {"Mem", "Memorial", false},   {"Elem", "Elementary", false},
+    {"Comm", "Community", false},      {"Dept", "Department", false}, {"Hosp", "Hospital", true},
+    {"Sch", "School", true},           {"Arpt", "Airport", true},     {"Inc", "Incorporated", true},
+    {"Corp", "Corporation", true},     {"Co", "Company", true},
+};
+
+/// The word right before `pos` (skipping spaces and one comma, "Acme, Inc."), or empty.
+std::string PlaceWordBefore(std::string const & s, size_t pos)
+{
+  while (pos > 0 && Space(s[pos - 1]))
+    --pos;
+  if (pos > 0 && s[pos - 1] == ',')
+    --pos;
+  while (pos > 0 && Space(s[pos - 1]))
+    --pos;
+  size_t start = pos;
+  while (start > 0 && (std::isalnum(static_cast<unsigned char>(s[start - 1])) || s[start - 1] == '\''))
+    --start;
+  return s.substr(start, pos - start);
+}
+
+/// The word starting at `pos` after spaces, and where it ends.
+std::string PlaceWordAfter(std::string const & s, size_t pos, size_t & end)
+{
+  while (pos < s.size() && Space(s[pos]))
+    ++pos;
+  end = pos;
+  while (end < s.size() && (std::isalnum(static_cast<unsigned char>(s[end])) || s[end] == '\''))
+    ++end;
+  return s.substr(pos, end - pos);
+}
+
+bool UpperStart(std::string const & w)
+{
+  return !w.empty() && std::isupper(static_cast<unsigned char>(w[0]));
+}
+
+/// A capitalised name word, not a lead-in like "Head" or "Onto".
+bool Capitalised(std::string const & w)
+{
+  return UpperStart(w) && !LeadInWord(Lower(w));
+}
+
+/// Expands kPlaceWords inside a name: a lead word needs a capitalised word on either side ("Veterans Mem
+/// Park", "Univ. of Texas", "Intl Blvd"); a tail word needs a name before it ("Methodist Hosp", "Acme,
+/// Inc.", "Smith and Sons Co.") and, for "Co", nothing named after it ("Weld Co Sheriff" may be a county;
+/// "Co Rd" is CountyRoads'). Exact case only, so "med school" and "inc" stay. Runs after Titles and
+/// AddressTails, before the street passes, so "Med. Ctr." is "Medical Center".
+std::string PlaceNameWords(std::string const & s)
+{
+  static std::regex const word(
+      "\\b(Intl|Natl|Univ|Med|Mem|Elem|Comm|Dept|Hosp|Sch|Arpt|Inc|Corp|Co)(\\.?)(?=$|[\\s,;:!?)])");
+  return Replace(s, word, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    if (pos > 0 && (s[pos - 1] == '-' || s[pos - 1] == '.' || s[pos - 1] == '/'))
+      return std::nullopt;
+    PlaceWord const * place = nullptr;
+    for (auto const & w : kPlaceWords)
+      if (m.str(1) == w.abbreviation)
+        place = &w;
+    size_t const after = pos + static_cast<size_t>(m.length(0));
+    size_t end = after;
+    auto next = PlaceWordAfter(s, after, end);
+    bool const spaceNext = after < s.size() && Space(s[after]);
+    if (next == "of" && spaceNext)
+    {
+      size_t ofEnd = end;
+      auto const named = PlaceWordAfter(s, end, ofEnd);
+      if (Capitalised(named))
+        next = named;
+    }
+    auto const before = PlaceWordBefore(s, pos);
+    // "5th St Mem Hosp": an ordinal names a place too.
+    bool const nameBefore = Capitalised(before) || (!before.empty() && std::isdigit(static_cast<unsigned char>(before[0])) &&
+                                                    std::isalpha(static_cast<unsigned char>(before.back())));
+    bool const nameAfter = spaceNext && Capitalised(next);
+    if (place->tail)
+    {
+      bool const andBefore = before == "and" || before == "&";
+      if (!nameBefore && !andBefore)
+        return std::nullopt;
+      if (m.str(1) == "Co" && nameAfter && m[2].length() == 0)
+        return std::nullopt;
+      // "Acme Inc. Then left" ends the sentence; "Acme Inc., then left" and "Acme Inc. and" carry on.
+      bool const keepPeriod = m[2].length() > 0 && (after >= s.size() || (spaceNext && UpperStart(next)));
+      return std::string(place->word) + (keepPeriod ? "." : "");
+    }
+    if (!nameBefore && !nameAfter)
+      return std::nullopt;
+    // "Med. Ctr." and "Univ. of Texas" carry on; "Lincoln Elem." may end the sentence.
+    bool const keepPeriod = m[2].length() > 0 && !nameAfter && (after >= s.size() || !spaceNext || UpperStart(next));
+    return std::string(place->word) + (keepPeriod ? "." : "");
+  });
+}
 }  // namespace
 }  // namespace backseat::pronunciation
