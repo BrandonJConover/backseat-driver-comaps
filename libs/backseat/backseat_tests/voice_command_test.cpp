@@ -842,3 +842,51 @@ TEST(TalkLessKeepsTheTurns)
   CHECK(AppActionNamed("talk_less") == AppAction::TalkLess);
   CHECK(AppActionNamed("talk_more") == AppAction::TalkMore);
 }
+
+TEST(NegatedRoadPreferencesAndReroutes)
+{
+  // B124: "don't take the highway" means avoid it, not nothing.
+  auto const only = [](char const * said, AppAction action)
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == action;
+    if (!ok)
+      std::printf("  heard \"%s\": %zu commands, first %s\n", said, c.size(), c.empty() ? "-" : ToolFor(c[0].action).name);
+    return ok;
+  };
+  for (char const * said : {"don't take the highway", "skip the highway", "stay off the highway", "stay off highways",
+                            "please don't use the freeway", "skip the highways today", "don’t take the freeway",
+                            "don't take the highway, avoid highways"})
+  {
+    CHECK(only(said, AppAction::AvoidHighways));
+    CHECK(WordsSupportTool(AppAction::AvoidHighways, "", said));
+  }
+  for (char const * said : {"don't use toll roads", "stay off toll roads", "stay off the toll roads", "skip toll roads",
+                            "please don't take toll roads"})
+  {
+    CHECK(only(said, AppAction::AvoidTolls));
+    CHECK(WordsSupportTool(AppAction::AvoidTolls, "", said));
+  }
+  // The other way round: not avoiding is allowing.
+  for (char const * said : {"don't avoid tolls", "don't avoid toll roads"})
+  {
+    CHECK(!Heard(said, AppAction::AvoidTolls));
+    CHECK(only(said, AppAction::AllowTolls));
+  }
+  CHECK(only("don't avoid highways", AppAction::AllowHighways));
+  // A question isn't a negation: "why don't we take the highway" still allows it.
+  CHECK(only("why don't we take the highway", AppAction::AllowHighways));
+  for (char const * said : {"reroute", "reroute me", "re-route me please", "find a faster route", "is there a faster way",
+                            "is there a quicker route", "find me a shorter route"})
+  {
+    CHECK(only(said, AppAction::DifferentRoute));
+    CHECK(WordsSupportTool(AppAction::DifferentRoute, "", said));
+  }
+  CHECK(!Heard("find a faster route", AppAction::FindAlongRoute));
+  CHECK(ParseAppCommands("don't reroute me").empty());
+  CHECK(!WordsSupportTool(AppAction::DifferentRoute, "", "the route is fine"));
+  // What already worked still does.
+  CHECK(only("avoid tolls", AppAction::AvoidTolls));
+  CHECK(only("take the highway", AppAction::AllowHighways));
+  CHECK(only("find a different route", AppAction::DifferentRoute));
+}

@@ -502,19 +502,25 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                                 " when will we arrive ", " when will i arrive ", " arrival time ", " what's our arrival ",
                                 " whats our arrival "}},
       {AppAction::DifferentRoute, {" different route ", " another route ", " other route ", " better route ",
-                                   " alternate route ", " alternative route ", " another way ", " different way "}},
+                                   " alternate route ", " alternative route ", " another way ", " different way ",
+                                   " reroute ", " re route ", " faster route ", " quicker route ", " shorter route ",
+                                   " faster way ", " quicker way "}},
       {AppAction::TakeMeBack, {" take me back ", " take us back ", " go back to where ", " head back ",
                                " back where we started ", " back to the start "}},
       {AppAction::TimeLeft, {" how long ", " how much longer ", " are we there yet ", " time left ", " when will we get ",
                              " when do we get ", " when will we be ", " what's the eta ", " whats the eta ", " eta ",
                              " how far ", " how much further ", " how much farther "}},
       {AppAction::AvoidTolls, {" avoid tolls ", " avoid toll ", " no tolls ", " no toll roads ", " avoid the tolls ",
-                               " without tolls ", " skip the tolls ", " no toll "}},
+                               " without tolls ", " skip the tolls ", " no toll ", " stay off toll roads ", " stay off the toll roads ",
+                               " stay off the toll road ", " stay off the tolls ", " skip toll roads ", " skip the toll roads ",
+                               " skip the toll road "}},
       {AppAction::AllowTolls, {" allow tolls ", " use tolls ", " use toll roads ", " tolls are fine ", " tolls are okay ",
                                " tolls are ok ", " toll roads are fine ", " take the toll road ", " take toll roads "}},
       {AppAction::AvoidHighways, {" avoid highways ", " avoid the highway ", " avoid highway ", " no highways ",
                                   " avoid freeways ", " avoid the freeway ", " no freeways ", " take back roads ",
-                                  " take the back roads ", " stay off the highway "}},
+                                  " take the back roads ", " stay off the highway ", " stay off highways ", " stay off the highways ",
+                                  " stay off the freeway ", " stay off freeways ", " skip the highway ", " skip highways ",
+                                  " skip the highways ", " skip the freeway "}},
       {AppAction::AllowHighways, {" allow highways ", " use highways ", " use the highway ", " take the highway ",
                                   " highways are fine ", " highways are okay ", " take the freeway ", " use the freeway "}},
       {AppAction::ChangeVoice, {" change your voice ", " change the voice ", " change voice ", " switch voice ",
@@ -659,9 +665,30 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
         found.push_back({at, AppCommand{AppAction::FindAlongRoute, stopFor}});
     }
   }
+  // "Don't take the highway" asks to avoid it and "don't avoid tolls" to allow them: a negated road
+  // preference is the opposite preference, not nothing.
+  auto const opposite = [](AppAction action)
+  {
+    switch (action)
+    {
+    case AppAction::AllowTolls: return AppAction::AvoidTolls;
+    case AppAction::AvoidTolls: return AppAction::AllowTolls;
+    case AppAction::AllowHighways: return AppAction::AvoidHighways;
+    case AppAction::AvoidHighways: return AppAction::AllowHighways;
+    default: return AppAction::Count;
+    }
+  };
+  for (auto & f : found)
+    if (auto const flip = opposite(f.second.action); flip != AppAction::Count && NegatedAt(words, starts, f.first))
+      f.second.action = flip;
   // "Don't cancel the route", "I don't want to go to work": heard, but not asked for.
-  found.erase(std::remove_if(found.begin(), found.end(), [&](auto const & f) { return NegatedAt(words, starts, f.first); }),
-              found.end());
+  found.erase(std::remove_if(found.begin(), found.end(), [&](auto const & f)
+  { return opposite(f.second.action) == AppAction::Count && NegatedAt(words, starts, f.first); }), found.end());
+  // "Don't take the highway, avoid highways": one order, said twice.
+  for (size_t i = 0; i < found.size(); ++i)
+    if (opposite(found[i].second.action) != AppAction::Count)
+      found.erase(std::remove_if(found.begin() + i + 1, found.end(), [&](auto const & f)
+      { return f.second.action == found[i].second.action; }), found.end());
   std::stable_sort(found.begin(), found.end(), [](auto const & a, auto const & b) { return a.first < b.first; });
   std::vector<AppCommand> out;
   for (auto & f : found)
@@ -852,7 +879,9 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::CurrentRoad: return saidAny({"road", "street", "highway"});
   case AppAction::NextTurn: return saidAny({"turn"});
   case AppAction::ArrivalTime: return saidAny({"time", "arrive", "arrival"});
-  case AppAction::DifferentRoute: return saidAny({"route", "way"}) && saidAny({"different", "another", "other", "better", "alternate", "alternative"});
+  case AppAction::DifferentRoute:
+    return saidAny({"reroute"}) || (saidAny({"route", "way"}) && saidAny({"different", "another", "other", "better", "alternate",
+                                                                         "alternative", "faster", "quicker", "shorter", "re"}));
   case AppAction::TakeMeBack: return saidAny({"back", "start"});
   case AppAction::BeNicer: return saidAny({"nice", "nicer", "kinder", "mean"});
   case AppAction::BeMeaner: return saidAny({"mean", "meaner"});
