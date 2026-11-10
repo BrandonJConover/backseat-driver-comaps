@@ -2623,3 +2623,40 @@ TEST(HostileFixMidDriveIsNotJudged)
   CHECK(nav.Engine());
   CHECK_EQUAL(nav.Engine()->Report().hardAccels, 0);
 }
+
+// One fix at 65 in a 50 (a GPS speed spike) isn't enough to blame the driver for the police.
+TEST(OneFastFixIsNotWhyThePoliceCame)
+{
+  Navigator nav(Config());
+  double const limit = FromDisplay(50, Units::Mph);
+  for (int i = 0; i <= 60; ++i)
+    nav.OnFix(AtPos(i * 1000, i == 55 ? FromDisplay(65, Units::Mph) : 20, 39.7 + i * 0.0002, -105, limit), Far());
+  for (int i = 61; i <= 120; ++i)
+    nav.OnFix(AtPos(i * 1000, 0, 39.7 + 60 * 0.0002, -105, limit), Far());
+  auto const lines = PullOverLines(nav.TakeLines());
+  CHECK_EQUAL(lines.size(), size_t(1));
+  CHECK(SaidLineOf(lines[0].text, "pullOver.limit"));
+}
+
+// The Navigator turns on the sustain and the limit-drop grace: braking from 55 into a 35 zone is fine,
+// holding 55 there isn't.
+TEST(NavigatorForgivesBrakingIntoALowerZone)
+{
+  double const limit55 = FromDisplay(55, Units::Mph), limit35 = FromDisplay(35, Units::Mph);
+  auto const speedingLines = [&](bool brake)
+  {
+    Navigator nav(Config());
+    nav.OnFix(At(0, limit55, limit55), Far());
+    nav.TakeLines();
+    int count = 0;
+    for (int i = 1; i <= 20; ++i)
+    {
+      double const mph = brake ? std::max(35.0, 55 - 2.5 * (i - 1)) : 55;
+      nav.OnFix(At(i * 1000, FromDisplay(mph, Units::Mph), limit35), Far());
+      count += static_cast<int>(LinesOf(nav.TakeLines(), Category::Speeding).size());
+    }
+    return count;
+  };
+  CHECK_EQUAL(speedingLines(true), 0);
+  CHECK(speedingLines(false) > 0);
+}

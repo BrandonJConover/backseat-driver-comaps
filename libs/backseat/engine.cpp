@@ -981,14 +981,54 @@ void CritiqueEngine::CheckSpeeding(TelemetrySample const & s, TelemetrySample co
 {
   Units const units = m_config.units;
   bool const backoff = m_config.speedingRenagMaxMs > 0;
-  int const over = s.speedLimitMps ? static_cast<int>(JsRound(ToDisplay(s.speedMps, units))) -
-                                         static_cast<int>(JsRound(ToDisplay(*s.speedLimitMps, units)))
-                                   : 0;
   double constexpr kFastLimitMps = 24.5;  // 55 mph
-  int const tolerance = s.speedLimitMps && *s.speedLimitMps >= kFastLimitMps && m_config.speedingToleranceFast >= 0
-                            ? m_config.speedingToleranceFast
-                            : m_config.speedingTolerance;
-  if (!s.speedLimitMps || over <= tolerance)
+  auto const overOf = [&](double limitMps) {
+    return static_cast<int>(JsRound(ToDisplay(s.speedMps, units))) -
+           static_cast<int>(JsRound(ToDisplay(limitMps, units)));
+  };
+  auto const toleranceOf = [&](double limitMps) {
+    return limitMps >= kFastLimitMps && m_config.speedingToleranceFast >= 0 ? m_config.speedingToleranceFast
+                                                                            : m_config.speedingTolerance;
+  };
+
+  // A big drop in the posted limit: remember the old one for the grace period.
+  if (s.speedLimitMps)
+  {
+    int const bigDrop = units == Units::Kmh ? 15 : 10;
+    if (m_prevLimitMps && JsRound(ToDisplay(*m_prevLimitMps, units)) - JsRound(ToDisplay(*s.speedLimitMps, units)) >= bigDrop)
+    {
+      bool const stillGraced = m_dropFromLimitMps && s.t - m_limitDroppedAt < m_config.speedingDropGraceMs;
+      m_dropFromLimitMps = stillGraced ? std::max(*m_dropFromLimitMps, *m_prevLimitMps) : *m_prevLimitMps;
+      m_limitDroppedAt = s.t;
+    }
+    else if (m_dropFromLimitMps && *s.speedLimitMps >= *m_dropFromLimitMps)
+      m_dropFromLimitMps.reset();  // back up (a one-fix snap to a side road): nothing to forgive
+    m_prevLimitMps = s.speedLimitMps;
+  }
+  if (m_dropFromLimitMps && s.t - m_limitDroppedAt >= m_config.speedingDropGraceMs)
+    m_dropFromLimitMps.reset();
+
+  std::optional<double> limitMps = s.speedLimitMps;
+  if (limitMps && m_dropFromLimitMps && m_config.speedingDropGraceMs > 0)
+  {
+    double const dt = prev ? (s.t - prev->t) / 1000 : 0;
+    bool const slowing = dt > 0 && (prev->speedMps - s.speedMps) / dt >= 0.5;
+    bool const withinOld = overOf(*m_dropFromLimitMps) <= toleranceOf(*m_dropFromLimitMps);
+    if (slowing || withinOld)
+      limitMps = m_dropFromLimitMps;
+  }
+
+  // How long over the posted limit itself, grace or not, so holding the old speed past the grace
+  // period is speeding at once.
+  bool const overPosted = s.speedLimitMps && overOf(*s.speedLimitMps) > toleranceOf(*s.speedLimitMps);
+  if (!overPosted)
+    m_overLimitSince.reset();
+  else if (!m_overLimitSince)
+    m_overLimitSince = s.t;
+
+  int const over = limitMps ? overOf(*limitMps) : 0;
+  int const tolerance = limitMps ? toleranceOf(*limitMps) : m_config.speedingTolerance;
+  if (!limitMps || over <= tolerance)
   {
     m_speedingSince.reset();
     if (!m_underLimitSince)
@@ -1001,9 +1041,12 @@ void CritiqueEngine::CheckSpeeding(TelemetrySample const & s, TelemetrySample co
     }
     return;
   }
+  // Not over for long enough yet (a one-fix glitch, or just crept over): nothing noted.
+  if (!m_speedingSince && m_overLimitSince && s.t - *m_overLimitSince < m_config.speedingSustainMs)
+    return;
   m_underLimitSince.reset();
   int const speed = static_cast<int>(JsRound(ToDisplay(s.speedMps, units)));
-  int const limit = static_cast<int>(JsRound(ToDisplay(*s.speedLimitMps, units)));
+  int const limit = static_cast<int>(JsRound(ToDisplay(*limitMps, units)));
 
   if (prev && m_speedingSince)
     m_stats.speedingSeconds += (s.t - prev->t) / 1000;

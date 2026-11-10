@@ -693,6 +693,8 @@ private:
   std::optional<double> m_lastLimitMps;
   std::string m_country;
   std::optional<double> m_lastBadSpeedingT;
+  /// Since when well over the limit; m_lastBadSpeedingT counts only past the speeding sustain.
+  std::optional<double> m_badSpeedingSince;
   TrafficLightLookup m_lightLookup;
   Pronouns m_pronouns = Pronouns::They;
   Housing m_housing = Housing::Unknown;

@@ -71,6 +71,13 @@ struct EngineConfig
   /// 0 keeps the plain speedingRenagMs (the TS engine's behavior).
   double speedingRenagMaxMs = 0;
   double speedingResetMs = 30000;
+  /// Over the limit (past the tolerance) this long before it counts: no speeding line or incident
+  /// for a one-fix limit glitch (a frontage road snapped for a second). 0: at once (the TS engine).
+  double speedingSustainMs = 0;
+  /// After the posted limit drops by 10 mph / 15 km/h or more, this long a car that's slowing down
+  /// (or still within the old limit) is judged against the old limit, so braking into a 35 zone
+  /// isn't speeding. 0: the new limit at once (the TS engine).
+  double speedingDropGraceMs = 0;
   /// Distances for the "you are turning left in 500 feet / 50 feet" nags.
   double countdownFarM = 152;  // 500 ft
   double countdownNearM = 15;  // 50 ft
@@ -269,6 +276,13 @@ private:
   /// "Still speeding" nags since the driver was last under the limit for a while.
   int m_speedingRenags = 0;
   std::optional<double> m_underLimitSince;
+  /// Since when the car has been over the posted limit (speedingSustainMs).
+  std::optional<double> m_overLimitSince;
+  /// The last known posted limit, and the limit before a big drop with when it dropped
+  /// (speedingDropGraceMs).
+  std::optional<double> m_prevLimitMps;
+  std::optional<double> m_dropFromLimitMps;
+  double m_limitDroppedAt = -1e18;
   std::optional<double> m_slowSince;
   std::optional<double> m_stoppedSince;
   int m_stopCount = 0;

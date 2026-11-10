@@ -172,8 +172,11 @@ TEST(NavigatorRewordsRoastsButNotDirections)
   auto const opening = nav.TakeLines();
   CHECK(!opening.empty());
   CHECK(model->asked.empty());  // greeting, rundown and directions are never reworded
-  f.tMs = 6000;
+  f.tMs = 3000;  // over for one fix: not speeding yet (3 s sustain)
   f.speedMps = FromDisplay(53, Units::Mph);
+  nav.OnFix(f, r);
+  CHECK(model->asked.empty());
+  f.tMs = 6000;
   nav.OnFix(f, r);
   CHECK_EQUAL(model->asked.size(), size_t{1});
   CHECK_EQUAL(model->asked[0].category, std::string("speeding"));

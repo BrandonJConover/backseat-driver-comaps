@@ -246,6 +246,10 @@ double constexpr kImplausibleMps2 = 12;
 int constexpr kSpeedingTolerance = 2;
 int constexpr kSpeedingToleranceFast = 3;
 double constexpr kSpeedingBarelyEveryMs = 5 * 60000;
+/// Over the limit this long (two fixes or more) before it's speeding: a one-fix snap to a slower
+/// frontage road isn't. And braking into a lower zone is judged against the old limit for a while.
+double constexpr kSpeedingSustainMs = 3000;
+double constexpr kSpeedingDropGraceMs = 10000;
 /// A remark held back for a turn is dropped after this long...
 double constexpr kTurnHeldMaxMs = 45000;
 /// "56 in a 45" is too good to lose to a turn, and still true half a minute later.
@@ -752,7 +756,11 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & route)
   if (fix.speedLimitMps)
   {
     m_lastLimitMps = fix.speedLimitMps;
-    if (fix.speedMps > *fix.speedLimitMps + kSeriousOverMps)
+    if (fix.speedMps <= *fix.speedLimitMps + kSeriousOverMps)
+      m_badSpeedingSince.reset();
+    else if (!m_badSpeedingSince)
+      m_badSpeedingSince = fix.tMs;
+    if (m_badSpeedingSince && fix.tMs - *m_badSpeedingSince >= kSpeedingSustainMs)
       m_lastBadSpeedingT = fix.tMs;
   }
   TrackTravelMode(fix, route);
@@ -1529,6 +1537,10 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   }
   if (config.speedingBarelyEveryMs == 0)
     config.speedingBarelyEveryMs = kSpeedingBarelyEveryMs;
+  if (config.speedingSustainMs == 0)
+    config.speedingSustainMs = kSpeedingSustainMs;
+  if (config.speedingDropGraceMs == 0)
+    config.speedingDropGraceMs = kSpeedingDropGraceMs;
   m_engine = std::make_unique<CritiqueEngine>(config, t);
   m_engine->SetTalkingUntil(m_talkingUntil);
   m_plan = {};
@@ -2411,6 +2423,7 @@ void Navigator::ResetTrip()
   m_pullOverSaid = false;
   m_policeSaid = false;
   m_lastBadSpeedingT.reset();
+  m_badSpeedingSince.reset();
   m_onBridge = false;
   m_hardCurveSamples = 0;
   m_lastCurveAheadT = -1e18;
