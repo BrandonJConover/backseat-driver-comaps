@@ -170,6 +170,24 @@ TEST(PlateGameRemembersBeingTurnedDown)
   CHECK_EQUAL(game.Log().grudges, 1);
 }
 
+TEST(PlateGameHearsAHedgedNoAsANo)
+{
+  // "Definitely not" was a yes because of "definitely" (loop B123).
+  PlateGame game(SeededRng(2));
+  game.NewTrip("home>work");
+  game.Offer(1);
+  CHECK(!game.OnDriverSaid("yes and no", 1));
+  auto no = game.OnDriverSaid("definitely not", 1);
+  CHECK(no);
+  CHECK_EQUAL(no->key, std::string("plateGame.declined"));
+  CHECK_EQUAL(game.Log().grudges, 1);
+
+  PlateGame keen(SeededRng(2));
+  keen.NewTrip("home>work");
+  keen.Offer(1);
+  CHECK_EQUAL(keen.OnDriverSaid("sure, why not", 1)->key, std::string("plateGame.accepted"));
+}
+
 TEST(NavigatorOffersThePlateGameOnACommute)
 {
   EngineConfig c;

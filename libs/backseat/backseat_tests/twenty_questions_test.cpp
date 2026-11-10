@@ -295,6 +295,20 @@ TEST(TwentyOfferYesNoAndSilence)
   CHECK(declined->grudge && declined->over);
   CHECK(!no.Active());
 
+  // "Definitely not" and "I guess not" are noes, not yeses (loop B123).
+  for (auto const * hedged : {"definitely not", "I guess not", "of course not"})
+  {
+    TwentyQuestions nope(SeededRng(3));
+    nope.Offer({}, false, 0, 0);
+    auto const r = nope.OnDriverSaid(hedged, 1000, 0);
+    CHECK(r && r->key == "twenty.declined");
+    CHECK(!nope.Active());
+  }
+  TwentyQuestions torn(SeededRng(3));
+  torn.Offer({}, false, 0, 0);
+  CHECK(!torn.OnDriverSaid("yes and no", 1000, 0));
+  CHECK(torn.Active());
+
   // A question straight away is a yes.
   TwentyQuestions eager(SeededRng(3));
   eager.Offer({}, false, 0, 0);

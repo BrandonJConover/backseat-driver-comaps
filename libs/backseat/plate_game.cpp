@@ -275,10 +275,12 @@ bool RarePlate(std::string const & code)
 
 YesNo ParseYesNo(std::string const & spoken)
 {
+  if (MixedAnswer(spoken))
+    return YesNo::Unclear;
   if (auto const phrase = AnswerPhrase(spoken))
     return *phrase ? YesNo::Yes : YesNo::No;
   std::string const w = Words(spoken);
-  for (auto const * unsure : {"don't know", "dont know", "not sure", "no idea"})
+  for (auto const * unsure : {"don't know", "dont know", "not sure", "not exactly sure", "not really sure", "no idea"})
     if (HasWord(w, unsure))
       return YesNo::Unclear;
   for (auto const * no : {"no", "nope", "nah", "nay", "negative", "uh uh", "not now", "not today", "pass", "no thanks",

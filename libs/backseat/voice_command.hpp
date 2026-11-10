@@ -189,9 +189,11 @@ bool SaidYes(std::string const & spoken);
 /// "No", "nope", "nah", "not really"...
 bool SaidNo(std::string const & spoken);
 /// The answers both yes/no readers (SaidYes/SaidNo and ParseYesNo) read the same way, before their own
-/// word lists: "maybe later", "go away", "not interested" -> false; "I don't mind", "sure, why not",
-/// "go ahead" -> true; anything else -> empty.
+/// word lists: "maybe later", "go away", "not interested", "definitely not", "I guess not" -> false;
+/// "I don't mind", "sure, why not", "go ahead" -> true; anything else -> empty.
 std::optional<bool> AnswerPhrase(std::string const & spoken);
+/// "Yes and no", "sort of", "kind of": neither a yes nor a no, so every yes/no reader leaves the ask open.
+bool MixedAnswer(std::string const & spoken);
 /// "Are you actually intending to walk there?" said out loud: true = walking ("yes", "I'm walking",
 /// "on foot"), false = driving ("no", "I'm driving", "in the car"), empty = not an answer ("turn
 /// right", "what's my next right").

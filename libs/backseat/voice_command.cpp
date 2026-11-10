@@ -957,6 +957,13 @@ std::optional<bool> AnswerPhrase(std::string const & spoken)
                         "not now", "not today", "go away", "leave me alone", "not interested", "not a chance",
                         "no chance", "no way", "not in a million years"}))
     return false;
+  // A hedge or a yes-word bent into a no: "definitely not", "I guess not", "not exactly". "I'm not exactly
+  // sure" stays unsure.
+  if (HasPhrase(words, {"definitely not", "absolutely not", "certainly not", "of course not", "i guess not",
+                        "i suppose not", "maybe not", "perhaps not", "probably not", "not exactly", "not at all",
+                        "sure not", "rather not", "id rather not"}) &&
+      !HasPhrase(words, {"exactly sure", "why not"}))
+    return false;
   // A yes with a "not" or a "don't" in it.
   if (HasPhrase(words, {"i dont mind", "dont mind", "dont see why not", "why not", "go for it", "go ahead",
                         "cant hurt", "wouldnt hurt", "might as well"}))
@@ -967,8 +974,16 @@ std::optional<bool> AnswerPhrase(std::string const & spoken)
   return {};
 }
 
+bool MixedAnswer(std::string const & spoken)
+{
+  return HasPhrase(AnswerWords(spoken), {"yes and no", "yeah and no", "yes or no", "yes no", "sort of", "kind of",
+                                         "kinda", "sorta"});
+}
+
 bool SaidYes(std::string const & spoken)
 {
+  if (MixedAnswer(spoken))
+    return false;
   if (auto const phrase = AnswerPhrase(spoken))
     return *phrase;
   std::string const words = AnswerWords(spoken);
@@ -984,6 +999,8 @@ bool SaidYes(std::string const & spoken)
 
 bool SaidNo(std::string const & spoken)
 {
+  if (MixedAnswer(spoken))
+    return false;
   if (auto const phrase = AnswerPhrase(spoken))
     return !*phrase;
   std::string const words = AnswerWords(spoken);
