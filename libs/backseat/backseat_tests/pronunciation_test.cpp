@@ -765,6 +765,14 @@ TEST(DecimalMilesReadTheWayDriversSayThem)
   CHECK_EQUAL(DecimalMiles("Turn left onto Main St in 0.5 mi."), std::string("Turn left onto Main St in a half mile."));
   CHECK_EQUAL(DecimalMiles("In 0.3 km, 4.5 m, 110.5 mi"), std::string("In 0.3 km, 4.5 m, 110.5 mi"));
   CHECK_EQUAL(DecimalMiles("Version 2.5 minutes"), std::string("Version 2.5 minutes"));
+  // After a determiner the half or quarter takes no article; only a whole word counts, and it stays put.
+  CHECK_EQUAL(DecimalMiles("the 0.5 mi road"), std::string("the half mile road"));
+  CHECK_EQUAL(DecimalMiles("A .25 mi gap"), std::string("A quarter mile gap"));
+  CHECK_EQUAL(DecimalMiles("breathe 0.5 mi"), std::string("breathe a half mile"));
+  CHECK_EQUAL(DecimalMiles("the  0.5 mi"), std::string("the  a half mile"));
+  CHECK_EQUAL(DecimalMiles("0.5 mi"), std::string("a half mile"));
+  for (char const * text : {"the 0.5 mi road", "every 0.75 mi", "Bathe 0.25 mi"})
+    CHECK_EQUAL(DecimalMiles(DecimalMiles(text)), DecimalMiles(text));
 }
 
 TEST(SymbolsAndLeftoverAbbreviationsMatchTheGoldenCases)

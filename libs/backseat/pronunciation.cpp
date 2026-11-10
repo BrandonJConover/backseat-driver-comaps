@@ -1706,6 +1706,26 @@ std::string Decades(std::string const & text)
   });
 }
 
+namespace
+{
+// The word right before `pos` (one space between) is a/an/the/this/that/each/every, as a whole word.
+bool AfterDeterminer(std::string const & text, size_t pos)
+{
+  if (pos < 2 || text[pos - 1] != ' ')
+    return false;
+  size_t start = pos - 1;
+  while (start > 0 && IsAsciiLetter(text[start - 1]))
+    --start;
+  if (start == pos - 1 || (start > 0 && (std::isalnum(static_cast<unsigned char>(text[start - 1])) ||
+                                         static_cast<unsigned char>(text[start - 1]) >= 0x80)))
+    return false;
+  std::string word = text.substr(start, pos - 1 - start);
+  std::transform(word.begin(), word.end(), word.begin(), [](unsigned char ch) { return std::tolower(ch); });
+  static std::set<std::string> const kDeterminers = {"a", "an", "the", "this", "that", "each", "every"};
+  return kDeterminers.count(word) > 0;
+}
+}  // namespace
+
 std::string DecimalMiles(std::string const & text)
 {
   static std::regex const re("(\\d{1,2})?\\.(\\d{1,2}) ?(?:mi|miles?)\\b");
@@ -1719,12 +1739,18 @@ std::string DecimalMiles(std::string const & text)
     }
     long long const whole = m[1].matched ? ToNumber(m.str(1)) : 0;
     std::string const frac = m.str(2);
+    // After a determiner the half or quarter takes no article of its own: "the 0.5 mi road" is "the
+    // half mile road", "every 0.25 mi" "every quarter mile", "a 0.75 mi climb" "a three quarter mile
+    // climb" (BookLyre I-190, CROSS X-041). "bathe 0.5 mi" and "in 0.5 mi" keep "a half mile".
+    bool const determiner = whole == 0 && AfterDeterminer(text, pos);
     if (frac == "5" || frac == "50")
-      return whole == 0 ? std::string("a half mile") : std::to_string(whole) + " and a half miles";
+      return whole == 0 ? std::string(determiner ? "half mile" : "a half mile")
+                        : std::to_string(whole) + " and a half miles";
     if (frac == "25")
-      return whole == 0 ? std::string("a quarter mile") : std::to_string(whole) + " and a quarter miles";
+      return whole == 0 ? std::string(determiner ? "quarter mile" : "a quarter mile")
+                        : std::to_string(whole) + " and a quarter miles";
     if (frac == "75")
-      return whole == 0 ? std::string("three quarters of a mile")
+      return whole == 0 ? std::string(determiner ? "three quarter mile" : "three quarters of a mile")
                         : std::to_string(whole) + " and three quarters miles";
     if (whole != 0 || frac.find_first_not_of('0') == std::string::npos)
       return std::nullopt;
