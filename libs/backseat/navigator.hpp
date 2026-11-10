@@ -119,6 +119,9 @@ struct RouteSnapshot
   std::vector<TurnKind> plannedTurns;
   LatLon origin;
   LatLon destinationPoint;
+  /// The place itself (the shop's door, not the end of the route on the road), when the host knows
+  /// it: the arrival call says which side it's on (loop B119).
+  std::optional<LatLon> destinationMark;
   /// Which way the route goes from the car's spot on it, degrees clockwise from north. Negative
   /// when unknown.
   double routeBearingDeg = -1;
@@ -246,6 +249,12 @@ std::string InstructionText(TurnKind turn, std::string const & street, std::stri
 /// (loop B86); exits and roundabouts chain too, going straight never does. A roundabout with a known
 /// exit says which one: "At the roundabout, take the second exit onto Oak Street" (loop B98).
 std::string InstructionText(RouteSnapshot const & route, double speedMps = 0);
+
+/// Which side of the road the destination is on (loop B119): "right" or "left" when `mark` is ahead
+/// of `here` along `routeBearingDeg`, at least 10 m off to the side and within 500 m; empty when the
+/// bearing is unknown, or the mark is behind, on the road itself or too far to judge. Geometry only, so
+/// it's the same in left-hand traffic.
+std::string DestinationSide(LatLon const & here, double routeBearingDeg, LatLon const & mark);
 
 /// "the second exit" for 2, "exit 12" past the eighth; empty for 0 or less (unknown).
 std::string RoundaboutExitWords(int exit);
@@ -501,6 +510,8 @@ private:
   void CountLefts(double t);
   /// "In half a mile, turn left onto Elm Street." for the maneuver in route.
   void SayInstruction(double t, RouteSnapshot const & route);
+  /// "right"/"left" for an arrival within reach whose place the host marked; empty otherwise.
+  std::string DestinationSideNow(RouteSnapshot const & route) const;
   void SayMissedTurn(double t, bool unseen);
   void TrackPlateGame(double tMs, LatLon const & here, double speedMps, RouteSnapshot const & route);
   void SayPlate(double tMs, PlateGame::Reply const & reply);
@@ -708,6 +719,8 @@ private:
   bool m_roundaboutSaid = false;
   /// The maneuver the last "get into the left lane" was for; once each.
   std::optional<uint32_t> m_laneSaidFor;
+  /// The arrival the destination's side ("on your right") was said for; once each (loop B119).
+  std::optional<uint32_t> m_sideSaidFor;
   double m_turnSaidAt = -1e18;
   /// Just past a turn, the next direction waits a moment (unless it's close) so it doesn't land
   /// mid-turn: when it goes out.

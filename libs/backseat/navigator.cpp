@@ -62,6 +62,14 @@ double constexpr kUnplannedStopAfterMs = 180000;
 double constexpr kQuietAfterStopMinMs = 60000;
 /// Stops this close to the destination are just arriving.
 double constexpr kNearDestinationM = 250;
+/// The arrival call says which side the place is on when it's at most this far (loop B119); farther
+/// out the road can still bend, and the countdown never gets to it otherwise. The side has to be this
+/// far off the road's line to count, and the place no farther than kSideMaxM to be judged at all.
+double constexpr kSideWithinM = 400;
+double constexpr kSideMinOffsetM = 10;
+double constexpr kSideMaxM = 500;
+/// Closer than this the car is arriving; a late "it's on your right" is just noise.
+double constexpr kSideLastCallM = 20;
 /// If the GPS position never strays this far from where the car stopped, the phone stayed
 /// in the car. Carried around a gas station, a phone's fix wanders well past it.
 double constexpr kPhoneWanderedM = 30;
@@ -540,6 +548,22 @@ double CurveAheadM(std::vector<LatLon> const & ahead, double maxM, double minDeg
     }
   }
   return -1;
+}
+
+std::string DestinationSide(LatLon const & here, double routeBearingDeg, LatLon const & mark)
+{
+  if (!std::isfinite(routeBearingDeg) || routeBearingDeg < 0)
+    return {};
+  double const dist = DistanceM(here, mark);
+  if (!std::isfinite(dist) || dist > kSideMaxM)
+    return {};
+  double const rad = M_PI / 180;
+  double const delta = (Bearing(here, mark) - routeBearingDeg) * rad;
+  double const along = dist * std::cos(delta);
+  double const across = dist * std::sin(delta);  // positive: clockwise of the road, so on the right
+  if (along <= 0 || std::abs(across) < kSideMinOffsetM)
+    return {};
+  return across > 0 ? "right" : "left";
 }
 
 std::string InstructionText(TurnKind turn, std::string const & street, std::string const & destination)
@@ -1459,14 +1483,40 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     m_laneSaidFor = route.turnId;
     SayLine(t, Category::Instruction, route.laneSide == LaneSide::Left ? "lane.left" : "lane.right");
   }
+  // The arrival was called from too far out to tell the side: "It's on your right", once, when close
+  // enough, a few seconds after any direction so the two don't run together (loop B119).
+  if (route.turn == TurnKind::Destination && m_sideSaidFor != route.turnId && !m_instructionDueAt &&
+      t - m_turnSaidAt >= kLaneAfterDirectionMs && route.distToTurnM > kSideLastCallM)
+  {
+    if (std::string const side = DestinationSideNow(route); !side.empty())
+    {
+      m_sideSaidFor = route.turnId;
+      SayLine(t, Category::Instruction, side == "right" ? "arrive.side.right" : "arrive.side.left", {},
+              Priority::Nav);
+    }
+  }
   m_lastDistToTurnM = route.distToTurnM;
+}
+
+std::string Navigator::DestinationSideNow(RouteSnapshot const & route) const
+{
+  if (route.turn != TurnKind::Destination || !route.destinationMark || !m_hereFix ||
+      route.distToTurnM > kSideWithinM)
+    return {};
+  return DestinationSide({m_hereFix->lat, m_hereFix->lon}, route.routeBearingDeg, *route.destinationMark);
 }
 
 void Navigator::SayInstruction(double t, RouteSnapshot const & route)
 {
   m_turnSaidAt = t;
   // Same speed as the "say it now" window: this fix's, else the last known one (a tunnel).
-  std::string const text = InstructionText(route, TimingMps(m_hereFix ? m_hereFix->speedMps : -1));
+  std::string text = InstructionText(route, TimingMps(m_hereFix ? m_hereFix->speedMps : -1));
+  if (std::string const side = DestinationSideNow(route); !side.empty())
+  {
+    // "Arrive at Joe's Diner, on your right": an arrival never chains, so this ends the call.
+    text += ", on your " + side;
+    m_sideSaidFor = route.turnId;
+  }
   m_lastInstructionText = text;
   Trace("nav.turn", {{"id", std::to_string(*route.turnId)},
                      {"text", text},
@@ -2477,6 +2527,7 @@ void Navigator::ResetTrip()
   m_christmasSaid = false;
   m_roundaboutSaid = false;
   m_laneSaidFor.reset();
+  m_sideSaidFor.reset();
   m_musicJudged = false;
   m_musicPlaying = false;
   m_lastSightT = -1e18;
