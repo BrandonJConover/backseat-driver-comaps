@@ -443,6 +443,40 @@ std::pair<size_t, std::string> StopSearch(std::string const & words, std::vector
   }
   return {0, {}};
 }
+
+/// Where a distance question about a place along the way starts in `words`, and the place: "how far is it to the
+/// next gas station" -> "gas station", "how far is the nearest rest stop" -> "rest stop", "how many miles to a
+/// bathroom" -> "restroom". Empty for the trip ("how far to Chicago"), the next stop and the next turn.
+template <size_t N>
+std::pair<size_t, std::string> HowFarToPlace(std::string const & words, char const * const (&asks)[N])
+{
+  size_t ask = std::string::npos;
+  for (char const * how : asks)
+    ask = std::min(ask, words.find(how));
+  if (ask == std::string::npos)
+    return {0, {}};
+  for (char const * marker : {" the next ", " next ", " the nearest ", " nearest ", " the closest ", " closest "})
+    if (auto const at = words.find(marker, ask); at != std::string::npos)
+    {
+      std::string target = StopName(words.substr(at + std::string(marker).size()));
+      for (std::string const tail : {" from here", " from us", " away", " is", " is from here"})
+        if (target.size() > tail.size() && target.compare(target.size() - tail.size(), tail.size(), tail) == 0)
+          target.erase(target.size() - tail.size());
+      std::string const padded = " " + target + " ";
+      bool const notHere = target.empty() || target.rfind("stop", 0) == 0 || target.rfind("one", 0) == 0 ||
+                           padded.find(" turn ") != std::string::npos || padded.find(" exit ") != std::string::npos ||
+                           padded.find(" destination ") != std::string::npos;
+      if (notHere)
+        return {0, {}};
+      if (auto kind = StopKind(target); !kind.empty())
+        return {ask, kind};
+      return {ask, StopTarget(target)};
+    }
+  for (auto at = words.find(" to ", ask); at != std::string::npos; at = words.find(" to ", at + 1))
+    if (auto kind = StopKind(StopName(words.substr(at + 4))); !kind.empty())
+      return {ask, kind};
+  return {0, {}};
+}
 }  // namespace
 
 std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
@@ -509,7 +543,10 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                                " back where we started ", " back to the start "}},
       {AppAction::TimeLeft, {" how long ", " how much longer ", " are we there yet ", " time left ", " when will we get ",
                              " when do we get ", " when will we be ", " what's the eta ", " whats the eta ", " eta ",
-                             " how far ", " how much further ", " how much farther "}},
+                             " how far ", " how much further ", " how much farther ", " how many miles ",
+                             " how many more miles ", " how many kilometers ", " how many more kilometers ",
+                             " miles left ", " miles to go ", " kilometers left ", " kilometers to go ",
+                             " distance remaining ", " distance left ", " remaining distance "}},
       {AppAction::AvoidTolls, {" avoid tolls ", " avoid toll ", " no tolls ", " no toll roads ", " avoid the tolls ",
                                " without tolls ", " skip the tolls ", " no toll ", " stay off toll roads ", " stay off the toll roads ",
                                " stay off the toll road ", " stay off the tolls ", " skip toll roads ", " skip the toll roads ",
@@ -587,10 +624,13 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       break;
     }
   // "How far is my next turn?", "how long until I turn?": the turn, not the trip.
+  static char const * const kHowFar[] = {" how far ", " how long ", " how much longer ", " how much further ",
+                                         " how much farther ", " how many miles ", " how many more miles ",
+                                         " how many kilometers ", " how many more kilometers "};
   if (heardAction(AppAction::TimeLeft))
   {
     size_t ask = std::string::npos;
-    for (char const * how : {" how far ", " how long ", " how much longer ", " how much further ", " how much farther "})
+    for (char const * how : kHowFar)
       ask = std::min(ask, words.find(how));
     if (ask != std::string::npos)
       for (char const * turn : {" next turn ", " my turn ", " the turn ", " i turn ", " we turn ", " my exit ",
@@ -603,6 +643,16 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
           break;
         }
   }
+  // "How far is it to the next gas station?", "how many miles to the nearest rest stop?": a place to find, not
+  // the trip. A named place ("how far to Chicago") is usually the destination, so only "next"/"nearest" places
+  // and stop kinds ("how far to a gas station") count.
+  if (heardAction(AppAction::TimeLeft))
+    if (auto const place = HowFarToPlace(words, kHowFar); !place.second.empty())
+    {
+      drop(AppAction::TimeLeft);
+      if (!heardAction(AppAction::FindAlongRoute))
+        found.push_back({place.first, AppCommand{AppAction::FindAlongRoute, place.second}});
+    }
   if (words.find(" back to ") != std::string::npos && words.find(" back to where ") == std::string::npos &&
       words.find(" back to the start ") == std::string::npos)
     drop(AppAction::TakeMeBack);
@@ -852,7 +902,8 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::Unmute: return saidAny({"unmute", "un", "talk", "speak", "sound", "back"});
   case AppAction::RepeatInstruction: return saidAny({"repeat", "again", "what", "what's", "whats", "next", "where"});
   case AppAction::TimeLeft:
-    return saidAny({"long", "far", "eta", "time", "when", "there", "minutes", "left", "longer", "further", "farther"});
+    return saidAny({"long", "far", "eta", "time", "when", "there", "minutes", "left", "longer", "further", "farther",
+                    "miles", "kilometers", "distance", "remaining"});
   case AppAction::ReportPolice: return saidAny({"police", "cop", "cops", "pulled", "pulling", "trooper", "sheriff", "officer"});
   case AppAction::PlayPlateGame: return saidAny({"plate", "plates", "license", "game"});
   case AppAction::AvoidTolls:

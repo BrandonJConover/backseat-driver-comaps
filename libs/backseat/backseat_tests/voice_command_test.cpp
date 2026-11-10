@@ -890,3 +890,45 @@ TEST(NegatedRoadPreferencesAndReroutes)
   CHECK(only("take the highway", AppAction::AllowHighways));
   CHECK(only("find a different route", AppAction::DifferentRoute));
 }
+
+TEST(DistanceQuestions)
+{
+  // B125: "how far to the next gas station" wants the gas station found, not the trip's time left.
+  auto const only = [](char const * said, AppAction action, char const * argument)
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == action && c[0].argument == argument;
+    if (!ok)
+      std::printf("  heard \"%s\": %zu commands, first %s \"%s\"\n", said, c.size(), c.empty() ? "-" : ToolFor(c[0].action).name,
+                  c.empty() ? "" : c[0].argument.c_str());
+    return ok;
+  };
+  for (auto const & [said, place] : std::initializer_list<std::pair<char const *, char const *>>{
+           {"how far is it to the next gas station", "gas station"},
+           {"how far is the nearest gas station?", "gas station"},
+           {"how far to the next rest stop", "rest stop"},
+           {"how far away is the closest coffee shop", "coffee"},
+           {"how many miles to the next rest area", "rest area"},
+           {"how far is the nearest bathroom from here", "restroom"},
+           {"how far to a gas station", "gas station"},
+           {"how much farther to the next Walmart", "walmart"},
+           {"how long until the next McDonald's", "mcdonald's"}})
+  {
+    CHECK(only(said, AppAction::FindAlongRoute, place));
+    CHECK(WordsSupportTool(AppAction::FindAlongRoute, place, said));
+  }
+  // The rest of the trip, said as a distance.
+  for (char const * said : {"how many miles left", "how many more miles", "how many miles to go", "miles to go?",
+                            "distance remaining", "what's the distance left", "how many kilometers left",
+                            "how far away are we", "how far to Chicago", "how far is it to grandma's house"})
+  {
+    CHECK(only(said, AppAction::TimeLeft, ""));
+    CHECK(WordsSupportTool(AppAction::TimeLeft, "", said));
+  }
+  // Turns, exits and stops keep their own answers.
+  for (char const * said : {"how far is my next turn", "how far to the next exit", "how many miles to my exit"})
+    CHECK(only(said, AppAction::NextTurn, ""));
+  CHECK(only("how far is the next stop", AppAction::NextStop, ""));
+  CHECK(!Heard("how far until the next one", AppAction::FindAlongRoute));
+  CHECK(ParseAppCommands("don't tell me how far the next gas station is").empty());
+}
