@@ -153,6 +153,9 @@ struct RouteSnapshot
 using PlaceLookup = std::function<std::optional<Place>(LatLon const &)>;
 /// Whether there's a traffic light (or similar reason to wait) right by a point.
 using TrafficLightLookup = std::function<bool(LatLon const &)>;
+/// Whether there's a railway level crossing right by a point (within ~60 m). Hosts answer from the
+/// map's railway=level_crossing points; no lookup, no train lines.
+using LevelCrossingLookup = std::function<bool(LatLon const &)>;
 /// The road the router would take instead, from a point on the route, avoiding the jam there
 /// (e.g. "I-25"). Empty when there's no real alternative.
 using AlternateLookup = std::function<std::optional<std::string>(LatLon const &)>;
@@ -318,6 +321,9 @@ public:
   void SetBuildingLookup(BuildingLookup lookup) { m_buildingLookup = std::move(lookup); }
   /// Stops next to a traffic light are red lights, not pulling over.
   void SetTrafficLightLookup(TrafficLightLookup lookup) { m_lightLookup = std::move(lookup); }
+  /// Stopped at a railway crossing for a while gets one "wait.train" line per stop, never while
+  /// moving (BI-111); the crossing also explains the stop, so no pull-over line.
+  void SetLevelCrossingLookup(LevelCrossingLookup lookup) { m_crossingLookup = std::move(lookup); }
   /// Names the road to blame a jam on ("I told you to take I-25").
   void SetAlternateLookup(AlternateLookup lookup) { m_alternateLookup = std::move(lookup); }
   void SetDriverPronouns(Pronouns p) { m_pronouns = p; }
@@ -704,6 +710,8 @@ private:
   double m_resumedT = -1e18;
   /// Pulled over at the roadside: said once per stop. The police line once per trip.
   bool m_pullOverSaid = false;
+  /// This stop has been checked for a railway crossing (once per stop, at kTrainWaitMs).
+  bool m_trainChecked = false;
   bool m_policeSaid = false;
   std::optional<double> m_lastLimitMps;
   std::string m_country;
@@ -711,6 +719,7 @@ private:
   /// Since when well over the limit; m_lastBadSpeedingT counts only past the speeding sustain.
   std::optional<double> m_badSpeedingSince;
   TrafficLightLookup m_lightLookup;
+  LevelCrossingLookup m_crossingLookup;
   Pronouns m_pronouns = Pronouns::They;
   Housing m_housing = Housing::Unknown;
   std::string m_driverName;

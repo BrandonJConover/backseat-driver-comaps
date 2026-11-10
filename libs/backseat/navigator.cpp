@@ -76,6 +76,8 @@ double constexpr kPhoneWanderedM = 30;
 /// Stopped this long at the roadside, with nothing around to explain it, is pulling over.
 /// Long enough to sit out most stop-and-go; red lights are ruled out by the light lookup.
 double constexpr kPullOverAfterMs = 45000;
+/// Stopped this long by a railway crossing: that's a train, worth one line (BI-111).
+double constexpr kTrainWaitMs = 20000;
 /// A pull-over this soon after serious speeding is probably the police.
 double constexpr kPoliceAfterSpeedingMs = 120000;
 /// "Serious" speeding: this far over the limit (~10 mph).
@@ -923,6 +925,7 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
       m_stopWanderM = 0;
       m_stopAnnounced = false;
       m_pullOverSaid = false;
+      m_trainChecked = false;
       m_stopInTraffic = m_inTraffic;
       // On a road fast enough to judge traffic on, a dead stop is called a jam within one traffic
       // window, so the engine's longStop waits for that call (BI-056). Elsewhere it keeps its 45 s.
@@ -975,12 +978,22 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
   m_stopInTraffic = m_stopInTraffic || m_inTraffic;
   bool const hasDestination = route.destinationPoint.lat || route.destinationPoint.lon;
   bool const nearDestination = hasDestination && DistanceM(here, route.destinationPoint) < kNearDestinationM;
+  // Waiting for a train: one line, asked once per stop and only from a car still parked where it
+  // stopped. Nothing about beating the train or the gate (Gates: no tempting unsafe moves).
+  if (!m_trainChecked && m_crossingLookup && fix.tMs - *m_stopSince >= kTrainWaitMs)
+  {
+    m_trainChecked = true;
+    if (InCar(m_travelMode) && m_talk != TalkLevel::DirectionsOnly && m_stopWanderM < kPhoneWanderedM &&
+        m_crossingLookup(m_stopAt))
+      SayLine(fix.tMs, Category::LongStop, "wait.train");
+  }
   if (!m_pullOverSaid && !nearDestination && !m_inTraffic && route.state == RouteState::OnRoute &&
       fix.tMs - *m_stopSince >= kPullOverAfterMs)
   {
     m_pullOverSaid = true;
     // Anything that explains the stop rules out the roadside: a light, a lot, a gas station.
     bool const explained = m_road.CurrentStopSpot() != StopSpot::None || (m_lightLookup && m_lightLookup(m_stopAt)) ||
+                           (m_crossingLookup && m_crossingLookup(m_stopAt)) ||
                            (m_parkingLookup && m_parkingLookup(m_stopAt)) || (m_placeLookup && m_placeLookup(m_stopAt));
     if (!explained)
     {
