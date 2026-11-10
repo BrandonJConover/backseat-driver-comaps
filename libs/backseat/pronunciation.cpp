@@ -148,6 +148,28 @@ constexpr Word kPlaces[] = {
     {"mukilteo", "muk-il-TEE-oh"},
 };
 
+// Store and restaurant names drivers navigate to that Kokoro's Misaki dictionaries lack (scout BI-093
+// checked each against misaki 0.7.4 us_gold/us_silver), so "Arrive at Kroger" isn't guessed. Names only,
+// never a line about them. Keys are letters only (the hosts' tokenizers split "Arby's" into the name and
+// "'s", which adds the z). Lexicon()
+// adds them after kPlaces without replacing a word already there. "Buc-ee's" and "H-E-B" are rewritten
+// by Brands() first. Golden cases in backseat_tests/spoken_brands.json, shared with BookLyre (CROSS).
+constexpr Word kBrands[] = {
+    // Groceries.
+    {"kroger", "KROH-gur"}, {"meijer", "MY-ur"}, {"publix", "PUB-liks"}, {"wegmans", "WEG-munz"},
+    {"lidl", "LEE-dul"}, {"aldi", "AHL-dee"}, {"costco", "KOST-koh"},
+    // Food.
+    {"qdoba", "kyoo-DOH-buh"}, {"whataburger", "WUT-uh-bur-gur"}, {"panera", "puh-NAIR-uh"},
+    {"popeyes", "POP-yz"}, {"zaxby", "ZAKS-bee"}, {"culver", "KUL-vur"}, {"bojangles", "boh-JANG-gulz"},
+    {"bruegger", "BROO-gur"}, {"hardee", "HAR-dee"}, {"applebee", "AP-ul-bee"}, {"krispy", "KRIS-pee"},
+    {"dunkin", "DUN-kin"}, {"arby", "AR-bee"}, {"pei", "PAY"},
+    // Gas and travel stops.
+    {"wawa", "WAH-wah"}, {"sheetz", "SHEETS"}, {"buckees", "BUK-eez"}, {"valero", "vuh-LAIR-oh"},
+    {"exxon", "EK-sahn"}, {"racetrac", "RAYS-trak"},
+    // Shops.
+    {"ulta", "UL-tuh"}, {"sephora", "suh-FOR-uh"},
+};
+
 // Places spelled like an English word but said another way there ("Burnet Rd" in Austin is BURN-it,
 // Humble TX is UM-bul). Swapped for a stand-in only where the sentence says it's the place (see
 // LocalPlaces()), so "be humble" and "the manor" keep their sound.
@@ -1156,6 +1178,26 @@ bool StateWord(std::string const & w, char const * state)
   return In(w, {"TX", "Tex", "Texas"});
 }
 }  // namespace
+
+std::string Brands(std::string const & text)
+{
+  if (text.find("uc") == std::string::npos && text.find("UC") == std::string::npos && text.find('E') == std::string::npos)
+    return text;
+  // "Buc-ee's", "Bucees", "BUC-EE'S": one word the dictionary has, so the hyphen and quote don't split it.
+  static std::regex const bucees("\\b[Bb][Uu][Cc]-?[Ee][Ee](?:'|\xE2\x80\x99)?[Ss]\\b");
+  // "HEB", "H-E-B" (the grocery) are letters; capitals only, so "heb" in a web address or a word stays.
+  static std::regex const heb("\\bH-?E-?B\\b(?!-)");
+  auto s = std::regex_replace(text, bucees, "Buckees");
+  return std::regex_replace(s, heb, "H E B");
+}
+
+std::vector<std::string> BrandWords()
+{
+  std::vector<std::string> out;
+  for (auto const & b : kBrands)
+    out.emplace_back(b.word);
+  return out;
+}
 
 std::string LocalPlaces(std::string const & text)
 {
@@ -2346,6 +2388,9 @@ std::string ForSpeech(std::string const & text)
       return std::nullopt;
     return Compass(m.str(1));
   });
+  // Store names as one word or letters: "Buc-ee's" is "Buckees", "H-E-B" "H E B" (after the compass
+  // passes, which would make that E east).
+  s = Brands(s);
   // Highways, routes and exits the way drivers say them: "I-405" is "I four oh five", "FM 1431"
   // "F M fourteen thirty one", "TX-71" "Texas seventy one", "Exit 238B" "Exit two thirty eight B".
   if (HasDigit(s))
@@ -2494,6 +2539,9 @@ std::vector<std::pair<std::string, std::string>> Lexicon()
       if (ph && taken.insert(p.word).second)
         out.emplace_back(p.word, *ph);
     }
+    for (auto const & b : kBrands)
+      if (auto const ph = ForeignWordPhonemes(b.said); ph && taken.insert(b.word).second)
+        out.emplace_back(b.word, *ph);
     return out;
   }();
   auto lexicon = builtIn;

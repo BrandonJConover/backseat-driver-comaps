@@ -96,6 +96,11 @@ std::string LocalPlaces(std::string const & text);
 
 /// Every respelling LocalPlaces() swaps in (their stand-ins are in Lexicon()).
 std::vector<std::string> LocalPlaceRespellings();
+/// Store names spelled so the dictionary or the letters say them: "Buc-ee's" is "Buckees", "HEB" and
+/// "H-E-B" are "H E B" (capitals only). Golden cases in backseat_tests/spoken_brands.json.
+std::string Brands(std::string const & text);
+/// Every store name Lexicon() holds for Kokoro's dictionary gaps ("kroger", "arby's"...).
+std::vector<std::string> BrandWords();
 
 /// Every respelling ForeignStreets() swaps in, one word each (their stand-ins are in Lexicon()).
 std::vector<std::string> ForeignStreetRespellings();

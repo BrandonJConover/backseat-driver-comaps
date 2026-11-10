@@ -656,6 +656,39 @@ TEST(PlaceNamesAreSaidTheLocalWay)
   SetUserWords("");
 }
 
+TEST(StoreNamesAreInTheDictionary)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_BRANDS_PATH);
+  CHECK(cases.size() >= 12);
+  for (auto const & c : cases)
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  std::map<std::string, std::string> lexicon;
+  std::vector<std::string> order;
+  for (auto const & [w, ph] : Lexicon())
+  {
+    order.push_back(w);
+    lexicon.emplace(w, ph);
+  }
+  // Every store name resolves to phonemes (a respelling the reader can't parse would drop it).
+  auto const brands = BrandWords();
+  CHECK(brands.size() >= 28);
+  for (auto const & b : brands)
+  {
+    CHECK(lexicon.count(b) == 1);
+    CHECK(!lexicon[b].empty());
+    CHECK(std::count(order.begin(), order.end(), b) == 1);
+  }
+  for (std::string const w : {"kroger", "meijer", "arby", "wawa", "sheetz", "buckees", "qdoba", "whataburger"})
+    CHECK(lexicon.count(w) == 1);
+  CHECK_EQUAL(lexicon["sheetz"], std::string("ʃˈits"));
+  // The driver's own word for a store still wins.
+  SetUserWords("HEB\theb\n");
+  CHECK(ForSpeech("Arrive at HEB").find("H E B") == std::string::npos);
+  SetUserWords("");
+  CHECK_EQUAL(Brands("Arrive at Kroger"), std::string("Arrive at Kroger"));
+  CHECK_EQUAL(Brands("hebrew HEBREW Heb"), std::string("hebrew HEBREW Heb"));
+}
+
 TEST(DatesMatchTheGoldenCases)
 {
   auto const cases = GoldenCases(BACKSEAT_SPOKEN_DATES_PATH);
