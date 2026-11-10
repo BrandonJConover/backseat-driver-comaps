@@ -465,3 +465,59 @@ TEST(NavigatorPlateGameQuitFreesThanks)
   nav.OnFix(PlateFix(500000), done);
   CHECK(PlateLines(nav.TakeLines()).empty());
 }
+
+TEST(PlateGameHearsNicknamesAndShortNames)
+{
+  CHECK(MatchPlateRegion("a Mass plate") == Code("MA"));
+  CHECK(MatchPlateRegion("Massachusetts") == Code("MA"));
+  CHECK(MatchPlateRegion("one from the Lone Star State") == Code("TX"));
+  CHECK(MatchPlateRegion("Sunshine State!") == Code("FL"));
+  CHECK(MatchPlateRegion("the Garden State") == Code("NJ"));
+  CHECK(MatchPlateRegion("Green Mountain State") == Code("VT"));
+  CHECK(MatchPlateRegion("land of ten thousand lakes") == Code("MN"));
+  CHECK(MatchPlateRegion("show me state") == Code("MO"));
+  // A nickname that is also a word stays out of chatter that isn't one.
+  CHECK(!MatchPlateRegion("this is a mountain state"));
+  CHECK(!MatchPlateRegion("massive truck"));
+  CHECK(!MatchPlateRegion("what a state this road is in"));
+  PlateGame game = PlayingGame();
+  CHECK_EQUAL(game.OnDriverSaid("Lone Star State plate", 0, false, 1000.0)->key, std::string("plateGame.newFar"));
+  CHECK(game.Log().lifetime == std::set<std::string>{"TX"});
+  CHECK(NegatedSighting("no Lone Star State plates yet"));
+}
+
+TEST(PlateGameCountsEveryPlateInOneSentence)
+{
+  CHECK(MatchPlateRegions("a Florida and a Georgia") == (std::vector<std::string>{"FL", "GA"}));
+  CHECK(MatchPlateRegions("Florida Georgia") == (std::vector<std::string>{"FL", "GA"}));
+  CHECK(MatchPlateRegions("West Virginia and Virginia") == (std::vector<std::string>{"WV", "VA"}));
+  CHECK(MatchPlateRegions("Texas, Texas, and Ohio") == (std::vector<std::string>{"TX", "OH"}));
+  CHECK(MatchPlateRegions("a Florida but no Georgia") == (std::vector<std::string>{"FL"}));
+  CHECK(MatchPlateRegions("no Texas or Ohio plates yet").empty());
+  CHECK(MatchPlateRegions("haven't seen Ohio but there's a Texas") == (std::vector<std::string>{"TX"}));
+  CHECK(MatchPlateRegions("no way, Hawaii!") == (std::vector<std::string>{"HI"}));
+
+  PlateGame game = PlayingGame();
+  auto r = game.OnDriverSaid("a Florida and a Georgia", 0, false, 1000.0);
+  CHECK(r.has_value());
+  CHECK(game.Log().lifetime == (std::set<std::string>{"FL", "GA"}));
+  // The answer is about one of them and counts both.
+  CHECK(r->text.find("Florida") != std::string::npos || r->text.find("Georgia") != std::string::npos);
+
+  // The most exciting one gets the answer; the repeat is logged quietly, so the first repeat
+  // later still gets Brandon's line.
+  auto rare = game.OnDriverSaid("Florida and Hawaii", 0, false, 2000.0);
+  CHECK_EQUAL(rare->key, std::string("plateGame.rare"));
+  CHECK(rare->text.find("Hawaii") != std::string::npos);
+  CHECK_EQUAL(game.OnDriverSaid("Georgia", 0, false, 3000.0)->key, std::string("plateGame.repeatFirst"));
+
+  // Negated in the offer: neither a yes nor a plate; one real plate in the list is a yes.
+  PlateGame offered(SeededRng(3));
+  offered.NewTrip("home>work");
+  offered.Offer(0);
+  CHECK(!offered.OnDriverSaid("no Texas or Ohio plates yet", 0, false, 1000.0));
+  CHECK(offered.GetState() == PlateGame::State::Offered);
+  CHECK(offered.OnDriverSaid("not Texas, but an Ohio", 0, false, 2000.0).has_value());
+  CHECK(offered.GetState() == PlateGame::State::Playing);
+  CHECK(offered.Log().lifetime == std::set<std::string>{"OH"});
+}

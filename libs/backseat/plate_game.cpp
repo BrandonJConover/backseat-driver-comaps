@@ -21,57 +21,57 @@ struct PlateRegion
 };
 
 std::vector<PlateRegion> const kRegions = {
-    {"AL", "Alabama", {}},
-    {"AK", "Alaska", {}},
-    {"AZ", "Arizona", {}},
-    {"AR", "Arkansas", {}},
-    {"CA", "California", {"cali"}},
-    {"CO", "Colorado", {}},
-    {"CT", "Connecticut", {}},
+    {"AL", "Alabama", {"yellowhammer state"}},
+    {"AK", "Alaska", {"last frontier"}},
+    {"AZ", "Arizona", {"grand canyon state"}},
+    {"AR", "Arkansas", {"natural state"}},
+    {"CA", "California", {"cali", "golden state"}},
+    {"CO", "Colorado", {"centennial state"}},
+    {"CT", "Connecticut", {"constitution state", "nutmeg state"}},
     {"DE", "Delaware", {}},
     {"DC", "Washington D.C.", {"washington dc", "dc", "d c", "district of columbia"}},
-    {"FL", "Florida", {}},
-    {"GA", "Georgia", {}},
-    {"HI", "Hawaii", {}},
-    {"ID", "Idaho", {}},
-    {"IL", "Illinois", {}},
-    {"IN", "Indiana", {}},
-    {"IA", "Iowa", {}},
-    {"KS", "Kansas", {}},
-    {"KY", "Kentucky", {}},
-    {"LA", "Louisiana", {}},
-    {"ME", "Maine", {}},
-    {"MD", "Maryland", {}},
-    {"MA", "Massachusetts", {}},
-    {"MI", "Michigan", {}},
-    {"MN", "Minnesota", {}},
-    {"MS", "Mississippi", {}},
-    {"MO", "Missouri", {}},
-    {"MT", "Montana", {}},
-    {"NE", "Nebraska", {}},
-    {"NV", "Nevada", {}},
-    {"NH", "New Hampshire", {}},
-    {"NJ", "New Jersey", {"jersey"}},
-    {"NM", "New Mexico", {}},
-    {"NY", "New York", {}},
-    {"NC", "North Carolina", {}},
-    {"ND", "North Dakota", {}},
-    {"OH", "Ohio", {}},
-    {"OK", "Oklahoma", {}},
-    {"OR", "Oregon", {}},
-    {"PA", "Pennsylvania", {}},
-    {"RI", "Rhode Island", {}},
-    {"SC", "South Carolina", {}},
-    {"SD", "South Dakota", {}},
-    {"TN", "Tennessee", {}},
-    {"TX", "Texas", {}},
-    {"UT", "Utah", {}},
-    {"VT", "Vermont", {}},
-    {"VA", "Virginia", {}},
-    {"WA", "Washington", {"washington state"}},
+    {"FL", "Florida", {"sunshine state"}},
+    {"GA", "Georgia", {"peach state"}},
+    {"HI", "Hawaii", {"aloha state"}},
+    {"ID", "Idaho", {"gem state"}},
+    {"IL", "Illinois", {"land of lincoln"}},
+    {"IN", "Indiana", {"hoosier state"}},
+    {"IA", "Iowa", {"hawkeye state"}},
+    {"KS", "Kansas", {"sunflower state"}},
+    {"KY", "Kentucky", {"bluegrass state"}},
+    {"LA", "Louisiana", {"pelican state"}},
+    {"ME", "Maine", {"pine tree state"}},
+    {"MD", "Maryland", {"old line state"}},
+    {"MA", "Massachusetts", {"mass", "bay state"}},
+    {"MI", "Michigan", {"great lakes state"}},
+    {"MN", "Minnesota", {"north star state", "land of 10000 lakes", "land of ten thousand lakes"}},
+    {"MS", "Mississippi", {"magnolia state"}},
+    {"MO", "Missouri", {"show me state"}},
+    {"MT", "Montana", {"big sky country", "treasure state"}},
+    {"NE", "Nebraska", {"cornhusker state"}},
+    {"NV", "Nevada", {"silver state"}},
+    {"NH", "New Hampshire", {"granite state"}},
+    {"NJ", "New Jersey", {"jersey", "garden state"}},
+    {"NM", "New Mexico", {"land of enchantment"}},
+    {"NY", "New York", {"empire state"}},
+    {"NC", "North Carolina", {"tar heel state", "tarheel state"}},
+    {"ND", "North Dakota", {"peace garden state"}},
+    {"OH", "Ohio", {"buckeye state"}},
+    {"OK", "Oklahoma", {"sooner state"}},
+    {"OR", "Oregon", {"beaver state"}},
+    {"PA", "Pennsylvania", {"keystone state"}},
+    {"RI", "Rhode Island", {"ocean state"}},
+    {"SC", "South Carolina", {"palmetto state"}},
+    {"SD", "South Dakota", {"mount rushmore state"}},
+    {"TN", "Tennessee", {"volunteer state"}},
+    {"TX", "Texas", {"lone star state"}},
+    {"UT", "Utah", {"beehive state"}},
+    {"VT", "Vermont", {"green mountain state"}},
+    {"VA", "Virginia", {"old dominion"}},
+    {"WA", "Washington", {"washington state", "evergreen state"}},
     {"WV", "West Virginia", {}},
-    {"WI", "Wisconsin", {}},
-    {"WY", "Wyoming", {}},
+    {"WI", "Wisconsin", {"badger state"}},
+    {"WY", "Wyoming", {"equality state", "cowboy state"}},
     {"PR", "Puerto Rico", {}},
     {"AB", "Alberta", {}},
     {"BC", "British Columbia", {}},
@@ -158,11 +158,11 @@ struct RegionMatch
   size_t end = 0;
 };
 
-std::optional<RegionMatch> FindRegion(std::string const & words)
+/// Every region named in `words`, in the order said. Where names overlap the longest wins:
+/// "west virginia" over "virginia", "new mexico" over "mexico".
+std::vector<RegionMatch> FindRegions(std::string const & words)
 {
-  RegionMatch best;
-  size_t bestLen = 0;
-  // Longest name wins: "west virginia" over "virginia", "new mexico" over "mexico".
+  std::vector<RegionMatch> all;
   for (auto const & r : kRegions)
   {
     std::vector<std::string> names = {r.name};
@@ -171,17 +171,34 @@ std::optional<RegionMatch> FindRegion(std::string const & words)
     for (auto const & n : names)
     {
       std::string const w = Words(n.rfind("the ", 0) == 0 ? n.substr(4) : n);
-      size_t const at = words.find(w);
-      if (w.size() > bestLen && at != std::string::npos)
-      {
-        best = {r.code, at, at + w.size() - 1};
-        bestLen = w.size();
-      }
+      for (size_t at = words.find(w); at != std::string::npos; at = words.find(w, at + 1))
+        all.push_back({r.code, at, at + w.size() - 1});
     }
   }
-  if (best.code.empty())
+  std::stable_sort(all.begin(), all.end(), [](RegionMatch const & x, RegionMatch const & y)
+                   { return x.end - x.begin > y.end - y.begin; });
+  std::vector<RegionMatch> kept;
+  for (auto const & m : all)
+  {
+    // Neighbors share the padding space between them (" florida georgia "); that isn't an overlap.
+    bool const overlaps = std::any_of(kept.begin(), kept.end(), [&](RegionMatch const & k)
+                                      { return m.begin < k.end && k.begin < m.end; });
+    if (!overlaps)
+      kept.push_back(m);
+  }
+  std::sort(kept.begin(), kept.end(),
+            [](RegionMatch const & x, RegionMatch const & y) { return x.begin < y.begin; });
+  return kept;
+}
+
+/// The one region a sentence is about: the longest name in it.
+std::optional<RegionMatch> FindRegion(std::string const & words)
+{
+  auto const all = FindRegions(words);
+  if (all.empty())
     return {};
-  return best;
+  return *std::max_element(all.begin(), all.end(), [](RegionMatch const & x, RegionMatch const & y)
+                           { return x.end - x.begin < y.end - y.begin; });
 }
 
 bool EndsWith(std::string const & s, std::string const & tail)
@@ -198,14 +215,14 @@ std::optional<std::string> MatchPlateRegion(std::string const & spoken)
   return match->code;
 }
 
-bool NegatedSighting(std::string const & spoken)
+namespace
 {
-  std::string const words = Words(spoken);
-  auto const match = FindRegion(words);
-  if (!match)
-    return false;
+/// Whether the region at `match` is named but not seen ("no Texas plates yet"). `listed`: another
+/// region came before it, so a bare "no" is a negation too ("a Florida but no Georgia").
+bool NegatedAt(std::string const & words, RegionMatch const & match, bool listed)
+{
   // The words before the name, without the filler between a negation and the name ("not a single").
-  std::string before = words.substr(0, match->begin + 1);
+  std::string before = words.substr(0, match.begin + 1);
   for (bool trimmed = true; trimmed;)
   {
     trimmed = false;
@@ -219,18 +236,56 @@ bool NegatedSighting(std::string const & spoken)
   // Apostrophes are dropped by Words(): "haven't" is "havent".
   for (char const * negation : {" not ", " havent seen ", " hasnt seen ", " hadnt seen ", " didnt see ", " didnt spot ",
                                 " never seen ", " never saw ", " not seen ", " dont see ", " cant see ", " cant find ",
-                                " no sign of ", " yet to see ", " still no ", " without "})
+                                " no sign of ", " yet to see ", " still no ", " without ", " nor "})
     if (EndsWith(before, negation))
       return true;
-  // A bare "no" only when the sentence goes on about plates: "no Texas plates yet", not "No! Texas!".
   if (EndsWith(before, " no "))
   {
-    std::string const after = words.substr(match->end);
+    if (listed)
+      return true;
+    // A bare "no" only when the sentence goes on about plates: "no Texas plates yet", not "No! Texas!".
+    std::string const after = words.substr(match.end);
     for (char const * tail : {" plate ", " plates ", " yet ", " so far ", " today ", " ones "})
       if (after.find(tail) != std::string::npos)
         return true;
   }
   return false;
+}
+
+/// Each region named, with whether it was negated. A region joined to a negated one by "or"
+/// ("no Texas or Ohio plates") is negated too.
+std::vector<std::pair<std::string, bool>> Sightings(std::string const & words)
+{
+  std::vector<std::pair<std::string, bool>> out;
+  auto const all = FindRegions(words);
+  for (size_t i = 0; i < all.size(); ++i)
+  {
+    bool negated = NegatedAt(words, all[i], i > 0);
+    if (!negated && i > 0 && out.back().second)
+    {
+      std::string const between = words.substr(all[i - 1].end, all[i].begin - all[i - 1].end + 1);
+      negated = between == " or " || between == " or a " || between == " or an " || between == " ";
+    }
+    out.emplace_back(all[i].code, negated);
+  }
+  return out;
+}
+}  // namespace
+
+bool NegatedSighting(std::string const & spoken)
+{
+  std::string const words = Words(spoken);
+  auto const match = FindRegion(words);
+  return match && NegatedAt(words, *match, false);
+}
+
+std::vector<std::string> MatchPlateRegions(std::string const & spoken)
+{
+  std::vector<std::string> out;
+  for (auto const & [code, negated] : Sightings(Words(spoken)))
+    if (!negated && std::find(out.begin(), out.end(), code) == out.end())
+      out.push_back(code);
+  return out;
 }
 
 bool QuitsPlateGame(std::string const & spoken)
@@ -396,11 +451,12 @@ std::optional<PlateGame::Reply> PlateGame::OnDriverSaid(std::string const & spok
     m_state = State::Over;
     return answered(std::move(r));
   }
-  auto code = MatchPlateRegion(spoken);
+  auto const codes = MatchPlateRegions(spoken);
+  std::optional<std::string> code;
+  if (!codes.empty())
+    code = codes.front();
   // "Haven't seen Ohio yet" is talk about the game, not a plate.
-  bool const negated = code && NegatedSighting(spoken);
-  if (negated)
-    code.reset();
+  bool const negated = codes.empty() && MatchPlateRegion(spoken).has_value();
   if (code && parked)
   {
     // Brandon's rule: a parking lot is a buffet of plates. Nothing counts there.
@@ -413,7 +469,7 @@ std::optional<PlateGame::Reply> PlateGame::OnDriverSaid(std::string const & spok
     if (code)
     {
       m_state = State::Playing;
-      return answered(Plate(*code, tier));
+      return answered(Plates(codes, tier));
     }
     if (negated)
       return {};
@@ -432,7 +488,7 @@ std::optional<PlateGame::Reply> PlateGame::OnDriverSaid(std::string const & spok
     }
   }
   if (code)
-    return answered(Plate(*code, tier));
+    return answered(Plates(codes, tier));
   if (negated)
     return {};
   // "I saw a Narnia plate": a plate, but no such place.
@@ -467,9 +523,7 @@ PlateGame::Reply PlateGame::Plate(std::string const & code, int tier)
     m_repeatedThisTrip = true;
     return Make(first ? "plateGame.repeatFirst" : "plateGame.repeat", tier, vars);
   }
-  commute.insert(code);
-  m_log.lifetime.insert(code);
-  m_trip.push_back(code);
+  Record(code);
   Vars withCount = vars;
   withCount["count"] = std::to_string(m_trip.size());
   if (RarePlate(code))
@@ -477,6 +531,42 @@ PlateGame::Reply PlateGame::Plate(std::string const & code, int tier)
   if (m_here && PlateNeighbors(code, *m_here))
     return Make("plateGame.neighbor", tier, withCount);
   return Make("plateGame.newFar", tier, withCount);
+}
+
+int PlateGame::Rank(std::string const & code) const
+{
+  if (m_here && code == *m_here)
+    return 0;
+  auto const commute = m_log.byRoute.find(m_routeKey);
+  if (commute != m_log.byRoute.end() && commute->second.count(code))
+    return 1;
+  if (RarePlate(code))
+    return 4;
+  return m_here && PlateNeighbors(code, *m_here) ? 2 : 3;
+}
+
+bool PlateGame::Record(std::string const & code)
+{
+  if (m_here && code == *m_here)
+    return false;
+  if (!m_log.byRoute[m_routeKey].insert(code).second)
+    return false;
+  m_log.lifetime.insert(code);
+  m_trip.push_back(code);
+  return true;
+}
+
+PlateGame::Reply PlateGame::Plates(std::vector<std::string> const & codes, int tier)
+{
+  std::string best = codes.front();
+  for (auto const & c : codes)
+    if (Rank(c) > Rank(best))
+      best = c;
+  // The others first, so the count in the answer includes them.
+  for (auto const & c : codes)
+    if (c != best)
+      Record(c);
+  return Plate(best, tier);
 }
 
 std::optional<PlateGame::Reply> PlateGame::WrapUp(int tier)

@@ -20,6 +20,10 @@ namespace backseat
 /// e.g. "I see a New Mexico plate" -> "NM". Names only, not codes: speech recognition
 /// writes "Colorado", and "OK" or "IN" would match ordinary words.
 std::optional<std::string> MatchPlateRegion(std::string const & spoken);
+/// Every region the driver says they saw, in the order said and without repeats: "a Florida and a
+/// Georgia" -> FL, GA. Nicknames count ("the Lone Star State", "Mass"); negated ones don't
+/// ("a Florida but no Georgia" -> FL; "no Texas or Ohio plates" -> none).
+std::vector<std::string> MatchPlateRegions(std::string const & spoken);
 /// "Colorado" for "CO". Empty for an unknown code.
 std::string PlateRegionName(std::string const & code);
 /// Code for a region's name as the map data spells it ("Colorado", "British Columbia").
@@ -120,6 +124,12 @@ public:
 
 private:
   Reply Plate(std::string const & code, int tier);
+  /// Several plates in one breath: logs the others quietly and answers for the most exciting one.
+  Reply Plates(std::vector<std::string> const & codes, int tier);
+  /// How a plate would be judged, best first: 4 rare, 3 far, 2 neighbor, 1 already seen, 0 home state.
+  int Rank(std::string const & code) const;
+  /// Logs a new plate (not the home state, not a repeat). False when there was nothing to log.
+  bool Record(std::string const & code);
   Reply Make(std::string const & key, int tier, Vars vars = {});
   std::string Pick(std::string const & key, int tier);
   Reply Tally(int tier);
