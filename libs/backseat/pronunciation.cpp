@@ -2440,6 +2440,30 @@ std::string StreetsAndCompass(std::string s)
 }
 
 // ForSpeech: money, percent, units, fractions, clock times, ordinals and plain numbers; runs only when a digit is left (moved out of ForSpeech, loop B111).
+// Web error codes the way programmers say them: "Error 404" and "404 not found" are "four oh four", not
+// "four hundred four" (loop B114: the persona's "Error 404: patience not found" joke). Only a 4xx/5xx code
+// with "error" before it or "error"/"not found" after it, so "404 Main St" and "Route 500" keep their reading.
+std::string ErrorCodes(std::string s)
+{
+  static char const * const kDigits[] = {"zero", "one", "two",   "three", "four",
+                                         "five", "six", "seven", "eight", "nine"};
+  auto said = [](std::string const & code) {
+    std::string const first = kDigits[code[0] - '0'];
+    if (code[1] == '0' && code[2] == '0')
+      return first + " hundred";
+    auto digit = [&](char c) { return std::string(c == '0' ? "oh" : kDigits[c - '0']); };
+    return first + " " + digit(code[1]) + " " + digit(code[2]);
+  };
+  static std::regex const before("\\b([Ee]rror|ERROR|HTTP) ([45]\\d\\d)\\b");
+  static std::regex const after("\\b([45]\\d\\d)( (?:[Ee]rror|ERROR|[Nn]ot [Ff]ound|NOT FOUND)\\b)");
+  s = Replace(s, before, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return m.str(1) + " " + said(m.str(2));
+  });
+  return Replace(s, after, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return said(m.str(1)) + m.str(2);
+  });
+}
+
 std::string NumberWords(std::string s)
 {
   // Money and percentages.
@@ -2599,6 +2623,8 @@ std::string ForSpeech(std::string const & text)
   s = Brands(s);
   // Highways, routes and exits the way drivers say them: "I-405" is "I four oh five", "FM 1431"
   // "F M fourteen thirty one", "TX-71" "Texas seventy one", "Exit 238B" "Exit two thirty eight B".
+  if (HasDigit(s))
+    s = ErrorCodes(s);
   if (HasDigit(s))
     s = Roads(s);
   // House numbers in pairs: "1600 Pennsylvania Avenue" is "sixteen hundred ...".
