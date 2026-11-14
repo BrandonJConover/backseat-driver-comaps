@@ -8,6 +8,7 @@ add_executable(${PROJECT_NAME}
   engine_test.cpp
   jerk_settle_test.cpp
   countdown_distance_test.cpp
+  long_approach_test.cpp
   exit_after_merge_test.cpp
   exit_skip_test.cpp
   destination_side_test.cpp

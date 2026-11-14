@@ -93,8 +93,9 @@ struct EngineConfig
   /// Speed that counts as rolling along (heading checks, "how long until the turn"). A walker
   /// rolls at 1 m/s; a car at 3.
   double rollingMps = 3;
-  /// A turn announced this long ago and still not reached is forgotten (heading checks, countdown).
-  /// Three minutes in a car; on foot the next turn can be ten minutes away.
+  /// A turn with no progress toward it for this long is stale: heading checks ignore it until the
+  /// car gets closer again (loop B146; was: this long since it was announced, which dropped the
+  /// countdown on any approach over three minutes). Three minutes in a car; on foot ten or more.
   double pendingTurnForgetMs = 180000;
   /// A stretch at least this long to the next maneuver gets "Please continue straight." nags,
   /// one every straightNagEveryMs of driving, three at most.
@@ -220,6 +221,11 @@ private:
     bool turned = false;
     /// "Your other left" was already said for this maneuver.
     bool wrongSaid = false;
+    /// Last time the car got 20 m+ closer to the maneuver, and the distance then (loop B146). A turn
+    /// counts as stale for heading checks only after pendingTurnForgetMs with no such progress, so a
+    /// long approach (an exit 15 km out) keeps its countdown.
+    std::optional<double> aliveAt = std::nullopt;
+    double aliveDistM = 0;
   };
 
   /// "Please continue straight." ... "You should still be going straight." ... "I'm serious."

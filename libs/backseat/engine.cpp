@@ -20,6 +20,8 @@ namespace
 double constexpr kNever = -std::numeric_limits<double>::infinity();
 /// A heading swing counts as taking (or botching) the pending turn only this close to it.
 double constexpr kWrongTurnWithinM = 120;
+/// Getting this much closer to the maneuver keeps a pending turn alive (loop B146).
+double constexpr kAliveProgressM = 20;
 /// The far countdown call comes at least this many seconds out at the current speed...
 double constexpr kCountdownFarS = 12;
 /// ...but never farther than this (half a mile).
@@ -445,6 +447,8 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
       m_pendingTurn =
           PendingTurn{dir == Maneuver::Right ? TurnDirection::Right : TurnDirection::Left, shape, e.t, stage, {}, false,
                       {}, e.distanceM, e.distanceM, e.text};
+      m_pendingTurn->aliveAt = e.t;
+      m_pendingTurn->aliveDistM = e.distanceM;
     }
     // The heading swing from the turn just finished isn't about this one.
     m_headings.clear();
@@ -514,7 +518,18 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
   }
   case NavEvent::Type::Progress:
     if (m_pendingTurn)
-      m_pendingTurn->distM = e.distanceM;
+    {
+      auto & p = *m_pendingTurn;
+      p.distM = e.distanceM;
+      // Getting closer keeps the turn alive however long the approach (loop B146).
+      if (p.aliveDistM - e.distanceM > kAliveProgressM)
+      {
+        if (p.aliveAt && e.t - *p.aliveAt > m_config.pendingTurnForgetMs)
+          m_headings.clear();  // the swing from before the long stop isn't about this turn
+        p.aliveAt = e.t;
+        p.aliveDistM = e.distanceM;
+      }
+    }
     NagStraight(out, e.t, e.distanceM);
     Countdown(out, e.t, e.distanceM);
     break;
@@ -683,8 +698,14 @@ void CritiqueEngine::CheckTurnDirection(TelemetrySample const & s, std::vector<C
 {
   if (!s.headingDeg || s.speedMps < m_config.rollingMps)
     return;
-  if (m_pendingTurn && s.t - m_pendingTurn->since > m_config.pendingTurnForgetMs)
-    m_pendingTurn.reset();
+  // A turn with no progress toward it for minutes (parked, wandering a lot) is stale: no heading
+  // verdicts on it. It isn't dropped: once the car gets closer again, the countdown and the checks
+  // carry on (loop B146: dropping it by age lost every call on approaches over three minutes).
+  if (m_pendingTurn && s.t - m_pendingTurn->aliveAt.value_or(m_pendingTurn->since) > m_config.pendingTurnForgetMs)
+  {
+    m_headings.clear();
+    return;
+  }
   m_headings.push_back({s.t, *s.headingDeg});
   m_headings.erase(std::remove_if(m_headings.begin(), m_headings.end(), [&](Heading const & h) { return s.t - h.t > 12000; }),
                    m_headings.end());
