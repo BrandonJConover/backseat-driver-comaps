@@ -1,0 +1,205 @@
+{
+ "about": "Dotted rank and office titles before a capitalised name (loop B140, CROSS X-052): Capt./Lt./Col./Sgt./Gen./Maj./Cpl./Adm./Cmdr./Prof./Rev./Insp./Supt./Gov./Sen./Pres./Msgr./Fr. -> Captain, Lieutenant ... Ported from EpubToM4B tests/fixtures/spoken_dotted_titles.json (auto/loop) plus GPS street cases. Left out on purpose: 'I live on Water St.' and 'She lives on Elm St now.' (Backseat respells the heteronyms live/lives), and 'Café St. Germain' / 'Ève St. Clair' (BookLyre reads 'Street.' there; Backseat reads Saint, which is right). Backseat also drops the period in 'Ken Griffey, Sr., played' the way BookLyre does. Backseat Driver: backseat::pronunciation::ForSpeech / DottedTitles, Titles (libs/backseat/pronunciation_streets.hpp).",
+ "cases": [
+  {
+   "input": "Capt. Hook and Lt. Dan met Col. Mustard.",
+   "expected": "Captain Hook and Lieutenant Dan met Colonel Mustard."
+  },
+  {
+   "input": "Sgt. Pepper and Gen. Lee saluted Prof. Plum.",
+   "expected": "Sergeant Pepper and General Lee saluted Professor Plum."
+  },
+  {
+   "input": "Rev. Green, Cpl. Hicks and Maj. Tom waited.",
+   "expected": "Reverend Green, Corporal Hicks and Major Tom waited."
+  },
+  {
+   "input": "Adm. Nelson, Cmdr. Riker and Insp. Lestrade arrived.",
+   "expected": "Admiral Nelson, Commander Riker and Inspector Lestrade arrived."
+  },
+  {
+   "input": "Supt. Hastings called Gov. Brown and Sen. Smith.",
+   "expected": "Superintendent Hastings called Governor Brown and Senator Smith."
+  },
+  {
+   "input": "Pres. Lincoln and Fr. Brown prayed.",
+   "expected": "President Lincoln and Father Brown prayed."
+  },
+  {
+   "input": "They climbed Mt. Everest and camped at Ft. Knox.",
+   "expected": "They climbed Mount Everest and camped at Fort Knox."
+  },
+  {
+   "input": "Capt. the ship.",
+   "expected": "Capt. the ship."
+  },
+  {
+   "input": "He was Capt.",
+   "expected": "He was Capt."
+  },
+  {
+   "input": "Take St. Johns Road.",
+   "expected": "Take Saint Johns Road."
+  },
+  {
+   "input": "Turn onto St. Charles Avenue.",
+   "expected": "Turn onto Saint Charles Avenue."
+  },
+  {
+   "input": "Head down St. Marks Place.",
+   "expected": "Head down Saint Marks Place."
+  },
+  {
+   "input": "Pray to St. Jude.",
+   "expected": "Pray to Saint Jude."
+  },
+  {
+   "input": "Wander St. Johns Road at dusk.",
+   "expected": "Wander Saint Johns Road at dusk."
+  },
+  {
+   "input": "Find St. Mary Street.",
+   "expected": "Find Saint Mary Street."
+  },
+  {
+   "input": "Walk along St. Clair Avenue.",
+   "expected": "Walk along Saint Clair Avenue."
+  },
+  {
+   "input": "Exit at St. Paul.",
+   "expected": "Exit at Saint Paul."
+  },
+  {
+   "input": "The shop on Cross St. was shut.",
+   "expected": "The shop on Cross Street was shut."
+  },
+  {
+   "input": "He lived on Baker St. Then he left.",
+   "expected": "He lived on Baker Street. Then he left."
+  },
+  {
+   "input": "Walk past Main St. Mary was there.",
+   "expected": "Walk past Main Street. Mary was there."
+  },
+  {
+   "input": "Meet me on Baker St, at noon.",
+   "expected": "Meet me on Baker Street, at noon."
+  },
+  {
+   "input": "Main St. Johns Road is closed.",
+   "expected": "Main Saint Johns Road is closed."
+  },
+  {
+   "input": "He moved to St. Petersburg.",
+   "expected": "He moved to Saint Petersburg."
+  },
+  {
+   "input": "St. Patrick's Day is here.",
+   "expected": "Saint Patrick's Day is here."
+  },
+  {
+   "input": "It was Martin Luther King, Jr.",
+   "expected": "It was Martin Luther King, Junior."
+  },
+  {
+   "input": "Martin Luther King, Jr. was born.",
+   "expected": "Martin Luther King, Junior was born."
+  },
+  {
+   "input": "Sammy Davis Jr sang.",
+   "expected": "Sammy Davis Junior sang."
+  },
+  {
+   "input": "John Smith Sr. Then he left.",
+   "expected": "John Smith Senior. Then he left."
+  },
+  {
+   "input": "Ken Griffey, Sr., played ball.",
+   "expected": "Ken Griffey, Senior, played ball."
+  },
+  {
+   "input": "The Jr. high school.",
+   "expected": "The Junior high school."
+  },
+  {
+   "input": "Jrs and Srs alike.",
+   "expected": "Jrs and Srs alike."
+  },
+  {
+   "input": "Nothing to change here.",
+   "expected": "Nothing to change here."
+  },
+  {
+   "input": "St",
+   "expected": "St"
+  },
+  {
+   "input": "The Stadium was full.",
+   "expected": "The Stadium was full."
+  },
+  {
+   "input": "Stop at Capt. D's.",
+   "expected": "Stop at Captain D's."
+  },
+  {
+   "input": "Take Col. Glenn Hwy north.",
+   "expected": "Take Colonel Glenn Highway north."
+  },
+  {
+   "input": "Turn left onto Gen. Lee Ave",
+   "expected": "Turn left onto General Lee Avenue"
+  },
+  {
+   "input": "Sgt. Pepper's Diner is on the right.",
+   "expected": "Sergeant Pepper's Diner is on the right."
+  },
+  {
+   "input": "Take Lt. Col. Smith Blvd",
+   "expected": "Take Lieutenant Colonel Smith Boulevard"
+  },
+  {
+   "input": "Turn onto Gov. Ann Richards Hwy",
+   "expected": "Turn onto Governor Ann Richards Highway"
+  },
+  {
+   "input": "Sen. Bob Dole Ave",
+   "expected": "Senator Bob Dole Avenue"
+  },
+  {
+   "input": "Msgr. O'Brien Rd",
+   "expected": "Monsignor O'Brien Road"
+  },
+  {
+   "input": "Exit at Rev. Martin Luther King Jr. Blvd",
+   "expected": "Exit at Reverend Martin Luther King Junior Boulevard"
+  },
+  {
+   "input": "Adm. Nimitz Dr",
+   "expected": "Admiral Nimitz Drive"
+  },
+  {
+   "input": "He was Capt. Then he left.",
+   "expected": "He was Capt. Then he left."
+  },
+  {
+   "input": "Capt. I said no.",
+   "expected": "Capt. I said no."
+  },
+  {
+   "input": "turn at the col. Here",
+   "expected": "turn at the col. Here"
+  },
+  {
+   "input": "Gen. Lee and gen. pop.",
+   "expected": "General Lee and gen. pop."
+  },
+  {
+   "input": "Lt.Dan waved.",
+   "expected": "Lt.Dan waved."
+  },
+  {
+   "input": "He was Capt. I'm sure.",
+   "expected": "He was Capt. I'm sure."
+  }
+ ]
+}

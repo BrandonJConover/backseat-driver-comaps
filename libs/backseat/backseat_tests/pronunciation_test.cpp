@@ -976,3 +976,28 @@ TEST(MilitaryAndTwentyFourHourTimes)
     longText += "at 0600h 23:59 ";
   CHECK(!ForSpeech(longText).empty());
 }
+
+TEST(DottedTitlesBeforeNames)
+{
+  // Loop B140, CROSS X-052: BookLyre's dotted-title cases plus street names with a rank in them.
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_DOTTED_TITLES_PATH);
+  CHECK(cases.size() >= 45);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // Every title reads in full before a name, and stays as written before a lowercase word.
+  for (char const * t : {"Capt", "Lt", "Col", "Sgt", "Gen", "Maj", "Cpl", "Adm", "Cmdr", "Prof", "Rev", "Insp",
+                         "Supt", "Gov", "Sen", "Pres", "Msgr", "Fr"})
+  {
+    std::string const title(t);
+    CHECK(ForSpeech("Meet " + title + ". Morgan Rd").find(title + ".") == std::string::npos);
+    CHECK(ForSpeech("Meet " + title + ". morgan").find(title + ".") != std::string::npos);
+  }
+  // Hostile input stays quick and doesn't throw.
+  std::string longText;
+  for (int i = 0; i < 2000; ++i)
+    longText += "Lt. Col. Capt. ";
+  CHECK(!ForSpeech(longText).empty());
+}

@@ -182,6 +182,39 @@ std::string CountyRoads(std::string s)
   return s;
 }
 
+/// Rank and office titles with their period, before a capitalised name (loop B140, CROSS X-052): "Capt. D's"
+/// is "Captain D's", "Col. Glenn Hwy" "Colonel Glenn Highway", "Lt. Col. Smith" "Lieutenant Colonel Smith".
+/// Only with the period and a capitalised word after it: "col." lowercase, "Gen. 3" and "Capt. I said" stay,
+/// and so does a title before a word that likely starts a new sentence ("He was Capt. Then he left").
+std::string DottedTitles(std::string s)
+{
+  if (s.find(". ") == std::string::npos ||
+      !HasLetterWord(s, {"Capt", "Lt", "Col", "Sgt", "Gen", "Maj", "Cpl", "Adm", "Cmdr", "Prof", "Rev", "Insp",
+                         "Supt", "Gov", "Sen", "Pres", "Msgr", "Fr"}))
+    return s;
+  static std::map<std::string, std::string> const words = {
+      {"Capt", "Captain"},   {"Lt", "Lieutenant"}, {"Col", "Colonel"},    {"Sgt", "Sergeant"},
+      {"Gen", "General"},    {"Maj", "Major"},     {"Cpl", "Corporal"},   {"Adm", "Admiral"},
+      {"Cmdr", "Commander"}, {"Prof", "Professor"}, {"Rev", "Reverend"},  {"Insp", "Inspector"},
+      {"Supt", "Superintendent"}, {"Gov", "Governor"}, {"Sen", "Senator"}, {"Pres", "President"},
+      {"Msgr", "Monsignor"}, {"Fr", "Father"}};
+  // Words that start a sentence far more often than they follow a title.
+  static std::set<std::string> const starters = {
+      "I", "The", "Then", "He", "She", "It", "We", "They", "You", "This", "That", "There", "These", "Those",
+      "His", "Her", "Its", "Our", "Their", "My", "Your", "An", "And", "But", "So", "Now", "When", "If"};
+  static std::regex const title(
+      "\\b(Capt|Lt|Col|Sgt|Gen|Maj|Cpl|Adm|Cmdr|Prof|Rev|Insp|Supt|Gov|Sen|Pres|Msgr|Fr)\\. (?=[A-Z](?:[a-z]|'[A-Za-z]))");
+  return Replace(s, title, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    size_t const next = pos + static_cast<size_t>(m.length(0));
+    size_t end = next;
+    while (end < s.size() && IsAsciiLetter(s[end]))
+      ++end;
+    if (starters.count(s.substr(next, end - next)) > 0)
+      return std::nullopt;
+    return words.at(m.str(1)) + " ";
+  });
+}
+
 /// "St. Johns Rd" is "Saint Johns Rd", "Dr Martin Luther King Jr Blvd" is "Doctor Martin Luther
 /// King Junior Blvd", "Ft Worth" is "Fort Worth", "Hwy 290" is "Highway 290", "101 Fwy" is "101
 /// Freeway". "Main St. Then left" and "Elm Dr." stay street types for the street pass.
@@ -189,6 +222,7 @@ std::string CountyRoads(std::string s)
 /// James Street").
 std::string Titles(std::string s)
 {
+  s = DottedTitles(std::move(s));
   static std::regex const title("\\b(St|Ste|Dr|Ft)\\.? (?=[A-Z][a-z])");
   if (HasLetterWord(s, {"St", "Ste", "Dr", "Ft"}))
     s = Replace(s, title, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
@@ -212,9 +246,12 @@ std::string Titles(std::string s)
     if (!std::isupper(static_cast<unsigned char>(s[start])))
       return std::nullopt;
     std::string out = m.str(1) + (m.str(2) == "Jr" ? "Junior" : "Senior");
+    size_t next = pos + static_cast<size_t>(m.length(0));
+    // "Ken Griffey, Sr., played": the comma already pauses, so the period goes (loop B140).
+    if (m[3].length() > 0 && next < s.size() && (s[next] == ',' || s[next] == ';' || s[next] == ':'))
+      return out;
     if (m[3].length() > 0)
     {
-      size_t next = pos + static_cast<size_t>(m.length(0));
       while (next < s.size() && Space(s[next]))
         ++next;
       size_t wordEnd = next;
