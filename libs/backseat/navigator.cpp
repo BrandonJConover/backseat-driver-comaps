@@ -83,6 +83,12 @@ double constexpr kTrainWaitMs = 20000;
 /// to stay clear of the boarding call.
 double constexpr kFerryAheadMinM = 300;
 double constexpr kFerryAheadMaxM = 1500;
+/// A toll stretch gets its line as it begins: within this far of its start, or on it (BI-113).
+double constexpr kTollStartM = 200;
+/// ...and only this soon after coming in range; later, it's no longer the start.
+double constexpr kTollWindowMs = 90000;
+/// Two toll stretches with less free road than this between them are one toll road.
+double constexpr kTollFreeGapM = 2000;
 /// A pull-over this soon after serious speeding is probably the police.
 double constexpr kPoliceAfterSpeedingMs = 120000;
 /// "Serious" speeding: this far over the limit (~10 mph).
@@ -743,6 +749,8 @@ RouteSnapshot CleanRoute(RouteSnapshot route, double lastDistToTurnM)
     route.passedExitNextM.reset();
   if (route.ferryAheadM && !sane(*route.ferryAheadM, kMaxRouteM))
     route.ferryAheadM.reset();
+  if (route.tollAheadM && !sane(*route.tollAheadM, kMaxRouteM))
+    route.tollAheadM.reset();
   // A grade is a fraction (0.06 = 6%); past 100% it's not a road.
   if (route.gradeAhead && !(std::isfinite(*route.gradeAhead) && std::abs(*route.gradeAhead) <= 1))
     route.gradeAhead.reset();
@@ -859,7 +867,10 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & rawRoute)
     TrackLastExit(fix.tMs, route);
     TrackExitSkip(fix, route);
     if (m_talk != TalkLevel::DirectionsOnly)
+    {
       TrackFerry(fix, route);
+      TrackToll(fix, route);
+    }
     TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, fix.speedMps, route);
     TrackLongDrive(fix.tMs, route);
   }
@@ -1071,6 +1082,39 @@ void Navigator::TrackFerry(Fix const & fix, RouteSnapshot const & route)
   m_ferryAheadSaid = true;
   Trace("nav.ferryAhead", {{"ahead_m", LogNum(*route.ferryAheadM, 0)}});
   SayLine(fix.tMs, Category::Idle, "ferry.ahead", DriverVars());
+}
+
+void Navigator::TrackToll(Fix const & fix, RouteSnapshot const & route)
+{
+  // Free road ahead (or a long gap to the next toll): the next stretch is a new toll road.
+  if (!route.tollAheadM || *route.tollAheadM > kTollFreeGapM)
+  {
+    m_tollSaid = false;
+    m_tollWindowT.reset();
+    return;
+  }
+  if (m_tollSaid || route.state != RouteState::OnRoute || *route.tollAheadM > kTollStartM)
+    return;
+  if (!m_tollWindowT)
+    m_tollWindowT = fix.tMs;
+  if (fix.tMs - *m_tollWindowT > kTollWindowMs)
+  {
+    // Missed the start (turn calls had the air): mid-toll-road it's no longer news.
+    m_tollSaid = true;
+    return;
+  }
+  if (m_avoidTollsSaid)
+  {
+    // They asked to avoid tolls and the route took one anyway: not the driver's fault, no joke.
+    m_tollSaid = true;
+    Trace("nav.tollSkip", {{"why", "avoid_tolls_said"}});
+    return;
+  }
+  if (RemarkJustSaid(fix.tMs) || (route.turnId && route.distToTurnM < kIdleQuietM))
+    return;
+  m_tollSaid = true;
+  Trace("nav.tollStart", {{"ahead_m", LogNum(*route.tollAheadM, 0)}});
+  SayLine(fix.tMs, Category::Idle, "toll.start", DriverVars());
 }
 
 void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
@@ -1407,6 +1451,7 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     }
     m_engine.reset();
     ResetTrip();
+    m_avoidTollsSaid = false;
     // An off-road trip or a hike was this trip's; the next one starts from the route type again.
     if (m_modeFound)
     {
@@ -2622,6 +2667,8 @@ void Navigator::ResetTrip()
   m_bendHeadings.clear();
   m_curveAheadM = -1;
   m_ferryAheadSaid = m_ferryAboardSaid = m_wasOnFerry = false;
+  m_tollSaid = false;
+  m_tollWindowT.reset();
   m_lastBendT = -1e18;
   m_bendJokes = 0;
   m_coldStage = 0;
@@ -2791,6 +2838,10 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
   if (!m_engine || m_arrived)
     return;
   m_lastT = std::max(m_lastT, tMs);
+  // "Avoid tolls": the host reroutes; a toll stretch after that is no joke (BI-113).
+  for (auto const & command : ParseAppCommands(text))
+    if (command.action == AppAction::AvoidTolls || command.action == AppAction::AllowTolls)
+      m_avoidTollsSaid = command.action == AppAction::AvoidTolls;
   // A pop quiz is waiting: whatever was said is the answer (or a try at one).
   if (QuizAsking())
   {

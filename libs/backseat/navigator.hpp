@@ -152,6 +152,9 @@ struct RouteSnapshot
   std::optional<double> ferryAheadM;
   /// The car is on the route's ferry leg right now.
   bool onFerry = false;
+  /// How far along the route the next toll stretch starts (BI-113); 0 while driving on one, unset
+  /// when the rest of the route is toll-free.
+  std::optional<double> tollAheadM;
 };
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
@@ -604,6 +607,7 @@ private:
   void TrackCurveAhead(Fix const & fix, RouteSnapshot const & route);
   void TrackFerry(Fix const & fix, RouteSnapshot const & route);
   void HoldStopForFerry(RouteSnapshot const & route);
+  void TrackToll(Fix const & fix, RouteSnapshot const & route);
   void TrackMusic(double tMs, RouteSnapshot const & route);
   /// The trip started indoors: say so, and maybe remark on it once the car gets out.
   void SayIndoorStart(double tMs, RouteSnapshot const & route);
@@ -725,6 +729,12 @@ private:
   bool m_ferryAheadSaid = false;
   bool m_ferryAboardSaid = false;
   bool m_wasOnFerry = false;
+  /// Toll lines (BI-113): one per toll stretch, re-armed after more than kTollFreeGapM of free road.
+  bool m_tollSaid = false;
+  /// When the current toll stretch came within range; the line is skipped if it can't go soon after.
+  std::optional<double> m_tollWindowT;
+  /// The driver said "avoid tolls" this trip: a toll anyway is the route's doing, no joke.
+  bool m_avoidTollsSaid = false;
   bool m_policeSaid = false;
   std::optional<double> m_lastLimitMps;
   std::string m_country;
