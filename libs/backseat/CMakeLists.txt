@@ -39,6 +39,7 @@ set(
   pronunciation_senses.hpp
   pronunciation_streets.hpp
   pronunciation_text.hpp
+  pronunciation_web.hpp
   pop_quiz.cpp
   pop_quiz.hpp
   quiet_bits.cpp
