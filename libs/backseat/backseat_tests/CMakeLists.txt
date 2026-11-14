@@ -37,6 +37,7 @@ add_executable(${PROJECT_NAME}
   quiet_bits_test.cpp
   report_test.cpp
   report_speed_test.cpp
+  listen_speed_test.cpp
   achievements_test.cpp
   rundown_test.cpp
   road_bits_test.cpp
