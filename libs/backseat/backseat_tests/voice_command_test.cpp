@@ -1043,3 +1043,48 @@ TEST(SayAgainFormsRepeatTheDirection)
   CHECK(Heard("sorry, what's the next turn", AppAction::NextTurn));
   CHECK(!Heard("sorry, what's the next turn", AppAction::RepeatInstruction));
 }
+
+TEST(SpeedLimitTimeMuteAndDirectionPhrasings)
+{
+  // B151: phrasings the 11-14 voice-command probe missed or misheard.
+  for (char const * said : {"what's my speed limit", "What's my speed limit?", "whats my speed limit", "what is my speed limit",
+                            "speed limit", "Speed limit?", "the speed limit", "speed limit please"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == AppAction::SpeedLimit;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(ok);
+  }
+  CHECK(Heard("what's my speed", AppAction::CurrentSpeed));
+  CHECK(!Heard("what's my speed", AppAction::SpeedLimit));
+  CHECK(Heard("how fast am I going", AppAction::CurrentSpeed));
+  for (char const * said : {"how many minutes left", "how many minutes until we get there", "how much time is left",
+                            "how much time left", "minutes left?"})
+    CHECK(Heard(said, AppAction::TimeLeft));
+  CHECK(Heard("stop the navigation", AppAction::CancelRoute));
+  for (char const * said : {"turn off the voice", "turn the voice off", "voice off", "sound off"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == AppAction::Mute;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(ok);
+  }
+  for (char const * said : {"next direction", "what's the next direction", "whats the next direction"})
+  {
+    auto const c = ParseAppCommands(said);
+    CHECK(c.size() == 1 && c[0].action == AppAction::NextTurn);
+  }
+  // An always-on mic hears these at the radio and the passengers: still nothing.
+  for (char const * chatter : {"silence", "cancel", "never mind", "my speed was fine", "the voice on the radio is off key",
+                               "the speed limit here is silly", "speed limits are a suggestion"})
+  {
+    auto const c = ParseAppCommands(chatter);
+    if (!c.empty())
+      std::printf("  chatter \"%s\" heard %zu commands\n", chatter, c.size());
+    CHECK(c.empty());
+  }
+  CHECK(WordsSupportTool(AppAction::Mute, "", "turn off the voice"));
+  CHECK(WordsSupportTool(AppAction::NextTurn, "", "what's the next direction"));
+}
