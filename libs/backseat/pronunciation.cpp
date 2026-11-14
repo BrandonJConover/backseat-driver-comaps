@@ -1824,9 +1824,48 @@ std::string ErrorCodes(std::string s)
   });
 }
 
+// The cents sign Kokoro drops (loop B138, CROSS X-050): "50¢" is "50 cents", "1¢" "1 cent", "a 5¢ stamp"
+// "a 5 cent stamp" (singular after a/an before a word). Left alone when glued to something before it
+// ("$1.99¢", "x50¢", "1,50¢") or after it ("50¢¢", "50¢s").
+std::string CentsSign(std::string s)
+{
+  static std::string_view const kCent = "\xC2\xA2";
+  if (s.find(kCent) == std::string::npos)
+    return s;
+  static std::regex const cents("(\\d+(?:\\.\\d+)?) ?\xC2\xA2");
+  static std::regex const article("(?:^|[^A-Za-z])[Aa]n? $");
+  auto const original = s;
+  return Replace(s, cents, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    if (pos > 0)
+    {
+      auto const before = static_cast<unsigned char>(original[pos - 1]);
+      if (std::isalnum(before) || before >= 0x80 || std::string_view("_.,$").find(static_cast<char>(before)) != std::string_view::npos)
+        return std::nullopt;
+    }
+    auto const end = pos + static_cast<size_t>(m.length(0));
+    if (end < original.size())
+    {
+      auto const after = static_cast<unsigned char>(original[end]);
+      if (std::isalnum(after) || after == '_' || original.compare(end, kCent.size(), kCent) == 0)
+        return std::nullopt;
+    }
+    auto const amount = m.str(1);
+    // "a 5¢ stamp": the amount describes the next word, so it is singular.
+    bool singular = amount == "1";
+    if (!singular && end + 1 < original.size() && original[end] == ' ' &&
+        std::isalpha(static_cast<unsigned char>(original[end + 1])))
+    {
+      auto const head = original.substr(pos >= 4 ? pos - 4 : 0, pos >= 4 ? 4 : pos);
+      singular = std::regex_search(head, article);
+    }
+    return amount + (singular ? " cent" : " cents");
+  });
+}
+
 std::string NumberWords(std::string s)
 {
   // Money and percentages.
+  s = CentsSign(s);
   static std::regex const money("\\$(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d{2}))?\\b");
   if (HasAny(s, "$"))
     s = Replace(s, money, [](std::smatch const & m, size_t) -> std::optional<std::string> {

@@ -1,0 +1,45 @@
+{
+ "about": "The cents sign Kokoro drops, read as cents (loop B138, CROSS X-050; BookLyre's 7 cases from EpubToM4B tests/fixtures/spoken_currency.json b285dd9d, in Backseat's own spoken numbers, plus toll/store cases). '50¢' is 'fifty cents', '1¢' 'one cent', 'a 5¢ stamp' 'a five cent stamp' (singular after a/an before a word). '$1.99¢' is left to the money pass (the stray ¢ stays and is silent), as BookLyre leaves it. Backseat Driver: backseat::pronunciation::ForSpeech / CentsSign (libs/backseat/backseat_tests/pronunciation_test.cpp).",
+ "cases": [
+  {
+   "input": "The candy cost 50¢.",
+   "expected": "The candy cost fifty cents."
+  },
+  {
+   "input": "He found only 1¢ in the jar.",
+   "expected": "He found only one cent in the jar."
+  },
+  {
+   "input": "She licked a 5¢ stamp.",
+   "expected": "She licked a five cent stamp."
+  },
+  {
+   "input": "Gas was 2.5¢ cheaper.",
+   "expected": "Gas was two point five cents cheaper."
+  },
+  {
+   "input": "Coffee was 10 ¢ back then.",
+   "expected": "Coffee was ten cents back then."
+  },
+  {
+   "input": "The tag read $1.99¢ by mistake.",
+   "expected": "The tag read one dollar and ninety nine cents¢ by mistake."
+  },
+  {
+   "input": "Il coûte 50¢.",
+   "expected": "Il coûte fifty cents."
+  },
+  {
+   "input": "Stop at 99¢ Only Stores.",
+   "expected": "Stop at ninety nine cents Only Stores."
+  },
+  {
+   "input": "Tolls are 75¢ here.",
+   "expected": "Tolls are seventy five cents here."
+  },
+  {
+   "input": "An 8¢ fee.",
+   "expected": "An eight cent fee."
+  }
+ ]
+}

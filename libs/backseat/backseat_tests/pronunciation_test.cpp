@@ -932,3 +932,27 @@ TEST(ForSpeechPassOrderSurvivesTheSplit)
                           "three dollars and fifty cents at two thirty"));
   CHECK_EQUAL(ForSpeech("Ave B & Oak Dr. and then left"), std::string("Avenue B and Oak Drive and then left"));
 }
+
+TEST(CentsSignIsSaidAsCents)
+{
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_CURRENCY_PATH);
+  CHECK(cases.size() >= 8);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // Glued to something, or no amount: the sign is left where it is.
+  for (char const * s : {"x50¢", "50¢¢", "50¢s", "1,50¢", "¢"})
+    CHECK(ForSpeech(s).find("cent") == std::string::npos);
+  CHECK(ForSpeech("x50¢").find("¢") != std::string::npos);
+  CHECK(ForSpeech("50¢¢").find("cents") == std::string::npos);
+  // Only "a"/"an" right before makes it singular; "Cuban 5¢ cigar" is still plural.
+  CHECK_EQUAL(ForSpeech("Cuban 5¢ cigar"), std::string("Cuban five cents cigar"));
+  CHECK_EQUAL(ForSpeech("a 5¢."), std::string("a five cents."));
+  // Hostile input stays quick and doesn't throw.
+  std::string longText;
+  for (int i = 0; i < 2000; ++i)
+    longText += "1¢";
+  CHECK(!ForSpeech(longText).empty());
+}
