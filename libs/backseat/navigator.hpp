@@ -147,6 +147,11 @@ struct RouteSnapshot
   /// Rise over run of the route just ahead (0.1 is a 10% climb, negative downhill), when the map
   /// has altitudes for it (walking and cycling routes do).
   std::optional<double> gradeAhead;
+  /// How far along the route the next ferry leg starts, when the route takes one (BI-112). Unset
+  /// when there's no ferry ahead.
+  std::optional<double> ferryAheadM;
+  /// The car is on the route's ferry leg right now.
+  bool onFerry = false;
 };
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
@@ -597,6 +602,8 @@ private:
   void TrackSlowStart(Fix const & fix);
   /// "Hey did you know there is a curve ahead? I did."
   void TrackCurveAhead(Fix const & fix, RouteSnapshot const & route);
+  void TrackFerry(Fix const & fix, RouteSnapshot const & route);
+  void HoldStopForFerry(RouteSnapshot const & route);
   void TrackMusic(double tMs, RouteSnapshot const & route);
   /// The trip started indoors: say so, and maybe remark on it once the car gets out.
   void SayIndoorStart(double tMs, RouteSnapshot const & route);
@@ -712,6 +719,12 @@ private:
   bool m_pullOverSaid = false;
   /// This stop has been checked for a railway crossing (once per stop, at kTrainWaitMs).
   bool m_trainChecked = false;
+  /// The current stop began on a ferry: the boat explains it (no longStop, pull-over or resumed lines).
+  bool m_stopOnFerry = false;
+  /// Ferry lines, once per ferry (BI-112); both reset after getting off one.
+  bool m_ferryAheadSaid = false;
+  bool m_ferryAboardSaid = false;
+  bool m_wasOnFerry = false;
   bool m_policeSaid = false;
   std::optional<double> m_lastLimitMps;
   std::string m_country;

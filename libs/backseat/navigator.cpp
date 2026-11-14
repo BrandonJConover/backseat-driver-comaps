@@ -13,6 +13,7 @@
 #include <cctype>
 #include <cmath>
 #include <ctime>
+#include <limits>
 #include <random>
 
 namespace backseat
@@ -78,6 +79,10 @@ double constexpr kPhoneWanderedM = 30;
 double constexpr kPullOverAfterMs = 45000;
 /// Stopped this long by a railway crossing: that's a train, worth one line (BI-111).
 double constexpr kTrainWaitMs = 20000;
+/// A ferry gets one line when it's this far ahead (BI-112): close enough to matter, far enough
+/// to stay clear of the boarding call.
+double constexpr kFerryAheadMinM = 300;
+double constexpr kFerryAheadMaxM = 1500;
 /// A pull-over this soon after serious speeding is probably the police.
 double constexpr kPoliceAfterSpeedingMs = 120000;
 /// "Serious" speeding: this far over the limit (~10 mph).
@@ -736,6 +741,8 @@ RouteSnapshot CleanRoute(RouteSnapshot route, double lastDistToTurnM)
     route.routeBearingDeg = -1;
   if (route.passedExitNextM && !sane(*route.passedExitNextM, kMaxRouteM))
     route.passedExitNextM.reset();
+  if (route.ferryAheadM && !sane(*route.ferryAheadM, kMaxRouteM))
+    route.ferryAheadM.reset();
   // A grade is a fraction (0.06 = 6%); past 100% it's not a road.
   if (route.gradeAhead && !(std::isfinite(*route.gradeAhead) && std::abs(*route.gradeAhead) <= 1))
     route.gradeAhead.reset();
@@ -851,6 +858,8 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & rawRoute)
     TrackOffRoad(fix);
     TrackLastExit(fix.tMs, route);
     TrackExitSkip(fix, route);
+    if (m_talk != TalkLevel::DirectionsOnly)
+      TrackFerry(fix, route);
     TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, fix.speedMps, route);
     TrackLongDrive(fix.tMs, route);
   }
@@ -926,6 +935,7 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
       m_stopAnnounced = false;
       m_pullOverSaid = false;
       m_trainChecked = false;
+      m_stopOnFerry = false;
       m_stopInTraffic = m_inTraffic;
       // On a road fast enough to judge traffic on, a dead stop is called a jam within one traffic
       // window, so the engine's longStop waits for that call (BI-056). Elsewhere it keeps its 45 s.
@@ -935,6 +945,7 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
                             *fix.speedLimitMps >= kTrafficMinLimitMps && !m_inTraffic;
         m_engine->HoldLongStop(judged ? fix.tMs + kTrafficWindowMs : 0);
       }
+      HoldStopForFerry(route);
       // Christmas season, after dark, at a red light: the GPS has had it with lights.
       if (!m_christmasSaid && m_lightLookup && KnowsTheDate(fix.tMs))
       {
@@ -950,6 +961,7 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
     }
     return;
   }
+  HoldStopForFerry(route);
   // A stop lasts until the car is moving again; walking pace with the phone is still the stop.
   if (fix.speedMps >= MovingMps())
   {
@@ -969,7 +981,8 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
       return c == Category::UnplannedStop || c == Category::LongStop || c == Category::PullOver;
     }), m_turnHeld.end());
     // Stuck in a jam the driver never left the car: the traffic lines already cover it (B52).
-    if (spot != StopSpot::RestArea && spot != StopSpot::DriveThru && !m_stopInTraffic)
+    // Driving off a ferry isn't "finally moving again" either: the boat was the stop (BI-112).
+    if (spot != StopSpot::RestArea && spot != StopSpot::DriveThru && !m_stopInTraffic && !m_stopOnFerry)
       Say(m_engine->OnNav(NavEvent::Resumed(fix.tMs, stoppedMs, stayedInCar)));
     return;
   }
@@ -993,7 +1006,7 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
     m_pullOverSaid = true;
     // Anything that explains the stop rules out the roadside: a light, a lot, a gas station.
     bool const explained = m_road.CurrentStopSpot() != StopSpot::None || (m_lightLookup && m_lightLookup(m_stopAt)) ||
-                           (m_crossingLookup && m_crossingLookup(m_stopAt)) ||
+                           (m_crossingLookup && m_crossingLookup(m_stopAt)) || m_stopOnFerry ||
                            (m_parkingLookup && m_parkingLookup(m_stopAt)) || (m_placeLookup && m_placeLookup(m_stopAt));
     if (!explained)
     {
@@ -1006,7 +1019,8 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
         SayLine(fix.tMs, Category::PullOver, "pullOver");
     }
   }
-  if (!m_stopAnnounced && !nearDestination && !m_stopInTraffic && fix.tMs - *m_stopSince >= kUnplannedStopAfterMs)
+  if (!m_stopAnnounced && !nearDestination && !m_stopInTraffic && !m_stopOnFerry &&
+      fix.tMs - *m_stopSince >= kUnplannedStopAfterMs)
   {
     m_stopAnnounced = true;
     // The drive-thru has its own lines.
@@ -1022,9 +1036,46 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
   }
 }
 
+void Navigator::HoldStopForFerry(RouteSnapshot const & route)
+{
+  // Parked on a ferry is the boat's doing: no "why did we stop?" for the whole crossing.
+  if (!route.onFerry || m_stopOnFerry)
+    return;
+  m_stopOnFerry = true;
+  if (m_engine)
+    m_engine->HoldLongStop(std::numeric_limits<double>::infinity());
+}
+
+void Navigator::TrackFerry(Fix const & fix, RouteSnapshot const & route)
+{
+  // Off the boat: the next ferry gets its own lines.
+  if (m_wasOnFerry && !route.onFerry)
+    m_ferryAheadSaid = m_ferryAboardSaid = false;
+  m_wasOnFerry = route.onFerry;
+  if (route.state != RouteState::OnRoute || RemarkJustSaid(fix.tMs))
+    return;
+  if (route.onFerry)
+  {
+    // Aboard and parked: the one vessel this GPS will ever ride. Nothing while still rolling on.
+    if (!m_ferryAboardSaid && fix.speedMps >= 0 && fix.speedMps < kStoppedMps)
+    {
+      m_ferryAboardSaid = m_ferryAheadSaid = true;
+      SayLine(fix.tMs, Category::Idle, "ferry.aboard", DriverVars());
+    }
+    return;
+  }
+  // A turn call coming up owns the air; the ferry line waits while it's still in range.
+  if (m_ferryAheadSaid || !route.ferryAheadM || *route.ferryAheadM < kFerryAheadMinM ||
+      *route.ferryAheadM > kFerryAheadMaxM || (route.turnId && route.distToTurnM < kIdleQuietM))
+    return;
+  m_ferryAheadSaid = true;
+  Trace("nav.ferryAhead", {{"ahead_m", LogNum(*route.ferryAheadM, 0)}});
+  SayLine(fix.tMs, Category::Idle, "ferry.ahead", DriverVars());
+}
+
 void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
 {
-  if (route.state != RouteState::OnRoute || !fix.speedLimitMps || *fix.speedLimitMps < kTrafficMinLimitMps)
+  if (route.state != RouteState::OnRoute || route.onFerry || !fix.speedLimitMps || *fix.speedLimitMps < kTrafficMinLimitMps)
   {
     m_speeds.clear();
     return;
@@ -2570,6 +2621,7 @@ void Navigator::ResetTrip()
   m_bits.NewTrip((m_config.rng ? m_config.rng() : 0) < kCleanBitChance, m_said.Counter(kTurnStreakKey));
   m_bendHeadings.clear();
   m_curveAheadM = -1;
+  m_ferryAheadSaid = m_ferryAboardSaid = m_wasOnFerry = false;
   m_lastBendT = -1e18;
   m_bendJokes = 0;
   m_coldStage = 0;

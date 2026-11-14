@@ -54,6 +54,7 @@ add_executable(${PROJECT_NAME}
   soak_gaps_test.cpp
   long_stop_test.cpp
   train_crossing_test.cpp
+  ferry_test.cpp
   resume_after_stop_test.cpp
   jam_stop_test.cpp
   debug_log_test.cpp
