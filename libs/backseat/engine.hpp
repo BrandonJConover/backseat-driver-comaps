@@ -228,6 +228,9 @@ private:
     /// long approach (an exit 15 km out) keeps its countdown.
     std::optional<double> aliveAt = std::nullopt;
     double aliveDistM = 0;
+    /// When the last progress update for this maneuver came, so the countdown knows how far the
+    /// next one will jump (loop B148: sparse fixes stepped over the final call).
+    std::optional<double> lastProgressAt = std::nullopt;
   };
 
   /// "Please continue straight." ... "You should still be going straight." ... "I'm serious."

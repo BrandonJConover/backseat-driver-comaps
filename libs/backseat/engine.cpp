@@ -49,6 +49,11 @@ double constexpr kFinalClearMs = 1500;
 double constexpr kFinalCallMaxS = 10;
 /// speechAware: anything else has to be over at least this long before the final call is due.
 double constexpr kBeforeFinalClearMs = 1000;
+/// Sparse fixes (loop B148): the countdown looks one fix ahead, using the last gap between progress
+/// updates, but no gap longer than this counts (a stop at a light isn't a fix rate).
+double constexpr kLookAheadMaxS = 10;
+/// A final call that would land with less than this share of its usual lead goes out a fix early.
+double constexpr kFinalLateShare = 0.5;
 /// How long a roast takes to say, before it's picked (most are 10-15 words).
 double constexpr kRoastSpeakMs = 5000;
 /// The pause the phone leaves after each line.
@@ -767,6 +772,21 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   double const far = FarM();
   double const finalM = m_config.speechAware ? FinalDueM(t, p) : FinalM();
   double const mention = m_config.countdownMentionM;
+  // How far the next fix will land: with one fix every 5 s at 30 m/s the 150 m steps used to jump
+  // from outside the final window straight to the turn, so "Now, turn left" never came (loop B148).
+  double nextM = distanceM;
+  // The first update after the instruction measures its gap from the instruction itself.
+  if (m_lastSample)
+  {
+    double const gapS = (t - p.lastProgressAt.value_or(p.since)) / 1000;
+    if (gapS > 0 && gapS <= kLookAheadMaxS)
+      nextM = distanceM - std::max(0.0, m_lastSample->speedMps) * gapS;
+  }
+  p.lastProgressAt = t;
+  // The final call is due now, or the next fix would come too late for it (or past the turn).
+  bool const finalNow = distanceM > 5 && (distanceM <= finalM || nextM < kFinalLateShare * FinalM());
+  // Same for the far call: the next fix would already be inside the final window.
+  bool const farNow = !finalNow && distanceM > finalM && (distanceM <= far || nextM <= finalM);
   double const reminderM = m_config.units == Units::Mph ? 1609.344 : 1000;
   if (!p.reminded && p.stage == 0 && p.legM >= kReminderLegM && distanceM <= reminderM && distanceM > 1.5 * far)
   {
@@ -782,15 +802,15 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   // The instruction itself ("In 300 feet, turn left") was just said: a "by the way, in 250 feet"
   // on top of it is noise, and wrong. Those stages are passed over quietly.
   bool const justAnnounced = t - p.since < kJustAnnouncedMs;
-  if (p.stage == 0 && distanceM <= far && distanceM > finalM && justAnnounced)
+  if (p.stage == 0 && farNow && justAnnounced)
   {
     p.stage = 1;
   }
-  else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > finalM && justAnnounced)
+  else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > finalM && !finalNow && justAnnounced)
   {
     p.mentioned = true;
   }
-  else if (p.stage == 0 && distanceM <= far && distanceM > finalM)
+  else if (p.stage == 0 && farNow)
   {
     stage = "far";
     // The third left in a row and beyond: going around in circles, NASCAR style.
@@ -799,19 +819,20 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
       stage = "nascar";
       m_nascarSaid = true;
     }
-    sayM = SayDistanceM(far, distanceM);
+    // Said a fix early, past its mark: the distance that's really left.
+    sayM = distanceM <= far ? SayDistanceM(far, distanceM) : distanceM;
     p.stage = 1;
     p.farAt = t;
   }
   // At speed the 250 ft mark comes seconds after the 500 ft one; once is enough then.
-  else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > finalM &&
+  else if (p.stage == 1 && !p.mentioned && distanceM <= mention && distanceM > finalM && !finalNow &&
            (!p.farAt || t - *p.farAt >= kMentionAfterFarMs))
   {
     stage = "mention";
     sayM = SayDistanceM(mention, distanceM);
     p.mentioned = true;
   }
-  else if (p.stage <= 1 && distanceM <= finalM && distanceM > 5)
+  else if (p.stage <= 1 && finalNow)
   {
     // The call that matters most, so it's plain and it always comes, mention or not. Right after
     // the instruction it would only say it again: skipped at the usual spot, and when it's only
