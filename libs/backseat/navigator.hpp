@@ -906,6 +906,12 @@ private:
     bool onRoute = false;
   };
   std::optional<Progress> m_progress;
+  /// This fix's speed read from progress, when the GPS gave none (unset when it gave one).
+  std::optional<double> m_progressMps;
+  /// The route had no matched position yet when the trip would have started; when that was.
+  std::optional<double> m_startHeldSince;
+  /// Where the car was when the trip started, so a car that has clearly left counts as rolling.
+  std::optional<LatLon> m_tripStartPos;
   BuildingLookup m_buildingLookup;
   /// This trip started indoors; the "made it out" line is still to come (key, empty if not).
   std::string m_indoorOutKey;

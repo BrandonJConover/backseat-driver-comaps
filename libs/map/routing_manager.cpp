@@ -507,6 +507,13 @@ void RoutingManager::OnLocationUpdate(location::GpsInfo const & info)
                                    m_currentRouterType == routing::RouterType::Ruler
                                ? backseat::TravelMode::Walk
                                : backseat::TravelMode::Drive);
+  // The route only hears about a fix once the Extrapolator's task reaches the GUI thread, after this
+  // call returns. Until the first one is matched the route has no next turn, so a trip started with
+  // one-tap Go opened with the greeting and rundown and only then gave the first direction. Match
+  // the very first fix right away; after that the Extrapolator keeps the route current between fixes.
+  if (m_routingSession.IsFollowing() && m_routingSession.IsNavigable() && !m_routingSession.IsOnRoute() &&
+      !m_routingSession.IsFinished())
+    CheckLocationForRouting(info);
   // Only real fixes go to Backseat Driver: extrapolated ones would fake hard braking.
   m_backseat.OnLocationUpdate(info, m_routingSession, GetBackseatDestinationName());
 }
