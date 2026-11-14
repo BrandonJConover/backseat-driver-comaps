@@ -156,6 +156,9 @@ public:
   /// The kind of place of the current (or just-ended) stop, once known. The navigator's own stop
   /// lines leave rest areas and drive-thrus to this.
   StopSpot CurrentStopSpot() const { return m_spot; }
+  /// Whether the map put the car on a motorway at the last surroundings check; unknown (nullopt)
+  /// with no lookup set or before the first check this trip (loop B144).
+  std::optional<bool> OnMotorway() const { return m_motorwayKnown ? std::optional<bool>(m_motorwaySince >= 0) : std::nullopt; }
 
   void Reset();
 
@@ -193,6 +196,7 @@ private:
   std::optional<LatLon> m_lastHere;
   double m_lastSurroundT = -1e18;
   double m_motorwaySince = -1;
+  bool m_motorwayKnown = false;
   double m_unpavedSince = -1;
   double m_wildSince = -1;
   double m_villageEnteredT = -1e18;

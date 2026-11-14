@@ -41,6 +41,9 @@ char const * TravelModeName(TravelMode mode);
 void SetLineTravelMode(TravelMode mode);
 /// Whether `text` makes sense for `mode`: no cars, gas or brake pedals for someone on foot.
 bool LineFitsMode(std::string const & text, TravelMode mode);
+/// Whether `text` says the car is on a highway (highway, freeway, interstate, motorway): wrong on a
+/// city street (loop B144).
+bool LineClaimsHighway(std::string const & text);
 
 /// Where the driver lives, from the getting-to-know-you questions. Decides which lines fit: someone
 /// living on the streets doesn't need reminding that they don't have a house (Brandon: "I'm not that

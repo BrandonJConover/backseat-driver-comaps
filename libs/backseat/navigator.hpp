@@ -538,6 +538,9 @@ private:
   void SayPlate(double tMs, PlateGame::Reply const & reply);
   void SayLine(double tMs, Category category, std::string const & key, Vars vars = {},
                Priority priority = Priority::Roast);
+  /// `options` for `key` minus the lines claiming a highway when the map says the car is off one
+  /// (straight.later, traffic.standstill; loop B144). Unknown road or a motorway: unchanged.
+  std::vector<std::string> RoadFit(std::string const & key, std::vector<std::string> options) const;
   /// Hands a line over; "setup || punchline" is split, the punchline after an awkward pause.
   /// `setupVoice`: someone else says the setup of a "setup || punchline" line (a Kokoro voice id).
   void PushLine(Commentary c, std::string const & setupVoice = {});

@@ -41,6 +41,15 @@ std::string LineWords(std::string const & text)
 }
 }  // namespace
 
+bool LineClaimsHighway(std::string const & text)
+{
+  static char const * const kHighway[] = {"highway",    "highways",  "freeway",   "freeways",
+                                          "interstate", "interstates", "motorway", "motorways"};
+  std::string const lower = LineWords(text);
+  return std::any_of(std::begin(kHighway), std::end(kHighway),
+                     [&lower](char const * w) { return lower.find(" " + std::string(w) + " ") != std::string::npos; });
+}
+
 void SetLineTravelMode(TravelMode mode)
 {
   g_travelMode = mode;

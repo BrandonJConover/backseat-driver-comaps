@@ -239,6 +239,7 @@ void RoadBits::TrackSurroundings(RoadTick const & k)
       t = k.tMs;
   };
   since(s.motorway, m_motorwaySince);
+  m_motorwayKnown = true;
   since(s.unpaved, m_unpavedSince);
   since(s.wild, m_wildSince);
   if (s.village && !m_inVillage)

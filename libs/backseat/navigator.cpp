@@ -3052,9 +3052,24 @@ bool Navigator::Parked() const
   return m_parkingLookup({m_lastFix->lat, m_lastFix->lon});
 }
 
+std::vector<std::string> Navigator::RoadFit(std::string const & key, std::vector<std::string> options) const
+{
+  if (key != "straight.later" && key != "traffic.standstill")
+    return options;
+  std::optional<bool> const motorway = m_road.OnMotorway();
+  if (!motorway || *motorway)
+    return options;
+  std::vector<std::string> fit;
+  for (auto const & l : options)
+    if (!LineClaimsHighway(l))
+      fit.push_back(l);
+  // Every line names a highway (never today): say one anyway rather than nothing.
+  return fit.empty() ? options : fit;
+}
+
 void Navigator::SayLine(double tMs, Category category, std::string const & key, Vars vars, Priority priority)
 {
-  auto const & options = LinesFor(key, Tier());
+  std::vector<std::string> const options = RoadFit(key, LinesFor(key, Tier()));
   double const r = m_config.rng ? m_config.rng() : 0;
   Commentary c;
   c.t = tMs;
@@ -3527,6 +3542,7 @@ bool Navigator::PunchNag(Commentary & line, double r)
     auto const & more = LinesFor(moreKey, Tier());
     options.insert(options.end(), more.begin(), more.end());
   }
+  options = RoadFit(key, std::move(options));
   std::string text = Fill(m_said.Pick(key + "+", options, m_config.rng ? m_config.rng() : 0), line.vars);
   if (!text.empty())
     text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
