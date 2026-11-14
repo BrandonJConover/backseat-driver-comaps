@@ -1,5 +1,5 @@
 {
- "about": "Dotted rank and office titles before a capitalised name (loop B140, CROSS X-052): Capt./Lt./Col./Sgt./Gen./Maj./Cpl./Adm./Cmdr./Prof./Rev./Insp./Supt./Gov./Sen./Pres./Msgr./Fr. -> Captain, Lieutenant ... Ported from EpubToM4B tests/fixtures/spoken_dotted_titles.json (auto/loop) plus GPS street cases. Left out on purpose: 'I live on Water St.' and 'She lives on Elm St now.' (Backseat respells the heteronyms live/lives), and 'Café St. Germain' / 'Ève St. Clair' (BookLyre reads 'Street.' there; Backseat reads Saint, which is right). Backseat also drops the period in 'Ken Griffey, Sr., played' the way BookLyre does. Backseat Driver: backseat::pronunciation::ForSpeech / DottedTitles, Titles (libs/backseat/pronunciation_streets.hpp).",
+ "about": "Dotted rank and office titles before a capitalised name (loop B140, CROSS X-052): Capt./Lt./Col./Sgt./Gen./Maj./Cpl./Adm./Cmdr./Prof./Rev./Insp./Supt./Gov./Sen./Pres./Msgr./Fr. -> Captain, Lieutenant ... Ported from EpubToM4B tests/fixtures/spoken_dotted_titles.json (auto/loop) plus GPS street cases. Left out on purpose: 'I live on Water St.' and 'She lives on Elm St now.' (Backseat respells the heteronyms live/lives), and 'Café St. Germain' / 'Ève St. Clair' (BookLyre reads 'Street.' there; Backseat reads Saint, which is right). Backseat also drops the period in 'Ken Griffey, Sr., played' the way BookLyre does. Loop B142 (CROSS X-053) adds BookLyre's 16 cases from EpubToM4B 92d38349 tests/fixtures/spoken_titles.json (Pvt./Pfc./Spc./Brig./Det./Amb./Atty./Bro., 3rd Div./Regt./Bn., ext. 42) plus 4 GPS cases; Backseat says the ordinals and numbers as words ('the third Division', 'extension forty two'). Backseat Driver: backseat::pronunciation::ForSpeech / DottedTitles, Titles (libs/backseat/pronunciation_streets.hpp).",
  "cases": [
   {
    "input": "Capt. Hook and Lt. Dan met Col. Mustard.",
@@ -200,6 +200,86 @@
   {
    "input": "He was Capt. I'm sure.",
    "expected": "He was Capt. I'm sure."
+  },
+  {
+   "input": "Pvt. Ryan was found.",
+   "expected": "Private Ryan was found."
+  },
+  {
+   "input": "Det. Insp. Morse arrived.",
+   "expected": "Detective Inspector Morse arrived."
+  },
+  {
+   "input": "Atty. Gen. Reno spoke.",
+   "expected": "Attorney General Reno spoke."
+  },
+  {
+   "input": "Brig. Gen. Smith rode in.",
+   "expected": "Brigadier General Smith rode in."
+  },
+  {
+   "input": "Pfc. Jones and Spc. Diaz waited.",
+   "expected": "Private First Class Jones and Specialist Diaz waited."
+  },
+  {
+   "input": "Msgr. Kelly met Amb. Rice.",
+   "expected": "Monsignor Kelly met Ambassador Rice."
+  },
+  {
+   "input": "Bro. Thomas prayed.",
+   "expected": "Brother Thomas prayed."
+  },
+  {
+   "input": "The 3rd Div. held the ridge.",
+   "expected": "The third Division held the ridge."
+  },
+  {
+   "input": "He joined the 2nd Bn. The men cheered.",
+   "expected": "He joined the second Battalion. The men cheered."
+  },
+  {
+   "input": "The Royal Regt. of Wales marched.",
+   "expected": "The Royal Regiment of Wales marched."
+  },
+  {
+   "input": "Call ext. 42 for help.",
+   "expected": "Call extension forty two for help."
+  },
+  {
+   "input": "Press Ext. 7 now.",
+   "expected": "Press Extension seven now."
+  },
+  {
+   "input": "Thanks, Bro. The game is on.",
+   "expected": "Thanks, Bro. The game is on."
+  },
+  {
+   "input": "the det. was there",
+   "expected": "the det. was there"
+  },
+  {
+   "input": "The ext. cord was long.",
+   "expected": "The ext. cord was long."
+  },
+  {
+   "input": "In Div. Two they ran.",
+   "expected": "In Div. Two they ran."
+  },
+  {
+   "input": "Turn right onto Brig. Gen. Smith Blvd.",
+   "expected": "Turn right onto Brigadier General Smith Boulevard."
+  },
+  {
+   "input": "Destination: Pvt. Ryan Memorial Park",
+   "expected": "Destination: Private Ryan Memorial Park"
+  },
+  {
+   "input": "Front desk is ext. 204, I am not.",
+   "expected": "Front desk is extension two hundred four, I am not."
+  },
+  {
+   "input": "Nice driving, Bro. Then again, no.",
+   "expected": "Nice driving, Bro. Then again, no."
   }
  ]
 }

@@ -221,20 +221,26 @@ std::string DottedTitles(std::string s)
 {
   if (s.find(". ") == std::string::npos ||
       !HasLetterWord(s, {"Capt", "Lt", "Col", "Sgt", "Gen", "Maj", "Cpl", "Adm", "Cmdr", "Prof", "Rev", "Insp",
-                         "Supt", "Gov", "Sen", "Pres", "Msgr", "Fr"}))
+                         "Supt", "Gov", "Sen", "Pres", "Msgr", "Fr", "Pvt", "Pfc", "Spc", "Brig", "Det", "Amb",
+                         "Atty", "Bro"}))
     return s;
   static std::map<std::string, std::string> const words = {
       {"Capt", "Captain"},   {"Lt", "Lieutenant"}, {"Col", "Colonel"},    {"Sgt", "Sergeant"},
       {"Gen", "General"},    {"Maj", "Major"},     {"Cpl", "Corporal"},   {"Adm", "Admiral"},
       {"Cmdr", "Commander"}, {"Prof", "Professor"}, {"Rev", "Reverend"},  {"Insp", "Inspector"},
       {"Supt", "Superintendent"}, {"Gov", "Governor"}, {"Sen", "Senator"}, {"Pres", "President"},
-      {"Msgr", "Monsignor"}, {"Fr", "Father"}};
+      {"Msgr", "Monsignor"}, {"Fr", "Father"},
+      // Loop B142 (CROSS X-053): enlisted ranks and offices Kokoro spells out ("Pvt." is "P V T").
+      {"Pvt", "Private"},    {"Pfc", "Private First Class"}, {"Spc", "Specialist"}, {"Brig", "Brigadier"},
+      {"Det", "Detective"},  {"Amb", "Ambassador"}, {"Atty", "Attorney"}, {"Bro", "Brother"}};
   // Words that start a sentence far more often than they follow a title.
   static std::set<std::string> const starters = {
       "I", "The", "Then", "He", "She", "It", "We", "They", "You", "This", "That", "There", "These", "Those",
-      "His", "Her", "Its", "Our", "Their", "My", "Your", "An", "And", "But", "So", "Now", "When", "If"};
+      "His", "Her", "Its", "Our", "Their", "My", "Your", "An", "And", "But", "So", "Now", "When", "If",
+      "Yet", "What", "Who", "How", "Why", "Where"};
   static std::regex const title(
-      "\\b(Capt|Lt|Col|Sgt|Gen|Maj|Cpl|Adm|Cmdr|Prof|Rev|Insp|Supt|Gov|Sen|Pres|Msgr|Fr)\\. (?=[A-Z](?:[a-z]|'[A-Za-z]))");
+      "\\b(Capt|Lt|Col|Sgt|Gen|Maj|Cpl|Adm|Cmdr|Prof|Rev|Insp|Supt|Gov|Sen|Pres|Msgr|Fr|Pvt|Pfc|Spc|Brig|Det|Amb|Atty|"
+      "Bro)\\. (?=[A-Z](?:[a-z]|'[A-Za-z]))");
   return Replace(s, title, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     size_t const next = pos + static_cast<size_t>(m.length(0));
     size_t end = next;
@@ -246,6 +252,40 @@ std::string DottedTitles(std::string s)
   });
 }
 
+/// Military units after an ordinal or a name and phone extensions before a number (loop B142, CROSS X-053):
+/// "3rd Div." is "3rd Division", "Royal Regt." "Royal Regiment", "2nd Bn." "2nd Battalion", "ext. 42"
+/// "extension 42". The unit keeps its period only where the sentence may end (end of text or a capital
+/// next: "the 2nd Bn. The men cheered"). A lead-in before it isn't a name ("In Div. Two"), and "ext."
+/// without a number ("The ext. cord") stays.
+std::string UnitsAndExtensions(std::string s)
+{
+  if (s.find('.') == std::string::npos)
+    return s;
+  if (HasLetterWord(s, {"Div", "Regt", "Bn"}))
+  {
+    static std::map<std::string, std::string> const units = {
+        {"Div", "Division"}, {"Regt", "Regiment"}, {"Bn", "Battalion"}};
+    static std::regex const unit("\\b(\\d{1,4}(?:st|nd|rd|th)|[A-Z][a-z]{1,30}) (Div|Regt|Bn)\\.");
+    s = Replace(s, unit, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+      if (!std::isdigit(static_cast<unsigned char>(m.str(1)[0])) && LeadInWord(Lower(m.str(1))))
+        return std::nullopt;
+      size_t next = pos + static_cast<size_t>(m.length(0));
+      while (next < s.size() && Space(s[next]))
+        ++next;
+      bool const ends = next >= s.size() || std::isupper(static_cast<unsigned char>(s[next]));
+      return m.str(1) + " " + units.at(m.str(2)) + (ends ? "." : "");
+    });
+  }
+  if (s.find("xt.") != std::string::npos)
+  {
+    static std::regex const ext("\\b([Ee])xt\\. ?(?=\\d)");
+    s = Replace(s, ext, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+      return std::string(m.str(1) == "e" ? "extension " : "Extension ");
+    });
+  }
+  return s;
+}
+
 /// "St. Johns Rd" is "Saint Johns Rd", "Dr Martin Luther King Jr Blvd" is "Doctor Martin Luther
 /// King Junior Blvd", "Ft Worth" is "Fort Worth", "Hwy 290" is "Highway 290", "101 Fwy" is "101
 /// Freeway". "Main St. Then left" and "Elm Dr." stay street types for the street pass.
@@ -254,6 +294,7 @@ std::string DottedTitles(std::string s)
 std::string Titles(std::string s)
 {
   s = DottedTitles(std::move(s));
+  s = UnitsAndExtensions(std::move(s));
   static std::regex const title("\\b(St|Ste|Dr|Ft)\\.? (?=[A-Z][a-z])");
   if (HasLetterWord(s, {"St", "Ste", "Dr", "Ft"}))
     s = Replace(s, title, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
