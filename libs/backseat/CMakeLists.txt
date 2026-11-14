@@ -36,6 +36,7 @@ set(
   pronunciation_backup.cpp
   pronunciation_backup.hpp
   pronunciation_dates.hpp
+  pronunciation_measures.hpp
   pronunciation_scripts.cpp
   pronunciation_senses.hpp
   pronunciation_streets.hpp

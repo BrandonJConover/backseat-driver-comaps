@@ -37,6 +37,13 @@ std::string Symbols(std::string const & text);
 /// backseat_tests/spoken_web.json.
 std::string WebAddresses(std::string const & text);
 
+/// Feet and inches the way people say them: "13'6\"" (straight, curly or prime marks) is "13 feet 6
+/// inches", "6'2\" tall" "6 feet 2 inches tall", a lone "12'" "12 feet", "14 ft 2 in" "14 feet 2 inches";
+/// the numbers are left for the number pass. Inches 0-11 only. "the 90's", "rock 'n' roll", a closing
+/// quote ("says 'Clearance 12'") and "turn in 500 ft" are left. Part of ForSpeech (before Symbols);
+/// golden cases in backseat_tests/spoken_feet_inches.json (loop B149).
+std::string FeetAndInches(std::string const & text);
+
 /// Two-digit decades said as decades: "the 90s", "the '90s" and "the 80's" read "the nineties",
 /// "mid-70s" "mid-seventies". Twenties to nineties only; "10s", "$90s" and "A90s" are left. Part
 /// of ForSpeech; golden cases in backseat_tests/spoken_symbols.json.

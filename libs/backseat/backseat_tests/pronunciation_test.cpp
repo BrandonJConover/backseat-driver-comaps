@@ -977,6 +977,27 @@ TEST(MilitaryAndTwentyFourHourTimes)
   CHECK(!ForSpeech(longText).empty());
 }
 
+TEST(FeetAndInchesReadAsHeights)
+{
+  // Loop B149, BI-125: clearance signs and heights in straight, curly and prime marks, and "ft N in".
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_FEET_INCHES_PATH);
+  CHECK(cases.size() >= 15);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // The pass alone leaves numbers for the number pass and words alone.
+  CHECK_EQUAL(FeetAndInches("13'6\" ahead"), std::string("13 feet 6 inches ahead"));
+  CHECK_EQUAL(FeetAndInches("rock 'n' roll"), std::string("rock 'n' roll"));
+  CHECK_EQUAL(FeetAndInches("turn in 500 ft"), std::string("turn in 500 ft"));
+  // Hostile input stays quick and doesn't throw.
+  std::string longText;
+  for (int i = 0; i < 2000; ++i)
+    longText += "1'2\" 3' 4 ft 5 in '";
+  CHECK(!ForSpeech(longText).empty());
+}
+
 TEST(DottedTitlesBeforeNames)
 {
   // Loop B140, CROSS X-052: BookLyre's dotted-title cases plus street names with a rank in them.

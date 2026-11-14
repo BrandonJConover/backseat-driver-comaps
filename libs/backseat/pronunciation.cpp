@@ -4,6 +4,7 @@
 #include "backseat/pronunciation_text.hpp"
 #include "backseat/pronunciation_dates.hpp"
 #include "backseat/pronunciation_web.hpp"
+#include "backseat/pronunciation_measures.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1981,6 +1982,9 @@ std::string ForSpeech(std::string const & text)
   s = Cyrillic(s);
   // Kana by Hepburn, the same way: "ラーメン" is "ramen", "さくら通り" "sakura 通 ri".
   s = Kana(s);
+  // Feet and inches before Symbols and Decades take the marks: "13'6\"" is "13 feet 6 inches" (loop B149).
+  if (HasDigit(s))
+    s = FeetAndInches(s);
   // Symbols the voice would skip or spell: "½" is "1/2", "#5" "number 5", "/gal" "per gallon".
   s = Symbols(s);
   // Dates before ranges and fractions take their parts: "11/6/2026" is "November sixth, twenty twenty

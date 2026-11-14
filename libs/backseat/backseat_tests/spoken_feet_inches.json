@@ -1,0 +1,28 @@
+{
+ "about": "Feet and inches read as heights (loop B149, BI-125). Clearance signs and heights in straight, curly and prime marks, a lone N', and 'N ft M in'. Guards: apostrophes, decades, closing quotes, 'turn in 500 ft', inches over 11. Backseat Driver: backseat::pronunciation::ForSpeech / FeetAndInches (libs/backseat/backseat_tests/pronunciation_test.cpp).",
+ "cases": [
+  {"input": "Low clearance: 13'6\" ahead.", "expected": "Low clearance: thirteen feet six inches ahead."},
+  {"input": "Clearance 14 ft 2 in.", "expected": "Clearance fourteen feet two inches."},
+  {"input": "He was 6'2\" tall.", "expected": "He was six feet two inches tall."},
+  {"input": "Bridge clearance 13' 6\".", "expected": "Bridge clearance thirteen feet six inches."},
+  {"input": "Low bridge 12′ 9″ ahead.", "expected": "Low bridge twelve feet nine inches ahead."},
+  {"input": "Trucks over 11’6” turn back.", "expected": "Trucks over eleven feet six inches turn back."},
+  {"input": "A 12' boat on a trailer.", "expected": "A twelve foot boat on a trailer."},
+  {"input": "Max height 6'0\".", "expected": "Max height six feet."},
+  {"input": "She is 5'1\" and the gap is 1' wide.", "expected": "She is five feet one inch and the gap is one foot wide."},
+  {"input": "Clearance 14ft 2in. Turn left.", "expected": "Clearance fourteen feet two inches. Turn left."},
+  {"input": "Clearance 6 ft. 1 in clearance.", "expected": "Clearance six feet one inch clearance."},
+  {"input": "Garage 7'", "expected": "Garage seven feet"},
+  {"input": "Play some rock 'n' roll.", "expected": "Play some rock 'n' roll."},
+  {"input": "Don't turn here.", "expected": "Don't turn here."},
+  {"input": "Back in the 90's it was a field.", "expected": "Back in the nineties it was a field."},
+  {"input": "In 500 ft, turn right.", "expected": "In five hundred feet, turn right."},
+  {"input": "The sign says 'Clearance 12'", "expected": "The sign says 'Clearance twelve'"},
+  {"input": "Pipe 13 ft 14 in long.", "expected": "Pipe thirteen feet fourteen in long."},
+  {"input": "Joe's 4 boats", "expected": "Joe's four boats"},
+  {"input": "Watch for a 6'2\" man in a 12′ truck.", "expected": "Watch for a six foot two inch man in a twelve foot truck."},
+  {"input": "Low bridge 13'6, slow down.", "expected": "Low bridge thirteen feet six inches, slow down."},
+  {"input": "Lot 13' 6 cars deep.", "expected": "Lot thirteen feet six cars deep."},
+  {"input": "Clearance is 9 ft 6 in a few blocks on.", "expected": "Clearance is nine feet six in a few blocks on."}
+ ]
+}
