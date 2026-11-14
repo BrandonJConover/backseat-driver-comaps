@@ -269,7 +269,8 @@ TEST(ExitsUseExitWordingNotTurnRight)
 {
   std::vector<std::string> const want = {
       "In 500 feet you are going to take the exit on the right.",
-      "By the way, did I mention you should take the exit on the right.", "Hey, you should be taking the exit.",
+      "By the way, did I mention you should take the exit on the right.",
+      "Hey, you should be taking the exit on the right.",
       "You should still be taking the exit.", "Please stop exiting. You've exited."};
   CHECK(CountdownFor("Take the exit on the right onto I-25") == want);
   CHECK(TurnShapeOf("Take the exit on the left") == TurnShape::Exit);
@@ -378,4 +379,217 @@ TEST(KilometerThresholdsMatchTheMileOnes)
   CHECK_EQUAL(back.clearlyOver, 4);
   CHECK_EQUAL(back.wayOver, 10);
   CHECK_EQUAL(back.tooSlowMargin, 15.0);
+}
+
+TEST(StandInSpeedsAreNotJudgedForBrakingOrLaunching)
+{
+  auto engine = MakeEngine();
+  engine.OnTelemetry(Sample(0, 60, std::nullopt));
+  auto stand = Sample(1000, 0, std::nullopt);
+  stand.speedKnown = false;
+  engine.OnTelemetry(stand);
+  engine.OnTelemetry(Sample(2000, 60, std::nullopt));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 0);
+  CHECK_EQUAL(engine.Stats().hardAccels, 0);
+  // Measured speeds on both sides still count.
+  engine.OnTelemetry(Sample(3000, 30, std::nullopt));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 1);
+}
+
+namespace
+{
+CritiqueEngine GlitchAwareEngine()
+{
+  EngineConfig c;
+  c.rng = SeededRng(1);
+  c.implausibleMps2 = 12;
+  return CritiqueEngine(c, 0);
+}
+
+// Speeds in m/s here: the glitch threshold is physics, not display units.
+TelemetrySample Mps(double t, double mps)
+{
+  TelemetrySample s;
+  s.t = t;
+  s.speedMps = mps;
+  return s;
+}
+}  // namespace
+
+// A one-sample speed blip (25 -> 8 -> 25 m/s) is the GPS, not the driver: no brake, no launch.
+TEST(OneSampleSpeedGlitchIsNotAHardBrakeOrLaunch)
+{
+  auto engine = GlitchAwareEngine();
+  engine.OnTelemetry(Mps(0, 25));
+  engine.OnTelemetry(Mps(1000, 25));
+  auto const down = engine.OnTelemetry(Mps(2000, 8));
+  auto const up = engine.OnTelemetry(Mps(3000, 25));
+  engine.OnTelemetry(Mps(4000, 25));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 0);
+  CHECK_EQUAL(engine.Stats().hardAccels, 0);
+  for (auto const * out : {&down, &up})
+    for (auto const & c : *out)
+      CHECK(c.category != Category::HardBraking && c.category != Category::HardAccel);
+  // An upward blip too.
+  engine.OnTelemetry(Mps(5000, 40));
+  engine.OnTelemetry(Mps(6000, 25));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 0);
+  CHECK_EQUAL(engine.Stats().hardAccels, 0);
+}
+
+// A real emergency stop (~9 m/s²) is believable and still roasts at once.
+TEST(EmergencyStopIsStillAHardBrake)
+{
+  auto engine = GlitchAwareEngine();
+  engine.OnTelemetry(Mps(0, 27));
+  auto const out = engine.OnTelemetry(Mps(1000, 18));
+  engine.OnTelemetry(Mps(2000, 9));
+  engine.OnTelemetry(Mps(3000, 0));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 1);
+  bool roasted = false;
+  for (auto const & c : out)
+    roasted = roasted || c.category == Category::HardBraking;
+  CHECK(roasted);
+}
+
+// A drop too sharp for one second that then holds was a real (if blurry) slowdown: counted once, from
+// the last believable speed (25 -> 8 over two seconds).
+TEST(ImplausibleDropThatHoldsCountsOnTheNextSample)
+{
+  auto engine = GlitchAwareEngine();
+  engine.OnTelemetry(Mps(0, 25));
+  engine.OnTelemetry(Mps(1000, 8));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 0);
+  engine.OnTelemetry(Mps(2000, 8));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 1);
+  engine.OnTelemetry(Mps(3000, 8));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 1);
+  CHECK_EQUAL(engine.Stats().hardAccels, 0);
+}
+
+// Off by default: the TS-parity engine still judges every step as before.
+TEST(GlitchFilterIsOffByDefault)
+{
+  auto engine = MakeEngine();
+  engine.OnTelemetry(Mps(0, 25));
+  engine.OnTelemetry(Mps(1000, 8));
+  engine.OnTelemetry(Mps(2000, 25));
+  CHECK_EQUAL(engine.Stats().hardBrakes, 1);
+  CHECK_EQUAL(engine.Stats().hardAccels, 1);
+}
+
+namespace
+{
+CritiqueEngine GraceEngine(double sustainMs = 3000, double graceMs = 10000, Units units = Units::Mph)
+{
+  EngineConfig c;
+  c.rng = SeededRng(1);
+  c.units = units;
+  c.speedingSustainMs = sustainMs;
+  c.speedingDropGraceMs = graceMs;
+  return CritiqueEngine(c, 0);
+}
+
+int SpeedingCount(std::vector<Commentary> const & out)
+{
+  int n = 0;
+  for (auto const & c : out)
+    n += c.category == Category::Speeding ? 1 : 0;
+  return n;
+}
+}  // namespace
+
+// Braking from 55 into a 35 zone: judged against the old limit while slowing down.
+TEST(BrakingIntoALowerZoneIsNotSpeeding)
+{
+  auto engine = GraceEngine();
+  engine.OnTelemetry(Sample(0, 55, 55));
+  int lines = 0;
+  for (int i = 1; i <= 20; ++i)
+  {
+    double const mph = std::max(35.0, 55 - 2.5 * (i - 1));  // 35 by 9 s
+    lines += SpeedingCount(engine.OnTelemetry(Sample(i * 1000, mph, 35)));
+  }
+  CHECK_EQUAL(lines, 0);
+  CHECK(engine.Incidents().empty());
+}
+
+// Holding 55 after the sign says 35: the grace runs out and it's speeding right away.
+TEST(HoldingTheOldSpeedPastTheDropIsSpeeding)
+{
+  auto engine = GraceEngine();
+  engine.OnTelemetry(Sample(0, 55, 55));
+  std::optional<double> firstLineAt;
+  for (int i = 1; i <= 20 && !firstLineAt; ++i)
+    if (SpeedingCount(engine.OnTelemetry(Sample(i * 1000, 55, 35))) > 0)
+      firstLineAt = i * 1000.0;
+  CHECK(firstLineAt.has_value());
+  CHECK(*firstLineAt >= 10000 && *firstLineAt <= 11000);
+  CHECK(!engine.Incidents().empty());
+}
+
+// Snapped to a 40 mph frontage road for one fix at 70: nothing, with or without the drop grace.
+TEST(OneFixLimitSnapIsNotSpeeding)
+{
+  for (double grace : {10000.0, 0.0})
+  {
+    auto engine = GraceEngine(3000, grace);
+    int lines = 0;
+    for (int i = 0; i <= 10; ++i)
+      lines += SpeedingCount(engine.OnTelemetry(Sample(i * 1000, 70, i == 4 ? 40 : 70)));
+    CHECK_EQUAL(lines, 0);
+    CHECK(engine.Incidents().empty());
+  }
+}
+
+// Steady 50 in a 35 with no drop: said once it's been over for 3 s, not on the first fix.
+TEST(SteadySpeedingIsSaidAfterTheSustain)
+{
+  auto engine = GraceEngine();
+  CHECK_EQUAL(SpeedingCount(engine.OnTelemetry(Sample(0, 50, 35))), 0);
+  CHECK_EQUAL(SpeedingCount(engine.OnTelemetry(Sample(1000, 50, 35))), 0);
+  CHECK_EQUAL(SpeedingCount(engine.OnTelemetry(Sample(2000, 50, 35))), 0);
+  CHECK(engine.Incidents().empty());
+  CHECK_EQUAL(SpeedingCount(engine.OnTelemetry(Sample(3000, 50, 35))), 1);
+  CHECK_EQUAL(engine.Incidents().size(), size_t{1});
+  CHECK_EQUAL(*engine.Incidents()[0].overLimit, 15);
+}
+
+// Small drops (55 -> 50) get no grace; metric needs 15 km/h.
+TEST(OnlyBigLimitDropsGetGrace)
+{
+  auto engine = GraceEngine();
+  engine.OnTelemetry(Sample(0, 55, 55));
+  int lines = 0;
+  for (int i = 1; i <= 6; ++i)
+    lines += SpeedingCount(engine.OnTelemetry(Sample(i * 1000, 55 - 0.5 * i, 50)));
+  CHECK(lines > 0);  // 52+ in a 50 after 3 s
+
+  auto metric = GraceEngine(3000, 10000, Units::Kmh);
+  auto const kmh = [](double t, double v, double lim) {
+    TelemetrySample s;
+    s.t = t;
+    s.speedMps = FromDisplay(v, Units::Kmh);
+    s.speedLimitMps = FromDisplay(lim, Units::Kmh);
+    return s;
+  };
+  metric.OnTelemetry(kmh(0, 90, 90));
+  int metricLines = 0;
+  for (int i = 1; i <= 8; ++i)  // 90 -> 80 is under the 15 km/h drop: no grace
+    metricLines += SpeedingCount(metric.OnTelemetry(kmh(i * 1000, 90 - i, 80)));
+  CHECK(metricLines > 0);
+  auto metric2 = GraceEngine(3000, 10000, Units::Kmh);
+  metric2.OnTelemetry(kmh(0, 90, 90));
+  int graced = 0;
+  for (int i = 1; i <= 8; ++i)  // 90 -> 70 while slowing: graced
+    graced += SpeedingCount(metric2.OnTelemetry(kmh(i * 1000, 90 - 2.5 * i, 70)));
+  CHECK_EQUAL(graced, 0);
+}
+
+// The TS-engine defaults (no sustain, no grace) are unchanged: one over is a crime at once.
+TEST(NoSustainNoGraceKeepsTheOldBehavior)
+{
+  auto engine = GraceEngine(0, 0);
+  engine.OnTelemetry(Sample(0, 55, 55));
+  CHECK_EQUAL(SpeedingCount(engine.OnTelemetry(Sample(1000, 54, 35))), 1);
 }

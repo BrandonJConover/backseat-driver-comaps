@@ -1,0 +1,225 @@
+{
+ "about": "Shared expectations for dates said as dates: 'M/D/YYYY' and 'M/D/YY' month first (day first only when the first number can't be a month: '31/12/1999' the thirty first of December), ISO '2026-11-06', 'Nov. 6' / 'November 6th, 2026' with the day as an ordinal, 'on 12/25' after a date word; fractions ('3/4 mile', 'by 1/2 tank'), versions ('1/2/3'), counts ('May 3 cars') and impossible days ('2/30') are left for the number passes. Two-digit years: under 50 are 20xx. Backseat Driver: backseat::pronunciation::ForSpeech / Dates (libs/backseat/backseat_tests/spoken_dates.json). EpubToM4B can port the rule; keep both copies in sync. Day abbreviations and month-year: 'Fri' Friday, 'Mon-Fri' Monday to Friday, 'Mon/Wed/Fri' Monday, Wednesday and Friday, 'Oct 2026' October twenty twenty six; a lone 'Sat'/'Sun' only before a date ('Sat on it', 'Sun's down' stay words). Capital only.",
+ "cases": [
+  {
+   "input": "Dentist on 1/2/2026 at 3 pm.",
+   "language": "en",
+   "expected": "Dentist on January second, twenty twenty six at three peeem."
+  },
+  {
+   "input": "Due 11/06/2026.",
+   "language": "en",
+   "expected": "Due November sixth, twenty twenty six."
+  },
+  {
+   "input": "Due 11/6/26.",
+   "language": "en",
+   "expected": "Due November sixth, twenty twenty six."
+  },
+  {
+   "input": "Born 31/12/99.",
+   "language": "en",
+   "expected": "Born the thirty first of December, nineteen ninety nine."
+  },
+  {
+   "input": "Born 31/12/1999.",
+   "language": "en",
+   "expected": "Born the thirty first of December, nineteen ninety nine."
+  },
+  {
+   "input": "Logged 2026-11-06.",
+   "language": "en",
+   "expected": "Logged November sixth, twenty twenty six."
+  },
+  {
+   "input": "Open since 2024-01-15, sort of.",
+   "language": "en",
+   "expected": "Open since January fifteenth, twenty twenty four, sort of."
+  },
+  {
+   "input": "See you Nov 6.",
+   "language": "en",
+   "expected": "See you November sixth."
+  },
+  {
+   "input": "See you Nov. 6, 2026.",
+   "language": "en",
+   "expected": "See you November sixth, twenty twenty six."
+  },
+  {
+   "input": "See you November 6th.",
+   "language": "en",
+   "expected": "See you November sixth."
+  },
+  {
+   "input": "Sept 11, 2001.",
+   "language": "en",
+   "expected": "September eleventh, two thousand one."
+  },
+  {
+   "input": "Jan. 1.",
+   "language": "en",
+   "expected": "January first."
+  },
+  {
+   "input": "Oct 31 is Halloween.",
+   "language": "en",
+   "expected": "October thirty first is Halloween."
+  },
+  {
+   "input": "Mar 3 is a day.",
+   "language": "en",
+   "expected": "March third is a day."
+  },
+  {
+   "input": "May 5 is Cinco de Mayo.",
+   "language": "en",
+   "expected": "May fifth is Cinco de Mayo."
+  },
+  {
+   "input": "Merry Christmas, it's Dec 25th.",
+   "language": "en",
+   "expected": "Merry Christmas, it's December twenty fifth."
+  },
+  {
+   "input": "Note your odometer on January 1 and December 31.",
+   "language": "en",
+   "expected": "Note your odometer on January first and December thirty first."
+  },
+  {
+   "input": "See you on 12/25.",
+   "language": "en",
+   "expected": "See you on December twenty fifth."
+  },
+  {
+   "input": "Fri 11/6 at noon.",
+   "language": "en",
+   "expected": "Friday November sixth at noon."
+  },
+  {
+   "input": "The 3/4 mile mark.",
+   "language": "en",
+   "expected": "The three quarters of a mile mark."
+  },
+  {
+   "input": "By 1/2 tank you should stop.",
+   "language": "en",
+   "expected": "By a half tank you should stop."
+  },
+  {
+   "input": "Version 1/2/3.",
+   "language": "en",
+   "expected": "Version a half/three."
+  },
+  {
+   "input": "May 3 cars pass you.",
+   "language": "en",
+   "expected": "May three cars pass you."
+  },
+  {
+   "input": "Marching 5 bands.",
+   "language": "en",
+   "expected": "Marching five bands."
+  },
+  {
+   "input": "Due 13/13/2026.",
+   "language": "en",
+   "expected": "Due thirteen over thirteen/two thousand twenty six."
+  },
+  {
+   "input": "Trip on 2/30/2026.",
+   "language": "en",
+   "expected": "Trip on two over thirty/two thousand twenty six."
+  },
+  {
+   "input": "That was 0.5/1/2026.",
+   "language": "en",
+   "expected": "That was zero point five over one/two thousand twenty six."
+  },
+  {
+   "input": "Closed Fri.",
+   "language": "en",
+   "expected": "Closed Friday."
+  },
+  {
+   "input": "Open Mon-Fri.",
+   "language": "en",
+   "expected": "Open Monday to Friday."
+  },
+  {
+   "input": "Lane closures Tues-Thurs at night.",
+   "language": "en",
+   "expected": "Lane closures Tuesday to Thursday at night."
+  },
+  {
+   "input": "Market Sat & Sun.",
+   "language": "en",
+   "expected": "Market Saturday and Sunday."
+  },
+  {
+   "input": "Closed Sat and Sun.",
+   "language": "en",
+   "expected": "Closed Saturday and Sunday."
+  },
+  {
+   "input": "Pickup Mon/Wed/Fri.",
+   "language": "en",
+   "expected": "Pickup Monday, Wednesday and Friday."
+  },
+  {
+   "input": "Open Thu, Fri-Sun.",
+   "language": "en",
+   "expected": "Open Thursday, Friday to Sunday."
+  },
+  {
+   "input": "Detour thru Sun 11/9.",
+   "language": "en",
+   "expected": "Detour thru Sunday November ninth."
+  },
+  {
+   "input": "Concert Sat, Nov. 8.",
+   "language": "en",
+   "expected": "Concert Saturday, November eighth."
+  },
+  {
+   "input": "Wed. at noon.",
+   "language": "en",
+   "expected": "Wednesday at noon."
+  },
+  {
+   "input": "Roadwork until Oct 2026.",
+   "language": "en",
+   "expected": "Roadwork until October twenty twenty six."
+  },
+  {
+   "input": "Back in Jan. 2027.",
+   "language": "en",
+   "expected": "Back in January twenty twenty seven."
+  },
+  {
+   "input": "Since Sept 2025 this lane has been closed.",
+   "language": "en",
+   "expected": "Since September twenty twenty five this lane has been closed."
+  },
+  {
+   "input": "Sat on it.",
+   "language": "en",
+   "expected": "Sat on it."
+  },
+  {
+   "input": "Sun's down.",
+   "language": "en",
+   "expected": "Sun's down."
+  },
+  {
+   "input": "Sun at full brightness.",
+   "language": "en",
+   "expected": "Sun at full brightness."
+  },
+  {
+   "input": "Friar Tuck is on Monday.",
+   "language": "en",
+   "expected": "Friar Tuck is on Monday."
+  }
+ ]
+}

@@ -9,6 +9,8 @@ set(
   SRC
   achievements.cpp
   achievements.hpp
+  clip_pacing.cpp
+  clip_pacing.hpp
   debug_log.cpp
   debug_log.hpp
   engine.cpp
@@ -31,6 +33,14 @@ set(
   plate_game.hpp
   pronunciation.cpp
   pronunciation.hpp
+  pronunciation_backup.cpp
+  pronunciation_backup.hpp
+  pronunciation_dates.hpp
+  pronunciation_scripts.cpp
+  pronunciation_senses.hpp
+  pronunciation_streets.hpp
+  pronunciation_text.hpp
+  pronunciation_web.hpp
   pop_quiz.cpp
   pop_quiz.hpp
   quiet_bits.cpp
@@ -67,9 +77,26 @@ if (COMMAND omim_add_library)
 else()
   set(CMAKE_CXX_STANDARD 20)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  option(BACKSEAT_SANITIZE "Build backseat and its tests with AddressSanitizer and UBSan" OFF)
   add_library(${PROJECT_NAME} ${SRC})
   # Includes are written "backseat/engine.hpp", relative to libs/.
   target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+  # Standalone builds keep the library warning-clean; the CoMaps build above keeps its own flags.
+  if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wshadow -Wparentheses)
+    if (NOT BACKSEAT_NO_WERROR AND NOT BACKSEAT_SANITIZE)
+      target_compile_options(${PROJECT_NAME} PRIVATE -Werror)
+    endif()
+  endif()
+  # ASan + UBSan for the library and backseat_tests (standalone only; off by default):
+  #   cmake -S libs/backseat -B /tmp/bs-san -DBACKSEAT_SANITIZE=ON, build, run backseat_tests.
+  # -Werror stays off here: GCC 13's <regex> trips a false -Wmaybe-uninitialized under -fsanitize.
+  if (BACKSEAT_SANITIZE)
+    set(BACKSEAT_SAN_FLAGS -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined)
+    # PUBLIC so backseat_tests, which links the library, gets the same instrumentation and runtime.
+    target_compile_options(${PROJECT_NAME} PUBLIC ${BACKSEAT_SAN_FLAGS})
+    target_link_options(${PROJECT_NAME} PUBLIC ${BACKSEAT_SAN_FLAGS})
+  endif()
   enable_testing()
   add_subdirectory(backseat_tests)
 endif()

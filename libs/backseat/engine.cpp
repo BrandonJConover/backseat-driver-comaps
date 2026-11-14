@@ -6,6 +6,7 @@
 #include "backseat/units.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <limits>
 #include <random>
@@ -19,12 +20,21 @@ namespace
 double constexpr kNever = -std::numeric_limits<double>::infinity();
 /// A heading swing counts as taking (or botching) the pending turn only this close to it.
 double constexpr kWrongTurnWithinM = 120;
+/// Getting this much closer to the maneuver keeps a pending turn alive (loop B146).
+double constexpr kAliveProgressM = 20;
 /// The far countdown call comes at least this many seconds out at the current speed...
 double constexpr kCountdownFarS = 12;
 /// ...but never farther than this (half a mile).
 double constexpr kCountdownFarMaxM = 805;
 /// Countdown calls this soon after the instruction are skipped; it just said the distance.
 double constexpr kJustAnnouncedMs = 8000;
+/// A countdown call says its trigger distance ("In 500 feet") unless the car is already well inside
+/// it: more than this many seconds of travel (or a tenth of the distance) short, as after a fix gap
+/// or a merge that grew the far mark. Then it says what is left, so it never overstates.
+double constexpr kSayTriggerWithinS = 2;
+/// The long-leg "In 1 mile" reminder only goes out this close to a real mile; a gap that lands
+/// well short of it leaves the turn to the countdown.
+double constexpr kReminderAtLeast = 0.8;
 /// "Did I mention..." only if the far call was at least this long ago.
 double constexpr kMentionAfterFarMs = 10000;
 /// The plain "Now, turn left onto Elm Street." comes about this many seconds before the turn...
@@ -244,6 +254,39 @@ std::string DirectionText(std::string const & text, double distanceM, Units unit
   return "In " + distance + ", " + at + LowerFirst(text) + ".";
 }
 
+std::string RoundaboutExitOf(std::string const & instruction)
+{
+  static std::regex const exit(
+      R"(\btake (?:the (first|second|third|fourth|fifth|sixth|seventh|eighth) exit|exit (\d{1,2}))\b)",
+      std::regex::icase);
+  std::string const first = FirstManeuver(instruction);
+  std::smatch m;
+  if (TurnShapeOf(first) != TurnShape::Roundabout || !std::regex_search(first, m, exit))
+    return {};
+  std::string word = m[1].matched ? m[1].str() : m[2].str();
+  for (char & c : word)
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return word == "0" ? std::string() : word;
+}
+
+std::string ExitCallFor(Vars const & vars, int tier)
+{
+  auto const it = vars.find("exit");
+  if (it == vars.end() || it->second.empty())
+    return {};
+  std::string const & word = it->second;
+  bool const number = std::isdigit(static_cast<unsigned char>(word[0])) != 0;
+  std::string text = number ? "Exit " + word : word + " exit";
+  if (tier >= 2)
+  {
+    for (char & c : text)
+      c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    return text + "!";
+  }
+  text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
+  return text + ".";
+}
+
 TurnShape TurnShapeOf(std::string const & text)
 {
   static std::regex const uturn(R"(\bu-?turn\b)", std::regex::icase);
@@ -329,23 +372,46 @@ std::vector<Commentary> CritiqueEngine::OnTelemetry(TelemetrySample const & s)
 
     // Ignore gaps (tunnels, app backgrounded): a 30 s gap isn't a hard brake.
     // One continuous hard stop counts once, however many samples it spans.
-    double const accel = dt <= 3 ? (s.speedMps - prev->speedMps) / dt : 0;
+    // A made-up speed (GPS said "unknown") on either side isn't a measurement: a tunnel isn't a stop.
+    bool const measured = s.speedKnown && prev->speedKnown;
+    // Measure from before a glitch when the last step was one, so the snap back isn't a launch.
+    TelemetrySample const & ref = m_beforeGlitch ? *m_beforeGlitch : *prev;
+    double const refDt = (s.t - ref.t) / 1000;
+    double accel = refDt <= 3 && measured && ref.speedKnown ? (s.speedMps - ref.speedMps) / refDt : 0;
+    if (m_config.implausibleMps2 > 0 && std::abs(accel) > m_config.implausibleMps2)
+    {
+      // Keep the last believable sample while the glitch lasts (the 3 s window above ends it).
+      if (!m_beforeGlitch)
+        m_beforeGlitch = *prev;
+      accel = 0;
+    }
+    else
+    {
+      m_beforeGlitch.reset();
+    }
     bool const braking = accel <= -m_config.hardBrakeMps2;
     bool const accelerating = accel >= m_config.hardAccelMps2;
+    // Steady means a believable, measured step with little speed change (a stop counts).
+    bool const steady = measured && !m_beforeGlitch && std::abs(accel) < m_config.jerkSettleMps2;
+    if (!steady)
+      m_steadySince.reset();
+    else if (!m_steadySince)
+      m_steadySince = prev->t;
     if (braking && !m_braking)
     {
       m_stats.hardBrakes++;
       Log(MakeIncident(s.t, IncidentKind::HardBraking));
-      Roast(out, s.t, Category::HardBraking, "hardBraking", {}, true);
+      JerkRoast(out, s.t, Category::HardBraking, "hardBraking");
     }
     if (accelerating && !m_accelerating)
     {
       m_stats.hardAccels++;
       Log(MakeIncident(s.t, IncidentKind::HardAccel));
-      Roast(out, s.t, Category::HardAccel, "hardAccel", {}, true);
+      JerkRoast(out, s.t, Category::HardAccel, "hardAccel");
     }
     m_braking = braking;
     m_accelerating = accelerating;
+    ReleaseJerk(out, s.t);
   }
 
   CheckSpeeding(s, prev ? &*prev : nullptr, out);
@@ -380,9 +446,9 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     {
       m_pendingTurn =
           PendingTurn{dir == Maneuver::Right ? TurnDirection::Right : TurnDirection::Left, shape, e.t, stage, {}, false,
-                      {}, e.distanceM};
-      m_pendingTurn->legM = e.distanceM;
-      m_pendingTurn->text = e.text;
+                      {}, e.distanceM, e.distanceM, e.text};
+      m_pendingTurn->aliveAt = e.t;
+      m_pendingTurn->aliveDistM = e.distanceM;
     }
     // The heading swing from the turn just finished isn't about this one.
     m_headings.clear();
@@ -452,7 +518,18 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
   }
   case NavEvent::Type::Progress:
     if (m_pendingTurn)
-      m_pendingTurn->distM = e.distanceM;
+    {
+      auto & p = *m_pendingTurn;
+      p.distM = e.distanceM;
+      // Getting closer keeps the turn alive however long the approach (loop B146).
+      if (p.aliveDistM - e.distanceM > kAliveProgressM)
+      {
+        if (p.aliveAt && e.t - *p.aliveAt > m_config.pendingTurnForgetMs)
+          m_headings.clear();  // the swing from before the long stop isn't about this turn
+        p.aliveAt = e.t;
+        p.aliveDistM = e.distanceM;
+      }
+    }
     NagStraight(out, e.t, e.distanceM);
     Countdown(out, e.t, e.distanceM);
     break;
@@ -463,8 +540,9 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     std::string const said =
         m_pendingTurn ? "I said " + SaidWhat(m_pendingTurn->shape, m_pendingTurn->dir) + "." : "I said nothing about stopping.";
     Log(MakeIncident(e.t, IncidentKind::UnplannedStop, placeName.value_or(PlaceName(kind))), e.at);
-    Roast(out, e.t, Category::UnplannedStop, std::string("unplannedStop.") + PlaceName(kind),
-          {{"said", said}, {"name", placeName.value_or(PlaceFallback(kind))}}, true);
+    if (Roast(out, e.t, Category::UnplannedStop, std::string("unplannedStop.") + PlaceName(kind),
+              {{"said", said}, {"name", placeName.value_or(PlaceFallback(kind))}}, true))
+      m_lastUnplannedStopAt = e.t;
     break;
   }
   case NavEvent::Type::DestinationSet:
@@ -620,8 +698,14 @@ void CritiqueEngine::CheckTurnDirection(TelemetrySample const & s, std::vector<C
 {
   if (!s.headingDeg || s.speedMps < m_config.rollingMps)
     return;
-  if (m_pendingTurn && s.t - m_pendingTurn->since > m_config.pendingTurnForgetMs)
-    m_pendingTurn.reset();
+  // A turn with no progress toward it for minutes (parked, wandering a lot) is stale: no heading
+  // verdicts on it. It isn't dropped: once the car gets closer again, the countdown and the checks
+  // carry on (loop B146: dropping it by age lost every call on approaches over three minutes).
+  if (m_pendingTurn && s.t - m_pendingTurn->aliveAt.value_or(m_pendingTurn->since) > m_config.pendingTurnForgetMs)
+  {
+    m_headings.clear();
+    return;
+  }
   m_headings.push_back({s.t, *s.headingDeg});
   m_headings.erase(std::remove_if(m_headings.begin(), m_headings.end(), [&](Heading const & h) { return s.t - h.t > 12000; }),
                    m_headings.end());
@@ -687,6 +771,8 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
   if (!p.reminded && p.stage == 0 && p.legM >= kReminderLegM && distanceM <= reminderM && distanceM > 1.5 * far)
   {
     p.reminded = true;
+    if (distanceM < kReminderAtLeast * reminderM)
+      return;  // "In 1 mile" at 0.4 mi misleads; the countdown says it right soon enough.
     m_straight.reset();
     out.push_back(Make(t, Category::Instruction, DirectionText(p.text, reminderM, m_config.units), Priority::Nav));
     return;
@@ -713,7 +799,7 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
       stage = "nascar";
       m_nascarSaid = true;
     }
-    sayM = far;
+    sayM = SayDistanceM(far, distanceM);
     p.stage = 1;
     p.farAt = t;
   }
@@ -722,7 +808,7 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
            (!p.farAt || t - *p.farAt >= kMentionAfterFarMs))
   {
     stage = "mention";
-    sayM = mention;
+    sayM = SayDistanceM(mention, distanceM);
     p.mentioned = true;
   }
   else if (p.stage <= 1 && distanceM <= finalM && distanceM > 5)
@@ -769,11 +855,27 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
     TraceThrottled("roast.held", key + "/turn", {{"key", key}, {"why", "turn"}});
     return;
   }
-  Vars const vars{{"dir", DirName(p.dir)}, {"distance", distance}};
-  std::string const text = Fill(Pick(key, Tier()), vars);
-  out.push_back(Make(t, Category::Instruction, Capitalize(text), Priority::Nav));
+  Vars vars{{"dir", DirName(p.dir)}, {"distance", distance}};
+  // A roundabout with a known exit: the joke, then the exit on its own, so it isn't lost (loop B99).
+  // "still" is past the entry; the exit there would read as a new instruction.
+  if (p.shape == TurnShape::Roundabout && std::string_view(stage) != "still")
+    if (std::string const exit = RoundaboutExitOf(p.text); !exit.empty())
+      vars["exit"] = exit;
+  int const tier = Tier();
+  std::string text = Capitalize(Fill(Pick(key, tier), vars));
+  if (std::string const call = ExitCallFor(vars, tier); !call.empty())
+    text += " " + call;
+  out.push_back(Make(t, Category::Instruction, text, Priority::Nav));
   out.back().key = key;
   out.back().vars = vars;
+}
+
+/// The distance a countdown call says: its trigger, or what is left once the car is well past it.
+double CritiqueEngine::SayDistanceM(double triggerM, double distanceM) const
+{
+  double const mps = m_lastSample ? std::max(0.0, m_lastSample->speedMps) : 0;
+  double const slackM = std::max(kSayTriggerWithinS * mps, 0.1 * triggerM);
+  return distanceM < triggerM - slackM ? distanceM : triggerM;
 }
 
 /// Where the plain final call goes: about 4 seconds out at the current speed, 50 ft at least.
@@ -907,14 +1009,54 @@ void CritiqueEngine::CheckSpeeding(TelemetrySample const & s, TelemetrySample co
 {
   Units const units = m_config.units;
   bool const backoff = m_config.speedingRenagMaxMs > 0;
-  int const over = s.speedLimitMps ? static_cast<int>(JsRound(ToDisplay(s.speedMps, units))) -
-                                         static_cast<int>(JsRound(ToDisplay(*s.speedLimitMps, units)))
-                                   : 0;
   double constexpr kFastLimitMps = 24.5;  // 55 mph
-  int const tolerance = s.speedLimitMps && *s.speedLimitMps >= kFastLimitMps && m_config.speedingToleranceFast >= 0
-                            ? m_config.speedingToleranceFast
-                            : m_config.speedingTolerance;
-  if (!s.speedLimitMps || over <= tolerance)
+  auto const overOf = [&](double limitMps) {
+    return static_cast<int>(JsRound(ToDisplay(s.speedMps, units))) -
+           static_cast<int>(JsRound(ToDisplay(limitMps, units)));
+  };
+  auto const toleranceOf = [&](double limitMps) {
+    return limitMps >= kFastLimitMps && m_config.speedingToleranceFast >= 0 ? m_config.speedingToleranceFast
+                                                                            : m_config.speedingTolerance;
+  };
+
+  // A big drop in the posted limit: remember the old one for the grace period.
+  if (s.speedLimitMps)
+  {
+    int const bigDrop = units == Units::Kmh ? 15 : 10;
+    if (m_prevLimitMps && JsRound(ToDisplay(*m_prevLimitMps, units)) - JsRound(ToDisplay(*s.speedLimitMps, units)) >= bigDrop)
+    {
+      bool const stillGraced = m_dropFromLimitMps && s.t - m_limitDroppedAt < m_config.speedingDropGraceMs;
+      m_dropFromLimitMps = stillGraced ? std::max(*m_dropFromLimitMps, *m_prevLimitMps) : *m_prevLimitMps;
+      m_limitDroppedAt = s.t;
+    }
+    else if (m_dropFromLimitMps && *s.speedLimitMps >= *m_dropFromLimitMps)
+      m_dropFromLimitMps.reset();  // back up (a one-fix snap to a side road): nothing to forgive
+    m_prevLimitMps = s.speedLimitMps;
+  }
+  if (m_dropFromLimitMps && s.t - m_limitDroppedAt >= m_config.speedingDropGraceMs)
+    m_dropFromLimitMps.reset();
+
+  std::optional<double> limitMps = s.speedLimitMps;
+  if (limitMps && m_dropFromLimitMps && m_config.speedingDropGraceMs > 0)
+  {
+    double const dt = prev ? (s.t - prev->t) / 1000 : 0;
+    bool const slowing = dt > 0 && (prev->speedMps - s.speedMps) / dt >= 0.5;
+    bool const withinOld = overOf(*m_dropFromLimitMps) <= toleranceOf(*m_dropFromLimitMps);
+    if (slowing || withinOld)
+      limitMps = m_dropFromLimitMps;
+  }
+
+  // How long over the posted limit itself, grace or not, so holding the old speed past the grace
+  // period is speeding at once.
+  bool const overPosted = s.speedLimitMps && overOf(*s.speedLimitMps) > toleranceOf(*s.speedLimitMps);
+  if (!overPosted)
+    m_overLimitSince.reset();
+  else if (!m_overLimitSince)
+    m_overLimitSince = s.t;
+
+  int const over = limitMps ? overOf(*limitMps) : 0;
+  int const tolerance = limitMps ? toleranceOf(*limitMps) : m_config.speedingTolerance;
+  if (!limitMps || over <= tolerance)
   {
     m_speedingSince.reset();
     if (!m_underLimitSince)
@@ -927,9 +1069,12 @@ void CritiqueEngine::CheckSpeeding(TelemetrySample const & s, TelemetrySample co
     }
     return;
   }
+  // Not over for long enough yet (a one-fix glitch, or just crept over): nothing noted.
+  if (!m_speedingSince && m_overLimitSince && s.t - *m_overLimitSince < m_config.speedingSustainMs)
+    return;
   m_underLimitSince.reset();
   int const speed = static_cast<int>(JsRound(ToDisplay(s.speedMps, units)));
-  int const limit = static_cast<int>(JsRound(ToDisplay(*s.speedLimitMps, units)));
+  int const limit = static_cast<int>(JsRound(ToDisplay(*limitMps, units)));
 
   if (prev && m_speedingSince)
     m_stats.speedingSeconds += (s.t - prev->t) / 1000;
@@ -1020,6 +1165,7 @@ void CritiqueEngine::CheckStopped(TelemetrySample const & s, std::vector<Comment
   if (s.speedMps >= 0.5)
   {
     m_stoppedSince.reset();
+    m_longStopRemarks = 0;
     return;
   }
   if (!m_stoppedSince)
@@ -1028,19 +1174,76 @@ void CritiqueEngine::CheckStopped(TelemetrySample const & s, std::vector<Comment
     m_stopCount++;
     return;
   }
-  if (s.t - *m_stoppedSince < m_config.longStopAfterMs)
+  // Stuck in a jam keeps blaming the route every 45 s, as before.
+  if (m_trafficAlternate)
+  {
+    if (s.t - *m_stoppedSince < m_config.longStopAfterMs)
+      return;
+    if (Roast(out, s.t, Category::Traffic, "traffic", {{"alternate", *m_trafficAlternate}}))
+    {
+      m_stoppedSince = s.t;
+      Log(MakeIncident(s.t, IncidentKind::Traffic));
+    }
     return;
-  bool const spoke = m_trafficAlternate
-                         ? Roast(out, s.t, Category::Traffic, "traffic", {{"alternate", *m_trafficAlternate}})
-                         : Roast(out, s.t, Category::LongStop, "longStop", {{"stops", Num(m_stopCount)}});
-  if (spoke)
+  }
+  // Parked mid-route, each remark waits twice as long as the last (45 s, 90, 180), then it gives up.
+  if (m_longStopRemarks >= kLongStopRemarksPerStop)
+    return;
+  // The navigator may still call this stop a traffic jam (HoldLongStop).
+  if (s.t < m_longStopHoldUntil)
+    return;
+  if (s.t - *m_stoppedSince < m_config.longStopAfterMs * std::pow(2.0, m_longStopRemarks))
+    return;
+  // The stop was just remarked on by name ("Why are we stopping here?"), so don't pile on.
+  if (s.t - m_lastUnplannedStopAt < m_config.longStopAfterMs)
+    return;
+  if (Roast(out, s.t, Category::LongStop, "longStop", {{"stops", Num(m_stopCount)}}))
   {
     m_stoppedSince = s.t;
-    Log(MakeIncident(s.t, m_trafficAlternate ? IncidentKind::Traffic : IncidentKind::LongStop));
+    ++m_longStopRemarks;
+    Log(MakeIncident(s.t, IncidentKind::LongStop));
   }
 }
 
 // --- plumbing ----------------------------------------------------------
+
+/// A hard brake or launch: roasted now (TS behavior) or held until the car settles (jerkSettleMs).
+/// One held at a time: a second jolt during the hold is still counted but gets no second roast.
+void CritiqueEngine::JerkRoast(std::vector<Commentary> & out, double t, Category category, std::string const & key)
+{
+  if (m_config.jerkSettleMs <= 0)
+  {
+    Roast(out, t, category, key, {}, true);
+    return;
+  }
+  if (m_pendingJerk)
+  {
+    TraceThrottled("roast.held", key + "/settle", {{"key", key}, {"why", "settle.again"}});
+    return;
+  }
+  m_pendingJerk = PendingJerk{category, key, t, m_stats.turnsCompleted};
+  Trace("roast.held", {{"key", key}, {"why", "settle"}});
+}
+
+void CritiqueEngine::ReleaseJerk(std::vector<Commentary> & out, double t)
+{
+  if (!m_pendingJerk)
+    return;
+  PendingJerk const & p = *m_pendingJerk;
+  if (m_stats.turnsCompleted > p.turnsDone || t - p.since > m_config.jerkSettleGiveUpMs)
+  {
+    Trace("roast.dropped", {{"key", p.key}, {"why", m_stats.turnsCompleted > p.turnsDone ? "turn" : "unsettled"}});
+    m_pendingJerk.reset();
+    return;
+  }
+  bool const settled = !m_braking && !m_accelerating && m_steadySince && *m_steadySince >= p.since &&
+                       t - *m_steadySince >= m_config.jerkSettleMs;
+  if (!settled || m_bending || TurnNeedsQuiet(t, kRoastSpeakMs))
+    return;
+  PendingJerk const held = std::move(*m_pendingJerk);
+  m_pendingJerk.reset();
+  Roast(out, t, held.category, held.key, {}, true);
+}
 
 /// Emit a roast if cooldowns allow. `urgent` roasts (missed turns etc.) skip the global
 /// gap because they react to a specific moment. Returns whether anything was emitted.
@@ -1115,7 +1318,15 @@ std::string CritiqueEngine::Pick(std::string const & key, int tier)
   if (m_config.lineSource)
     if (auto generated = m_config.lineSource->Take(key, tier))
       return *generated;
-  auto const & options = LinesFor(key, tier);
+  auto const & all = LinesFor(key, tier);
+  // At speed, no line that asks the driver to pick up, hold or plug in the phone (loop B74), unless
+  // that would leave nothing to say.
+  std::vector<std::string> handsFree;
+  if (m_lastSample && m_lastSample->speedMps >= m_config.rollingMps)
+    for (auto const & l : all)
+      if (!AsksToHandlePhone(l))
+        handsFree.push_back(l);
+  auto const & options = handsFree.empty() ? all : handsFree;
   if (m_config.saidLog)
     return m_config.saidLog->Pick(key, options, m_config.rng());
   auto & recent = m_recentLines[key];

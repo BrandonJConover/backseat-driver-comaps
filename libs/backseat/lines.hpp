@@ -3,6 +3,8 @@
 // The lines themselves are generated from engine/src/lines.ts into lines_data.cpp.
 #pragma once
 
+#include "backseat/types.hpp"
+
 #include <cstdlib>
 #include <map>
 #include <set>
@@ -67,11 +69,77 @@ void SetLineMetric(bool metric);
 /// glory") is "Three meters of glory"). Lines without any come back as they are.
 std::string MetricWording(std::string const & text);
 
+/// Whether traffic keeps left in `country`, as the map files name it ("UK", "Australia", "Japan";
+/// "UK_England" and ISO codes like "GB" work too). Unknown or empty is right-hand traffic.
+bool DrivesOnLeft(std::string const & country);
+/// The US, Canada, or no country yet (empty): where four way stops, right on red, yellow center
+/// lines and the US sign colours are the rules. Same names as DrivesOnLeft.
+bool InNorthAmerica(std::string const & country);
+/// Where license plates name a state or province, so the plate game makes sense: North America and Mexico.
+bool PlatesNameAState(std::string const & country);
+/// Whether LinesFor() answers for a country that drives on the left: the few lines that assume the
+/// driver sits on the left and passes on the left ("The left lane is for passing") come back
+/// mirrored. Off (right-hand traffic) until told.
+void SetLineDriveSide(bool leftHand);
+/// `text` with its right-hand-traffic assumptions mirrored for left-hand traffic
+/// (DriveSideWording("The left lane is for passing.") is "The right lane is for passing.").
+/// Lines without any come back as they are. Real lane and turn calls are never changed. Roundabout
+/// "look left for traffic" advice becomes "look right" (traffic circulates clockwise there).
+std::string DriveSideWording(std::string const & text);
+
+/// The process-wide filters LinesFor() answers for (the four Set* calls above), so a caller can
+/// save and restore them or check a test left them as it found them (loop B83).
+struct LineFilters
+{
+  TravelMode mode = TravelMode::Drive;
+  Housing housing = Housing::Unknown;
+  bool metric = false;
+  bool leftHand = false;
+
+  bool operator==(LineFilters const & o) const
+  {
+    return mode == o.mode && housing == o.housing && metric == o.metric && leftHand == o.leftHand;
+  }
+  bool operator!=(LineFilters const & o) const { return !(*this == o); }
+};
+LineFilters CurrentLineFilters();
+/// Puts all four back (default-constructed LineFilters: driving, housing unknown, imperial, right-hand).
+void SetLineFilters(LineFilters const & filters);
+/// "drive/unknown/imperial/right"-style summary, for test failure messages and traces.
+std::string DescribeLineFilters(LineFilters const & filters);
+
 /// Templates for `key` at `tier` (0..2), for the current travel mode: what fits it, plus `key`.walk,
 /// `key`.bike, `key`.hike (or else `key`.walk) or `key`.offroad if there are any, or mode.generic when
 /// nothing fits. Lines that don't fit the driver's housing are left out too, unless that would leave
-/// none. Throws std::out_of_range for an unknown key.
+/// none. An unknown key or a tier outside 0..2 gives an empty pool (and a
+/// "lines.missing" trace) instead of throwing.
 std::vector<std::string> const & LinesFor(std::string const & key, int tier);
+
+/// Pays the one-time setup the first spoken line would otherwise pay mid-drive: the line table (and
+/// its metric / left-hand copy for `metric` and `leftHand`) and every lazily built speech pattern in
+/// pronunciation::ForSpeech. Call it once from a background thread at app start or route start; it
+/// changes nothing anyone hears and leaves SetLineMetric / SetLineDriveSide as they are. Safe to call
+/// again (later calls are cheap). Loop B66: cold first line was ~11 ms on the cloud box, warm ~0.1 ms.
+void Warm(bool metric, bool leftHand);
+
+/// Whether `line` asks the driver to pick up, hold, aim or plug in the phone ("hold me over the vent",
+/// "Plug me in. Now.", "Charger!"): a hands-off-the-wheel ask, fine at a stop, not at speed (loop B74).
+/// Negated asks ("Don't pick me up") and soft hints with no "now" ("You might want to plug me in if
+/// you want to get there") pass.
+bool AsksToHandlePhone(std::string const & line);
+
+/// Whether `line` tells the driver to look at the screen or pick/change something on it ("Look at it.",
+/// "LOOK!", "Look how simple", "Pick a voice", "Change anything you like"): fine parked, not at speed
+/// (loop B92). Negated ("Don't look at the screen"), "Look, I tried" and picks answered out loud
+/// ("Pick one. Say first, second, or third.") pass.
+bool LooksOrPicks(std::string const & line);
+
+/// How a line from pool `key` with spoken `text` should be delivered (loop B90): Aside for the GPS
+/// muttering to itself (any key with an "aside" part: quiet.aside, partner.aside, outdoors.aside,
+/// and their .walk/.bike variants), unless the line is shouted (has a "!"; the unhinged tier yells
+/// its asides). Everything else, and every built line with no key, is Normal. Directions never ask:
+/// TakeLines() keeps Priority::Nav lines Normal whatever their key.
+Delivery DeliveryFor(std::string const & key, std::string const & text);
 
 /// Fills {placeholders} from vars. {NAME} in capitals inserts the value in capitals.
 /// Unknown placeholders are left as they are.
@@ -92,7 +160,13 @@ class SaidLog
 {
 public:
   /// A line from `options` not said recently for `key`, chosen by `r` in [0, 1), and remembered.
+  /// An r outside [0, 1) (or NaN) is clamped; empty `options` give "" and remember nothing.
   std::string const & Pick(std::string const & key, std::vector<std::string> const & options, double r);
+  /// Takes back the last Pick() for `key` when it gave `line`: a line picked but replaced before anyone
+  /// heard it must not push a line that was heard out of the rotation (it would come back on the next
+  /// trip). Only the latest pick can be taken back, once; if it gave another line, or anything else
+  /// was done to `key` since, this does nothing.
+  void Unpick(std::string const & key, std::string const & line);
   /// Whether anything for `key` was said before (as far as the log remembers).
   bool Said(std::string const & key) const
   {
@@ -110,6 +184,7 @@ public:
   /// A note kept with the log, like the driver's answer to a question ("rest"), until forgotten.
   void Remember(std::string const & key, std::string const & value)
   {
+    m_before.erase(key);
     m_recent[key] = {value};
     m_dirty = true;
   }
@@ -121,6 +196,7 @@ public:
   }
   void Forget(std::string const & key)
   {
+    m_before.erase(key);
     if (m_recent.erase(key))
       m_dirty = true;
   }
@@ -134,6 +210,8 @@ public:
 
 private:
   std::map<std::string, std::vector<std::string>> m_recent;
+  /// Per key, the recent list as it was before the latest Pick(), for Unpick().
+  std::map<std::string, std::vector<std::string>> m_before;
   bool m_dirty = false;
 };
 }  // namespace backseat

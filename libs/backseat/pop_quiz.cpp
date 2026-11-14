@@ -1,9 +1,14 @@
 #include "backseat/pop_quiz.hpp"
 
+#include "backseat/lines.hpp"
+#include "backseat/types.hpp"
+
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <set>
 #include <utility>
+#include <vector>
 
 namespace backseat
 {
@@ -21,21 +26,21 @@ std::vector<QuizQuestion> const & QuizQuestions()
       {"flashingRed", true, "A flashing red light means what?",
        {"Treat it like a stop sign|stop sign|stop", "Go faster|faster", "The light is broken, ignore it|broken|ignore"}, 0},
       {"fourWay", true, "Two cars reach a four way stop at the same time. Who goes first?",
-       {"The car on the right|right", "The car on the left|left", "The bigger car|bigger"}, 0},
+       {"The car on the right|right", "The car on the left|left", "The bigger car|bigger"}, 0, QuizPlace::NorthAmerica},
       {"followDistance", true, "How many seconds behind the car ahead should you stay, at least?",
        {"1|one", "3|three", "10|ten"}, 1},
       {"schoolBus", true, "A school bus stops with its red lights flashing. What do you do?",
-       {"Stop|stop", "Pass it quickly|pass|quickly", "Honk|honk"}, 0},
+       {"Stop|stop", "Pass it quickly|pass|quickly", "Honk|honk"}, 0, QuizPlace::NorthAmerica},
       {"siren", true, "An ambulance comes up behind you with its siren on. What do you do?",
-       {"Speed up to stay ahead|speed up|ahead", "Pull to the right and stop|pull over|pull|right", "Brake right where you are|brake"}, 1},
+       {"Speed up to stay ahead|speed up|ahead", "Pull to the right and stop|pull over|pull|right", "Brake right where you are|brake"}, 1, QuizPlace::RightHandTraffic},
       {"handsOnWheel", true, "Where do driving instructors now say to put your hands on the wheel?",
        {"10 and 2|ten and two|10|ten", "9 and 3|nine and three|9|nine", "12 and 6|twelve and six|12|twelve"}, 1},
       {"orangeSign", true, "What does an orange diamond sign usually mean?",
-       {"A work zone ahead|work zone|construction|work", "A school ahead|school", "Free parking|free|parking"}, 0},
+       {"A work zone ahead|work zone|construction|work", "A school ahead|school", "Free parking|free|parking"}, 0, QuizPlace::NorthAmerica},
       {"brownSign", true, "What do brown road signs point you to?",
-       {"Parks and attractions|parks|park|attractions|recreation", "Hospitals|hospital", "Speed traps|speed trap|traps"}, 0},
+       {"Parks and attractions|parks|park|attractions|recreation", "Hospitals|hospital", "Speed traps|speed trap|traps"}, 0, QuizPlace::NorthAmerica},
       {"blueSign", true, "What do blue road signs tell you about?",
-       {"Gas, food and lodging|gas|food|lodging|services", "Road work|road work|work", "School zones|school"}, 0},
+       {"Gas, food and lodging|gas|food|lodging|services", "Road work|road work|work", "School zones|school"}, 0, QuizPlace::NorthAmerica},
       {"hydroplane", true, "Your car starts hydroplaning. What should you do?",
        {"Slam the brakes|slam|brakes", "Ease off the gas and steer straight|ease|steer straight|ease off", "Turn hard|turn hard|hard"}, 1},
       {"fog", true, "In thick fog, which headlights should you use?",
@@ -43,11 +48,11 @@ std::vector<QuizQuestion> const & QuizQuestions()
       {"merge", true, "When you merge onto a highway, what speed should you aim for?",
        {"Way under the speed of traffic|under|slow", "The speed of traffic|same|match", "Double the speed limit|double"}, 1},
       {"leftLane", true, "On the highway, what is the left lane for?",
-       {"Passing|passing|pass", "Cruising forever|cruising|forever", "Texting|texting|text"}, 0},
+       {"Passing|passing|pass", "Cruising forever|cruising|forever", "Texting|texting|text"}, 0, QuizPlace::RightHandTraffic},
       {"brokenWhite", true, "What does a broken white line between lanes mean?",
        {"You may change lanes|change lanes|change|may", "Never cross it|never", "The road is under construction|construction"}, 0},
       {"solidYellow", true, "A solid yellow line on your side of the center means what?",
-       {"Pass whenever you want|whenever", "No passing|no passing|no", "Bike lane|bike"}, 1},
+       {"Pass whenever you want|whenever", "No passing|no passing|no", "Bike lane|bike"}, 1, QuizPlace::NorthAmerica},
       {"crosswalk", true, "Someone is walking in the crosswalk. Who has the right of way?",
        {"The walker|walker|person walking|walking|them", "You, you're in a car|car|me|you", "Whoever is louder|louder"}, 0},
       {"blindSpot", true, "Before changing lanes, what checks your blind spot?",
@@ -55,11 +60,14 @@ std::vector<QuizQuestion> const & QuizQuestions()
       {"uphillCurb", true, "Parking uphill next to a curb, which way do you turn the front wheels?",
        {"Away from the curb|away", "Toward the curb|toward|towards", "Straight ahead|straight"}, 0},
       {"bac", true, "In most of the US, what blood alcohol level makes it illegal to drive at 21 and over?",
-       {"0.02|point oh two|point zero two|02", "0.08|point oh eight|point zero eight|08", "0.20|point two|point two zero|20"}, 1},
+       {"0.02|point oh two|point zero two|02", "0.08|point oh eight|point zero eight|08", "0.20|point two|point two zero|20"}, 1, QuizPlace::NorthAmerica},
       {"turnSignal", true, "How far before a turn should you signal, in town?",
-       {"About 100 feet|100|hundred|feet", "Halfway through the turn|halfway", "Signals are optional|optional"}, 0},
+       {"About 100 feet|100|hundred|feet", "Halfway through the turn|halfway", "Signals are optional|optional"}, 0, QuizPlace::Imperial},
+      {"turnSignalMetric", true, "How far before a turn should you signal, in town?",
+       {"About 30 metres|30|thirty|metres|meters", "Halfway through the turn|halfway", "Signals are optional|optional"}, 0,
+       QuizPlace::Metric},
       {"rightOnRed", true, "Where it's allowed, what do you have to do before turning right on red?",
-       {"Come to a full stop|full stop|stop", "Honk twice|honk|twice", "Nothing, just go|nothing|go"}, 0},
+       {"Come to a full stop|full stop|stop", "Honk twice|honk|twice", "Nothing, just go|nothing|go"}, 0, QuizPlace::NorthAmerica},
       {"skid", true, "When the back of the car skids, where do you steer?",
        {"Where you want to go|want|want to go", "The opposite way|opposite", "Let go of the wheel|let go"}, 0},
       {"headlightsDusk", true, "When should your headlights be on?",
@@ -135,6 +143,19 @@ QuizQuestion const * FindQuizQuestion(std::string const & id)
   return nullptr;
 }
 
+bool QuizFits(QuizQuestion const & q, std::string const & country, bool metric)
+{
+  switch (q.place)
+  {
+  case QuizPlace::Anywhere: return true;
+  case QuizPlace::NorthAmerica: return InNorthAmerica(country);
+  case QuizPlace::RightHandTraffic: return !DrivesOnLeft(country);
+  case QuizPlace::Imperial: return !metric;
+  case QuizPlace::Metric: return metric;
+  }
+  return true;
+}
+
 std::string QuizChoiceText(char const * choice)
 {
   std::string const s(choice);
@@ -144,8 +165,9 @@ std::string QuizChoiceText(char const * choice)
 namespace
 {
 /// Lowercase words, with apostrophes dropped ("it's" is "its") and decimals kept ("0.08").
-std::vector<std::string> QuizWords(std::string const & text)
+std::vector<std::string> QuizWords(std::string const & raw)
 {
+  std::string const text = StraightApostrophes(raw);
   std::vector<std::string> words;
   std::string word;
   for (size_t i = 0; i < text.size(); ++i)
@@ -155,10 +177,9 @@ std::vector<std::string> QuizWords(std::string const & text)
                          i + 1 < text.size() && std::isdigit(static_cast<unsigned char>(text[i + 1]));
     if (std::isalnum(ch) || decimal)
       word += static_cast<char>(std::tolower(ch));
-    else if (ch == '\'' || ch == 0xE2)  // Straight or curly (UTF-8 E2 80 99) apostrophe.
+    else if (ch == '\'')
     {
-      if (ch == 0xE2)
-        i += 2;
+      // "it's" is "its"; curly ones were straightened above. Dashes and other marks split words.
     }
     else if (!word.empty())
       words.push_back(std::exchange(word, std::string()));
@@ -209,9 +230,11 @@ std::set<std::string> QuizChoiceWords(char const * choice)
 }
 }  // namespace
 
-QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken)
+namespace
 {
-  auto const words = QuizWords(spoken);
+/// One answer with no "not" and no change of mind in it.
+QuizHeard ParsePlainQuizAnswer(QuizQuestion const & q, std::vector<std::string> const & words)
+{
   QuizHeard heard;
   if (words.empty())
     return heard;
@@ -231,7 +254,7 @@ QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken)
       for (auto const & w : QuizWords(all.substr(start, bar - start)))
         spelled += w + " ";
       if (!spelled.empty() && (said == spelled || said == "the " + spelled || "the " + said == spelled))
-        return {QuizHeard::Kind::Choice, static_cast<int>(i)};
+        return {QuizHeard::Kind::Choice, static_cast<int>(i), true};
       start = bar + 1;
     }
   }
@@ -295,7 +318,7 @@ QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken)
     }
   }
   if (byLetter >= 0)
-    return {QuizHeard::Kind::Choice, byLetter};
+    return {QuizHeard::Kind::Choice, byLetter, true};
 
   std::string padded = " ";
   for (auto const & w : words)
@@ -305,6 +328,152 @@ QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken)
     if (padded.find(cue) != std::string::npos)
       return {QuizHeard::Kind::GiveUp, -1};
   return heard;
+}
+
+bool QuizNegationWord(std::string const & w)
+{
+  return QuizAmong(w, {"not", "isnt", "never", "dont", "aint", "wasnt", "cant"});
+}
+
+/// Where the driver changed their mind ("A, no wait, C", "B. Actually, C"): the index just past the last
+/// cue, or 0 when there is none.
+size_t QuizAfterCorrection(std::vector<std::string> const & words)
+{
+  static std::vector<std::vector<char const *>> const kCues = {
+      {"no", "wait"},  {"wait", "no"}, {"wait"},          {"i", "mean"},   {"actually"},     {"scratch", "that"},
+      {"make", "that"}, {"or", "rather"}, {"change", "that", "to"}, {"change", "it", "to"},
+      {"change", "my", "answer", "to"}, {"no", "no"}, {"sorry"}, {"hold", "on"}};
+  size_t after = 0;
+  for (size_t k = 0; k < words.size(); ++k)
+    for (auto const & cue : kCues)
+    {
+      if (k + cue.size() > words.size())
+        continue;
+      bool match = true;
+      for (size_t j = 0; j < cue.size() && match; ++j)
+        match = words[k + j] == cue[j];
+      if (match)
+        after = std::max(after, k + cue.size());
+    }
+  return after;
+}
+
+/// Ruling choices out: "not B", "it's not the speed of traffic, it's the octagon", "I don't think it's C".
+/// The words after each "not" that name one choice are taken out and that choice can't be the pick; with
+/// nothing else named it stays Unclear (two choices ruled out never names the third).
+QuizHeard ParseQuizNegations(QuizQuestion const & q, std::vector<std::string> const & words)
+{
+  // A question whose choice is "not at all" or "never cross it" hears that word as the choice.
+  std::array<std::set<std::string>, 3> own;
+  for (size_t i = 0; i < 3; ++i)
+    own[i] = QuizChoiceWords(q.choices[i]);
+  auto const inChoice = [&own](std::string const & w, int skip)
+  {
+    for (int i = 0; i < 3; ++i)
+      if (i != skip && own[i].count(w))
+        return true;
+    return false;
+  };
+
+  std::vector<std::string> rest;
+  std::array<bool, 3> ruledOut{};
+  bool any = false;
+  for (size_t k = 0; k < words.size();)
+  {
+    bool const negation = QuizNegationWord(words[k]) && !inChoice(words[k], -1);
+    if (!negation)
+    {
+      rest.push_back(words[k++]);
+      continue;
+    }
+    size_t start = k + 1;
+    while (start < words.size() && QuizAmong(words[start], {"think", "its", "it", "is", "be", "say", "going"}))
+      ++start;
+    // The shortest run that names a choice, then as far as it keeps naming the same one.
+    int picked = -1;
+    size_t end = start;
+    for (size_t e = start + 1; e <= words.size() && e <= start + 6; ++e)
+    {
+      if (e > start + 1 &&
+          (QuizAmong(words[e - 1], {"but", "so", "its", "it", "i", "maybe", "probably", "then", "is", "must"}) ||
+           QuizNegationWord(words[e - 1])))
+        break;
+      auto const heard = ParsePlainQuizAnswer(q, {words.begin() + start, words.begin() + e});
+      if (heard.kind != QuizHeard::Kind::Choice)
+        continue;
+      if (picked >= 0 && heard.choice != picked)
+        break;
+      // "not way under, same": a word of another choice starts the next thought.
+      if (picked >= 0 && !heard.named && inChoice(words[e - 1], picked))
+        break;
+      picked = heard.choice;
+      end = e;
+    }
+    if (picked < 0)
+    {
+      // "I'm not sure", "don't know": not ruling anything out.
+      rest.push_back(words[k++]);
+      continue;
+    }
+    ruledOut[picked] = true;
+    any = true;
+    k = end;
+  }
+  if (!any)
+    return ParsePlainQuizAnswer(q, words);
+  auto const heard = ParsePlainQuizAnswer(q, rest);
+  if (heard.kind == QuizHeard::Kind::Choice && ruledOut[heard.choice])
+    return {};
+  return heard;
+}
+}  // namespace
+
+QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken)
+{
+  auto const words = QuizWords(spoken);
+  if (words.empty())
+    return {};
+  // The whole answer said word for word wins first ("not at all" is a choice).
+  auto const whole = ParsePlainQuizAnswer(q, words);
+  if (whole.kind == QuizHeard::Kind::Choice && whole.named)
+  {
+    bool hasCue = QuizAfterCorrection(words) > 0;
+    for (auto const & w : words)
+      hasCue = hasCue || QuizNegationWord(w);
+    if (!hasCue)
+      return whole;
+  }
+  size_t const after = QuizAfterCorrection(words);
+  if (after > 0)
+  {
+    std::vector<std::string> const tail(words.begin() + after, words.end());
+    if (!tail.empty())
+    {
+      auto const heard = ParseQuizNegations(q, tail);
+      if (heard.kind != QuizHeard::Kind::Unclear)
+        return heard;
+    }
+    // "B, actually." The change of mind named nothing new: hear what came before it.
+    std::vector<std::string> const head(words.begin(), words.begin() + after);
+    return ParseQuizNegations(q, head);
+  }
+  return ParseQuizNegations(q, words);
+}
+
+bool AsksToRepeatQuiz(std::string const & spoken)
+{
+  std::string padded = " ";
+  for (auto const & w : QuizWords(spoken))
+    padded += w + " ";
+  for (char const * cue : {" repeat the question ", " repeat that question ", " repeat the quiz ", " what was the question ",
+                           " whats the question ", " what is the question ", " what was that question ",
+                           " read the question again ", " ask me again ", " ask again ", " say it again ", " say that again ",
+                           " repeat that ", " repeat it ", " come again ", " what were the choices ", " what are the choices ",
+                           " what were the options ", " what are the options ", " read the choices ", " read the options ",
+                           " repeat the choices ", " repeat the options ", " one more time "})
+    if (padded.find(cue) != std::string::npos)
+      return true;
+  return false;
 }
 
 bool AsksForPopQuiz(std::string const & spoken)

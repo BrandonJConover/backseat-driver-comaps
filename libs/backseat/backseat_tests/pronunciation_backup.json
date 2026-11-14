@@ -1,0 +1,18 @@
+{
+  "name": "The Four Keys",
+  "exportDate": 783302400.5,
+  "entries": [
+    {"id": "6F1C2A4E-0B7D-4C1E-9A55-3D2E8B1F0A11", "word": "Hermione", "pronunciation": "her-MY-oh-nee", "isPattern": false, "source": "manual", "description": "the friend"},
+    {"id": "7A2D3B5F-1C8E-4D2F-8B66-4E3F9C2A1B22", "word": "Mt Hood", "pronunciation": "mount hood", "isPattern": false, "source": "manual"},
+    {"id": "8B3E4C60-2D9F-4E30-9C77-5F40AD3B2C33", "word": "Quasi", "pronunciation": "/kwˈɑzi/", "isPattern": false, "source": "glossary"},
+    {"id": "9C4F5D71-3EA0-4F41-AD88-6051BE4C3D44", "word": "\\bDr\\.", "pronunciation": "Doctor", "isPattern": true, "source": "manual"},
+    {"id": "AD506E82-4FB1-4052-BE99-7162CF5D4E55", "word": "Café Renée", "pronunciation": "ka-FAY ruh-NAY", "isPattern": false, "source": "manual"},
+    {"id": "BE617F93-50C2-4163-8FAA-8273D06E5F66", "word": "  ", "pronunciation": "nothing", "isPattern": false, "source": "manual"},
+    {"id": "CF7280A4-61D3-4274-90BB-9384E17F6077", "word": "hermione", "pronunciation": "a second try", "isPattern": false, "source": "manual"},
+    {"id": "D08391B5-72E4-4385-A1CC-A495F2807188", "word": "Kvothe", "pronunciation": "KVOHTH\twith a tab", "isPattern": false, "source": "manual"},
+    {"id": "E194A2C6-83F5-4496-B2DD-B5A60391829A", "word": "Sirius \"Padfoot\" Black", "pronunciation": "SIR-ee-us", "isPattern": false, "source": "manual"},
+    {"id": "F2A5B3D7-9406-45A7-83EE-C6B714A293AB", "word": "Zoë 🐦", "pronunciation": "ZOH-ee", "isPattern": false, "source": "manual"},
+    {"id": "03B6C4E8-A517-46B8-94FF-D7C825B3A4BC", "word": "Denna", "isPattern": false, "source": "manual"}
+  ],
+  "bookTitles": ["The Four Keys"]
+}

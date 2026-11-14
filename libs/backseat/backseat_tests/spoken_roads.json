@@ -1,0 +1,465 @@
+{
+ "about": "Shared expectations for highway, route and exit numbers said the way drivers say them. Backseat Driver: backseat::pronunciation::ForSpeech (libs/backseat/backseat_tests/spoken_roads.json). EpubToM4B can port the route-number rules (books quote I-95, Route 66); keep both copies in sync.",
+ "cases": [
+  {
+   "input": "Take I-405 N",
+   "language": "en",
+   "expected": "Take I four oh five North"
+  },
+  {
+   "input": "Merge onto I-35",
+   "language": "en",
+   "expected": "Merge onto I thirty five"
+  },
+  {
+   "input": "Merge onto US-183",
+   "language": "en",
+   "expected": "Merge onto yooess one eighty three"
+  },
+  {
+   "input": "Merge onto US-36",
+   "language": "en",
+   "expected": "Merge onto yooess thirty six"
+  },
+  {
+   "input": "Turn left onto FM 1431",
+   "language": "en",
+   "expected": "Turn left onto F M fourteen thirty one"
+  },
+  {
+   "input": "Take CR-3502",
+   "language": "en",
+   "expected": "Take County Road thirty five oh two"
+  },
+  {
+   "input": "Take RM 620",
+   "language": "en",
+   "expected": "Take R M six twenty"
+  },
+  {
+   "input": "Stay on SH 71",
+   "language": "en",
+   "expected": "Stay on State Highway seventy one"
+  },
+  {
+   "input": "Take SR 71",
+   "language": "en",
+   "expected": "Take State Route seventy one"
+  },
+  {
+   "input": "Merge onto TX-71",
+   "language": "en",
+   "expected": "Merge onto Texas seventy one"
+  },
+  {
+   "input": "Take CA-1 S",
+   "language": "en",
+   "expected": "Take California one South"
+  },
+  {
+   "input": "Take M-14",
+   "language": "en",
+   "expected": "Take M fourteen"
+  },
+  {
+   "input": "Take IN-46",
+   "language": "en",
+   "expected": "Take Indiana forty six"
+  },
+  {
+   "input": "Take Exit 238B",
+   "language": "en",
+   "expected": "Take Exit two thirty eight B"
+  },
+  {
+   "input": "Take exit 12A toward Dallas",
+   "language": "en",
+   "expected": "Take exit twelve A toward Dallas"
+  },
+  {
+   "input": "Take Hwy 290",
+   "language": "en",
+   "expected": "Take Highway two ninety"
+  },
+  {
+   "input": "Take Highway 200",
+   "language": "en",
+   "expected": "Take Highway two hundred"
+  },
+  {
+   "input": "Stay on Route 66",
+   "language": "en",
+   "expected": "Stay on Route sixty six"
+  },
+  {
+   "input": "Follow Loop 360",
+   "language": "en",
+   "expected": "Follow Loop three sixty"
+  },
+  {
+   "input": "Take Interstate 405",
+   "language": "en",
+   "expected": "Take Interstate four oh five"
+  },
+  {
+   "input": "Merge onto the 101 Fwy.",
+   "language": "en",
+   "expected": "Merge onto the one oh one Freeway."
+  },
+  {
+   "input": "Take I-35E",
+   "language": "en",
+   "expected": "Take I thirty five E"
+  },
+  {
+   "input": "Take FM 1400",
+   "language": "en",
+   "expected": "Take F M fourteen hundred"
+  },
+  {
+   "input": "Take FM 2000",
+   "language": "en",
+   "expected": "Take F M two thousand"
+  },
+  {
+   "input": "Only 405 miles to go",
+   "language": "en",
+   "expected": "Only four hundred five miles to go"
+  },
+  {
+   "input": "That's 1,234 miles",
+   "language": "en",
+   "expected": "That's one thousand two hundred thirty four miles"
+  },
+  {
+   "input": "Exit in 2 mi",
+   "language": "en",
+   "expected": "Exit in two miles"
+  },
+  {
+   "input": "I 5 times told you",
+   "language": "en",
+   "expected": "I five times told you"
+  },
+  {
+   "input": "Turn left IN 500 FT",
+   "language": "en",
+   "expected": "Turn left IN five hundred FT"
+  },
+  {
+   "input": "Watch TV 2 nights",
+   "language": "en",
+   "expected": "Watch TV two nights"
+  },
+  {
+   "input": "Exits 12-14 closed",
+   "language": "en",
+   "expected": "Exits twelve to fourteen closed"
+  },
+  {
+   "input": "Arrive at 2:05",
+   "language": "en",
+   "expected": "Arrive at two oh five"
+  },
+  {
+   "input": "Take US 290 Bus",
+   "language": "en",
+   "expected": "Take yooess two ninety Business"
+  },
+  {
+   "input": "Merge onto US-183 Alt toward Austin",
+   "language": "en",
+   "expected": "Merge onto yooess one eighty three Alternate toward Austin"
+  },
+  {
+   "input": "Take US 87 Byp.",
+   "language": "en",
+   "expected": "Take yooess eighty seven Bypass."
+  },
+  {
+   "input": "Stay on TX-71 BUS",
+   "language": "en",
+   "expected": "Stay on Texas seventy one Business"
+  },
+  {
+   "input": "Merge onto I-35 Bus",
+   "language": "en",
+   "expected": "Merge onto I thirty five Business"
+  },
+  {
+   "input": "Merge onto US 290;TX 71",
+   "language": "en",
+   "expected": "Merge onto yooess two ninety or Texas seventy one"
+  },
+  {
+   "input": "Take I-35 / US-290",
+   "language": "en",
+   "expected": "Take I thirty five or yooess two ninety"
+  },
+  {
+   "input": "Take US 183;SH 45;Loop 1",
+   "language": "en",
+   "expected": "Take yooess one eighty three or State Highway forty five or Loop one"
+  },
+  {
+   "input": "Take US-290 Bus;TX-71",
+   "language": "en",
+   "expected": "Take yooess two ninety Business or Texas seventy one"
+  },
+  {
+   "input": "Take IH 35 S",
+   "language": "en",
+   "expected": "Take I thirty five South"
+  },
+  {
+   "input": "Take IH-10",
+   "language": "en",
+   "expected": "Take I ten"
+  },
+  {
+   "input": "Turn right onto Ranch Rd 2222",
+   "language": "en",
+   "expected": "Turn right onto Ranch Road twenty two twenty two"
+  },
+  {
+   "input": "Turn left onto RR 12",
+   "language": "en",
+   "expected": "Turn left onto Ranch Road twelve"
+  },
+  {
+   "input": "Take County Rd 3502",
+   "language": "en",
+   "expected": "Take County Road thirty five oh two"
+  },
+  {
+   "input": "Wait at the I-35 bus stop",
+   "language": "en",
+   "expected": "Wait at the I thirty five bus stop"
+  },
+  {
+   "input": "Take I-35 Bus stop",
+   "language": "en",
+   "expected": "Take I thirty five Bus stop"
+  },
+  {
+   "input": "Bus stop ahead",
+   "language": "en",
+   "expected": "Bus stop ahead"
+  },
+  {
+   "input": "Press the Alt key",
+   "language": "en",
+   "expected": "Press the Alt key"
+  },
+  {
+   "input": "Only 3/4 mile",
+   "language": "en",
+   "expected": "Only three quarters of a mile"
+  },
+  {
+   "input": "Never forget 9/11",
+   "language": "en",
+   "expected": "Never forget nine over eleven"
+  },
+  {
+   "input": "TV 2/PO 3",
+   "language": "en",
+   "expected": "TV two/PO three"
+  },
+  {
+   "input": "Down the Rd 5 times",
+   "language": "en",
+   "expected": "Down the Rd five times"
+  },
+  {
+   "input": "Take US 87 Byp. toward Lubbock",
+   "language": "en",
+   "expected": "Take yooess eighty seven Bypass toward Lubbock"
+  },
+  {
+   "input": "Take US 87 Byp. Then turn left.",
+   "language": "en",
+   "expected": "Take yooess eighty seven Bypass. Then turn left."
+  },
+  {
+   "input": "Take I-35 NB",
+   "language": "en",
+   "expected": "Take I thirty five Northbound"
+  },
+  {
+   "input": "Merge onto US-290 WB",
+   "language": "en",
+   "expected": "Merge onto yooess two ninety Westbound"
+  },
+  {
+   "input": "Crash on I-10 EB near exit 12",
+   "language": "en",
+   "expected": "Crash on I ten Eastbound near exit twelve"
+  },
+  {
+   "input": "Stay on TX-71 SB.",
+   "language": "en",
+   "expected": "Stay on Texas seventy one Southbound."
+  },
+  {
+   "input": "Take US 183 Alt NB",
+   "language": "en",
+   "expected": "Take yooess one eighty three Alternate Northbound"
+  },
+  {
+   "input": "Take US-290 W / TX-71 W",
+   "language": "en",
+   "expected": "Take yooess two ninety West or Texas seventy one West"
+  },
+  {
+   "input": "Slow traffic on US 290 WB;TX 71 WB",
+   "language": "en",
+   "expected": "Slow traffic on yooess two ninety Westbound or Texas seventy one Westbound"
+  },
+  {
+   "input": "NB: see below",
+   "language": "en",
+   "expected": "NB: see below"
+  },
+  {
+   "input": "WB",
+   "language": "en",
+   "expected": "WB"
+  },
+  {
+   "input": "Watch the NBA game",
+   "language": "en",
+   "expected": "Watch the NBA game"
+  },
+  {
+   "input": "SB 1234 passed",
+   "language": "en",
+   "expected": "SB one thousand two hundred thirty four passed"
+  },
+  {
+   "input": "Take I-35 NBX",
+   "language": "en",
+   "expected": "Take I thirty five NBX"
+  },
+  {
+   "input": "Turn onto County Rd K",
+   "language": "en",
+   "expected": "Turn onto County Road K"
+  },
+  {
+   "input": "Turn onto Co Rd K",
+   "language": "en",
+   "expected": "Turn onto County Road K"
+  },
+  {
+   "input": "Turn onto CR-K",
+   "language": "en",
+   "expected": "Turn onto County Road K"
+  },
+  {
+   "input": "Turn onto CR K",
+   "language": "en",
+   "expected": "Turn onto County Road K"
+  },
+  {
+   "input": "Take Hwy KK",
+   "language": "en",
+   "expected": "Take Highway K K"
+  },
+  {
+   "input": "Take County Rd KK west",
+   "language": "en",
+   "expected": "Take County Road K K west"
+  },
+  {
+   "input": "Take County Hwy PD.",
+   "language": "en",
+   "expected": "Take County Highway P D."
+  },
+  {
+   "input": "Turn onto Twp Rd 12",
+   "language": "en",
+   "expected": "Turn onto Township Road twelve"
+  },
+  {
+   "input": "Turn onto Twp. Rd. 5",
+   "language": "en",
+   "expected": "Turn onto Township Road five"
+  },
+  {
+   "input": "Turn onto Co Rd 45",
+   "language": "en",
+   "expected": "Turn onto County Road forty five"
+  },
+  {
+   "input": "Turn onto Co. Rd. 45",
+   "language": "en",
+   "expected": "Turn onto County Road forty five"
+  },
+  {
+   "input": "Turn onto County Road N",
+   "language": "en",
+   "expected": "Turn onto County Road N"
+  },
+  {
+   "input": "Turn onto County Rd N, then left",
+   "language": "en",
+   "expected": "Turn onto County Road N, then left"
+  },
+  {
+   "input": "Take County Road E toward Ely",
+   "language": "en",
+   "expected": "Take County Road E toward Ely"
+  },
+  {
+   "input": "Arrive at N1234 County Rd K",
+   "language": "en",
+   "expected": "Arrive at N twelve thirty four County Road K"
+  },
+  {
+   "input": "Arrive at W5678 State Hwy 29",
+   "language": "en",
+   "expected": "Arrive at W fifty six seventy eight State Highway twenty nine"
+  },
+  {
+   "input": "Arrive at W12345 Main Street",
+   "language": "en",
+   "expected": "Arrive at W one twenty three forty five Main Street"
+  },
+  {
+   "input": "Arrive at S102 Oak St",
+   "language": "en",
+   "expected": "Arrive at S one oh two Oak Street"
+  },
+  {
+   "input": "Smith & Sons Co.",
+   "language": "en",
+   "expected": "Smith and Sons Company."
+  },
+  {
+   "input": "Take I-35 W",
+   "language": "en",
+   "expected": "Take I thirty five West"
+  },
+  {
+   "input": "Take Exit 12B",
+   "language": "en",
+   "expected": "Take Exit twelve B"
+  },
+  {
+   "input": "Take Hwy N",
+   "language": "en",
+   "expected": "Take Highway North"
+  },
+  {
+   "input": "Park the CR-V",
+   "language": "en",
+   "expected": "Park the CR-V"
+  },
+  {
+   "input": "Exit E123 Terminal",
+   "language": "en",
+   "expected": "Exit E123 Terminal"
+  }
+ ]
+}

@@ -29,6 +29,7 @@ struct RoadDrive
   bool night = false;
   int hour = 13;
   double r = 0.9;
+  bool jam = false;
   std::vector<RoadRemark> heard;
 
   std::vector<RoadRemark> Run(int seconds, double mps)
@@ -47,6 +48,7 @@ struct RoadDrive
       k.tripMs = tripMs;
       k.night = night;
       k.localHour = hour;
+      k.jam = jam;
       auto const said_ = road.Tick(k, said, r);
       for (auto const & s : said_)
       {
@@ -177,6 +179,21 @@ TEST(NoGasForFiftyMiles)
   d.Run(60, 25);
   CHECK(HasKey(d.heard, "gas.none"));
   CHECK_EQUAL(Find(d.heard, "gas.none").vars.at("distance"), std::string("50 miles"));
+}
+
+// Pulling out of a jam the navigator hasn't called over yet: "No gas for 50 miles" waits for
+// "Traffic's clearing up" instead of landing seconds before it (loop B64).
+TEST(NoGasWaitsForTheJamToClear)
+{
+  RoadDrive d;
+  d.tripMs = 5 * 60000;
+  d.road.SetRouteAheadLookup(Ahead(d, {{Stopover::Coffee, 30000}}));
+  d.jam = true;
+  d.Run(60, 25);
+  CHECK(d.heard.empty());
+  d.jam = false;
+  d.Run(5, 25);
+  CHECK(HasKey(d.heard, "gas.none"));
 }
 
 TEST(GasAheadMeansNoGasLine)
@@ -456,7 +473,7 @@ TEST(EveryRoadKeyHasLinesInEveryTier)
         "rest.survey", "rest.surveyAfter", "gas.none", "coffee.far", "viewpoint.ahead", "viewpoint.passed",
         "driveThru.in", "driveThru.long", "driveThru.leaving", "signal.lost", "signal.back", "road.smallTown",
         "road.nature", "road.farm", "road.gravel", "night.sunset", "night.dark", "night.late", "weather.wet",
-        "weather.fog", "weather.snow", "weather.clear", "weather.wind", "traffic.cleared", "trap.bathroom.ask",
+        "weather.fog", "weather.snow", "weather.ice", "weather.clear", "weather.wind", "traffic.cleared", "trap.bathroom.ask",
         "trap.bathroom.caught", "trap.rate.ask", "trap.rate.after"})
     for (int tier = 0; tier < 3; ++tier)
       CHECK(!LinesFor(key, tier).empty());
@@ -541,6 +558,10 @@ TEST(QuietStretchAsideIsBrandonsFirstLine)
   double dist = 60000;
   auto const lines = RoadNav(nav, t, 600, 25, dist);
   CHECK(SaidText(lines, LinesFor("quiet.aside", 0).front()));
+  // Muttered to itself: tagged for the whisper delivery (loop B90).
+  for (auto const & l : lines)
+    if (l.text == LinesFor("quiet.aside", 0).front())
+      CHECK(l.delivery == Delivery::Aside);
 }
 
 TEST(QuietStretchTrapAsksAndFilesTheAnswer)
@@ -612,4 +633,91 @@ TEST(RoadWeatherReadsMetNorwaySymbols)
   CHECK(!cloudy.rain && !cloudy.snow && !cloudy.fog && !cloudy.clear && !cloudy.windy);
   CHECK(WeatherFromNws("cloudy", 4, 16, 10).windy);  // gusts in m/s, as MET reports them
   CHECK(WeatherFromNws("cloudy", 4, -1, -20).tempC == -20);
+}
+
+TEST(RoadWeatherTellsIceFromSnow)
+{
+  // Loop B91: freezing rain, freezing drizzle, sleet and ice pellets are ice (and still snow for anything that
+  // asks); plain snow is not ice, and freezing fog is fog, not snow.
+  for (char const * d : {"Freezing Rain", "Light Freezing Drizzle", "Ice Pellets", "Snow and Sleet",
+                         "heavysleetshowersandthunder_day", "lightsleet"})
+  {
+    Weather const w = WeatherFromNws(d, -1, -1);
+    CHECK(w.ice && w.snow && !w.rain);
+  }
+  Weather const snow = WeatherFromNws("Light Snow", -1, -1);
+  CHECK(snow.snow && !snow.ice);
+  Weather const fog = WeatherFromNws("Freezing Fog", -1, -1);
+  CHECK(fog.fog && !fog.snow && !fog.ice);
+
+  RoadDrive d;
+  d.tripMs = 5 * 60000;
+  d.road.OnWeather(d.t, WeatherFromNws("Freezing Rain", -1, -1));
+  d.Run(20 * 60, 20);
+  CHECK(HasKey(d.heard, "weather.ice"));
+  CHECK(!HasKey(d.heard, "weather.snow"));
+  CHECK(!HasKey(d.heard, "weather.wet"));
+}
+
+TEST(BathroomTrapHearsNotAndLeftoverTalk)
+{
+  struct Case
+  {
+    char const * words;
+    char const * filed;  // "" = nothing filed
+  };
+  for (Case const & c : std::vector<Case>{
+           {" definitely not gas stations ", "rest"},
+           {" not rest stops ", "gas"},
+           {" i don t like gas stations ", "rest"},
+           {" rest stops not gas stations ", "rest"},
+           {" not gas stations rest stops ", "rest"},
+           {" gas stations never rest stops ", "gas"},
+           {" anything but rest stops ", "gas"},
+           {" no rest stops ", "rest"},  // "No, rest stops." reads the same once the comma is gone.
+           {" gas station ", "gas"},
+           {" neither not rest stops and not gas stations ", ""},
+           {" both of them are gross rest stops and gas stations ", ""},
+       })
+  {
+    RoadDrive d;
+    d.road.StartTrap(d.t, d.said);
+    auto const reply = d.road.OnAnswer(d.t + 2000, c.words, d.said);
+    CHECK_EQUAL(d.said.Recalled("note.bathroom"), std::string(c.filed));
+    CHECK_EQUAL(reply.has_value(), *c.filed != '\0');
+    CHECK(!d.road.AwaitingAnswer(d.t + 2000));
+  }
+
+  // Talk about something else first and the question is still open.
+  RoadDrive d;
+  d.road.StartTrap(d.t, d.said);
+  CHECK(!d.road.OnAnswer(d.t + 1000, " there s a cop behind us ", d.said));
+  CHECK(d.road.AwaitingAnswer(d.t + 1000));
+  auto const reply = d.road.OnAnswer(d.t + 4000, " gas stations obviously ", d.said);
+  CHECK(reply.has_value());
+  CHECK_EQUAL(d.said.Recalled("note.bathroom"), std::string("gas"));
+}
+
+TEST(RateTrapOnlyTakesSomethingLikeARating)
+{
+  for (char const * words : {" there s a cop behind us ", " it s on autopilot right now ",
+                             " can you find me a gas station nearby "})
+  {
+    RoadDrive d;
+    d.said.Remember("note.bathroom", "gas");
+    d.road.StartTrap(d.t, d.said);
+    CHECK(!d.road.OnAnswer(d.t + 1000, words, d.said));
+    CHECK(d.road.AwaitingAnswer(d.t + 1000));
+  }
+  for (char const * words : {" three ", " a 4 ", " like a two out of five ", " zero stars ", " terrible ",
+                             " meh ", " no comment ", " honestly it was pretty good "})
+  {
+    RoadDrive d;
+    d.said.Remember("note.bathroom", "gas");
+    d.road.StartTrap(d.t, d.said);
+    auto const reply = d.road.OnAnswer(d.t + 1000, words, d.said);
+    CHECK(reply.has_value());
+    CHECK_EQUAL(reply->key, std::string("trap.rate.after"));
+    CHECK(!d.road.AwaitingAnswer(d.t + 1000));
+  }
 }

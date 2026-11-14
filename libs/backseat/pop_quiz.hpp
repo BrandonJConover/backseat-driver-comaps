@@ -7,6 +7,7 @@
 // gets mocked. All offline: the questions are hardcoded here.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <optional>
 #include <string>
@@ -14,6 +15,21 @@
 
 namespace backseat
 {
+/// Where a question is true. Road rules differ: a UK driver passes on the right, has no right on
+/// red and no yellow center lines, and a metric driver signals in metres, not feet.
+enum class QuizPlace
+{
+  Anywhere,
+  /// US and Canada road rules and signs (four way stops, right on red, yellow center lines).
+  NorthAmerica,
+  /// Right-hand traffic ("pull to the right", "the left lane is for passing").
+  RightHandTraffic,
+  /// Read in feet and miles.
+  Imperial,
+  /// Read in metres.
+  Metric
+};
+
 struct QuizQuestion
 {
   /// Stable id, for "not again so soon" across trips.
@@ -26,7 +42,12 @@ struct QuizQuestion
   std::array<char const *, 3> choices;
   /// Index of the right choice.
   int answer;
+  QuizPlace place = QuizPlace::Anywhere;
 };
+
+/// True when the question is right for a drive in `country` (a map name like "UK_England", "US"
+/// or "Canada"; empty means the US) with the GPS in metric units or not.
+bool QuizFits(QuizQuestion const & q, std::string const & country, bool metric);
 
 /// Every question. The first is the first one ever asked.
 std::vector<QuizQuestion> const & QuizQuestions();
@@ -47,10 +68,15 @@ struct QuizHeard
   };
   Kind kind = Kind::Unclear;
   int choice = -1;
+  /// Named outright: by its letter or number ("B", "option two") or word for word ("the octagon").
+  bool named = false;
 };
 /// The choice named by its words ("octagon"), its letter ("B", "bee", "option c") or its place
 /// ("the second one"). Words win: "three" answers "3 seconds" before it means "C".
 QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken);
+
+/// "Can you repeat the question?", "what were the choices?", "say that again".
+bool AsksToRepeatQuiz(std::string const & spoken);
 
 /// The driver asked for one: "give me a pop quiz", "quiz me".
 bool AsksForPopQuiz(std::string const & spoken);
@@ -90,6 +116,8 @@ public:
   std::optional<Outcome> GiveUp(double t);
   /// Out of time. Empty until then.
   std::optional<Outcome> Tick(double t);
+  /// The question is read again: the time to answer starts over from `answerBy`, never shorter.
+  void ExtendAnswerBy(double answerBy) { m_answerBy = std::max(m_answerBy, answerBy); }
 
   /// After an answer the card shows the result this long.
   static double constexpr kResultShownMs = 8000;

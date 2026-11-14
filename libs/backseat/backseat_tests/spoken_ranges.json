@@ -1,0 +1,293 @@
+{
+ "about": "Shared expectations for number ranges. EpubToM4B: text/spoken_text.ranges via normalize_for_kokoro (tests/fixtures/spoken_ranges.json). Backseat Driver: backseat::pronunciation::Ranges (libs/backseat/backseat_tests/spoken_ranges.json). Keep both copies in sync; cases marked from=backseat were added by Backseat Driver.",
+ "cases": [
+  {
+   "input": "The war lasted from 1914–1918.",
+   "language": "en",
+   "expected": "The war lasted from 1914 to 1918."
+  },
+  {
+   "input": "Open to children aged 7–11.",
+   "language": "en",
+   "expected": "Open to children aged 7 to 11."
+  },
+  {
+   "input": "See pages 3-5 for details.",
+   "language": "en",
+   "expected": "See pages 3 to 5 for details."
+  },
+  {
+   "input": "See pp. 3-5.",
+   "language": "en",
+   "expected": "See pages 3 to 5."
+  },
+  {
+   "input": "The 1905-06 season was wet.",
+   "language": "en",
+   "expected": "The 1905 to 1906 season was wet."
+  },
+  {
+   "input": "She reigned 1837–1901.",
+   "language": "en",
+   "expected": "She reigned 1837 to 1901."
+  },
+  {
+   "input": "In 1914–18 the men were away.",
+   "language": "en",
+   "expected": "In 1914 to 1918 the men were away."
+  },
+  {
+   "input": "It was 1914—1918 all over again.",
+   "language": "en",
+   "expected": "It was 1914 to 1918 all over again."
+  },
+  {
+   "input": "between 3–5 hours",
+   "language": "en",
+   "expected": "between 3 and 5 hours"
+  },
+  {
+   "input": "between 3-5 hours",
+   "language": "en",
+   "expected": "between 3 and 5 hours"
+  },
+  {
+   "input": "Numbers rose from 10-20 overnight.",
+   "language": "en",
+   "expected": "Numbers rose from 10 to 20 overnight."
+  },
+  {
+   "input": "Read Chapter 3-5 tonight.",
+   "language": "en",
+   "expected": "Read Chapter 3 to 5 tonight."
+  },
+  {
+   "input": "verses 16-18",
+   "language": "en",
+   "expected": "verses 16 to 18"
+  },
+  {
+   "input": "ages 2-4",
+   "language": "en",
+   "expected": "ages 2 to 4"
+  },
+  {
+   "input": "nearly 10–15% of them",
+   "language": "en",
+   "expected": "nearly 10 to 15% of them"
+  },
+  {
+   "input": "some 1,000–2,000 men",
+   "language": "en",
+   "expected": "some 1,000 to 2,000 men"
+  },
+  {
+   "input": "about 2.5–3.5 kg",
+   "language": "en",
+   "expected": "about 2.5 to 3.5 kg"
+  },
+  {
+   "input": "years 1914-1918",
+   "language": "en",
+   "expected": "years 1914 to 1918"
+  },
+  {
+   "input": "It was 1999-2001 when he left.",
+   "language": "en",
+   "expected": "It was 1999 to 2001 when he left."
+  },
+  {
+   "input": "They won 3–2 in extra time.",
+   "language": "en",
+   "expected": "They won 3–2 in extra time."
+  },
+  {
+   "input": "Arsenal lost 2–3 at home.",
+   "language": "en",
+   "expected": "Arsenal lost 2–3 at home."
+  },
+  {
+   "input": "Call 555-1234 tonight.",
+   "language": "en",
+   "expected": "Call 555-1234 tonight."
+  },
+  {
+   "input": "On 2024-01-15 we met.",
+   "language": "en",
+   "expected": "On 2024-01-15 we met."
+  },
+  {
+   "input": "ISBN 978-0-14-143951-8",
+   "language": "en",
+   "expected": "ISBN 978-0-14-143951-8"
+  },
+  {
+   "input": "a 3-year-old boy",
+   "language": "en",
+   "expected": "a 3-year-old boy"
+  },
+  {
+   "input": "a 2024-01 report",
+   "language": "en",
+   "expected": "a 2024-01 report"
+  },
+  {
+   "input": "pages 5-3",
+   "language": "en",
+   "expected": "pages 5-3"
+  },
+  {
+   "input": "He was 5–4 in the polls? No, the vote was 5–4.",
+   "language": "en",
+   "expected": "He was 5–4 in the polls? No, the vote was 5–4."
+  },
+  {
+   "input": "in 1914 — 1918 was worse",
+   "language": "en",
+   "expected": "in 1914 — 1918 was worse"
+  },
+  {
+   "input": "the 1960s–70s",
+   "language": "en",
+   "expected": "the 1960s–70s"
+  },
+  {
+   "input": "It cost -5 to -3 points.",
+   "language": "en",
+   "expected": "It cost -5 to -3 points."
+  },
+  {
+   "input": "Route 66-A",
+   "language": "en",
+   "expected": "Route 66-A"
+  },
+  {
+   "input": "the 9-5 grind",
+   "language": "en",
+   "expected": "the 9-5 grind"
+  },
+  {
+   "input": "between 1-0 and 2-0",
+   "language": "en",
+   "expected": "between 1-0 and 2-0"
+  },
+  {
+   "input": "a 3-1/2 inch nail",
+   "language": "en",
+   "expected": "a 3 and a half inch nail"
+  },
+  {
+   "input": "Il a vécu 1914–1918.",
+   "language": "fr",
+   "expected": "Il a vécu 1914–1918."
+  },
+  {
+   "input": "In 3-5 miles, take the exit.",
+   "language": "en",
+   "expected": "In 3 to 5 miles, take the exit.",
+   "from": "backseat"
+  },
+  {
+   "input": "Traffic for 10–15 minutes.",
+   "language": "en",
+   "expected": "Traffic for 10 to 15 minutes.",
+   "from": "backseat"
+  },
+  {
+   "input": "Exits 12-14 are closed.",
+   "language": "en",
+   "expected": "Exits 12 to 14 are closed.",
+   "from": "backseat"
+  },
+  {
+   "input": "Stay on I-35 for 3–5 mi.",
+   "language": "en",
+   "expected": "Stay on I-35 for 3 to 5 mi.",
+   "from": "backseat"
+  },
+  {
+   "input": "Merge onto US-36 now.",
+   "language": "en",
+   "expected": "Merge onto US-36 now.",
+   "from": "backseat"
+  },
+  {
+   "input": "Call 800-555-1234 for help.",
+   "language": "en",
+   "expected": "Call 800-555-1234 for help.",
+   "from": "backseat"
+  },
+  {
+   "input": "It's 3-5 o'clock somewhere.",
+   "language": "en",
+   "expected": "It's 3-5 o'clock somewhere.",
+   "from": "backseat"
+  },
+  {
+   "input": "Lanes 2-3 merge ahead.",
+   "language": "en",
+   "expected": "Lanes 2 to 3 merge ahead.",
+   "from": "backseat"
+  },
+  {
+   "input": "Done 9:00–10:30.",
+   "language": "en",
+   "expected": "Done 9:00–10:30.",
+   "from": "backseat"
+  },
+  {
+   "input": "Open Monday to Friday 9-5.",
+   "language": "en",
+   "expected": "Open Monday to Friday 9 to 5.",
+   "from": "backseat"
+  },
+  {
+   "input": "Monday to Friday, 9-5",
+   "language": "en",
+   "expected": "Monday to Friday, 9 to 5",
+   "from": "backseat"
+  },
+  {
+   "input": "Open 9-5",
+   "language": "en",
+   "expected": "Open 9 to 5",
+   "from": "backseat"
+  },
+  {
+   "input": "Sat 10-4",
+   "language": "en",
+   "expected": "Sat 10 to 4",
+   "from": "backseat"
+  },
+  {
+   "input": "Hours 7-11 daily",
+   "language": "en",
+   "expected": "Hours 7 to 11 daily",
+   "from": "backseat"
+  },
+  {
+   "input": "Open 9-17",
+   "language": "en",
+   "expected": "Open 9-17",
+   "from": "backseat"
+  },
+  {
+   "input": "Open 0-5",
+   "language": "en",
+   "expected": "Open 0-5",
+   "from": "backseat"
+  },
+  {
+   "input": "Friday 5-5",
+   "language": "en",
+   "expected": "Friday 5-5",
+   "from": "backseat"
+  },
+  {
+   "input": "the 7-11 on Main",
+   "language": "en",
+   "expected": "the 7-11 on Main",
+   "from": "backseat"
+  }
+ ]
+}

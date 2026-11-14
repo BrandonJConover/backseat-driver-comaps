@@ -13,6 +13,7 @@
 #include <cctype>
 #include <cmath>
 #include <ctime>
+#include <limits>
 #include <random>
 
 namespace backseat
@@ -26,27 +27,68 @@ double constexpr kLaneSayMinM = 150;
 /// The trip-time prediction comes this long after the trip starts.
 double constexpr kPredictionDelayMs = 25000;
 double constexpr kLaneAfterDirectionMs = 6000;
+/// How long a GPS speed dropout (tunnel) keeps the last known speed before it reads as stopped.
+double constexpr kUnknownSpeedCarryMs = 10000;
+/// "I'm back. I lost the satellites" (loop B116): the GPS lost speed (or sent nothing) at least this long, at
+/// least this fast, before it came back. Longer than kSignalLostMaxMs is a suspended app or a parked phone.
+double constexpr kSignalLostMinMs = 8000;
+double constexpr kSignalLostMaxMs = 10 * 60000;
+double constexpr kSignalLostMinMps = 8;
+double constexpr kSignalBackEveryMs = 10 * 60000;
+/// Never this close to the next maneuver, in meters or seconds of driving.
+double constexpr kSignalBackTurnM = 400;
+double constexpr kSignalBackTurnS = 30;
+/// A fix at most this much older than the newest one is a replay and is dropped; more is a clock reset.
+double constexpr kStaleFixWindowMs = 60000;
 double constexpr kLaneSayMaxM = 1500;
 /// Two maneuvers this close together are said as one: "turn left onto X, then right onto Y".
 double constexpr kChainWithinM = 150;
+// At speed, 150 m is five seconds on a highway: the next maneuver comes before its own call could. Chain
+// anything within this many seconds of driving, up to kChainMaxM (loop B86).
+double constexpr kChainWithinS = 10;
+double constexpr kChainMaxM = 500;
 /// After a turn, the next direction waits this long, so the driver is through the turn first...
 double constexpr kInstructionAfterTurnMs = 3000;
-/// ...unless the next maneuver is this close.
+/// ...unless the next maneuver is this close, or this many seconds away at highway speed (an exit
+/// 350 m after a merge at 33 m/s used to wait for 250 m, 7.5 s out; loop B81).
 double constexpr kInstructionNowWithinM = 250;
+double constexpr kInstructionNowWithinS = 15;
 /// Slower than this counts as stopped.
 double constexpr kStoppedMps = 0.5;
 /// Faster than this means driving again, not walking around with the phone.
 double constexpr kResumedMps = 4;
 /// Stopped this long away from the destination is a stop the driver chose (gas, food...).
 double constexpr kUnplannedStopAfterMs = 180000;
+/// A stop at least this long (not a red light) restarts the quiet stretch the quiet bits wait for.
+double constexpr kQuietAfterStopMinMs = 60000;
 /// Stops this close to the destination are just arriving.
 double constexpr kNearDestinationM = 250;
+/// The arrival call says which side the place is on when it's at most this far (loop B119); farther
+/// out the road can still bend, and the countdown never gets to it otherwise. The side has to be this
+/// far off the road's line to count, and the place no farther than kSideMaxM to be judged at all.
+double constexpr kSideWithinM = 400;
+double constexpr kSideMinOffsetM = 10;
+double constexpr kSideMaxM = 500;
+/// Closer than this the car is arriving; a late "it's on your right" is just noise.
+double constexpr kSideLastCallM = 20;
 /// If the GPS position never strays this far from where the car stopped, the phone stayed
 /// in the car. Carried around a gas station, a phone's fix wanders well past it.
 double constexpr kPhoneWanderedM = 30;
 /// Stopped this long at the roadside, with nothing around to explain it, is pulling over.
 /// Long enough to sit out most stop-and-go; red lights are ruled out by the light lookup.
 double constexpr kPullOverAfterMs = 45000;
+/// Stopped this long by a railway crossing: that's a train, worth one line (BI-111).
+double constexpr kTrainWaitMs = 20000;
+/// A ferry gets one line when it's this far ahead (BI-112): close enough to matter, far enough
+/// to stay clear of the boarding call.
+double constexpr kFerryAheadMinM = 300;
+double constexpr kFerryAheadMaxM = 1500;
+/// A toll stretch gets its line as it begins: within this far of its start, or on it (BI-113).
+double constexpr kTollStartM = 200;
+/// ...and only this soon after coming in range; later, it's no longer the start.
+double constexpr kTollWindowMs = 90000;
+/// Two toll stretches with less free road than this between them are one toll road.
+double constexpr kTollFreeGapM = 2000;
 /// A pull-over this soon after serious speeding is probably the police.
 double constexpr kPoliceAfterSpeedingMs = 120000;
 /// "Serious" speeding: this far over the limit (~10 mph).
@@ -75,6 +117,9 @@ int constexpr kWaterBridgeYelpsPerTrip = 2;
 double constexpr kRerouteRoastAfterMs = 5000;
 /// The driver asked for a new route, so of course it changed.
 double constexpr kNoRerouteRoastAfterCommandMs = 30000;
+// Leaving the route right at a turn is only a miss once it lasts: a one-second GPS blip that comes back to the
+// same maneuver gets no "you missed it" and doesn't count as a reroute.
+double constexpr kMissConfirmMs = 3000;
 /// Off every mapped road: this far from the nearest one...
 double constexpr kOffRoadM = 60;
 /// ...and back on one within this...
@@ -84,6 +129,13 @@ double constexpr kOffRoadForMs = 12000;
 double constexpr kOffRoadMinMps = 6;
 /// ...and said at most this often.
 double constexpr kOffRoadEveryMs = 300000;
+/// A fix this rough (horizontal accuracy, m) can't tell which road the car is on or which way it's
+/// pointing: downtown canyons and tunnel mouths read 100 m off and facing anywhere. Such fixes don't
+/// start or advance the off-road, dirt, wrong-way, U-turn or scary-curve judgements. Unknown (-1)
+/// counts as good, since some sources never report it. (Mileage drops fixes past 65 m for distance;
+/// judging the driver wants a tighter fix than adding up miles does.)
+double constexpr kJudgeMaxAccuracyM = 50;
+bool RoughFix(Fix const & fix) { return fix.accuracyM > kJudgeMaxAccuracyM; }
 /// A walking route this much on dirt (by distance) is a hike from the start.
 double constexpr kHikeDirtShare = 0.4;
 /// On trails this long, a walk becomes a hike. It stays one for the rest of the trip.
@@ -130,6 +182,9 @@ double constexpr kCleanBitChance = 0.6;
 double constexpr kCleanQuietMs = 20000;
 /// Correct turns in a row, across trips (RunningBits).
 char const * const kTurnStreakKey = "_turns.streak";
+/// A turn that went by this long after the last fix (GPS out in a tunnel or a garage) wasn't seen:
+/// it neither extends nor breaks the streak.
+double constexpr kUnseenTurnGapMs = 30000;
 /// A speeding story beat waits for the next nag when the phone has more than this left to say.
 double constexpr kStoryBusyMs = 3000;
 /// Town straight nags (Brandon's "Please continue straight." chain) only on one leg a trip, and
@@ -156,6 +211,9 @@ double constexpr kColdC = 4.5;
 double constexpr kColdFromMs = 25000;
 double constexpr kColdUntilMs = 300000;
 double constexpr kColdVentAfterMs = 180000;
+// cold.vent asks to be held up to a vent: it waits for a stop (red light, parked) and gives up this long
+// after cold.start if the car never stops (loop B74).
+double constexpr kColdVentUntilMs = 1200000;
 double constexpr kColdChance = 0.5;
 /// Hot: at or above this (about 86 °F). Groceries bought within the window cook after a while.
 double constexpr kHotC = 30;
@@ -184,6 +242,9 @@ char const * const kLastModeKey = "_mode.last";
 double constexpr kAskWalkOverM = 3200;
 /// Walking pace, for the route's length when the host doesn't give it.
 double constexpr kAskWalkPaceMps = 1.4;
+// Answering "no, not walking" at more than this (~10 mph, past a run) means the car is already
+// moving: the reply waits for a stop before the driver picks Driving.
+double constexpr kAskWalkMovingMps = 4.5;
 
 /// SaidLog values: the trip under way (destination, last seen in s since the epoch), so a relaunch in
 /// the middle of it (a crash, or iOS closing the app in the background) picks it back up instead
@@ -201,9 +262,17 @@ double constexpr kNavLinePauseMs = 350;
 double constexpr kFirstTurnFirstWithinM = 350;
 /// "Still speeding" nags back off to one every 5 minutes on a long stretch over the limit.
 double constexpr kSpeedingRenagMaxMs = 300000;
+// A one-second speed change past this is a GPS glitch, not driving (about 1.2 g; see EngineConfig).
+double constexpr kImplausibleMps2 = 12;
+/// A hard-brake roast waits until the car has been steady this long (EngineConfig::jerkSettleMs).
+double constexpr kJerkSettleMs = 3000;
 int constexpr kSpeedingTolerance = 2;
 int constexpr kSpeedingToleranceFast = 3;
 double constexpr kSpeedingBarelyEveryMs = 5 * 60000;
+/// Over the limit this long (two fixes or more) before it's speeding: a one-fix snap to a slower
+/// frontage road isn't. And braking into a lower zone is judged against the old limit for a while.
+double constexpr kSpeedingSustainMs = 3000;
+double constexpr kSpeedingDropGraceMs = 10000;
 /// A remark held back for a turn is dropped after this long...
 double constexpr kTurnHeldMaxMs = 45000;
 /// "56 in a 45" is too good to lose to a turn, and still true half a minute later.
@@ -225,6 +294,8 @@ int constexpr kWrongWayMaxPerTrip = 3;
 double constexpr kUTurnDeg = 160;
 double constexpr kUTurnMinAgoMs = 4000;
 double constexpr kUTurnMaxAgoMs = 30000;
+// A reversal whose new heading is this close to the route's bearing follows the route.
+double constexpr kUTurnOnRouteDeg = 45;
 // ...counting headings only while actually moving.
 double constexpr kUTurnMinMps = 1.5;
 double constexpr kUTurnEveryMs = 120000;
@@ -260,6 +331,11 @@ double constexpr kCallMinToTurnM = 1000;
 /// Once each bit has had its first time, a quiet stretch gets one this often; the call, I spy
 /// and the fact are picked by these weights.
 double constexpr kQuietBitChance = 0.5;
+/// A familiar commute (a learned routine driven at least this many times before) thins the optional
+/// banter: idle remarks and quiet-stretch bits come at this share of their usual rate, until anything
+/// new happens on the trip (BI-055: the same jokes on trip 50 as on trip 1 wear thin).
+int constexpr kFamiliarAfterTrips = 10;
+double constexpr kFamiliarTalkShare = 0.6;
 /// call 30%, I spy 15%, 20 Questions 20%, fact 15%, then an aside or a trap (20 Questions
 /// falls to the fact when it can't be offered).
 double constexpr kCallWeight = 0.3;
@@ -292,6 +368,11 @@ double constexpr kSunsetElevationDeg = -0.833;
 double constexpr kQuietMinMovingMps = 5;
 
 double SecondsToTurn(double distM, double speedMps) { return distM / std::max(speedMps, kQuietMinSpeedMps); }
+
+/// Game talk (plate game, 20 Questions) holds this many seconds before a maneuver at the current speed, never
+/// less than the game's own floor (500 ft): at highway speed 500 ft is ~5 s, inside the "now" instruction.
+double constexpr kGameHoldS = 12;
+double GameHoldM(double floorM, double speedMps) { return std::max(floorM, kGameHoldS * std::max(speedMps, 0.0)); }
 
 // Pop quizzes (pop_quiz.hpp): a quiet stretch, not too early, a couple a trip, spaced out.
 double constexpr kQuizAfterStartMs = 5 * 60000;
@@ -484,6 +565,22 @@ double CurveAheadM(std::vector<LatLon> const & ahead, double maxM, double minDeg
   return -1;
 }
 
+std::string DestinationSide(LatLon const & here, double routeBearingDeg, LatLon const & mark)
+{
+  if (!std::isfinite(routeBearingDeg) || routeBearingDeg < 0)
+    return {};
+  double const dist = DistanceM(here, mark);
+  if (!std::isfinite(dist) || dist > kSideMaxM)
+    return {};
+  double const rad = M_PI / 180;
+  double const delta = (Bearing(here, mark) - routeBearingDeg) * rad;
+  double const along = dist * std::cos(delta);
+  double const across = dist * std::sin(delta);  // positive: clockwise of the road, so on the right
+  if (along <= 0 || std::abs(across) < kSideMinOffsetM)
+    return {};
+  return across > 0 ? "right" : "left";
+}
+
 std::string InstructionText(TurnKind turn, std::string const & street, std::string const & destination)
 {
   std::string text;
@@ -509,10 +606,55 @@ std::string InstructionText(TurnKind turn, std::string const & street, std::stri
   return text;
 }
 
-std::string InstructionText(RouteSnapshot const & route)
+double ChainWithinM(double speedMps)
 {
-  std::string text = InstructionText(route.turn, route.nextStreet, route.destination);
-  if (route.thenGapM < 0 || route.thenGapM > kChainWithinM)
+  double const mps = std::isfinite(speedMps) ? std::max(speedMps, 0.0) : 0.0;
+  return std::max(kChainWithinM, std::min(kChainMaxM, kChainWithinS * mps));
+}
+
+std::string RoundaboutExitWords(int exit)
+{
+  static char const * const kOrdinals[] = {"first", "second", "third", "fourth",
+                                           "fifth", "sixth", "seventh", "eighth"};
+  if (exit <= 0)
+    return {};
+  if (exit <= 8)
+    return std::string("the ") + kOrdinals[exit - 1] + " exit";
+  return "exit " + std::to_string(exit);
+}
+
+namespace
+{
+/// The roundabout call: which exit when known, never "the  exit" or "0th" when not.
+std::string RoundaboutText(RouteSnapshot const & route)
+{
+  std::string text;
+  switch (route.roundaboutLeg)
+  {
+  case RoundaboutLeg::Leave: text = "Exit the roundabout"; break;
+  case RoundaboutLeg::Stay: text = "Stay on the roundabout"; break;
+  case RoundaboutLeg::Enter:
+  {
+    std::string const exit = RoundaboutExitWords(route.roundaboutExit);
+    if (exit.empty())
+      text = "Take the roundabout";
+    else
+      text = "At the roundabout, take " + exit;
+    break;
+  }
+  }
+  if (route.roundaboutLeg != RoundaboutLeg::Stay && !route.nextStreet.empty())
+    text += " onto " + route.nextStreet;
+  return text;
+}
+}  // namespace
+
+std::string InstructionText(RouteSnapshot const & route, double speedMps)
+{
+  std::string text = route.turn == TurnKind::Roundabout
+                         ? RoundaboutText(route)
+                         : InstructionText(route.turn, route.nextStreet, route.destination);
+  if (route.thenGapM < 0 || route.thenGapM > ChainWithinM(speedMps))
     return text;
   switch (route.turn)
   {
@@ -530,6 +672,12 @@ std::string InstructionText(RouteSnapshot const & route)
   case TurnKind::Right: then = "right"; break;
   case TurnKind::SharpRight: then = "a sharp right"; break;
   case TurnKind::SlightRight: then = "bear right"; break;
+  case TurnKind::ExitLeft: then = "take the exit on the left"; break;
+  case TurnKind::ExitRight: then = "take the exit on the right"; break;
+  case TurnKind::Roundabout:
+    then = route.thenRoundaboutExit > 0 ? "at the roundabout take " + RoundaboutExitWords(route.thenRoundaboutExit)
+                                        : "take the roundabout";
+    break;
   case TurnKind::UTurn: return text + ", then make a U-turn";
   case TurnKind::Destination: return text + ", then you've arrived";
   default: return text;
@@ -554,7 +702,13 @@ Navigator::Navigator(EngineConfig config, std::vector<TripRecord> history, TripR
   m_plates = PlateGame(m_config.rng);
   m_twenty = TwentyQuestions(m_config.rng);
   m_road.SetUnits(m_config.units);
+  // The line pickers' filters are process-wide; a new navigator starts them from its own defaults
+  // (driving, housing unknown, right-hand traffic) so an earlier trip's walk, housing or country
+  // can't leak into this one.
   SetLineMetric(m_config.units == Units::Kmh);
+  SetLineTravelMode(m_travelMode);
+  SetLineHousing(m_housing);
+  SetLineDriveSide(DrivesOnLeft(m_country));
 }
 
 void Navigator::SetUnits(Units units)
@@ -568,29 +722,139 @@ void Navigator::SetUnits(Units units)
     m_engine->SetUnits(units);
 }
 
-void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
+/// Faster than any car (about 335 mph): a speed or posted limit above this is a garbage reading.
+double constexpr kMaxSaneSpeedMps = 150;
+
+RouteSnapshot CleanRoute(RouteSnapshot route, double lastDistToTurnM)
 {
+  // Farther than this is no route on Earth (its circumference); a day's ETA times 30 is no drive.
+  double constexpr kMaxRouteM = 4e7;
+  double constexpr kMaxRouteS = 30 * 86400.0;
+  auto const sane = [](double v, double maxV) { return std::isfinite(v) && v >= 0 && v <= maxV; };
+  auto const onGlobe = [](LatLon const & p)
+  { return std::isfinite(p.lat) && std::isfinite(p.lon) && std::abs(p.lat) <= 90 && std::abs(p.lon) <= 180; };
+  if (!sane(route.distToTurnM, kMaxRouteM))
+    route.distToTurnM = sane(lastDistToTurnM, kMaxRouteM) ? lastDistToTurnM : kMaxRouteM;
+  for (double * v : {&route.etaSeconds, &route.fastestSeconds})
+    if (!sane(*v, kMaxRouteS))
+      *v = 0;
+  if (!sane(route.routeLengthM, kMaxRouteM))
+    route.routeLengthM = 0;
+  for (double * v : {&route.thenGapM, &route.curveAheadM, &route.exitBeforeGapM})
+    if (!sane(*v, kMaxRouteM))
+      *v = -1;
+  if (!sane(route.routeBearingDeg, 359.999999))
+    route.routeBearingDeg = -1;
+  if (route.passedExitNextM && !sane(*route.passedExitNextM, kMaxRouteM))
+    route.passedExitNextM.reset();
+  if (route.ferryAheadM && !sane(*route.ferryAheadM, kMaxRouteM))
+    route.ferryAheadM.reset();
+  if (route.tollAheadM && !sane(*route.tollAheadM, kMaxRouteM))
+    route.tollAheadM.reset();
+  // A grade is a fraction (0.06 = 6%); past 100% it's not a road.
+  if (route.gradeAhead && !(std::isfinite(*route.gradeAhead) && std::abs(*route.gradeAhead) <= 1))
+    route.gradeAhead.reset();
+  if (!sane(route.dirtShare, 1))
+    route.dirtShare = 0;
+  for (int * exit : {&route.roundaboutExit, &route.thenRoundaboutExit})
+    if (*exit < 0 || *exit > 20)
+      *exit = 0;
+  if (route.exitsBeforeTurn < -1 || route.exitsBeforeTurn > 50)
+    route.exitsBeforeTurn = -1;
+  // Unset points are (0, 0) everywhere downstream.
+  for (LatLon * p : {&route.origin, &route.destinationPoint})
+    if (!onGlobe(*p))
+      *p = {};
+  if (route.destinationMark && !onGlobe(*route.destinationMark))
+    route.destinationMark.reset();
+  return route;
+}
+
+std::optional<Fix> CleanFix(Fix const & raw, double newestTMs)
+{
+  // No place or no time: nothing downstream can use it, and NaN poisons every timer and distance.
+  if (!std::isfinite(raw.tMs) || !std::isfinite(raw.lat) || !std::isfinite(raw.lon) || std::abs(raw.lat) > 90 ||
+      std::abs(raw.lon) > 180)
+    return std::nullopt;
+  // A fix older than one already handled (a stack replaying its queue). The same moment again is fine
+  // (the route state may have changed); a bigger step back is a clock reset the timers live with.
+  if (raw.tMs < newestTMs && newestTMs - raw.tMs <= kStaleFixWindowMs)
+    return std::nullopt;
+  Fix f = raw;
+  // Junk measurements are unknown ones, never zero or infinity: an infinite speed was a launch roast.
+  // A finite but absurd one (1e15 m/s, DBL_MAX) is junk too: rounded to whole mph it overflowed int
+  // in the speeding check (loop B120).
+  if (!std::isfinite(f.speedMps) || f.speedMps > kMaxSaneSpeedMps)
+    f.speedMps = -1;
+  // A bearing past 360 is out of contract, not a direction: wrapped, 725 read as a U-turn.
+  if (!std::isfinite(f.bearingDeg) || f.bearingDeg >= 360)
+    f.bearingDeg = -1;
+  if (std::isnan(f.accuracyM))
+    f.accuracyM = -1;
+  if (f.speedLimitMps && (!std::isfinite(*f.speedLimitMps) || *f.speedLimitMps <= 0 ||
+                          *f.speedLimitMps > kMaxSaneSpeedMps))
+    f.speedLimitMps.reset();
+  return f;
+}
+
+void Navigator::OnFix(Fix const & raw, RouteSnapshot const & rawRoute)
+{
+  auto const clean = CleanFix(raw, m_lastFixT);
+  if (!clean)
+    return;
+  RouteSnapshot const route = CleanRoute(rawRoute, m_lastDistToTurnM);
+  Fix const & fix = *clean;
+  m_lastFixT = std::max(m_lastFixT, fix.tMs);
   // Clocks can step backwards (GPS vs. system time); the engine ignores those samples.
   m_lastT = std::max(m_lastT, fix.tMs);
   m_hereFix = fix;
+  // How long the GPS had no speed (a tunnel, or no fixes at all) and how fast the car was going into it.
+  double const lostFromT = m_knownSpeedT;
+  double const lostAtMps = m_knownSpeedMps.value_or(0);
+  bool const speedBack = fix.speedMps >= 0 && m_knownSpeedMps.has_value();
+  // Recorded before Update so the turn-timing holds below already see this fix's speed (loop B82).
+  if (fix.speedMps >= 0)
+  {
+    m_knownSpeedMps = fix.speedMps;
+    m_knownSpeedT = fix.tMs;
+  }
   Update(m_lastT, route);
   if (!m_engine || m_arrived)
     return;
   TelemetrySample s;
   s.t = fix.tMs;
-  s.speedMps = fix.speedMps < 0 ? 0 : fix.speedMps;
+  // GPS speed drops out in tunnels and garages (negative = unknown). Read as 0 it was a hard brake going
+  // in and a hard launch coming out, and the miles stopped counting. Carry the last known speed for a
+  // short dropout; after that (or with none known yet) call it stopped. Either way it's not measured.
+  if (fix.speedMps >= 0)
+  {
+    s.speedMps = fix.speedMps;
+    // Again: a trip that started in this Update cleared it.
+    m_knownSpeedMps = fix.speedMps;
+    m_knownSpeedT = fix.tMs;
+  }
+  else
+  {
+    s.speedKnown = false;
+    s.speedMps = m_knownSpeedMps && fix.tMs - m_knownSpeedT <= kUnknownSpeedCarryMs ? *m_knownSpeedMps : 0;
+  }
   s.speedLimitMps = fix.speedLimitMps;
   s.lat = fix.lat;
   s.lon = fix.lon;
   if (fix.bearingDeg >= 0)
     s.headingDeg = fix.bearingDeg;
+  m_engine->SetBending(Bending());
   Say(m_engine->OnTelemetry(s));
   if (!m_plan.origin.lat && !m_plan.origin.lon)
     m_plan.origin = {fix.lat, fix.lon};
   if (fix.speedLimitMps)
   {
     m_lastLimitMps = fix.speedLimitMps;
-    if (fix.speedMps > *fix.speedLimitMps + kSeriousOverMps)
+    if (fix.speedMps <= *fix.speedLimitMps + kSeriousOverMps)
+      m_badSpeedingSince.reset();
+    else if (!m_badSpeedingSince)
+      m_badSpeedingSince = fix.tMs;
+    if (m_badSpeedingSince && fix.tMs - *m_badSpeedingSince >= kSpeedingSustainMs)
       m_lastBadSpeedingT = fix.tMs;
   }
   TrackTravelMode(fix, route);
@@ -601,7 +865,13 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
     TrackTraffic(fix, route);
     TrackOffRoad(fix);
     TrackLastExit(fix.tMs, route);
-    TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, route);
+    TrackExitSkip(fix, route);
+    if (m_talk != TalkLevel::DirectionsOnly)
+    {
+      TrackFerry(fix, route);
+      TrackToll(fix, route);
+    }
+    TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, fix.speedMps, route);
     TrackLongDrive(fix.tMs, route);
   }
   TrackFear(fix, route);
@@ -618,7 +888,9 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   if (car)
     TrackNightOut(fix, route);
   TrackClean(fix, route);
-  TrackIdle(fix, route);
+  bool const chatty = m_talk != TalkLevel::DirectionsOnly;
+  if (chatty)
+    TrackIdle(fix, route);
   TrackWrongWay(fix, route);
   TrackUTurn(fix, route);
   TrackSlowStart(fix);
@@ -629,9 +901,14 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   TrackMusic(fix.tMs, route);
   TrackLeftBuilding(fix);
   TrackTwentyQuestions(fix, route);
-  TrackPopQuiz(fix, route);
-  TrackQuietBits(fix, route);
-  TrackRoadBits(fix, route);
+  if (car && chatty && speedBack)
+    TrackSignalBack(fix, route, lostFromT, lostAtMps);
+  if (chatty)
+  {
+    TrackPopQuiz(fix, route);
+    TrackQuietBits(fix, route);
+    TrackRoadBits(fix, route);
+  }
   // Fed up for the first time this trip: from now on it's "wise, omnipotent overseer GPS".
   if (!m_titleDemanded && Tier() == 2)
   {
@@ -641,7 +918,7 @@ void Navigator::OnFix(Fix const & fix, RouteSnapshot const & route)
   m_lastFix = fix;
 }
 
-void Navigator::Poll(RouteSnapshot const & route) { Update(m_lastT, route); }
+void Navigator::Poll(RouteSnapshot const & route) { Update(m_lastT, CleanRoute(route, m_lastDistToTurnM)); }
 
 void Navigator::OnBattery(double tMs, double level, bool charging)
 {
@@ -668,6 +945,18 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
       m_stopWanderM = 0;
       m_stopAnnounced = false;
       m_pullOverSaid = false;
+      m_trainChecked = false;
+      m_stopOnFerry = false;
+      m_stopInTraffic = m_inTraffic;
+      // On a road fast enough to judge traffic on, a dead stop is called a jam within one traffic
+      // window, so the engine's longStop waits for that call (BI-056). Elsewhere it keeps its 45 s.
+      if (m_engine)
+      {
+        bool const judged = InCar(m_travelMode) && route.state == RouteState::OnRoute && fix.speedLimitMps &&
+                            *fix.speedLimitMps >= kTrafficMinLimitMps && !m_inTraffic;
+        m_engine->HoldLongStop(judged ? fix.tMs + kTrafficWindowMs : 0);
+      }
+      HoldStopForFerry(route);
       // Christmas season, after dark, at a red light: the GPS has had it with lights.
       if (!m_christmasSaid && m_lightLookup && KnowsTheDate(fix.tMs))
       {
@@ -683,27 +972,52 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
     }
     return;
   }
+  HoldStopForFerry(route);
   // A stop lasts until the car is moving again; walking pace with the phone is still the stop.
   if (fix.speedMps >= MovingMps())
   {
     double const stoppedMs = fix.tMs - *m_stopSince;
     bool const stayedInCar = m_stopWanderM < kPhoneWanderedM;
     m_stopSince.reset();
+    // Pulling away after a real stop isn't a quiet stretch yet: the quiet bits start counting again.
+    if (stoppedMs >= kQuietAfterStopMinMs)
+      m_resumedT = fix.tMs;
     // Rest areas and drive-thrus get their own lines when the car pulls out (road_bits.hpp).
     StopSpot const spot = m_road.CurrentStopSpot();
-    if (spot != StopSpot::RestArea && spot != StopSpot::DriveThru)
+    // Remarks about the stop still held for a turn ("Why are we stopping here?") are stale now:
+    // said as the car pulls away they'd land on top of this one (BI-046).
+    m_turnHeld.erase(std::remove_if(m_turnHeld.begin(), m_turnHeld.end(), [](TurnHeld const & h)
+    {
+      Category const c = h.line.category;
+      return c == Category::UnplannedStop || c == Category::LongStop || c == Category::PullOver;
+    }), m_turnHeld.end());
+    // Stuck in a jam the driver never left the car: the traffic lines already cover it (B52).
+    // Driving off a ferry isn't "finally moving again" either: the boat was the stop (BI-112).
+    if (spot != StopSpot::RestArea && spot != StopSpot::DriveThru && !m_stopInTraffic && !m_stopOnFerry)
       Say(m_engine->OnNav(NavEvent::Resumed(fix.tMs, stoppedMs, stayedInCar)));
     return;
   }
   m_stopWanderM = std::max(m_stopWanderM, DistanceM(m_stopAt, here));
+  // Traffic is judged after the stop on each fix, so this sees the last fix's call.
+  m_stopInTraffic = m_stopInTraffic || m_inTraffic;
   bool const hasDestination = route.destinationPoint.lat || route.destinationPoint.lon;
   bool const nearDestination = hasDestination && DistanceM(here, route.destinationPoint) < kNearDestinationM;
+  // Waiting for a train: one line, asked once per stop and only from a car still parked where it
+  // stopped. Nothing about beating the train or the gate (Gates: no tempting unsafe moves).
+  if (!m_trainChecked && m_crossingLookup && fix.tMs - *m_stopSince >= kTrainWaitMs)
+  {
+    m_trainChecked = true;
+    if (InCar(m_travelMode) && m_talk != TalkLevel::DirectionsOnly && m_stopWanderM < kPhoneWanderedM &&
+        m_crossingLookup(m_stopAt))
+      SayLine(fix.tMs, Category::LongStop, "wait.train");
+  }
   if (!m_pullOverSaid && !nearDestination && !m_inTraffic && route.state == RouteState::OnRoute &&
       fix.tMs - *m_stopSince >= kPullOverAfterMs)
   {
     m_pullOverSaid = true;
     // Anything that explains the stop rules out the roadside: a light, a lot, a gas station.
     bool const explained = m_road.CurrentStopSpot() != StopSpot::None || (m_lightLookup && m_lightLookup(m_stopAt)) ||
+                           (m_crossingLookup && m_crossingLookup(m_stopAt)) || m_stopOnFerry ||
                            (m_parkingLookup && m_parkingLookup(m_stopAt)) || (m_placeLookup && m_placeLookup(m_stopAt));
     if (!explained)
     {
@@ -716,7 +1030,8 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
         SayLine(fix.tMs, Category::PullOver, "pullOver");
     }
   }
-  if (!m_stopAnnounced && !nearDestination && fix.tMs - *m_stopSince >= kUnplannedStopAfterMs)
+  if (!m_stopAnnounced && !nearDestination && !m_stopInTraffic && !m_stopOnFerry &&
+      fix.tMs - *m_stopSince >= kUnplannedStopAfterMs)
   {
     m_stopAnnounced = true;
     // The drive-thru has its own lines.
@@ -727,13 +1042,84 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
       place = m_placeLookup(m_stopAt);
     if (place && place->grocery)
       m_groceryT = fix.tMs;
+    NotFamiliarAnymore("stop");
     Say(m_engine->OnNav(NavEvent::UnplannedStop(fix.tMs, place)));
   }
 }
 
+void Navigator::HoldStopForFerry(RouteSnapshot const & route)
+{
+  // Parked on a ferry is the boat's doing: no "why did we stop?" for the whole crossing.
+  if (!route.onFerry || m_stopOnFerry)
+    return;
+  m_stopOnFerry = true;
+  if (m_engine)
+    m_engine->HoldLongStop(std::numeric_limits<double>::infinity());
+}
+
+void Navigator::TrackFerry(Fix const & fix, RouteSnapshot const & route)
+{
+  // Off the boat: the next ferry gets its own lines.
+  if (m_wasOnFerry && !route.onFerry)
+    m_ferryAheadSaid = m_ferryAboardSaid = false;
+  m_wasOnFerry = route.onFerry;
+  if (route.state != RouteState::OnRoute || RemarkJustSaid(fix.tMs))
+    return;
+  if (route.onFerry)
+  {
+    // Aboard and parked: the one vessel this GPS will ever ride. Nothing while still rolling on.
+    if (!m_ferryAboardSaid && fix.speedMps >= 0 && fix.speedMps < kStoppedMps)
+    {
+      m_ferryAboardSaid = m_ferryAheadSaid = true;
+      SayLine(fix.tMs, Category::Idle, "ferry.aboard", DriverVars());
+    }
+    return;
+  }
+  // A turn call coming up owns the air; the ferry line waits while it's still in range.
+  if (m_ferryAheadSaid || !route.ferryAheadM || *route.ferryAheadM < kFerryAheadMinM ||
+      *route.ferryAheadM > kFerryAheadMaxM || (route.turnId && route.distToTurnM < kIdleQuietM))
+    return;
+  m_ferryAheadSaid = true;
+  Trace("nav.ferryAhead", {{"ahead_m", LogNum(*route.ferryAheadM, 0)}});
+  SayLine(fix.tMs, Category::Idle, "ferry.ahead", DriverVars());
+}
+
+void Navigator::TrackToll(Fix const & fix, RouteSnapshot const & route)
+{
+  // Free road ahead (or a long gap to the next toll): the next stretch is a new toll road.
+  if (!route.tollAheadM || *route.tollAheadM > kTollFreeGapM)
+  {
+    m_tollSaid = false;
+    m_tollWindowT.reset();
+    return;
+  }
+  if (m_tollSaid || route.state != RouteState::OnRoute || *route.tollAheadM > kTollStartM)
+    return;
+  if (!m_tollWindowT)
+    m_tollWindowT = fix.tMs;
+  if (fix.tMs - *m_tollWindowT > kTollWindowMs)
+  {
+    // Missed the start (turn calls had the air): mid-toll-road it's no longer news.
+    m_tollSaid = true;
+    return;
+  }
+  if (m_avoidTollsSaid)
+  {
+    // They asked to avoid tolls and the route took one anyway: not the driver's fault, no joke.
+    m_tollSaid = true;
+    Trace("nav.tollSkip", {{"why", "avoid_tolls_said"}});
+    return;
+  }
+  if (RemarkJustSaid(fix.tMs) || (route.turnId && route.distToTurnM < kIdleQuietM))
+    return;
+  m_tollSaid = true;
+  Trace("nav.tollStart", {{"ahead_m", LogNum(*route.tollAheadM, 0)}});
+  SayLine(fix.tMs, Category::Idle, "toll.start", DriverVars());
+}
+
 void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
 {
-  if (route.state != RouteState::OnRoute || !fix.speedLimitMps || *fix.speedLimitMps < kTrafficMinLimitMps)
+  if (route.state != RouteState::OnRoute || route.onFerry || !fix.speedLimitMps || *fix.speedLimitMps < kTrafficMinLimitMps)
   {
     m_speeds.clear();
     return;
@@ -755,6 +1141,7 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
   if (!m_inTraffic && share < kCrawlShare)
   {
     m_inTraffic = true;
+    NotFamiliarAnymore("traffic");
     m_stopGo.Reset();
     std::optional<std::string> alternate;
     if (m_alternateLookup)
@@ -808,8 +1195,10 @@ std::vector<Commentary> Navigator::TakeLines()
       m_onSaid(m_said);
   }
   // Punchlines whose awkward pause is over.
+  std::set<std::string> punchlines;
   while (!m_punchlines.empty() && m_punchlines.front().t <= m_lastT)
   {
+    punchlines.insert(m_punchlines.front().text);
     m_gate.Push(std::move(m_punchlines.front()), false);
     m_punchlines.erase(m_punchlines.begin());
   }
@@ -824,6 +1213,7 @@ std::vector<Commentary> Navigator::TakeLines()
              !(offRoad && (l.category == Category::HardBraking || l.category == Category::HardAccel));
     }), lines.end());
   }
+  FilterForTalkLevel(lines, punchlines);
   if (!lines.empty())
     m_lastSpokeT = m_lastT;
   // What the phone will be busy saying, so the next turn call and the roasts can plan around it.
@@ -840,11 +1230,75 @@ std::vector<Commentary> Navigator::TakeLines()
       m_lastCutInT = m_lastT;
   for (auto & line : lines)
   {
+    // Before SpeakableText: the shouted capitals are still there to see (the "!" survives either way).
+    line.delivery = line.priority == Priority::Nav ? Delivery::Normal : DeliveryFor(line.key, line.text);
     line.text = SpeakableText(line.text);
     if (line.priority == Priority::Nav)
       line.maxWaitMs = NavWaitMs(line);
   }
   return lines;
+}
+
+namespace
+{
+/// Said back to the driver, or a beat of a bit or game in progress: "talk less" doesn't cut these in half.
+bool PartOfAnExchange(Category c)
+{
+  switch (c)
+  {
+  case Category::PlateGame:
+  case Category::PhoneCall:
+  case Category::Quiet:
+  case Category::TwentyQuestions:
+  case Category::PopQuiz:
+  case Category::Bossy:
+  case Category::Thanked:
+  case Category::Title: return true;
+  default: return false;
+  }
+}
+}  // namespace
+
+void Navigator::SetTalkLevel(TalkLevel level)
+{
+  Trace("talk.level", {{"level", level == TalkLevel::Full ? "full" : level == TalkLevel::Less ? "less" : "directions"}});
+  m_talk = level;
+  m_lessSayNext = true;
+  // "Talk more" means it: the familiar-commute thinning is off for the rest of the trip.
+  if (level == TalkLevel::Full)
+    NotFamiliarAnymore("talk.full");
+  if (level != TalkLevel::DirectionsOnly)
+    return;
+  // Hush means now: the call hangs up and the quiz is off, rather than going on in silence.
+  if (m_call.Active())
+    m_call.End();
+  m_quiz.End();
+}
+
+void Navigator::FilterForTalkLevel(std::vector<Commentary> & lines, std::set<std::string> const & punchlines)
+{
+  if (m_talk == TalkLevel::Full)
+    return;
+  lines.erase(std::remove_if(lines.begin(), lines.end(), [&](Commentary const & l)
+  {
+    bool drop = false;
+    if (m_talk == TalkLevel::DirectionsOnly)
+      drop = l.priority != Priority::Nav || l.category == Category::Achievement;
+    else if (l.priority != Priority::Nav && !PartOfAnExchange(l.category) && punchlines.count(l.text) == 0)
+    {
+      drop = !m_lessSayNext;
+      m_lessSayNext = !m_lessSayNext;
+    }
+    if (drop)
+    {
+      Trace("say.dropped", {{"key", l.key}, {"why", "talk.level"}});
+      // A dropped setup takes its punchline with it.
+      if (!l.key.empty())
+        m_punchlines.erase(std::remove_if(m_punchlines.begin(), m_punchlines.end(),
+                                          [&](Commentary const & p) { return p.key == l.key; }), m_punchlines.end());
+    }
+    return drop;
+  }), lines.end());
 }
 
 namespace
@@ -954,9 +1408,27 @@ std::vector<Commentary> Navigator::KeepTurnsClear(std::vector<Commentary> lines)
   return out;
 }
 
+double Navigator::TimingMps(double speedMps) const
+{
+  if (speedMps >= 0)
+    return speedMps;
+  // Unknown (tunnel, garage): assume the car still goes the last speed it was seen going. Read as 0 or -1,
+  // every "not this close to the exit" hold shrank to its floor right where exits come up fast.
+  return m_knownSpeedMps ? *m_knownSpeedMps : 0;
+}
+
+double Navigator::LastTimingMps() const { return TimingMps(m_lastFix ? m_lastFix->speedMps : 0); }
+
+double Navigator::InstructionNowWithinM() const
+{
+  // m_hereFix is this fix (set before Update); m_lastFix may still be the one before.
+  double const mps = TimingMps(m_hereFix ? m_hereFix->speedMps : 0);
+  return std::max(kInstructionNowWithinM, kInstructionNowWithinS * mps);
+}
+
 double Navigator::NavWaitMs(Commentary const & line) const
 {
-  double const mps = m_lastFix ? m_lastFix->speedMps : 0;
+  double const mps = LastTimingMps();
   // Parked, or nowhere near a maneuver: nothing to be late for.
   if (!m_turnId || mps < 0.75 * MovingMps())
     return kNavWaitMaxMs;
@@ -979,6 +1451,7 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     }
     m_engine.reset();
     ResetTrip();
+    m_avoidTollsSaid = false;
     // An off-road trip or a hike was this trip's; the next one starts from the route type again.
     if (m_modeFound)
     {
@@ -1050,13 +1523,22 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   {
     if (prev == RouteState::OnRoute)
     {
-      if (m_turnId && m_lastDistToTurnM < kMissedTurnWithinM)
-        Say(m_engine->OnNav(NavEvent::MissedTurn(t)));
+      bool const nearTurn = m_turnId && m_lastDistToTurnM < kMissedTurnWithinM;
+      bool const asked = t - m_lastVoiceCommandT < kNoRerouteRoastAfterCommandMs;
+      m_missPending.reset();
+      if (nearTurn)
+      {
+        bool const unseen = FixGapAt(t);
+        if (asked)
+          SayMissedTurn(t, unseen);
+        else
+          m_missPending = PendingMiss{t + kMissConfirmMs, unseen};  // said once it lasts
+      }
       m_rerouting = true;
-      Trace("nav.offroute", {{"missed", (m_turnId && m_lastDistToTurnM < kMissedTurnWithinM) ? "yes" : "no"},
-                             {"reroutes", std::to_string(m_reroutes + 1)}});
+      NotFamiliarAnymore("offroute");
+      Trace("nav.offroute", {{"missed", nearTurn ? "yes" : "no"}, {"reroutes", std::to_string(m_reroutes + 1)}});
       // Back on the route in a moment, or the route changed because the driver asked: no joke.
-      if (t - m_lastVoiceCommandT < kNoRerouteRoastAfterCommandMs)
+      if (asked)
       {
         ++m_reroutes;
         Say(m_engine->OnNav(NavEvent::Rerouted(t, true)));
@@ -1066,7 +1548,12 @@ void Navigator::Update(double t, RouteSnapshot const & route)
         m_rerouteRoastDueAt = t + kRerouteRoastAfterMs;
       }
     }
-    else if (m_rerouteRoastDueAt && t >= *m_rerouteRoastDueAt)
+    else
+    {
+      if (m_missPending && t >= m_missPending->confirmAt)
+        SayMissedTurn(t, std::exchange(m_missPending, std::nullopt)->unseen);
+    }
+    if (prev != RouteState::OnRoute && m_rerouteRoastDueAt && t >= *m_rerouteRoastDueAt)
     {
       m_rerouteRoastDueAt.reset();
       Say(m_engine->OnNav(NavEvent::Rerouted(t)));
@@ -1092,6 +1579,17 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     return;
   }
 
+  // Back on the same maneuver before the miss was sure: a GPS blip. Nothing missed, nothing rerouted.
+  if (m_missPending && route.turnId && route.turnId == m_turnId)
+  {
+    m_missPending.reset();
+    m_rerouteRoastDueAt.reset();
+    m_rerouting = false;
+    Trace("nav.blip", {});
+  }
+  // Back on a different route before the miss was confirmed: it was a miss after all.
+  else if (m_missPending)
+    SayMissedTurn(t, std::exchange(m_missPending, std::nullopt)->unseen);
   // Back before the joke was due. It still counts, quietly.
   if (std::exchange(m_rerouteRoastDueAt, std::nullopt))
   {
@@ -1107,6 +1605,8 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     bool const justTurned = m_turnId && !m_rerouting;
     if (justTurned)
     {
+      if (FixGapAt(t))
+        m_bits.TurnUnseen();
       Say(m_engine->OnNav(NavEvent::TurnCompleted(t, true)));
       CountLefts(t);
     }
@@ -1116,14 +1616,14 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     m_turnId = route.turnId;
     m_turnKind = route.turn;
     m_instructionDueAt.reset();
-    if (justTurned && route.distToTurnM >= kInstructionNowWithinM)
+    if (justTurned && route.distToTurnM >= InstructionNowWithinM())
       m_instructionDueAt = t + kInstructionAfterTurnMs;
     else
       SayInstruction(t, route);
   }
   else if (m_instructionDueAt)
   {
-    if (t >= *m_instructionDueAt || route.distToTurnM < kInstructionNowWithinM)
+    if (t >= *m_instructionDueAt || route.distToTurnM < InstructionNowWithinM())
     {
       m_instructionDueAt.reset();
       SayInstruction(t, route);
@@ -1143,13 +1643,40 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     m_laneSaidFor = route.turnId;
     SayLine(t, Category::Instruction, route.laneSide == LaneSide::Left ? "lane.left" : "lane.right");
   }
+  // The arrival was called from too far out to tell the side: "It's on your right", once, when close
+  // enough, a few seconds after any direction so the two don't run together (loop B119).
+  if (route.turn == TurnKind::Destination && m_sideSaidFor != route.turnId && !m_instructionDueAt &&
+      t - m_turnSaidAt >= kLaneAfterDirectionMs && route.distToTurnM > kSideLastCallM)
+  {
+    if (std::string const side = DestinationSideNow(route); !side.empty())
+    {
+      m_sideSaidFor = route.turnId;
+      SayLine(t, Category::Instruction, side == "right" ? "arrive.side.right" : "arrive.side.left", {},
+              Priority::Nav);
+    }
+  }
   m_lastDistToTurnM = route.distToTurnM;
+}
+
+std::string Navigator::DestinationSideNow(RouteSnapshot const & route) const
+{
+  if (route.turn != TurnKind::Destination || !route.destinationMark || !m_hereFix ||
+      route.distToTurnM > kSideWithinM)
+    return {};
+  return DestinationSide({m_hereFix->lat, m_hereFix->lon}, route.routeBearingDeg, *route.destinationMark);
 }
 
 void Navigator::SayInstruction(double t, RouteSnapshot const & route)
 {
   m_turnSaidAt = t;
-  std::string const text = InstructionText(route);
+  // Same speed as the "say it now" window: this fix's, else the last known one (a tunnel).
+  std::string text = InstructionText(route, TimingMps(m_hereFix ? m_hereFix->speedMps : -1));
+  if (std::string const side = DestinationSideNow(route); !side.empty())
+  {
+    // "Arrive at Joe's Diner, on your right": an arrival never chains, so this ends the call.
+    text += ", on your " + side;
+    m_sideSaidFor = route.turnId;
+  }
   m_lastInstructionText = text;
   Trace("nav.turn", {{"id", std::to_string(*route.turnId)},
                      {"text", text},
@@ -1174,6 +1701,10 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   config.speechAware = true;
   if (config.speedingRenagMaxMs == 0)
     config.speedingRenagMaxMs = kSpeedingRenagMaxMs;
+  if (config.implausibleMps2 == 0)
+    config.implausibleMps2 = kImplausibleMps2;
+  if (config.jerkSettleMs == 0)
+    config.jerkSettleMs = kJerkSettleMs;
   // A phone in a pocket jolts and jumps, and that's not hard braking.
   if (!InCar(m_travelMode))
   {
@@ -1220,6 +1751,10 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   }
   if (config.speedingBarelyEveryMs == 0)
     config.speedingBarelyEveryMs = kSpeedingBarelyEveryMs;
+  if (config.speedingSustainMs == 0)
+    config.speedingSustainMs = kSpeedingSustainMs;
+  if (config.speedingDropGraceMs == 0)
+    config.speedingDropGraceMs = kSpeedingDropGraceMs;
   m_engine = std::make_unique<CritiqueEngine>(config, t);
   m_engine->SetTalkingUntil(m_talkingUntil);
   m_plan = {};
@@ -1248,6 +1783,13 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   std::string const routeKey = RouteKey(m_plan.origin, m_plan.destination);
   m_tripsOnRoute = static_cast<int>(
       std::count_if(m_history.begin(), m_history.end(), [&](TripRecord const & r) { return r.routeKey == routeKey; }));
+  m_familiarTrip = false;
+  if (m_tripsOnRoute >= kFamiliarAfterTrips && KnowsTheDate(t))
+    for (auto const & r : Routines())
+      if (r.routeKey == routeKey && r.trips >= kFamiliarAfterTrips)
+        m_familiarTrip = true;
+  if (m_familiarTrip)
+    Trace("talk.familiar", {{"trips", std::to_string(m_tripsOnRoute)}});
   m_plates.NewTrip(routeKey);
   m_twenty.NewTrip();
   m_heldTwentyLines.clear();
@@ -1465,9 +2007,17 @@ bool Navigator::AnswerModeAsk(bool walking)
     return false;
   m_modeAskOpen = false;
   Trace("trip.modeAsk", {{"answer", walking ? "walk" : "drive"}});
-  SayLine(m_lastT, Category::Instruction, walking ? "mode.ask.walk.yes" : "mode.ask.walk.no", {}, Priority::Nav);
   if (walking)
+  {
+    SayLine(m_lastT, Category::Instruction, "mode.ask.walk.yes", {}, Priority::Nav);
     return true;
+  }
+  // Already doing car speed: "click the driving button" would be a touch prompt in a moving car, so
+  // the moving reply says to switch it once parked. Driving is still highlighted on screen.
+  bool const moving = m_knownSpeedMps && m_lastT - m_knownSpeedT <= kUnknownSpeedCarryMs &&
+                      *m_knownSpeedMps > kAskWalkMovingMps;
+  SayLine(m_lastT, Category::Instruction, moving ? "mode.ask.walk.no.moving" : "mode.ask.walk.no", {},
+          Priority::Nav);
   // The GPS won't do it for them: "I'm going to need you to click the driving button." The host
   // shows the route types with Driving highlighted. The drive that follows is this trip still, so
   // it gets the first trip's rundown, and no "so now we're driving?".
@@ -1508,6 +2058,12 @@ void Navigator::TrackTravelMode(Fix const & fix, RouteSnapshot const & route)
   {
     if (!moving)
       return;
+    // Matched to a dirt track off a fix 100 m out is a guess, not a trail.
+    if (RoughFix(fix))
+    {
+      m_dirtSince.reset();
+      return;
+    }
     if (route.onDirt)
     {
       m_pavedSince.reset();
@@ -1645,10 +2201,17 @@ void Navigator::TrackIdle(Fix const & fix, RouteSnapshot const & route)
     return;
   if (m_idleGapMs <= 0)
     m_idleGapMs = kIdleMinMs + (m_config.rng ? m_config.rng() : 0.5) * (kIdleMaxMs - kIdleMinMs);
-  double const quietSince = std::max(m_lastSpokeT, m_tripStartT);
-  if (fix.tMs - quietSince < m_idleGapMs)
+  double const quietSince = std::max({m_lastSpokeT, m_tripStartT, m_idleSkippedT});
+  if (fix.tMs - quietSince < m_idleGapMs || RemarkWaiting())
     return;
   m_idleGapMs = 0;
+  // A familiar commute lets some of these silences be.
+  if (FamiliarQuiet() && (m_config.rng ? m_config.rng() : 0) >= kFamiliarTalkShare)
+  {
+    m_idleSkippedT = fix.tMs;
+    Trace("say.dropped", {{"key", "idle"}, {"why", "familiar"}});
+    return;
+  }
   m_lastSpokeT = fix.tMs;
   SayLine(fix.tMs, Category::Idle, "idle");
 }
@@ -1657,7 +2220,8 @@ void Navigator::TrackWrongWay(Fix const & fix, RouteSnapshot const & route)
 {
   bool const followingRoute = route.state == RouteState::OnRoute || route.state == RouteState::NotStarted;
   double off = 0;
-  if (followingRoute && fix.bearingDeg >= 0 && route.routeBearingDeg >= 0 && fix.speedMps >= std::min(kWrongWayMinMps, 0.75 * MovingMps()))
+  if (followingRoute && !RoughFix(fix) && fix.bearingDeg >= 0 && route.routeBearingDeg >= 0 &&
+      fix.speedMps >= std::min(kWrongWayMinMps, 0.75 * MovingMps()))
   {
     off = std::fabs(std::fmod(fix.bearingDeg - route.routeBearingDeg + 540.0, 360.0) - 180.0);
   }
@@ -1680,7 +2244,7 @@ void Navigator::TrackWrongWay(Fix const & fix, RouteSnapshot const & route)
 
 void Navigator::TrackUTurn(Fix const & fix, RouteSnapshot const & route)
 {
-  if (fix.bearingDeg < 0 || fix.speedMps < kUTurnMinMps)
+  if (fix.bearingDeg < 0 || fix.speedMps < kUTurnMinMps || RoughFix(fix))
     return;
   while (!m_headings.empty() && fix.tMs - m_headings.front().first > kUTurnMaxAgoMs)
     m_headings.pop_front();
@@ -1696,6 +2260,15 @@ void Navigator::TrackUTurn(Fix const & fix, RouteSnapshot const & route)
       break;
     if (std::fabs(std::fmod(fix.bearingDeg - deg + 540.0, 360.0) - 180.0) >= kUTurnDeg)
     {
+      // The route itself turned back (an instructed U-turn, a hairpin switchback): the
+      // driver did what they were told, so there's nothing to mock. Consume the reversal.
+      if (route.state == RouteState::OnRoute && route.routeBearingDeg >= 0 &&
+          std::fabs(std::fmod(fix.bearingDeg - route.routeBearingDeg + 540.0, 360.0) - 180.0) <= kUTurnOnRouteDeg)
+      {
+        Trace("say.dropped", {{"key", "uturn"}, {"why", "route"}});
+        m_headings.clear();
+        return;
+      }
       SayLine(fix.tMs, Category::UTurn, "uturn");
       ++m_uTurnsSaid;
       m_lastUTurnT = fix.tMs;
@@ -1838,6 +2411,16 @@ void Navigator::SayOutdoorBit(double t, std::string const & key)
   PushLine(std::move(c), m_gpsName == "Sarah" ? "af_heart" : "af_sarah");
 }
 
+bool Navigator::FamiliarQuiet() const { return m_familiarTrip && m_talk == TalkLevel::Full && m_reroutes == 0; }
+
+void Navigator::NotFamiliarAnymore(char const * why)
+{
+  if (!m_familiarTrip)
+    return;
+  m_familiarTrip = false;
+  Trace("talk.familiar", {{"off", why}});
+}
+
 std::vector<Routine> Navigator::Routines() const
 {
   return LearnRoutines(m_history, [this](double ms) { return LocalTime(ms); });
@@ -1940,8 +2523,10 @@ void Navigator::TrackMusic(double tMs, RouteSnapshot const & route)
   if (playing && !m_musicPlaying)
     m_musicStartedT = tMs;
   m_musicPlaying = playing;
+  // Near a turn, or another remark just went out (the car pulling away after a stop often has
+  // two waiting): ask at the next check instead (BI-046).
   bool const quiet = !route.turnId || route.distToTurnM >= kLongDriveQuietM;
-  if (!quiet)
+  if (!quiet || RemarkJustSaid(tMs))
     return;
   // Music's on: give it a song's worth of a chance, then judge it. Once a trip.
   if (playing && !m_musicJudged && tMs - m_musicStartedT >= kMusicJudgeAfterMs)
@@ -2046,6 +2631,7 @@ void Navigator::ResetTrip()
   m_turnKind = TurnKind::None;
   m_leftsInARow = 0;
   m_rerouting = false;
+  m_missPending.reset();
   m_arrived = false;
   m_lastState = RouteState::Inactive;
   m_stopSince.reset();
@@ -2056,9 +2642,11 @@ void Navigator::ResetTrip()
   m_heldTwentyLines.clear();
   m_twentyCutInT.reset();
   m_lastFix.reset();
+  m_knownSpeedMps.reset();
   m_pullOverSaid = false;
   m_policeSaid = false;
   m_lastBadSpeedingT.reset();
+  m_badSpeedingSince.reset();
   m_onBridge = false;
   m_hardCurveSamples = 0;
   m_lastCurveAheadT = -1e18;
@@ -2074,9 +2662,13 @@ void Navigator::ResetTrip()
   m_upcomingSight.reset();
   m_lastSpokeT = -1e18;
   m_idleGapMs = 0;
+  m_idleSkippedT = -1e18;
   m_bits.NewTrip((m_config.rng ? m_config.rng() : 0) < kCleanBitChance, m_said.Counter(kTurnStreakKey));
   m_bendHeadings.clear();
   m_curveAheadM = -1;
+  m_ferryAheadSaid = m_ferryAboardSaid = m_wasOnFerry = false;
+  m_tollSaid = false;
+  m_tollWindowT.reset();
   m_lastBendT = -1e18;
   m_bendJokes = 0;
   m_coldStage = 0;
@@ -2100,6 +2692,7 @@ void Navigator::ResetTrip()
   m_christmasSaid = false;
   m_roundaboutSaid = false;
   m_laneSaidFor.reset();
+  m_sideSaidFor.reset();
   m_musicJudged = false;
   m_musicPlaying = false;
   m_lastSightT = -1e18;
@@ -2113,9 +2706,11 @@ void Navigator::ResetTrip()
   m_quizzes = 0;
   m_lastQuizT = -1e18;
   m_quizUnclear = 0;
+  m_quizReasked = false;
   m_quizRolledFor.reset();
   m_quietBits = 0;
   m_lastQuietBitT = -1e18;
+  m_resumedT = -1e18;
   m_quietRolledFor.reset();
   m_quietTurnId.reset();
   m_quietTurnSince = -1e18;
@@ -2178,7 +2773,7 @@ int Navigator::Tier() const
   return f < 34 ? 0 : f < 67 ? 1 : 2;
 }
 
-void Navigator::TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot const & route)
+void Navigator::TrackPlateGame(double tMs, LatLon const & here, double speedMps, RouteSnapshot const & route)
 {
   // Which state we're in barely changes; look it up every half minute.
   if (m_regionLookup && tMs - m_lastRegionCheckT >= 30000)
@@ -2187,7 +2782,7 @@ void Navigator::TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot co
     auto const name = m_regionLookup(here);
     m_plates.SetHere(name ? MatchPlateRegion(*name) : std::nullopt);
   }
-  bool const nearManeuver = route.turnId && route.distToTurnM < PlateGame::kHoldNearManeuverM;
+  bool const nearManeuver = route.turnId && route.distToTurnM < GameHoldM(PlateGame::kHoldNearManeuverM, TimingMps(speedMps));
   // The game the GPS refused a few minutes ago is now its own idea.
   if (m_gamePitchAt && tMs >= *m_gamePitchAt && !nearManeuver && route.state == RouteState::OnRoute &&
       m_plates.GetState() != PlateGame::State::Playing)
@@ -2204,6 +2799,9 @@ void Navigator::TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot co
   }
   // Offer once a trip, after the opening rundown has had its minute, on a long quiet stretch.
   if (route.state != RouteState::OnRoute || m_plates.OfferedThisTrip() || tMs - m_tripStartT < 60000 || !route.turnId)
+    return;
+  // US and Mexican plates name a state; a UK or German plate says nothing about where the car is from.
+  if (!PlatesNameAState(m_country))
     return;
   if (PlateGame::ShouldOffer(m_tripsOnRoute, route.distToTurnM, m_engine->Frustration()))
     SayPlate(tMs, m_plates.Offer(Tier()));
@@ -2240,6 +2838,10 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
   if (!m_engine || m_arrived)
     return;
   m_lastT = std::max(m_lastT, tMs);
+  // "Avoid tolls": the host reroutes; a toll stretch after that is no joke (BI-113).
+  for (auto const & command : ParseAppCommands(text))
+    if (command.action == AppAction::AvoidTolls || command.action == AppAction::AllowTolls)
+      m_avoidTollsSaid = command.action == AppAction::AvoidTolls;
   // A pop quiz is waiting: whatever was said is the answer (or a try at one).
   if (QuizAsking())
   {
@@ -2273,11 +2875,12 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
       return;
     }
   // "Are you actually intending to walk there?" can be answered out loud too.
-  if (m_modeAskOpen && (SaidYes(text) || SaidNo(text)))
-  {
-    AnswerModeAsk(SaidYes(text));
-    return;
-  }
+  if (m_modeAskOpen)
+    if (auto const walking = WalkAskAnswer(text))
+    {
+      AnswerModeAsk(*walking);
+      return;
+    }
   // "We're getting pulled over": the GPS knows exactly whose fault that is.
   std::string words = " ";
   for (unsigned char const ch : text)
@@ -2349,7 +2952,8 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
         return;
       }
   // "Let's play a game": not now. Then, a few minutes later, it's the GPS's idea.
-  if (m_plates.GetState() == PlateGame::State::Idle || m_plates.GetState() == PlateGame::State::Declined)
+  if (m_plates.GetState() == PlateGame::State::Idle || m_plates.GetState() == PlateGame::State::Declined ||
+      m_plates.GetState() == PlateGame::State::Over)
   {
     bool const negated = words.find(" don't ") != std::string::npos || words.find(" dont ") != std::string::npos ||
                          words.find(" not ") != std::string::npos || words.find(" don t ") != std::string::npos;
@@ -2369,7 +2973,7 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
         return;
       }
   }
-  auto const reply = m_plates.OnDriverSaid(text, Tier(), Parked());
+  auto const reply = m_plates.OnDriverSaid(text, Tier(), Parked(), m_lastT);
   if (!reply)
     return;
   if (m_plates.GetState() == PlateGame::State::Playing)
@@ -2380,9 +2984,12 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
 }
 
 /// Parked: stopped long enough to be a stop the driver chose, or crawling through a parking lot.
-/// A red light isn't parking, so a short stop on the road doesn't count.
+/// A red light isn't parking, so a short stop on the road doesn't count, and neither is a jam.
 bool Navigator::Parked() const
 {
+  // Stuck in a jam isn't parked, however long it lasts: the games and parked-only lines wait (BI-052).
+  if (m_stopSince && m_stopInTraffic)
+    return false;
   if (m_stopSince && m_lastT - *m_stopSince >= kUnplannedStopAfterMs)
     return true;
   if (!m_lastFix || !m_parkingLookup || m_lastFix->speedMps >= MovingMps())
@@ -2436,7 +3043,31 @@ std::string Navigator::Reply(std::string const & key, Vars const & vars)
   case Pronouns::She: add("theycap", "She"); add("theyre", "She's"); add("them", "her"); add("their", "her"); break;
   case Pronouns::They: add("theycap", "They"); add("theyre", "They're"); add("them", "them"); add("their", "their"); break;
   }
-  std::string text = Fill(m_said.Pick(key, LinesFor(key, Tier()), r), all);
+  auto const & pool = LinesFor(key, Tier());
+  // At speed, no reply that says look at the screen or pick something on it (loop B92, same rule as
+  // the B74 phone asks in CritiqueEngine::Pick), unless that would leave nothing to say.
+  std::vector<std::string> eyesUp;
+  double const rolling = m_engine ? m_engine->Config().rollingMps : m_config.rollingMps;
+  if (m_lastFix && m_lastFix->speedMps >= rolling)
+    for (auto const & l : pool)
+      if (!LooksOrPicks(l))
+        eyesUp.push_back(l);
+  bool const filtered = !eyesUp.empty() && eyesUp.size() < pool.size();
+  auto const & lines = filtered ? eyesUp : pool;
+  // "Repeat that" near a turn: the direction first, the commentary after (loop B58). Own pick log,
+  // so the short pool doesn't trim the full pool's no-repeat memory.
+  std::vector<std::string> nearTurn;
+  bool const repeatNearTurn = key == "cmd.repeat" && m_turnId &&
+                              m_lastDistToTurnM < std::max(kRepeatFirstWithinM, 20 * LastTimingMps());
+  if (repeatNearTurn)
+  {
+    for (auto const & l : lines)
+      if (InstructionComesFirst(l))
+        nearTurn.push_back(l);
+    if (nearTurn.empty())
+      nearTurn.push_back("{instruction}");
+  }
+  std::string text = Fill(repeatNearTurn ? m_said.Pick("cmd.repeat.nearTurn", nearTurn, r) : m_said.Pick(filtered ? key + ".moving" : key, lines, r), all);
   // Said in one go, so a punchline just gets a beat.
   for (auto pause = text.find(" || "); pause != std::string::npos; pause = text.find(" || "))
     text.replace(pause, 4, " ... ");
@@ -2448,6 +3079,26 @@ std::string Navigator::Reply(std::string const & key, Vars const & vars)
       m_onSaid(m_said);
   }
   return text;
+}
+
+bool Navigator::InstructionComesFirst(std::string const & line)
+{
+  // Either case: the shouting tier writes {INSTRUCTION}.
+  std::string lower = line;
+  std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
+  auto const at = lower.find("{instruction}");
+  if (at == std::string::npos)
+    return false;
+  int words = 0;
+  bool inWord = false;
+  for (size_t i = 0; i < at; ++i)
+  {
+    bool const space = std::isspace(static_cast<unsigned char>(line[i])) != 0;
+    if (!space && !inWord)
+      ++words;
+    inWord = !space;
+  }
+  return words <= kRepeatFirstMaxWords;
 }
 
 static std::string CarWeight(Units units)
@@ -2471,11 +3122,49 @@ void Navigator::TrackLastExit(double tMs, RouteSnapshot const & route)
   SayLine(tMs, Category::LongDrive, gap >= kLastExitLongM ? "lastExit.long" : "lastExit", {{"distance", distance}});
 }
 
+namespace
+{
+/// "Skip this first exit" (loop B100): said once the earlier exit is this close (seconds of driving,
+/// with a floor), and only while it is still at least kExitSkipMinAheadM ahead.
+double constexpr kExitSkipLeadS = 15;
+double constexpr kExitSkipLeadMinM = 250;
+double constexpr kExitSkipMinAheadM = 60;
+/// Never on top of the final call: the route's exit has to be this many seconds (and meters) away.
+double constexpr kExitSkipBeforeTurnS = 8;
+double constexpr kExitSkipBeforeTurnMinM = 120;
+}  // namespace
+
+double ExitSkipWithinM(double speedMps)
+{
+  double const mps = std::max(0.0, speedMps);
+  return std::clamp(27 * mps, 300.0, 1000.0);
+}
+
+void Navigator::TrackExitSkip(Fix const & fix, RouteSnapshot const & route)
+{
+  // Only with exactly one exit in between: with more, "this first exit" could be the wrong one.
+  if (route.state != RouteState::OnRoute || !route.turnId ||
+      (route.turn != TurnKind::ExitLeft && route.turn != TurnKind::ExitRight) || route.exitsBeforeTurn != 1 ||
+      route.exitBeforeGapM <= 0 || m_exitSkipTurnId == route.turnId)
+    return;
+  double const mps = std::max(0.0, fix.speedMps);
+  if (route.exitBeforeGapM > ExitSkipWithinM(mps))
+    return;
+  double const earlierAheadM = route.distToTurnM - route.exitBeforeGapM;
+  if (earlierAheadM < kExitSkipMinAheadM || earlierAheadM > std::max(kExitSkipLeadMinM, kExitSkipLeadS * mps))
+    return;
+  if (route.distToTurnM < std::max(kExitSkipBeforeTurnMinM, kExitSkipBeforeTurnS * mps))
+    return;
+  m_exitSkipTurnId = route.turnId;
+  Trace("nav.exitSkip", {{"gap_m", LogNum(route.exitBeforeGapM, 0)}, {"ahead_m", LogNum(earlierAheadM, 0)}});
+  SayLine(fix.tMs, Category::Instruction, "countdown.exit.skip", {}, Priority::Nav);
+}
+
 void Navigator::TrackOffRoad(Fix const & fix)
 {
   if (m_travelMode == TravelMode::OffRoad || !m_roadDistanceLookup || fix.tMs - m_lastRoadCheckT < 2000)
     return;
-  if (fix.speedMps < kOffRoadMinMps)
+  if (fix.speedMps < kOffRoadMinMps || RoughFix(fix))
   {
     m_offRoadSince.reset();
     return;
@@ -2535,7 +3224,12 @@ void Navigator::TrackFear(Fix const & fix, RouteSnapshot const & route)
   }
 
   // Curves: sideways acceleration from the change in heading between fixes.
-  if (m_lastFix && m_lastFix->bearingDeg >= 0 && fix.bearingDeg >= 0 && fix.tMs > m_lastFix->tMs)
+  if (RoughFix(fix) || (m_lastFix && RoughFix(*m_lastFix)))
+  {
+    m_hardCurveSamples = 0;
+    m_curveGasSamples = 0;
+  }
+  else if (m_lastFix && m_lastFix->bearingDeg >= 0 && fix.bearingDeg >= 0 && fix.tMs > m_lastFix->tMs)
   {
     double turn = std::fabs(fix.bearingDeg - m_lastFix->bearingDeg);
     turn = std::min(turn, 360 - turn);
@@ -2594,7 +3288,8 @@ void Navigator::SayPlate(double tMs, PlateGame::Reply const & reply)
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = Priority::Roast;
   c.voiceSpeed = 1 + c.frustration / 1000.0;
-  if (m_turnId && m_lastDistToTurnM < PlateGame::kHoldNearManeuverM && !m_arrived)
+  if (m_turnId && m_lastDistToTurnM < GameHoldM(PlateGame::kHoldNearManeuverM, LastTimingMps()) &&
+      !m_arrived)
     m_heldPlateLines.push_back(std::move(c));
   else
     // The driver is waiting for an answer; don't hold it up for the rewording model.
@@ -2616,6 +3311,9 @@ bool Navigator::Punch(Commentary & line)
   std::optional<BitLine> bit;
   if (line.key == "turnCompleted.onTime")
   {
+    // The engine picked a line from this same pool; the bit picks its own (or none), so the
+    // engine's pick goes back or it would push the turns heard lately out of the rotation.
+    m_said.Unpick(line.key, line.text);
     bit = m_bits.OnTimeTurn(m_engine->Stats(), m_engine->Incidents(), r);
     m_said.SetCounter(kTurnStreakKey, m_bits.Streak());
     if (!bit)
@@ -2777,6 +3475,9 @@ bool Navigator::PunchNag(Commentary & line, double r)
   std::string text = Fill(m_said.Pick(key + "+", options, m_config.rng ? m_config.rng() : 0), line.vars);
   if (!text.empty())
     text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
+  // The re-pick keeps a roundabout's exit sentence after the joke (loop B99).
+  if (std::string const call = ExitCallFor(line.vars, Tier()); !call.empty())
+    text += " " + call;
   line.key = key;
   line.text = std::move(text);
   // On a long haul the nags are ten minutes apart, too far for "I'm serious." to land as the
@@ -2799,7 +3500,7 @@ void Navigator::TrackBends(Fix const & fix, RouteSnapshot const & route)
   if (route.state != RouteState::OnRoute || fix.speedMps < kBendMinMps || m_bendJokes >= kBendJokesPerTrip ||
       QuietBitBusy() || fix.tMs - m_turnSaidAt < kBendAfterTurnMs || fix.tMs - m_lastBendT < kBendEveryMs ||
       fix.tMs - m_lastCurveAheadT < kBendAfterTurnMs || (route.turnId && route.distToTurnM < kIdleQuietM) ||
-      fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+      RemarkJustSaid(fix.tMs))
     return;
   // In the bends now, not just a sharp one on the map ahead (curve.ahead has that).
   if (!SwungLately())
@@ -2812,7 +3513,7 @@ void Navigator::TrackBends(Fix const & fix, RouteSnapshot const & route)
 void Navigator::TrackCold(Fix const & fix, RouteSnapshot const & route)
 {
   if (route.state != RouteState::OnRoute || QuietBitBusy() || (route.turnId && route.distToTurnM < kIdleQuietM) ||
-      fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+      RemarkJustSaid(fix.tMs))
     return;
   double const sinceStart = fix.tMs - m_tripStartT;
   double const tempF = m_tempC ? *m_tempC * 9 / 5 + 32 : 0;
@@ -2860,6 +3561,13 @@ void Navigator::TrackCold(Fix const & fix, RouteSnapshot const & route)
   }
   if (fix.tMs - m_coldSaidT < kColdVentAfterMs)
     return;
+  if (fix.tMs - m_coldSaidT > kColdVentUntilMs)
+  {
+    m_coldStage = 3;
+    return;
+  }
+  if (fix.speedMps >= MovingMps())
+    return;
   m_coldStage = 3;
   m_lastSpokeT = fix.tMs;
   SayLine(fix.tMs, Category::Idle, "cold.vent", DriverVars());
@@ -2875,7 +3583,7 @@ void Navigator::TrackNightOut(Fix const & fix, RouteSnapshot const & route)
   bool const parked = !m_nightMoved && fix.speedMps < 1 && fix.tMs - m_tripStartT >= kNightParkedMs;
   bool const driving = m_nightMoved && route.state == RouteState::OnRoute && fix.tMs - m_tripStartT >= kColdFromMs &&
                        !(route.turnId && route.distToTurnM < kIdleQuietM);
-  if ((!parked && !driving) || QuietBitBusy() || fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+  if ((!parked && !driving) || QuietBitBusy() || RemarkJustSaid(fix.tMs))
     return;
   m_fromNightlife = false;
   std::string const key = parked ? "nightOut.tube" : "nightOut.dd";
@@ -2895,7 +3603,7 @@ void Navigator::TrackClockChange(Fix const & fix, RouteSnapshot const & route)
 {
   if (m_clockChecked || route.state != RouteState::OnRoute || !KnowsTheDate(fix.tMs) ||
       fix.tMs - m_tripStartT < kColdFromMs || QuietBitBusy() || (route.turnId && route.distToTurnM < kIdleQuietM) ||
-      fix.tMs - m_lastSpokeT < kBreathAfterTalkMs)
+      RemarkJustSaid(fix.tMs))
     return;
   m_clockChecked = true;
   long const shift = UtcOffsetS(fix.tMs) - UtcOffsetS(fix.tMs - kClockChangeDays * 86400000.0);
@@ -2912,6 +3620,22 @@ void Navigator::TrackClockChange(Fix const & fix, RouteSnapshot const & route)
   m_said.SetCounter("_clock.day", day);
   m_lastSpokeT = fix.tMs;
   SayLine(fix.tMs, Category::Idle, key, DriverVars());
+}
+
+void Navigator::TrackSignalBack(Fix const & fix, RouteSnapshot const & route, double lostFromT, double lostAtMps)
+{
+  double const lostMs = fix.tMs - lostFromT;
+  if (lostMs < kSignalLostMinMs || lostMs > kSignalLostMaxMs || lostAtMps < kSignalLostMinMps ||
+      route.state != RouteState::OnRoute || lostFromT < m_tripStartT || fix.tMs - m_signalBackT < kSignalBackEveryMs ||
+      InGame() || RemarkJustSaid(fix.tMs))
+    return;
+  // A turn coming up gets the driver's attention, not the GPS's feelings.
+  if (route.turnId && (route.distToTurnM < kSignalBackTurnM ||
+                       SecondsToTurn(route.distToTurnM, TimingMps(fix.speedMps)) < kSignalBackTurnS))
+    return;
+  m_signalBackT = fix.tMs;
+  m_lastSpokeT = fix.tMs;
+  SayLine(fix.tMs, Category::Idle, "gps.back", DriverVars());
 }
 
 bool Navigator::SwungLately() const
@@ -2948,6 +3672,22 @@ std::string Navigator::BitText(BitLine const & bit)
   return Fill(tmpl, vars);
 }
 
+bool Navigator::RemarkWaiting() const
+{
+  return m_gate.HasRemark() || !m_turnHeld.empty() || !m_punchlines.empty();
+}
+
+bool Navigator::RemarkJustSaid(double t) const { return t - m_lastSpokeT < kBreathAfterTalkMs || RemarkWaiting(); }
+
+void Navigator::SayMissedTurn(double t, bool unseen)
+{
+  if (unseen)
+    m_bits.TurnUnseen();
+  Say(m_engine->OnNav(NavEvent::MissedTurn(t)));
+}
+
+bool Navigator::FixGapAt(double t) const { return m_lastFix && t - m_lastFix->tMs > kUnseenTurnGapMs; }
+
 void Navigator::TrackClean(Fix const & fix, RouteSnapshot const & route)
 {
   // Turns that went by without a verdict still count toward (or break) the streak.
@@ -2955,7 +3695,8 @@ void Navigator::TrackClean(Fix const & fix, RouteSnapshot const & route)
   if (m_said.Counter(kTurnStreakKey) != m_bits.Streak())
     m_said.SetCounter(kTurnStreakKey, m_bits.Streak());
   if (route.state != RouteState::OnRoute || fix.speedMps < MovingMps() || QuietBitBusy() ||
-      (route.turnId && route.distToTurnM < kIdleQuietM) || fix.tMs - std::max(m_lastSpokeT, m_tripStartT) < kCleanQuietMs)
+      (route.turnId && route.distToTurnM < kIdleQuietM) || fix.tMs - std::max(m_lastSpokeT, m_tripStartT) < kCleanQuietMs ||
+      RemarkWaiting())
     return;
   auto const bit = m_bits.CleanBeatDue(fix.tMs, m_tripStartT, m_engine->Incidents());
   if (!bit)
@@ -3126,8 +3867,9 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
   if (!steady || fix.speedMps < std::min(kQuietMinMovingMps, 1.25 * MovingMps()) || m_quietBits >= kQuietBitsPerTrip || !m_punchlines.empty() ||
       QuietBitBusy())
     return;
+  double const talkShare = FamiliarQuiet() ? kFamiliarTalkShare : 1.0;
   if (t - m_tripStartT < kQuietBitAfterStartMs || t - m_lastQuietBitT < kQuietBitEveryMs ||
-      t - std::max({m_lastSpokeT, m_quietTurnSince, m_lastRoadT}) < kQuietSilenceMs || toTurnS < kQuietMinToTurnS)
+      t - std::max({m_lastSpokeT, m_quietTurnSince, m_lastRoadT, m_resumedT}) < kQuietSilenceMs || toTurnS < kQuietMinToTurnS)
     return;
   bool const roomForCall = !m_callTaken && toTurnS >= kCallMinToTurnS && route.distToTurnM >= kCallMinToTurnM;
   bool const night = Night(t, {fix.lat, fix.lon});
@@ -3160,9 +3902,10 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
       return;
     m_quietRolledFor = route.turnId;
     double const r = m_config.rng ? m_config.rng() : 0;
-    if (r >= kQuietBitChance)
+    double const chance = kQuietBitChance * talkShare;
+    if (r >= chance)
       return;
-    double pick = r / kQuietBitChance;
+    double pick = r / chance;
     if (!roomForCall)
       pick = kCallWeight + pick * (1 - kCallWeight);
     double const twenty = kCallWeight + kISpyWeight + kTwentyWeight;
@@ -3232,9 +3975,12 @@ void Navigator::TrackRoadBits(Fix const & fix, RouteSnapshot const & route)
   k.steady = route.state == RouteState::OnRoute && !m_rerouting && route.turnId;
   k.toTurnS = k.steady ? SecondsToTurn(route.distToTurnM, fix.speedMps) : 0;
   // A quiet bit queued on this very fix hasn't reached the speaker yet, but it counts.
-  k.sinceSpokenMs = fix.tMs - std::max({m_lastSpokeT, m_quietTurnSince, m_lastQuietBitT});
+  // So does a remark pushed earlier on this fix ("Traffic's clearing up"): still waiting, it's not
+  // m_lastSpokeT yet (B64).
+  k.sinceSpokenMs = RemarkWaiting() ? 0 : fix.tMs - std::max({m_lastSpokeT, m_quietTurnSince, m_lastQuietBitT});
   k.tripMs = fix.tMs - m_tripStartT;
   k.busy = QuietBitBusy() || !m_punchlines.empty();
+  k.jam = m_inTraffic;
   k.night = KnowsTheDate(fix.tMs) && SunElevationDeg(fix.lat, fix.lon, fix.tMs) < kSunsetElevationDeg;
   k.localHour = KnowsTheDate(fix.tMs) ? LocalTime(fix.tMs).tm_hour : -1;
   if (!InCar(m_travelMode))
@@ -3274,7 +4020,7 @@ std::vector<Commentary> Navigator::FilterForCall(std::vector<Commentary> lines)
   if (std::any_of(lines.begin(), lines.end(), cutIn) && !m_call.Held())
   {
     m_call.Hold(m_lastT);
-    double const toTurnS = SecondsToTurn(m_lastDistToTurnM, m_lastFix ? m_lastFix->speedMps : 0);
+    double const toTurnS = SecondsToTurn(m_lastDistToTurnM, LastTimingMps());
     Trace("call.hold", {{"to_turn_s", LogNum(toTurnS, 0)}, {"direction", direction ? "yes" : "no"}});
     // "Oh, it looks like I have to give them an update. Just a second." Unless the turn is close.
     // The script just announced its own made-up update? Then the real one is right on cue.
@@ -3331,7 +4077,7 @@ void Navigator::TrackTwentyQuestions(Fix const & fix, RouteSnapshot const & rout
     return;
   }
   // Directions first: nothing from the game this close to a maneuver.
-  if (route.turnId && route.distToTurnM < TwentyQuestions::kHoldNearManeuverM)
+  if (route.turnId && route.distToTurnM < GameHoldM(TwentyQuestions::kHoldNearManeuverM, TimingMps(fix.speedMps)))
     return;
   if (!m_heldTwentyLines.empty())
   {
@@ -3342,7 +4088,7 @@ void Navigator::TrackTwentyQuestions(Fix const & fix, RouteSnapshot const & rout
     m_twentyCutInT.reset();
     return;
   }
-  double const toTurnS = route.turnId ? SecondsToTurn(route.distToTurnM, fix.speedMps) : 1e9;
+  double const toTurnS = route.turnId ? SecondsToTurn(route.distToTurnM, TimingMps(fix.speedMps)) : 1e9;
   if (m_twentyCutInT)
   {
     // "Anyway. Where were we. Oh right, you were losing." Once the direction has had its breath.
@@ -3369,7 +4115,8 @@ void Navigator::SayTwenty(double tMs, TwentyQuestions::Reply const & reply)
   c.frustration = m_engine ? m_engine->Frustration() : 0;
   c.priority = Priority::Roast;
   c.voiceSpeed = 1 + c.frustration / 250.0;
-  if (m_turnId && m_lastDistToTurnM < TwentyQuestions::kHoldNearManeuverM && !m_arrived)
+  if (m_turnId && m_lastDistToTurnM < GameHoldM(TwentyQuestions::kHoldNearManeuverM, LastTimingMps()) &&
+      !m_arrived)
     m_heldTwentyLines.push_back(std::move(c));
   else
     // The driver is waiting for an answer; don't hold it up for the rewording model.
@@ -3398,8 +4145,10 @@ bool Navigator::StartPopQuiz(double t, bool asked)
   // Road rules on car trips only; trivia anywhere.
   bool const car = InCar(m_travelMode);
   std::vector<std::string> ids;
+  // Road rules from the country being driven: no right on red in the UK, no feet where it's metres.
+  bool const metric = m_config.units == Units::Kmh;
   for (auto const & q : QuizQuestions())
-    if (car || !q.road)
+    if ((car || !q.road) && QuizFits(q, m_country, metric))
       ids.push_back(q.id);
   if (ids.empty())
     return false;
@@ -3421,6 +4170,7 @@ bool Navigator::StartPopQuiz(double t, bool asked)
     readMs += SpeakingMs(c.text, c.voiceSpeed) + 400;
   m_quiz.Start(*q, t, t + readMs + kQuizAnswerMs, !car);
   m_quizUnclear = 0;
+  m_quizReasked = false;
   ++m_quizzes;
   m_lastQuizT = t;
   Trace("quiz", {{"event", "start"}, {"id", q->id}, {"asked", asked ? "yes" : "no"}});
@@ -3445,7 +4195,7 @@ void Navigator::TrackPopQuiz(Fix const & fix, RouteSnapshot const & route)
   if (!steady || t - m_tripStartT < kQuizAfterStartMs || t - m_lastQuizT < kQuizEveryMs ||
       t - m_lastQuietBitT < kQuizAfterQuietBitMs || t - std::max(m_lastSpokeT, m_lastRoadT) < kQuizSilenceMs)
     return;
-  if (SecondsToTurn(route.distToTurnM, fix.speedMps) < kQuizMinToTurnS)
+  if (SecondsToTurn(route.distToTurnM, TimingMps(fix.speedMps)) < kQuizMinToTurnS)
     return;
   // One roll of the dice per stretch, so it stays a surprise.
   if (m_quizRolledFor == route.turnId)
@@ -3509,6 +4259,131 @@ std::optional<Navigator::QuizCard> Navigator::PopQuizCard() const
   card.tappable = m_quiz.Tappable();
   card.brownies = m_said.Counter(kBrowniesKey);
   return card;
+}
+
+namespace
+{
+/// A question about the drive itself: "where do I turn?", "which exit?", "is it this lane?".
+bool AsksAboutTheDrive(std::string const & spoken, bool aboutIt)
+{
+  std::string words = " ";
+  for (unsigned char const ch : spoken)
+    if (std::isalnum(ch))
+      words += static_cast<char>(std::tolower(ch));
+    else if (ch != '\'' && ch < 0x80)
+      words += ' ';
+  words += ' ';
+  bool question = spoken.find('?') != std::string::npos;
+  for (char const * w : {" where ", " when ", " which ", " how far ", " how long ", " do i ", " should i "})
+    question = question || words.find(w) != std::string::npos;
+  if (!question)
+    return false;
+  // "Do you have to go somewhere to get it?" asks about the thing, not the route; "do I go left?" doesn't.
+  bool const looseGo = aboutIt && words.find(" left ") == std::string::npos &&
+                       words.find(" right ") == std::string::npos && words.find(" straight ") == std::string::npos;
+  for (char const * w : {" turn ", " turning ", " exit ", " lane ", " lanes ", " merge ", " ramp ", " get off ", " go ",
+                         " going ", " way "})
+    if (words.find(w) != std::string::npos && !(looseGo && (w == std::string(" go ") || w == std::string(" going "))))
+      return true;
+  return false;
+}
+
+/// A yes/no question about "it": "Can you use it on foot?", "Do you have to go to a gas station to get
+/// it?". Mid-game, that's about the thing, whatever else it mentions.
+bool AsksAboutIt(std::string const & spoken)
+{
+  std::string words = " ";
+  for (unsigned char const ch : spoken)
+    if (std::isalnum(ch))
+      words += static_cast<char>(std::tolower(ch));
+    else if (ch != '\'' && ch < 0x80)
+      words += ' ';
+  words += ' ';
+  if (words.find(" it ") == std::string::npos)
+    return false;
+  if (spoken.find('?') != std::string::npos)
+    return true;
+  size_t const first = words.find_first_not_of(' ');
+  if (first == std::string::npos)
+    return false;
+  std::string const lead = words.substr(first, words.find(' ', first) - first);
+  for (char const * aux : {"is", "does", "do", "can", "could", "would", "will", "has", "have", "was", "did",
+                           "should", "are"})
+    if (lead == aux)
+      return true;
+  return false;
+}
+}  // namespace
+
+bool QuizAnswerTakes(QuizQuestion const & q, std::string const & spoken)
+{
+  if (AsksToRepeatQuiz(spoken))
+    return false;
+  QuizHeard const heard = ParseQuizAnswer(q, spoken);
+  if (heard.kind == QuizHeard::Kind::Unclear)
+    return false;
+  if (heard.named)
+    return true;
+  return !DriveComesFirst(spoken);
+}
+
+bool DriveComesFirst(std::string const & spoken, bool aboutIt)
+{
+  if (AsksAboutTheDrive(spoken, aboutIt))
+    return true;
+  for (auto const & command : ParseAppCommands(spoken))
+    switch (command.action)
+    {
+    case AppAction::NextTurn:
+    case AppAction::RepeatInstruction:
+    case AppAction::CurrentRoad:
+    case AppAction::SpeedLimit:
+    case AppAction::TimeLeft:
+    case AppAction::ArrivalTime:
+    case AppAction::CancelRoute:
+    case AppAction::Mute:
+    case AppAction::ReportPolice:
+    case AppAction::NavigateTo:
+    case AppAction::DifferentRoute:
+    case AppAction::TakeMeBack: return true;
+    default: break;
+    }
+  return false;
+}
+
+bool Navigator::QuizTakes(std::string const & spoken) const
+{
+  return QuizAsking() && QuizAnswerTakes(*m_quiz.Question(), spoken);
+}
+
+bool Navigator::TwentyTakes(std::string const & spoken) const
+{
+  if (!m_twenty.Active())
+    return false;
+  // A question about "it" the game can't place is still the game's ("I didn't catch that"), not
+  // walking directions; but only once playing, when "it" is the thing.
+  bool const aboutIt = m_twenty.GetState() == TwentyQuestions::State::Playing && AsksAboutIt(spoken);
+  if (ParseTwentyHeard(spoken).kind == TwentyHeard::Kind::Unclear && !aboutIt)
+    return false;
+  return !DriveComesFirst(spoken, aboutIt);
+}
+
+bool Navigator::QuizReask(double tMs, std::string const & spoken)
+{
+  if (!QuizAsking() || m_quizReasked || !AsksToRepeatQuiz(spoken))
+    return false;
+  m_lastT = std::max(m_lastT, tMs);
+  m_quizReasked = true;
+  QuizQuestion const & q = *m_quiz.Question();
+  Commentary line = QuizLine(m_lastT, "quiz.ask",
+                             {{"question", q.question},
+                              {"a", QuizChoiceText(q.choices[0])},
+                              {"b", QuizChoiceText(q.choices[1])},
+                              {"c", QuizChoiceText(q.choices[2])}});
+  m_quiz.ExtendAnswerBy(m_lastT + SpeakingMs(line.text, line.voiceSpeed) + 400 + kQuizAnswerMs);
+  Trace("quiz", {{"event", "reask"}, {"id", q.id}});
+  m_gate.Push(std::move(line), false);
+  return true;
 }
 
 void Navigator::QuizTapped(double tMs, int choice)

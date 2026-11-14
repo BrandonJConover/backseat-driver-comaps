@@ -4,6 +4,7 @@
 #include "backseat/lines.hpp"
 #include "backseat/navigator.hpp"
 #include "backseat/twenty_questions.hpp"
+#include "backseat/voice_command.hpp"
 
 #include <algorithm>
 
@@ -45,13 +46,13 @@ RouteSnapshot TqRoute(uint32_t turnId, double dist)
   return r;
 }
 
-Fix TqFix(double tMs)
+Fix TqFix(double tMs, double speedMps = 25)
 {
   Fix f;
   f.tMs = tMs;
   f.lat = 39.74;
   f.lon = -104.99;
-  f.speedMps = 25;
+  f.speedMps = speedMps;
   f.bearingDeg = 90;
   return f;
 }
@@ -294,6 +295,20 @@ TEST(TwentyOfferYesNoAndSilence)
   CHECK(declined->grudge && declined->over);
   CHECK(!no.Active());
 
+  // "Definitely not" and "I guess not" are noes, not yeses (loop B123).
+  for (auto const * hedged : {"definitely not", "I guess not", "of course not"})
+  {
+    TwentyQuestions nope(SeededRng(3));
+    nope.Offer({}, false, 0, 0);
+    auto const r = nope.OnDriverSaid(hedged, 1000, 0);
+    CHECK(r && r->key == "twenty.declined");
+    CHECK(!nope.Active());
+  }
+  TwentyQuestions torn(SeededRng(3));
+  torn.Offer({}, false, 0, 0);
+  CHECK(!torn.OnDriverSaid("yes and no", 1000, 0));
+  CHECK(torn.Active());
+
   // A question straight away is a yes.
   TwentyQuestions eager(SeededRng(3));
   eager.Offer({}, false, 0, 0);
@@ -508,4 +523,219 @@ TEST(TwentyIsAQuietStretchBit)
   CHECK(lines[0].text.find("20 questions") != std::string::npos);
   CHECK(!asked.empty());
   CHECK_EQUAL(nav.GetTwentyLog().grudges, 1);
+}
+
+TEST(TwentyHearsCurlyApostrophes)
+{
+  auto const straight = ParseTwentyHeard("It's a deer");
+  CHECK_EQUAL(static_cast<int>(straight.kind), static_cast<int>(Kind::Guess));
+  for (char const * curly : {"It\xE2\x80\x99s a deer", "You\xE2\x80\x99re thinking of a deer", "itʼs a deer"})
+  {
+    auto const h = ParseTwentyHeard(curly);
+    CHECK_EQUAL(static_cast<int>(h.kind), static_cast<int>(Kind::Guess));
+    CHECK_EQUAL(h.thing, straight.thing);
+  }
+  CHECK_EQUAL(static_cast<int>(ParseTwentyHeard("I\xE2\x80\x99m done").kind), static_cast<int>(Kind::Quit));
+}
+
+// At 70 mph 500 ft is five seconds, inside the "now" call: the hold scales to 12 s at the current speed.
+TEST(TwentyHoldScalesWithSpeed)
+{
+  for (bool highway : {true, false})
+  {
+    Navigator nav = TqNavigator();
+    double t = kTqDayMs;
+    double dist = 60000;
+    TqDrive(nav, t, 30, 1, dist);
+    nav.OnDriverSaid(t, "twenty questions");
+    TqDrive(nav, t, 5, 1, dist);
+    double const speed = highway ? 31 : 10;
+    double const at = highway ? 300 : 200;
+    nav.OnFix(TqFix(t, speed), TqRoute(1, at));
+    nav.TakeLines();
+    t += 1000;
+    nav.OnDriverSaid(t, "Is it alive?");
+    std::vector<Commentary> near;
+    for (int i = 0; i < 3; ++i, t += 1000)
+    {
+      nav.OnFix(TqFix(t, speed), TqRoute(1, at - speed * (i + 1)));
+      auto lines = nav.TakeLines();
+      near.insert(near.end(), lines.begin(), lines.end());
+    }
+    if (highway)
+    {
+      CHECK(TqGame(near).empty());
+      std::vector<Commentary> past;
+      for (int i = 0; i < 3; ++i, t += 1000)
+      {
+        nav.OnFix(TqFix(t, speed), TqRoute(2, 30000));
+        auto lines = nav.TakeLines();
+        past.insert(past.end(), lines.begin(), lines.end());
+      }
+      CHECK_EQUAL(TqGame(past).size(), size_t{1});
+    }
+    else
+    {
+      // Town speed: 200 m is 20 s off, the answer plays as it always did.
+      CHECK_EQUAL(TqGame(near).size(), size_t{1});
+    }
+  }
+}
+
+// Loop B82 (BI-073): a tunnel before the exit leaves the speed unknown; the hold keeps the last speed seen.
+TEST(TwentyHoldKeepsItsSpeedInATunnel)
+{
+  Navigator nav = TqNavigator();
+  double t = kTqDayMs;
+  double dist = 60000;
+  TqDrive(nav, t, 30, 1, dist);
+  nav.OnDriverSaid(t, "twenty questions");
+  TqDrive(nav, t, 5, 1, dist);
+  double const speed = 31;
+  double const at = 300;
+  nav.OnFix(TqFix(t, speed), TqRoute(1, at));
+  nav.TakeLines();
+  t += 1000;
+  nav.OnDriverSaid(t, "Is it alive?");
+  std::vector<Commentary> near;
+  for (int i = 0; i < 3; ++i, t += 1000)
+  {
+    nav.OnFix(TqFix(t, -1), TqRoute(1, at - speed * (i + 1)));
+    auto lines = nav.TakeLines();
+    near.insert(near.end(), lines.begin(), lines.end());
+  }
+  CHECK(TqGame(near).empty());
+  std::vector<Commentary> past;
+  for (int i = 0; i < 3; ++i, t += 1000)
+  {
+    nav.OnFix(TqFix(t, -1), TqRoute(2, 30000));
+    auto lines = nav.TakeLines();
+    past.insert(past.end(), lines.begin(), lines.end());
+  }
+  CHECK_EQUAL(TqGame(past).size(), size_t{1});
+}
+
+// Loop B55 (BI-049): give-up, quit and hint cues inside a question about the thing aren't cues.
+TEST(TwentyCuesInsideQuestionsStayQuestions)
+{
+  for (char const * said : {"What is it made of?", "Is it small enough to hold?", "Do I give it food?",
+                            "Does it help me drive?", "Does it have no more than two legs?", "Does it help?",
+                            "Is it what you give someone on a birthday?"})
+  {
+    auto const k = ParseTwentyHeard(said).kind;
+    CHECK(k != Kind::GiveUp);
+    CHECK(k != Kind::Quit);
+    CHECK(k != Kind::Hint);
+  }
+  CHECK_EQUAL(static_cast<int>(ParseTwentyHeard("Is it small enough to hold?").trait), static_cast<int>(Trait::Small));
+  CHECK_EQUAL(static_cast<int>(ParseTwentyHeard("Do I give it food?").trait), static_cast<int>(Trait::Food));
+  struct Case
+  {
+    char const * said;
+    Kind kind;
+  };
+  for (auto const & c : std::vector<Case>{
+           {"I give up", Kind::GiveUp},
+           {"Okay, I give.", Kind::GiveUp},
+           {"just tell me what it is", Kind::GiveUp},
+           {"What is it?", Kind::GiveUp},
+           {"Fine, what is it then?", Kind::GiveUp},
+           {"So what was it", Kind::GiveUp},
+           {"I'm done", Kind::Quit},
+           {"Enough.", Kind::Quit},
+           {"That's enough of this", Kind::Quit},
+           {"No more questions", Kind::Quit},
+           {"give me a hint", Kind::Hint},
+           {"Can you help me?", Kind::Hint},
+           {"help me out here", Kind::Hint},
+           {"Help!", Kind::Hint},
+           {"I need help", Kind::Hint},
+       })
+  {
+    CHECK_EQUAL(static_cast<int>(ParseTwentyHeard(c.said).kind), static_cast<int>(c.kind));
+  }
+}
+
+// "Is it not alive?" asks the opposite; "isn't it alive?" still asks whether it's alive.
+TEST(TwentyNegatedQuestionsFlip)
+{
+  struct Case
+  {
+    char const * said;
+    Trait trait;
+    bool flipped;
+  };
+  for (auto const & c : std::vector<Case>{
+           {"Is it not alive?", Trait::Alive, true},
+           {"It's not an animal?", Trait::Animal, true},
+           {"Does it not have wheels?", Trait::Wheels, true},
+           {"Is it not bigger than a car?", Trait::BiggerThanCar, true},
+           {"Is it not smaller than a car?", Trait::BiggerThanCar, false},
+           {"Is it not safe?", Trait::Dangerous, false},
+           {"Is it not outside?", Trait::InCar, false},
+           {"Isn't it alive?", Trait::Alive, false},
+           {"Doesn't it have wheels?", Trait::Wheels, false},
+       })
+  {
+    auto const h = ParseTwentyHeard(c.said);
+    CHECK_EQUAL(static_cast<int>(h.kind), static_cast<int>(Kind::Question));
+    CHECK_EQUAL(static_cast<int>(h.trait), static_cast<int>(c.trait));
+    CHECK_EQUAL(h.flipped, c.flipped);
+  }
+  // The game answers the flipped question: the deer is alive, so "is it not alive" is a no.
+  auto g = TqGameWith("a deer", {"forest"});
+  auto const r = g.OnDriverSaid("Is it not alive?", 1000, 0);
+  CHECK(r.has_value());
+  CHECK_EQUAL(r->key, std::string("twenty.no"));
+}
+
+// Mid-game, a question that sounds like a command is still a question: the host hands it to the game
+// before ParseAppCommands can make it "find a gas station" or walking directions. The drive comes first.
+TEST(TwentyTakesQuestionsBeforeAppCommands)
+{
+  Navigator nav = TqNavigator();
+  double t = kTqDayMs;
+  double dist = 60000;
+  TqDrive(nav, t, 30, 1, dist);
+  // No game: nothing is the game's.
+  CHECK(!nav.TwentyTakes("Do you have to go to a gas station to get it?"));
+  CHECK(!nav.TwentyTakes("Is it alive?"));
+  nav.OnDriverSaid(t, "let's play twenty questions");
+  TqDrive(nav, t, 5, 1, dist);
+  // These are why it exists: the app commands parser hears them as app actions.
+  bool sawCommand = false;
+  for (char const * said : {"Do you have to go to a gas station to get it?", "Can you use it on foot?",
+                            "Is it a police car?", "Is it alive?", "Is it a giraffe?", "give me a hint",
+                            "I give up", "Is it bigger than a car?"})
+  {
+    CHECK(nav.TwentyTakes(said));
+    sawCommand = sawCommand || !ParseAppCommands(said).empty();
+  }
+  CHECK(sawCommand);
+  // And the game answers it rather than leaving it to the app.
+  nav.OnDriverSaid(t, "Can you use it on foot?");
+  CHECK_EQUAL(TqGame(TqDrive(nav, t, 5, 1, dist)).size(), size_t{1});
+  // The drive outranks the game, even asked about "it".
+  for (char const * said : {"what's the next turn", "cancel the route", "where do I turn?", "take me to Target",
+                            "which exit is it?", "is it this lane?", "do I get off here, is it this ramp?", "mute"})
+    CHECK(!nav.TwentyTakes(said));
+  // Chatter the game can't read goes the usual way.
+  CHECK(!nav.TwentyTakes("this traffic is ridiculous"));
+  // Once it's over, nothing is the game's.
+  nav.OnDriverSaid(t, "I'm done");
+  TqDrive(nav, t, 5, 1, dist);
+  CHECK(!nav.TwentyTakes("Is it alive?"));
+}
+
+TEST(DriveComesFirstMatchesTheQuiz)
+{
+  CHECK(DriveComesFirst("where do i turn"));
+  CHECK(DriveComesFirst("cancel the route"));
+  CHECK(!DriveComesFirst("option two"));
+  CHECK(!DriveComesFirst("Is it alive?"));
+  // "Go" is the route unless it's a question about the thing.
+  CHECK(DriveComesFirst("do I go straight?"));
+  CHECK(!DriveComesFirst("Do you have to go to a gas station to get it?", true));
+  CHECK(DriveComesFirst("Do I go left to get it?", true));
+  CHECK(DriveComesFirst("which way do I turn to get it?", true));
 }

@@ -1,5 +1,6 @@
 #include "backseat/achievements.hpp"
 
+#include <cmath>
 #include <cstdlib>
 #include <sstream>
 
@@ -39,6 +40,13 @@ std::string Achievements::Serialize() const
   return out.str();
 }
 
+namespace
+{
+/// Far more than there are badges (renamed ones stay in the file), so only a corrupt file hits it.
+size_t constexpr kBadgesMax = 512;
+size_t constexpr kBadgeIdMax = 64;
+}  // namespace
+
 Achievements Achievements::Parse(std::string const & text)
 {
   Achievements a;
@@ -47,15 +55,19 @@ Achievements Achievements::Parse(std::string const & text)
   while (std::getline(in, row))
   {
     auto const tab = row.find('\t');
-    if (tab == std::string::npos || tab == 0)
+    if (tab == std::string::npos || tab == 0 || tab > kBadgeIdMax)
+      continue;
+    // Past the cap only real badges get in, so junk ahead of them in a corrupt file can't push them out.
+    if (a.m_unlocked.size() >= kBadgesMax && !FindBadge(row.substr(0, tab)))
       continue;
     char const * when = row.c_str() + tab + 1;
     char * end = nullptr;
     double const tMs = std::strtod(when, &end);
     if (end == when)
       continue;
+    // A hand-edited "nan"/"inf" time keeps the badge but not the time (0 = unknown).
     // Badges that were renamed or removed stay in the file but don't count.
-    a.m_unlocked.emplace(row.substr(0, tab), tMs);
+    a.m_unlocked.emplace(row.substr(0, tab), std::isfinite(tMs) ? tMs : 0.0);
   }
   return a;
 }

@@ -1,0 +1,16 @@
+{
+ "about": "Shared expectations for grouped and long numbers: a comma-grouped number (1,250,000) is a quantity and is spelled out whatever its length (up to 15 digits); a bare run of 7+ digits (phone number, account, binary) stays digit by digit; groups over 15 digits fall back to digits. Backseat Driver: backseat::pronunciation::ForSpeech (libs/backseat/backseat_tests/spoken_numbers.json). EpubToM4B can port the same rule; keep both copies in sync.",
+ "cases": [
+  {"input": "1,000,000 people", "language": "en", "expected": "one million people"},
+  {"input": "About 1,250,000 cars a day use this road.", "language": "en", "expected": "About one million two hundred fifty thousand cars a day use this road."},
+  {"input": "Population 8,336,817.", "language": "en", "expected": "Population eight million three hundred thirty six thousand eight hundred seventeen."},
+  {"input": "3,000,000,000 years", "language": "en", "expected": "three billion years"},
+  {"input": "2,500,000.5 miles", "language": "en", "expected": "two million five hundred thousand point five miles"},
+  {"input": "$1,500,000 for a house", "language": "en", "expected": "one million five hundred thousand dollars for a house"},
+  {"input": "1,250 people", "language": "en", "expected": "one thousand two hundred fifty people"},
+  {"input": "999,999 miles", "language": "en", "expected": "nine hundred ninety nine thousand nine hundred ninety nine miles"},
+  {"input": "Call 5551234567", "language": "en", "expected": "Call five five five one two three four five six seven"},
+  {"input": "Code 1000000", "language": "en", "expected": "Code one zero zero zero zero zero zero"},
+  {"input": "1,234,567,890,123,456 grains", "language": "en", "expected": "one two three four five six seven eight nine zero one two three four five six grains"}
+ ]
+}

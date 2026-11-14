@@ -49,6 +49,18 @@ struct EngineConfig
   double hardBrakeMps2 = 3.5;
   /// Acceleration (m/s²) that counts as a jackrabbit start.
   double hardAccelMps2 = 3.0;
+  /// A one-second speed change past this (m/s²) is a GPS glitch, not driving: no car brakes or launches
+  /// much past 1.2 g, and a real emergency stop is about 9. Such a step isn't judged, and the next one is
+  /// measured from the last believable sample, so a 25 -> 8 -> 25 m/s blip is neither a hard brake nor a
+  /// launch while 25 -> 8 -> 8 still counts (as 8.5 m/s² over two seconds). 0: off (the TS engine's behavior).
+  double implausibleMps2 = 0;
+  /// Hold a hard-brake / hard-launch roast until the car has settled: |accel| under jerkSettleMps2 (or
+  /// stopped) for this long, not in a bend and not near a turn call. The stats and incident log still
+  /// count it at the onset. Dropped after jerkSettleGiveUpMs or once a turn is completed. A roast in the
+  /// middle of an emergency stop is the last thing a driver needs. 0: off (the TS engine's behavior).
+  double jerkSettleMs = 0;
+  double jerkSettleMps2 = 1.0;
+  double jerkSettleGiveUpMs = 20000;
   /// Display units under the limit, sustained for tooSlowAfterMs, to get called slow.
   double tooSlowMargin = 15;
   double tooSlowAfterMs = 20000;
@@ -66,6 +78,13 @@ struct EngineConfig
   /// 0 keeps the plain speedingRenagMs (the TS engine's behavior).
   double speedingRenagMaxMs = 0;
   double speedingResetMs = 30000;
+  /// Over the limit (past the tolerance) this long before it counts: no speeding line or incident
+  /// for a one-fix limit glitch (a frontage road snapped for a second). 0: at once (the TS engine).
+  double speedingSustainMs = 0;
+  /// After the posted limit drops by 10 mph / 15 km/h or more, this long a car that's slowing down
+  /// (or still within the old limit) is judged against the old limit, so braking into a 35 zone
+  /// isn't speeding. 0: the new limit at once (the TS engine).
+  double speedingDropGraceMs = 0;
   /// Distances for the "you are turning left in 500 feet / 50 feet" nags.
   double countdownFarM = 152;  // 500 ft
   double countdownNearM = 15;  // 50 ft
@@ -74,8 +93,9 @@ struct EngineConfig
   /// Speed that counts as rolling along (heading checks, "how long until the turn"). A walker
   /// rolls at 1 m/s; a car at 3.
   double rollingMps = 3;
-  /// A turn announced this long ago and still not reached is forgotten (heading checks, countdown).
-  /// Three minutes in a car; on foot the next turn can be ten minutes away.
+  /// A turn with no progress toward it for this long is stale: heading checks ignore it until the
+  /// car gets closer again (loop B146; was: this long since it was announced, which dropped the
+  /// countdown on any approach over three minutes). Three minutes in a car; on foot ten or more.
   double pendingTurnForgetMs = 180000;
   /// A stretch at least this long to the next maneuver gets "Please continue straight." nags,
   /// one every straightNagEveryMs of driving, three at most.
@@ -123,6 +143,14 @@ TurnShape TurnShapeOf(std::string const & text);
 /// "Turn left onto Elm Street, then right onto Oak Lane" -> "Turn left onto Elm Street".
 std::string FirstManeuver(std::string const & text);
 
+/// Which roundabout exit an instruction names: "At the roundabout, take the third exit onto Oak
+/// Street" -> "third", "take exit 12" -> "12", anything else -> "" (loop B99).
+std::string RoundaboutExitOf(std::string const & instruction);
+
+/// The roundabout countdown's exit sentence, from the line's "exit" var: "Third exit.", "Exit 12.";
+/// tier 2 shouts it ("THIRD EXIT!"). Empty when the var is missing or empty (loop B99).
+std::string ExitCallFor(Vars const & vars, int tier);
+
 /// The spoken direction: "In 500 feet, turn left onto Elm Street.", "In a quarter mile, at the light,
 /// turn right onto Oak Lane.", "Your destination, Sundance Lane, is 400 feet ahead."
 std::string DirectionText(std::string const & text, double distanceM, Units units, Control control = Control::None);
@@ -137,6 +165,11 @@ public:
 
   std::vector<Commentary> OnTelemetry(TelemetrySample const & s);
   std::vector<Commentary> OnNav(NavEvent const & e);
+  /// Hold the parked-mid-route longStop remark until `untilMs` (0 = no hold). The navigator sets this
+  /// when a stop starts on a road fast enough to judge traffic on: until its traffic window has seen
+  /// the stop, the stop may be a jam about to be called, and "We've been stopped for a while" eight
+  /// seconds before "Traffic. Great." is one remark too many (BI-056).
+  void HoldLongStop(double untilMs) { m_longStopHoldUntil = untilMs; }
 
   int Frustration() const;
   TripStats const & Stats() const { return m_stats; }
@@ -150,6 +183,10 @@ public:
 
   /// The phone is busy saying what it was handed until about `t` (speechAware only).
   void SetTalkingUntil(double t) { m_talkingUntil = std::max(m_talkingUntil, t); }
+  /// The road is curving or the car is swinging round (Navigator::Bending): a held brake roast waits.
+  void SetBending(bool bending) { m_bending = bending; }
+  /// A hard brake/launch roast is waiting for the car to settle (jerkSettleMs).
+  bool JerkRoastWaiting() const { return m_pendingJerk.has_value(); }
   /// A line that takes `speakMs` to say would get in the way of the next turn: it would still be
   /// playing when the final call is due, or the final call is out and the turn isn't done yet.
   /// Always false unless speechAware.
@@ -184,6 +221,11 @@ private:
     bool turned = false;
     /// "Your other left" was already said for this maneuver.
     bool wrongSaid = false;
+    /// Last time the car got 20 m+ closer to the maneuver, and the distance then (loop B146). A turn
+    /// counts as stale for heading checks only after pendingTurnForgetMs with no such progress, so a
+    /// long approach (an exit 15 km out) keeps its countdown.
+    std::optional<double> aliveAt = std::nullopt;
+    double aliveDistM = 0;
   };
 
   /// "Please continue straight." ... "You should still be going straight." ... "I'm serious."
@@ -226,7 +268,10 @@ private:
   EngineConfig m_config;
   double m_frustration = 0;
   std::optional<TelemetrySample> m_lastSample;
+  /// The sample before an implausible speed jump: the next step's acceleration is measured from it.
+  std::optional<TelemetrySample> m_beforeGlitch;
   double FarM() const;
+  double SayDistanceM(double triggerM, double distanceM) const;
   double FinalM() const;
   /// Where the final call goes with speechAware: FinalM(), or farther out when the call is long or
   /// the phone is still talking, so it's over before the car gets to the turn.
@@ -248,11 +293,39 @@ private:
   /// "Still speeding" nags since the driver was last under the limit for a while.
   int m_speedingRenags = 0;
   std::optional<double> m_underLimitSince;
+  /// Since when the car has been over the posted limit (speedingSustainMs).
+  std::optional<double> m_overLimitSince;
+  /// The last known posted limit, and the limit before a big drop with when it dropped
+  /// (speedingDropGraceMs).
+  std::optional<double> m_prevLimitMps;
+  std::optional<double> m_dropFromLimitMps;
+  double m_limitDroppedAt = -1e18;
   std::optional<double> m_slowSince;
   std::optional<double> m_stoppedSince;
   int m_stopCount = 0;
+  /// longStop remarks during the current stop; each waits twice as long as the last, then they stop.
+  int m_longStopRemarks = 0;
+  static constexpr int kLongStopRemarksPerStop = 3;
+  /// When an unplannedStop remark last spoke, so longStop doesn't land in the same breath.
+  double m_lastUnplannedStopAt = -1e18;
+  /// See HoldLongStop.
+  double m_longStopHoldUntil = 0;
   bool m_braking = false;
   bool m_accelerating = false;
+  /// A hard brake/launch roast held until the car settles (jerkSettleMs).
+  struct PendingJerk
+  {
+    Category category;
+    std::string key;
+    double since;
+    int turnsDone;
+  };
+  std::optional<PendingJerk> m_pendingJerk;
+  /// Since when |accel| has stayed under jerkSettleMps2.
+  std::optional<double> m_steadySince;
+  bool m_bending = false;
+  void JerkRoast(std::vector<Commentary> & out, double t, Category category, std::string const & key);
+  void ReleaseJerk(std::vector<Commentary> & out, double t);
   double m_lastSpeedingLogAt;
   std::optional<std::string> m_lastInstructionText;
   std::optional<double> m_lastInstructionDistanceM;

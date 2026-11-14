@@ -1,0 +1,141 @@
+{
+ "about": "24-hour times read the way people say them (loop B139, CROSS X-051). BookLyre's 26 military-time cases from EpubToM4B tests/fixtures/spoken_military_times.json (auto/loop 9e49563, BACKLOG #209) in Backseat's own spoken numbers (no hyphens; years, counts and money as ForSpeech reads them), plus colon times: '22:00' is 'twenty two hundred', '13:00' 'thirteen hundred', '12:00'/'6:00' keep o'clock, '25:30' is not a time. Backseat Driver: backseat::pronunciation::ForSpeech / MilitaryTimes, NumberWords (libs/backseat/backseat_tests/pronunciation_test.cpp). BookLyre's negative cases (durations, years, rooms, out-of-range, money, '1430 h', 'hourses') are not military times here either; their expected values are Backseat's ordinary count/year/money reading of the digits.",
+ "cases": [
+  {
+   "input": "At 0600 hours the guns opened up.",
+   "expected": "At oh six hundred hours the guns opened up."
+  },
+  {
+   "input": "We move out at 1430 hrs.",
+   "expected": "We move out at fourteen thirty hours."
+  },
+  {
+   "input": "Lights out at 2200 hours.",
+   "expected": "Lights out at twenty two hundred hours."
+  },
+  {
+   "input": "Report by 0900h sharp.",
+   "expected": "Report by oh nine hundred hours sharp."
+  },
+  {
+   "input": "At 0000 hours, the watch changed.",
+   "expected": "At zero hundred hours, the watch changed."
+  },
+  {
+   "input": "Hold until 0030 hrs.",
+   "expected": "Hold until zero thirty hours."
+  },
+  {
+   "input": "at 1200 hours",
+   "expected": "at twelve hundred hours"
+  },
+  {
+   "input": "from 2359 hours",
+   "expected": "from twenty three fifty nine hours"
+  },
+  {
+   "input": "By 1300 hours, the 0815 hours train had left.",
+   "expected": "By thirteen hundred hours, the oh eight fifteen hours train had left."
+  },
+  {
+   "input": "Contact at 1405 hours.",
+   "expected": "Contact at fourteen oh five hours."
+  },
+  {
+   "input": "0600 HOURS: reveille.",
+   "expected": "oh six hundred hours: reveille."
+  },
+  {
+   "input": "AT 1800 HRS the gate shut.",
+   "expected": "AT eighteen hundred hours the gate shut."
+  },
+  {
+   "input": "Since 0745 hours nothing moved.",
+   "expected": "Since oh seven forty five hours nothing moved."
+  },
+  {
+   "input": "Till 2100 hours, then sleep.",
+   "expected": "Till twenty one hundred hours, then sleep."
+  },
+  {
+   "input": "around 1615 hours",
+   "expected": "around sixteen fifteen hours"
+  },
+  {
+   "input": "He logged 1430 hours of work.",
+   "expected": "He logged one thousand four hundred thirty hours of work."
+  },
+  {
+   "input": "In 1944 hours passed slowly.",
+   "expected": "In one thousand nine hundred forty four hours passed slowly."
+  },
+  {
+   "input": "Room 0600 was cold.",
+   "expected": "Room six hundred was cold."
+  },
+  {
+   "input": "after 1430 hours of flight time",
+   "expected": "after one thousand four hundred thirty hours of flight time"
+  },
+  {
+   "input": "at 2400 hours",
+   "expected": "at two thousand four hundred hours"
+  },
+  {
+   "input": "at 1460 hours",
+   "expected": "at one thousand four hundred sixty hours"
+  },
+  {
+   "input": "at 14300 hours",
+   "expected": "at fourteen thousand three hundred hours"
+  },
+  {
+   "input": "It cost $0600 hours later.",
+   "expected": "It cost six hundred dollars hours later."
+  },
+  {
+   "input": "at 1430 h",
+   "expected": "at one thousand four hundred thirty h"
+  },
+  {
+   "input": "The year 1944 was hard.",
+   "expected": "The year nineteen forty four was hard."
+  },
+  {
+   "input": "at 0600 hourses",
+   "expected": "at six hundred hourses"
+  },
+  {
+   "input": "Open until 22:00 today.",
+   "expected": "Open until twenty two hundred today."
+  },
+  {
+   "input": "Leave at 13:00.",
+   "expected": "Leave at thirteen hundred."
+  },
+  {
+   "input": "Mo-Fr 06:00-22:00",
+   "expected": "Mo-Fr six o'clock-twenty two hundred"
+  },
+  {
+   "input": "Meet at 12:00.",
+   "expected": "Meet at twelve o'clock."
+  },
+  {
+   "input": "Gates open at 6:00.",
+   "expected": "Gates open at six o'clock."
+  },
+  {
+   "input": "Closes at 00:00.",
+   "expected": "Closes at zero hundred."
+  },
+  {
+   "input": "Arrive by 18:45.",
+   "expected": "Arrive by eighteen forty five."
+  },
+  {
+   "input": "Final score 25:30.",
+   "expected": "Final score twenty five:thirty."
+  }
+ ]
+}

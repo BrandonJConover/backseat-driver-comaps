@@ -78,6 +78,12 @@ enum class AppAction
   WhatDoYouKnow,
   ForgetThat,
   SetTravelMode,
+  /// Fewer remarks; directions as always.
+  TalkLess,
+  /// Directions, lane calls and arrival only: no remarks, bits or games ("shut up").
+  DirectionsOnly,
+  /// Back to the full commentary.
+  TalkMore,
   Count
 };
 
@@ -110,6 +116,13 @@ struct AppCommand
 /// gives AvoidTolls, NavigateTo("home"). Police and the plate game are left to the navigator,
 /// which already listens for them.
 std::vector<AppCommand> ParseAppCommands(std::string const & spoken);
+
+/// Whether a search for `place` is someone needing help: a hospital, emergency room, urgent care, police station
+/// or pharmacy (loop B126). Those searches get plain answers, never a joke about the driver or the place.
+bool UrgentPlace(std::string const & place);
+/// The line key for a search answer: `base` ("search.none", "search.one", "search.results"), with ".urgent" added
+/// when UrgentPlace(place).
+std::string SearchLineKey(std::string const & base, std::string const & place);
 
 /// Whether `heard` is the GPS's own `line` coming back through the mic: most of its meaningful words
 /// are in the line, or three words in a row are. One word isn't enough to tell ("work", "yes").
@@ -182,6 +195,16 @@ private:
 bool SaidYes(std::string const & spoken);
 /// "No", "nope", "nah", "not really"...
 bool SaidNo(std::string const & spoken);
+/// The answers both yes/no readers (SaidYes/SaidNo and ParseYesNo) read the same way, before their own
+/// word lists: "maybe later", "go away", "not interested", "definitely not", "I guess not" -> false;
+/// "I don't mind", "sure, why not", "go ahead" -> true; anything else -> empty.
+std::optional<bool> AnswerPhrase(std::string const & spoken);
+/// "Yes and no", "sort of", "kind of": neither a yes nor a no, so every yes/no reader leaves the ask open.
+bool MixedAnswer(std::string const & spoken);
+/// "Are you actually intending to walk there?" said out loud: true = walking ("yes", "I'm walking",
+/// "on foot"), false = driving ("no", "I'm driving", "in the car"), empty = not an answer ("turn
+/// right", "what's my next right").
+std::optional<bool> WalkAskAnswer(std::string const & spoken);
 
 /// Whose business the mileage log tracks, said out loud. "Me", "mine", "I do" -> "" (the driver's
 /// own). "My wife", "my wife's" -> "wife" (likewise husband, partner, girlfriend, boyfriend). "Sarah",

@@ -1,17 +1,30 @@
 #include "backseat/pronunciation.hpp"
+#include "backseat/pronunciation_senses.hpp"
+#include "backseat/pronunciation_streets.hpp"
+#include "backseat/pronunciation_text.hpp"
+#include "backseat/pronunciation_dates.hpp"
+#include "backseat/pronunciation_web.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <climits>
 #include <functional>
 #include <initializer_list>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <regex>
+#include <set>
+#include <sstream>
 #include <string_view>
 
 namespace backseat::pronunciation
 {
+using detail::Decode;
+using detail::Encode;
+using detail::Letter;
+
 namespace
 {
 // MARK: - The dictionary
@@ -62,278 +75,154 @@ constexpr Word kWords[] = {
     {"bayss", "/bˈAs/"},
     // Tiny, not sixty seconds.
     {"mynoot", "/mInˈut/"},
+    // bow, bowed, bowing: bending, or a ship's front ("took a bow", "bowed his head", "the bow of the
+    // ship"); the default is the ribbon or the archer's bow. "bough"/"boughs" are real words with that
+    // sound; the other two aren't words at all.
+    {"bough", "/bˈW/"},
+    {"boughs", "/bˈWz/"},
+    {"boughed", "/bˈWd/"},
+    {"boughing", "/bˈWɪŋ/"},
+    // Clock times: "5pm", "5:30 p.m." (Clock()). Spelled "AM"/"PM" read as "am"/"pim" or get skipped.
+    {"ayem", "/ˌAˈɛm/"},
+    {"peeem", "/pˌiˈɛm/"},
 };
 
-// MARK: - Picking the sense
-
-using Set = std::initializer_list<std::string_view>;
-
-bool In(std::string const & w, Set set)
+// Names Kokoro's Misaki dictionaries lack, so the fallback guesses them ("Simon" -> "sim-on").
+// Misaki phonemes from BookLyre's names lexicon (EpubToM4B tools/pronunciation/build_names_lexicon.py,
+// CMUdict converted to Misaki; CROSS X-003). Keep this to names a line or the driver can bring up.
+struct Name
 {
-  return std::find(set.begin(), set.end(), w) != set.end();
-}
-
-bool EndsWith(std::string const & w, std::string_view tail)
-{
-  return w.size() >= tail.size() && w.compare(w.size() - tail.size(), tail.size(), tail) == 0;
-}
-
-// Words before a verb: "to", modals, "don't", subject pronouns.
-bool Verby(std::string const & w)
-{
-  return In(w, {"to", "will", "can", "can't", "cannot", "could", "would", "should", "must", "might", "may", "please",
-                "don't", "didn't", "doesn't", "never", "gonna", "wanna", "let's", "i", "we", "they", "you", "won't",
-                "wouldn't", "couldn't", "shouldn't", "gotta"}) ||
-         EndsWith(w, "'ll") || EndsWith(w, "'d");
-}
-
-// Words before a noun.
-bool Det(std::string const & w)
-{
-  return In(w, {"a", "an", "the", "my", "your", "his", "her", "its", "our", "their", "this", "that", "no", "any",
-                "every", "another", "one", "some", "of"});
-}
-
-// Words after a verb.
-bool Obj(std::string const & w)
-{
-  return In(w, {"you", "your", "me", "my", "him", "her", "them", "us", "it", "the", "anything", "anyone", "everyone",
-                "people", "everybody", "somebody", "someone", "yourself", "myself", "himself", "herself",
-                "themselves", "ourselves", "others", "this", "that", "his", "their", "our"});
-}
-
-struct Ctx
-{
-  std::string p2, p1, n1, n2;
+  char const * word;
+  char const * phonemes;
 };
 
-using Rule = std::function<char const *(Ctx const &)>;
+constexpr Name kNames[] = {
+    // Line-bank names (Neil Armstrong, Gertrude, Floyd...).
+    {"neil", "nˈil"}, {"armstrong", "ˈɑɹmstɹˌɑŋ"}, {"gertrude", "ɡˈɜɹtɹud"}, {"nigel", "nˈIʤᵊl"},
+    {"darlene", "dˈɑɹlˌin"}, {"sheila", "ʃˈilə"}, {"duane", "dwˈAn"}, {"bev", "bˈɛv"}, {"wanda", "wˈɑndə"},
+    {"floyd", "flˈYd"}, {"trudy", "tɹˈudi"}, {"maxine", "mæksˈin"}, {"lyle", "lˈIl"}, {"rhonda", "ɹˈɑndə"},
+    {"yee", "jˈi"}, {"angeles", "ˈænʤələs"}, {"ferrari", "fəɹˈɑɹi"}, {"yuri", "jˈʊɹi"}, {"katy", "kˈAɾi"},
+    // First names PronounsForName() knows, so the driver's own name is said right.
+    {"allison", "ˈæləsən"}, {"amanda", "əmˈændə"}, {"andrea", "ˈændɹˌiə"}, {"andrew", "ˈændɹu"}, {"andy", "ˈændi"},
+    {"angela", "ˈænʤələ"}, {"ann", "ˈæn"}, {"anthony", "ˈænθəni"}, {"ashley", "ˈæʃli"}, {"ava", "ˈAvə"},
+    {"betty", "bˈɛɾi"}, {"brian", "bɹˈIən"}, {"bruce", "bɹˈus"}, {"carolyn", "kˈɛɹələn"}, {"catherine", "kˈæθəɹən"},
+    {"cheryl", "ʃˈɛɹəl"}, {"chloe", "klˈOi"}, {"christine", "kɹəstˈin"}, {"connor", "kˈɑnəɹ"}, {"cynthia", "sˈɪnθiə"},
+    {"danielle", "dˌæniˈɛl"}, {"debbie", "dˈɛbi"}, {"debra", "dˈɛbɹə"}, {"denise", "dənˈis"}, {"dennis", "dˈɛnəs"},
+    {"derek", "dˈɛɹək"}, {"diane", "dIˈæn"}, {"donald", "dˈɑnəld"}, {"dorothy", "dˈɔɹəθi"}, {"doug", "dˈʌɡ"},
+    {"douglas", "dˈʌɡləs"}, {"dylan", "dˈɪlən"}, {"ed", "ˈɛd"}, {"emily", "ˈɛməli"}, {"eric", "ˈɛɹək"},
+    {"ethan", "ˈiθən"}, {"evan", "ˈɛvən"}, {"evelyn", "ˈɛvələn"}, {"gerald", "ʤˈɛɹəld"}, {"hannah", "hˈænə"},
+    {"ian", "ˈiən"}, {"jacqueline", "ʤˈækwələn"}, {"janet", "ʤˈænət"}, {"janice", "ʤˈænəs"}, {"jeremy", "ʤˈɛɹəmˌi"},
+    {"jerry", "ʤˈɛɹi"}, {"joan", "ʤˈOn"}, {"jose", "hˌOzˈA"}, {"juan", "wˈɑn"}, {"julie", "ʤˈuli"},
+    {"katherine", "kˈæθəɹən"}, {"kathleen", "kæθlˈin"}, {"kathryn", "kˈæθɹən"}, {"kathy", "kˈæθi"},
+    {"katie", "kˈAɾi"}, {"kayla", "kˈAlə"}, {"keith", "kˈiθ"}, {"kenneth", "kˈɛnəθ"}, {"kevin", "kˈɛvən"},
+    {"kim", "kˈɪm"}, {"kimberly", "kˈɪmbəɹli"}, {"kristen", "kɹˈɪstən"}, {"kyle", "kˈIl"}, {"larry", "lˈɛɹi"},
+    {"lauren", "lˈɔɹən"}, {"leah", "lˈiə"}, {"linda", "lˈɪndə"}, {"lindsay", "lˈɪndzi"}, {"liz", "lˈɪz"},
+    {"lori", "lˈɔɹi"}, {"lucas", "lˈukəs"}, {"luis", "luˈis"}, {"luke", "lˈuk"}, {"marcus", "mˈɑɹkəs"},
+    {"margaret", "mˈɑɹɡəɹət"}, {"marie", "məɹˈi"}, {"marilyn", "mˈɛɹələn"}, {"martha", "mˈɑɹθə"}, {"matt", "mˈæt"},
+    {"matthew", "mˈæθju"}, {"megan", "mˈAɡən"}, {"mia", "mˈiə"}, {"michelle", "məʃˈɛl"}, {"natalie", "nˈæɾəli"},
+    {"nathan", "nˈAθən"}, {"nicole", "nəkˈOl"}, {"olivia", "Olˈɪviə"}, {"paige", "pˈAʤ"}, {"pamela", "pˈæmələ"},
+    {"patricia", "pətɹˈɪʃə"}, {"patrick", "pˈætɹək"}, {"paul", "pˈɔl"}, {"raymond", "ɹˈAmənd"},
+    {"rebecca", "ɹəbˈɛkə"}, {"ronald", "ɹˈɑnəld"}, {"russell", "ɹˈʌsᵊl"}, {"ryan", "ɹˈIən"}, {"samantha", "səmˈænθə"},
+    {"sara", "sˈɛɹə"}, {"scott", "skˈɑt"}, {"sean", "ʃˈɔn"}, {"shirley", "ʃˈɜɹli"}, {"sophia", "sOfˈiə"},
+    {"stephanie", "stˈɛfəni"}, {"teresa", "təɹˈisə"}, {"theresa", "təɹˈisə"}, {"travis", "tɹˈævəs"},
+    {"willie", "wˈɪli"}, {"zach", "zˈæk"}, {"zachary", "zˈækəɹi"}, {"zoe", "zˈOi"},
+};
 
-std::map<std::string, Rule> const & Rules()
+// Place names Kokoro's Misaki dictionaries lack (the fallback guesses them: "Buda" like the city in
+// Hungary, "Pflugerville" with a P), as the locals say them. Reader respellings, or Misaki IPA between
+// slashes; Lexicon() adds them after kNames without replacing a word already there (Kyle is a name).
+// Scout BI-033 checked each against misaki 0.7.4 us_gold/us_silver. Golden cases in
+// backseat_tests/spoken_places.json, shared with BookLyre (CROSS).
+constexpr Word kPlaces[] = {
+    // Central Texas.
+    {"buda", "BYOO-duh"}, {"manchaca", "MAN-shak"}, {"pflugerville", "FLOO-gur-vil"}, {"gruene", "GREEN"},
+    {"boerne", "BUR-nee"}, {"mexia", "muh-HAY-uh"}, {"refugio", "reh-FYUR-ee-oh"}, {"bexar", "BAIR"},
+    {"pedernales", "pur-duh-NAL-iss"}, {"guadalupe", "GWAH-duh-loop"}, {"lamar", "luh-MAR"},
+    {"cibolo", "SEE-buh-loh"}, {"bastrop", "BASS-trop"}, {"lampasas", "lam-PASS-us"}, {"kerrville", "KUR-vil"},
+    {"seguin", "seh-GEEN"}, {"hutto", "HUH-toh"}, {"helotes", "heh-LOH-tiss"}, {"uvalde", "yoo-VAL-dee"},
+    {"waxahachie", "wawk-suh-HATCH-ee"}, {"wimberley", "WIM-bur-lee"}, {"marfa", "MAR-fuh"},
+    {"llano", "LAN-oh"}, {"leander", "lee-AN-dur"}, {"bandera", "ban-DAIR-uh"}, {"goliad", "GOH-lee-ad"},
+    {"nacogdoches", "nak-uh-DOH-chiss"},
+    // Elsewhere in the US.
+    {"natchitoches", "NAK-uh-tish"}, {"puyallup", "pyoo-AL-up"}, {"schuylkill", "SKOO-kul"},
+    {"willamette", "wil-AM-it"}, {"kosciusko", "koz-ee-US-koh"}, {"moines", "MOYN"},
+    {"yosemite", "yoh-SEM-ih-tee"}, {"sequim", "SKWIM"}, {"tualatin", "too-AWL-uh-tin"},
+    {"mukilteo", "muk-il-TEE-oh"},
+};
+
+// Store and restaurant names drivers navigate to that Kokoro's Misaki dictionaries lack (scout BI-093
+// checked each against misaki 0.7.4 us_gold/us_silver), so "Arrive at Kroger" isn't guessed. Names only,
+// never a line about them. Keys are letters only (the hosts' tokenizers split "Arby's" into the name and
+// "'s", which adds the z). Lexicon()
+// adds them after kPlaces without replacing a word already there. "Buc-ee's" and "H-E-B" are rewritten
+// by Brands() first. Golden cases in backseat_tests/spoken_brands.json, shared with BookLyre (CROSS).
+constexpr Word kBrands[] = {
+    // Groceries.
+    {"kroger", "KROH-gur"}, {"meijer", "MY-ur"}, {"publix", "PUB-liks"}, {"wegmans", "WEG-munz"},
+    {"lidl", "LEE-dul"}, {"aldi", "AHL-dee"}, {"costco", "KOST-koh"},
+    // Food.
+    {"qdoba", "kyoo-DOH-buh"}, {"whataburger", "WUT-uh-bur-gur"}, {"panera", "puh-NAIR-uh"},
+    {"popeyes", "POP-yz"}, {"zaxby", "ZAKS-bee"}, {"culver", "KUL-vur"}, {"bojangles", "boh-JANG-gulz"},
+    {"bruegger", "BROO-gur"}, {"hardee", "HAR-dee"}, {"applebee", "AP-ul-bee"}, {"krispy", "KRIS-pee"},
+    {"dunkin", "DUN-kin"}, {"arby", "AR-bee"}, {"pei", "PAY"},
+    // Gas and travel stops.
+    {"wawa", "WAH-wah"}, {"sheetz", "SHEETS"}, {"buckees", "BUK-eez"}, {"valero", "vuh-LAIR-oh"},
+    {"exxon", "EK-sahn"}, {"racetrac", "RAYS-trak"},
+    // Shops.
+    {"ulta", "UL-tuh"}, {"sephora", "suh-FOR-uh"},
+};
+
+// Places spelled like an English word but said another way there ("Burnet Rd" in Austin is BURN-it,
+// Humble TX is UM-bul). Swapped for a stand-in only where the sentence says it's the place (see
+// LocalPlaces()), so "be humble" and "the manor" keep their sound.
+struct LocalPlace
 {
-  static std::map<std::string, Rule> const rules = {
-      {"live",
-       [](Ctx const & c) -> char const * {
-         // "go live", "it's live", "a live show", "live music": the adjective (the default).
-         if (In(c.p1, {"a", "an", "the", "go", "goes", "going", "went", "gone", "is", "are", "was", "were", "be",
-                       "been", "being", "it's", "we're", "they're", "you're", "i'm", "he's", "she's", "that's",
-                       "isn't", "aren't", "wasn't", "still", "totally"}))
-           return nullptr;
-         if (In(c.n1, {"music", "show", "shows", "broadcast", "stream", "streaming", "feed", "tv", "audience", "bait",
-                       "wire", "wires", "performance", "concert", "band", "version", "event", "coverage", "footage",
-                       "update", "updates", "traffic", "camera", "cam", "action", "recording", "radio", "chat",
-                       "demo", "sports", "game", "games", "tour", "set", "mic", "data", "map", "view", "location",
-                       "animals", "ammo", "round", "rounds", "theater", "comedy", "studio", "album", "oak", "oaks"}))
-           return nullptr;
-         return "liv";
-       }},
-      {"lives",
-       [](Ctx const & c) -> char const * {
-         return In(c.p1, {"he", "she", "it", "who", "that", "which", "everyone", "someone", "somebody", "nobody",
-                          "one", "anyone", "everybody", "mom", "dad", "still", "only", "also"})
-                    ? "livz"
-                    : nullptr;
-       }},
-      {"read",
-       [](Ctx const & c) -> char const * {
-         return In(c.p1, {"have", "has", "had", "i've", "you've", "we've", "they've", "been", "was", "were", "already",
-                          "being", "haven't", "hasn't", "hadn't", "i'd", "you'd", "we'd", "they'd", "well", "widely",
-                          "once", "just"})
-                    ? "red"
-                    : nullptr;
-       }},
-      {"lead",
-       [](Ctx const & c) -> char const * {
-         if (In(c.n1, {"foot", "feet", "footed", "pipe", "pipes", "paint", "poisoning", "weight", "weights",
-                       "balloon", "pencil", "pencils", "apron", "shot"}))
-           return "led";
-         if (c.p1 == "the" && c.n1 == "out")  // "get the lead out"
-           return "led";
-         return nullptr;
-       }},
-      {"wind",
-       [](Ctx const & c) -> char const * {
-         if (Det(c.p1) || In(c.p1, {"wind", "cold", "strong", "high", "west", "east", "north", "south", "against"}))
-           return nullptr;
-         if (In(c.p1, {"to", "will", "can", "please", "gonna", "wanna", "i", "you", "we", "they", "don't", "let's",
-                       "and", "should", "must"}) ||
-             EndsWith(c.p1, "'ll"))
-           return "wynd";
-         if (c.p1.empty() && In(c.n1, {"down", "up", "it", "the", "your", "back"}))
-           return "wynd";
-         if (In(c.n1, {"down", "up"}))
-           return "wynd";
-         return nullptr;
-       }},
-      {"winds",
-       [](Ctx const & c) -> char const * {
-         return In(c.p1, {"road", "path", "river", "trail", "route", "it", "that", "which", "street", "highway",
-                          "creek", "stream", "drive", "lane"})
-                    ? "wyndz"
-                    : nullptr;
-       }},
-      {"wound",
-       [](Ctx const & c) -> char const * {
-         if (In(c.n1, {"up", "down", "around", "through", "along", "tight", "back"}) &&
-             !In(c.p1, {"a", "the", "my", "your", "open", "his", "her", "flesh", "head", "gunshot"}))
-           return "wownd";
-         return nullptr;
-       }},
-      {"close",
-       [](Ctx const & c) -> char const * {
-         // "so close", "that was close", "close to", "close enough": near (the default).
-         static Set const nearBefore = {"so", "very", "too", "is", "was", "it's", "not", "getting", "how", "pretty",
-                                        "really", "this", "that", "up", "quite", "almost", "come", "came", "stay",
-                                        "keep", "get", "got", "be", "i'm", "we're", "you're", "they're", "are",
-                                        "were", "a", "the", "real", "dangerously", "uncomfortably", "fairly",
-                                        "as", "super", "way", "kind", "kinda", "sort"};
-         static Set const nearAfter = {"to", "enough", "by", "call", "behind", "second", "shave", "friend",
-                                       "friends", "one", "range", "quarters"};
-         if (In(c.p1, nearBefore) || In(c.n1, nearAfter))
-           return nullptr;
-         if (In(c.n1, {"my", "your", "his", "her", "its", "their", "our", "it", "them", "this", "that", "the", "a",
-                       "an", "eyes", "down", "out", "off", "shop", "up", "everything", "all"}))
-           return "kloze";
-         // Not "Am I close?": after "I" or "we" it takes an object, handled above.
-         if (In(c.p1, {"to", "will", "can", "please", "don't", "gonna", "let's", "should", "must", "never"}) ||
-             EndsWith(c.p1, "'ll"))
-           return "kloze";
-         return nullptr;
-       }},
-      {"excuse",
-       [](Ctx const & c) -> char const * {
-         return Det(c.p1) || In(c.p1, {"good", "bad", "great", "perfect", "poor", "lame", "best", "better", "real",
-                                       "valid", "convenient", "terrible", "flimsy", "weak", "new", "same", "old"})
-                    ? "ekskyoos"
-                    : nullptr;
-       }},
-      {"record",
-       [](Ctx const & c) -> char const * { return Verby(c.p1) || c.p1 == "and" ? "rikord" : nullptr; }},
-      {"estimate",
-       [](Ctx const & c) -> char const * {
-         return Det(c.p1) || In(c.p1, {"rough", "best", "good", "bad", "first", "new", "latest", "original",
-                                       "conservative", "generous", "optimistic", "honest"})
-                    ? "estimit"
-                    : nullptr;
-       }},
-      {"insult",
-       [](Ctx const & c) -> char const * {
-         if (Det(c.p1) || In(c.p1, {"an", "personal", "huge", "big", "real", "great", "final", "added"}))
-           return nullptr;
-         return Verby(c.p1) || c.p1 == "how" || Obj(c.n1) ? "insullt" : nullptr;
-       }},
-      {"subject",
-       [](Ctx const & c) -> char const * {
-         if (Det(c.p1))
-           return nullptr;
-         return Obj(c.n1) || Verby(c.p1) ? "subjekt" : nullptr;
-       }},
-      {"suspect",
-       [](Ctx const & c) -> char const * {
-         return In(c.p1, {"i", "we", "they", "you", "i'd", "we'd", "don't", "didn't", "to", "also", "strongly"})
-                    ? "suspekt"
-                    : nullptr;
-       }},
-      {"conduct",
-       [](Ctx const & c) -> char const * {
-         if (Det(c.p1))
-           return nullptr;
-         return Verby(c.p1) || In(c.n1, {"the", "a", "your", "this", "yourself", "yourselves", "an"}) ? "kunduct"
-                                                                                                     : nullptr;
-       }},
-      {"object",
-       [](Ctx const & c) -> char const * {
-         return In(c.p1, {"i", "we", "they", "you", "don't", "to", "will", "would", "didn't"}) || EndsWith(c.p1, "'ll")
-                    ? "objekt"
-                    : nullptr;
-       }},
-      {"desert",
-       [](Ctx const & c) -> char const * {
-         return !Det(c.p1) && In(c.n1, {"you", "me", "him", "her", "them", "us"}) ? "dezzert" : nullptr;
-       }},
-      {"permit",
-       [](Ctx const & c) -> char const * {
-         if (Det(c.p1))
-           return nullptr;
-         return Verby(c.p1) || In(c.n1, {"you", "me", "him", "her", "them", "us", "it", "anyone"}) ? "permitt"
-                                                                                                 : nullptr;
-       }},
-      {"contract",
-       [](Ctx const & c) -> char const * {
-         return !Det(c.p1) && Verby(c.p1) && !In(c.p1, {"i", "we", "they", "you"}) ? "kontrakt" : nullptr;
-       }},
-      {"progress",
-       [](Ctx const & c) -> char const * {
-         return In(c.p1, {"to", "will", "can", "we", "they", "i", "you", "don't", "didn't", "never"}) ||
-                        EndsWith(c.p1, "'ll")
-                    ? "progres"
-                    : nullptr;
-       }},
-      {"present",
-       [](Ctx const & c) -> char const * {
-         if (In(c.n1, {"day", "time", "moment", "tense", "company", "situation"}))
-           return nullptr;
-         return In(c.p1, {"to", "will", "can", "i", "we", "may", "please", "proudly", "now"}) || EndsWith(c.p1, "'ll")
-                    ? "prezent"
-                    : nullptr;
-       }},
-      {"bass",
-       [](Ctx const & c) -> char const * {
-         // The fish only when it's about fishing.
-         if (In(c.n1, {"fishing", "fish", "boat", "pro", "lake", "lure", "lures", "tournament", "pond"}))
-           return nullptr;
-         if (In(c.p1, {"caught", "catch", "largemouth", "smallmouth", "striped", "sea"}))
-           return nullptr;
-         return "bayss";
-       }},
-      {"tear",
-       [](Ctx const & c) -> char const * {
-         if (Det(c.p1) || In(c.p1, {"single", "a"}))
-           return nullptr;
-         // "tear up" is crying as often as ripping: left alone.
-         return In(c.n1, {"down", "off", "apart", "into", "through", "out", "it", "them", "the", "my", "your", "his",
-                          "her", "our", "their", "open"})
-                    ? "tair"
-                    : nullptr;
-       }},
-      {"tears",
-       [](Ctx const & c) -> char const * {
-         return In(c.p1, {"he", "she", "it", "who", "that", "which"}) &&
-                        In(c.n1, {"down", "off", "apart", "into", "through", "out", "it", "them", "the", "up",
-                                  "open"})
-                    ? "tairz"
-                    : nullptr;
-       }},
-      {"minute",
-       [](Ctx const & c) -> char const * {
-         return In(c.n1, {"detail", "details", "amount", "amounts", "difference", "differences", "fraction",
-                          "changes", "adjustments", "particles"})
-                    ? "mynoot"
-                    : nullptr;
-       }},
-      {"use",
-       [](Ctx const & c) -> char const * {
-         if (Obj(c.n1) || In(c.n1, {"a", "an", "to"}))
-           return nullptr;
-         return In(c.p1, {"no", "the", "any", "of", "much", "its", "good", "little", "a", "some", "what's", "whats",
-                          "for", "in", "personal", "business", "commercial", "regular", "daily", "heavy"})
-                    ? "yoos"
-                    : nullptr;
-       }},
-      {"content",
-       [](Ctx const & c) -> char const * {
-         return In(c.p1, {"the", "your", "my", "our", "their", "this", "that", "its", "his", "her", "original", "new",
-                          "sponsored", "more", "some", "any"})
-                    ? "kontent"
-                    : nullptr;
-       }},
-  };
-  return rules;
-}
+  char const * word;
+  char const * said;
+  /// After "to", "onto", "in"... too; false when the word is also a country or common noun there.
+  bool afterPreposition;
+  /// The state it's in, which may follow after a comma ("Humble, TX", "Reading, PA").
+  char const * state = "TX";
+};
+
+constexpr LocalPlace kLocalPlaces[] = {
+    {"Burnet", "BURN-it", true},
+    {"Humble", "UM-bul", true},
+    {"Manor", "MAY-nur", true},
+    // "in Palestine" is the country; only "Palestine, TX" or "Palestine Ave".
+    {"Palestine", "PAL-uh-steen", false},
+    // Reading PA (and Reading in England, the Reading Railroad) is RED-ing; capitalised mid-sentence it's
+    // the place, lowercase or at the start of a sentence ("Reading the map") it stays the verb.
+    {"Reading", "RED-ing", true, "PA"},
+};
 
 bool IsAsciiLetter(char ch)
 {
   return std::isalpha(static_cast<unsigned char>(ch)) != 0;
+}
+
+/// True when one of `words` is a whole run of ASCII letters in `s` ("St" in "Main St.", not in "Stop").
+/// The street, title and day passes screen with it before their regexes (loop B122): each regex only
+/// changes text at a word that is a whole letter run, so a line without one comes back as it went in.
+bool HasLetterWord(std::string_view s, std::initializer_list<std::string_view> words)
+{
+  for (size_t i = 0; i < s.size();)
+  {
+    if (!IsAsciiLetter(s[i]))
+    {
+      ++i;
+      continue;
+    }
+    size_t j = i;
+    while (j < s.size() && IsAsciiLetter(s[j]))
+      ++j;
+    auto const run = s.substr(i, j - i);
+    for (auto const w : words)
+      if (run == w)
+        return true;
+    i = j;
+  }
+  return false;
 }
 
 // ’ (U+2019) as UTF-8.
@@ -389,35 +278,90 @@ std::string ReplaceAll(std::string s, std::string_view from, std::string_view to
   return s;
 }
 
-std::string const kStreetWords[][2] = {
-    {"St", "Street"},     {"Ave", "Avenue"},  {"Blvd", "Boulevard"}, {"Rd", "Road"},        {"Dr", "Drive"},
-    {"Ln", "Lane"},       {"Ct", "Court"},    {"Pkwy", "Parkway"},   {"Hwy", "Highway"},    {"Pl", "Place"},
-    {"Cir", "Circle"},    {"Ter", "Terrace"}, {"Trl", "Trail"},      {"Expy", "Expressway"}, {"Fwy", "Freeway"},
-    {"Sq", "Square"},
-};
+std::string Ordinal(long long n);
 
-std::string Street(std::string const & abbreviation)
+/// I..XXXIX as a number, or 0 when it isn't a well-formed numeral ("IIII", "VX", "IC").
+int RomanValue(std::string const & r)
 {
-  for (auto const & w : kStreetWords)
-    if (w[0] == abbreviation)
-      return w[1];
-  return abbreviation;
+  static char const * const ones[] = {"", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"};
+  static char const * const tens[] = {"", "X", "XX", "XXX"};
+  for (int n = 1; n < 40; ++n)
+    if (r == std::string(tens[n / 10]) + ones[n % 10])
+      return n;
+  return 0;
 }
 
-std::string Compass(std::string const & c)
+/// Given names that carry a regnal number on streets and squares abroad and at home. Any other
+/// capitalised name counts too when a title (King, Pope, ...) comes right before it.
+bool RegnalName(std::string const & lower)
 {
-  static std::map<std::string, std::string> const words = {
-      {"N", "North"},     {"S", "South"},     {"E", "East"},      {"W", "West"},
-      {"NE", "Northeast"}, {"NW", "Northwest"}, {"SE", "Southeast"}, {"SW", "Southwest"}};
-  auto const it = words.find(c);
-  return it == words.end() ? c : it->second;
+  static std::set<std::string> const names = {
+      "abdullah", "adrian", "albert", "alexander", "alfonso", "amadeus", "anne", "baudouin", "benedict",
+      "boniface", "carlo", "carlos", "catherine", "charles", "christian", "clement", "constantine",
+      "david", "edward", "elizabeth", "emmanuel", "felipe", "ferdinand", "fernando", "francis",
+      "franz", "frederick", "friedrich", "george", "gregory", "gustav", "gustavo", "haakon", "harald",
+      "hassan", "henri", "henry", "innocent", "isabel", "isabella", "ivan", "jaime", "james", "jean",
+      "joão", "john", "joseph", "juan", "julius", "kamehameha", "karl", "leo", "leopold", "louis",
+      "ludwig", "manuel", "mary", "mohammed", "napoleon", "nicholas", "olav", "otto", "pablo",
+      "paul", "pedro", "peter", "philip", "philippe", "pio", "pius", "rama", "ramesses", "richard",
+      "robert", "rudolf", "sixtus", "stephen", "umberto", "urban", "victor", "wilhelm", "william"};
+  return names.count(lower) > 0;
 }
 
-bool Space(char ch)
+bool RegnalTitle(std::string const & lower)
 {
-  return std::isspace(static_cast<unsigned char>(ch)) != 0;
+  static std::set<std::string> const titles = {
+      "king", "queen", "pope", "tsar", "czar", "emperor", "empress", "prince", "princess", "sultan",
+      "kaiser", "shah", "pharaoh", "rey", "roi", "re", "rei", "könig", "papa", "san", "saint"};
+  return titles.count(lower) > 0;
 }
 
+/// The word that ends just before `end` (a run of anything but spaces), and where it starts.
+std::string WordEndingAt(std::string const & s, size_t end, size_t & start)
+{
+  start = end;
+  while (start > 0 && !Space(s[start - 1]))
+    --start;
+  return s.substr(start, end - start);
+}
+}  // namespace
+
+std::string Regnal(std::string const & text)
+{
+  static std::regex const numeral("\\b([IVX]{1,6})(?=$|[\\s,;:!?.)])");
+  return Replace(text, numeral, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    auto const roman = m.str(1);
+    int const n = RomanValue(roman);
+    if (n == 0 || pos < 2 || text[pos - 1] != ' ')
+      return std::nullopt;
+    size_t nameStart = 0;
+    auto const name = WordEndingAt(text, pos - 1, nameStart);
+    if (name.empty() || !std::isupper(static_cast<unsigned char>(name[0])))
+      return std::nullopt;
+    auto const lowerName = Lower(name);
+    bool named = RegnalName(lowerName);
+    if (!named && nameStart >= 2 && text[nameStart - 1] == ' ')
+    {
+      size_t titleStart = 0;
+      named = RegnalTitle(Lower(WordEndingAt(text, nameStart - 1, titleStart))) && !RegnalTitle(lowerName);
+    }
+    if (!named || (lowerName == "malcolm" && roman == "X"))
+      return std::nullopt;
+    size_t const after = pos + roman.size();
+    // "John V. Smith Rd": one letter and a period before another name is a middle initial.
+    if (roman.size() == 1 && after + 2 < text.size() && text[after] == '.' && text[after + 1] == ' ' &&
+        std::isupper(static_cast<unsigned char>(text[after + 2])))
+      return std::nullopt;
+    // "Henry I think": a lone I before a lowercase word is the pronoun.
+    if (roman == "I" && after + 1 < text.size() && text[after] == ' ' &&
+        std::islower(static_cast<unsigned char>(text[after + 1])) && text.compare(after + 1, 3, "of ") != 0)
+      return std::nullopt;
+    return "the " + Ordinal(n);
+  });
+}
+
+namespace
+{
 std::string Ordinal(long long n)
 {
   auto const words = SpellNumber(n);
@@ -434,12 +378,18 @@ std::string Ordinal(long long n)
   return head + last + "th";
 }
 
+// Digits as a number. A digit run too long for long long (a garbled street name, "99999999999999999999-5")
+// stops at LLONG_MAX instead of overflowing, which is undefined behaviour; every caller treats that as huge.
 long long ToNumber(std::string const & digits)
 {
   long long n = 0;
   for (char ch : digits)
     if (std::isdigit(static_cast<unsigned char>(ch)))
+    {
+      if (n > (LLONG_MAX - 9) / 10)
+        return LLONG_MAX;
       n = n * 10 + (ch - '0');
+    }
   return n;
 }
 
@@ -615,6 +565,100 @@ std::string ApplyUserWords(std::string const & text)
   }
   return s;
 }
+
+// MARK: - Ranges
+
+// Words a hyphen between two numbers can only mean "to" after ("pages 3-5", "from 10-20") or
+// before ("3-5 miles"). Anything else with a hyphen (phone numbers, scores, "the 9-5 grind")
+// stays as written. Lowercase, no trailing period.
+bool CountingWordBefore(std::string const & w)
+{
+  static std::array<std::string_view, 22> const words = {
+      "page", "pages", "pp", "p", "age", "ages", "aged", "verse", "verses", "chapter", "chapters",
+      "from", "between", "year", "years", "exit", "exits", "lane", "lanes", "mile", "miles", "step"};
+  return std::find(words.begin(), words.end(), w) != words.end();
+}
+
+bool CountingWordAfter(std::string const & w)
+{
+  static std::array<std::string_view, 24> const words = {
+      "mi", "mile", "miles", "ft", "feet", "km", "kilometers", "minute", "minutes", "min", "hour", "hours",
+      "hrs", "day", "days", "mph", "blocks", "exits", "lanes", "stops", "seconds", "weeks", "years", "times"};
+  return std::find(words.begin(), words.end(), w) != words.end();
+}
+
+bool Digit(char ch)
+{
+  return std::isdigit(static_cast<unsigned char>(ch)) != 0;
+}
+
+// The lowercase word that ends just before `pos` (skipping spaces and one trailing period), and
+// where it starts.
+// Words before a score: "lost 2–3" is a score, not a range.
+bool ScoreWordBefore(std::string const & w)
+{
+  static std::array<std::string_view, 9> const words = {"won", "lost", "beat", "drew", "tied", "score",
+                                                         "scored", "trailing", "leading"};
+  return std::find(words.begin(), words.end(), w) != words.end();
+}
+
+// Words that make a bare hyphen between two hours "to": "Monday to Friday 9-5", "Open 9-5", "Sat 10-4".
+// "the 9-5 grind" and scores stay as written. Lowercase.
+bool HoursWordBefore(std::string const & w)
+{
+  static std::array<std::string_view, 33> const words = {
+      "mon",      "tue",      "tues",      "wed",     "thu",      "fri",     "sat",      "sun",
+      "monday",   "tuesday",  "wednesday", "thursday", "friday",  "saturday", "sunday",  "mondays",
+      "tuesdays", "wednesdays", "thursdays", "fridays", "saturdays", "sundays", "weekdays", "weekends",
+      "daily",    "nightly",  "open",      "opens",   "hours",    "closes",  "closed",   "everyday",
+      "weeknights"};
+  return std::find(words.begin(), words.end(), w) != words.end();
+}
+
+std::string WordBefore(std::string const & s, size_t pos, size_t & start)
+{
+  size_t end = pos;
+  while (end > 0 && s[end - 1] == ' ')
+    --end;
+  if (end > 0 && s[end - 1] == '.')
+    --end;
+  start = end;
+  while (start > 0 && IsAsciiLetter(s[start - 1]))
+    --start;
+  return Lower(std::string_view(s).substr(start, end - start));
+}
+
+std::string WordAfter(std::string const & s, size_t pos)
+{
+  if (pos < s.size() && s[pos] == '%')
+    return "percent";
+  while (pos < s.size() && s[pos] == ' ')
+    ++pos;
+  size_t end = pos;
+  while (end < s.size() && IsAsciiLetter(s[end]))
+    ++end;
+  return Lower(std::string_view(s).substr(pos, end - pos));
+}
+
+double Value(std::string const & number)
+{
+  std::string plain;
+  for (char ch : number)
+    if (ch != ',')
+      plain += ch;
+  return std::stod(plain);
+}
+
+std::string FractionWords(std::string const & a, std::string const & b)
+{
+  if (a == "1" && b == "2")
+    return "a half";
+  if (a == "1" && b == "4")
+    return "a quarter";
+  if (a == "3" && b == "4")
+    return "three quarters";
+  return a + "/" + b;
+}
 }  // namespace
 
 void SetUserWords(std::string const & lines)
@@ -658,6 +702,8 @@ std::string SpellNumber(long long n)
                                       "seven",   "eight",   "nine",      "ten",      "eleven",   "twelve",  "thirteen",
                                       "fourteen", "fifteen", "sixteen",  "seventeen", "eighteen", "nineteen"};
   static char const * const tens[] = {"", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"};
+  if (n == std::numeric_limits<long long>::min())
+    return std::to_string(n);  // -n overflows; nothing real is this big
   if (n < 0)
     return "minus " + SpellNumber(-n);
   if (n < 20)
@@ -739,7 +785,18 @@ std::string PickSenses(std::string const & text)
     {
       c.n1 = words[k + 1].lower;
       if (k + 2 < words.size() && !words[k + 2].breakBefore)
+      {
         c.n2 = words[k + 2].lower;
+        if (k + 3 < words.size() && !words[k + 3].breakBefore)
+          c.n3 = words[k + 3].lower;
+      }
+    }
+    {
+      size_t at = words[k].start + words[k].len;
+      while (at < text.size() && Space(text[at]))
+        ++at;
+      c.endsClause = at >= text.size() || std::string_view(",.;:!?)").find(text[at]) != std::string_view::npos ||
+                     text.compare(at, 3, "\xE2\x80\x94") == 0 || text.compare(at, 3, "\xE2\x80\x93") == 0;
     }
     char const * token = rule->second(c);
     if (token == nullptr)
@@ -755,30 +812,970 @@ std::string PickSenses(std::string const & text)
   return out;
 }
 
-std::string ForSpeech(std::string const & text)
+std::string Ranges(std::string const & text)
 {
-  std::string s = ReplaceAll(text, "\xC2\xA0", " ");
+  // A number, a hyphen, en dash or unspaced em dash, a number; "3-1/2" too.
+  static std::regex const range(
+      "(\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?)(-|\xE2\x80\x93|\xE2\x80\x94)"
+      "(\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?)(?:/(\\d+))?");
+  auto const & s = text;
+  std::string out;
+  size_t last = 0;
+  for (std::sregex_iterator it(s.begin(), s.end(), range), end; it != end; ++it)
+  {
+    auto const & m = *it;
+    auto const pos = static_cast<size_t>(m.position(0));
+    auto const after = pos + static_cast<size_t>(m.length(0));
+    std::string prefix = s.substr(last, pos - last);
+    std::optional<std::string> said;
+    // Part of something longer: "I-35-40", "-5", "800-555-1234", "2024-01-15", "66-A", "3-5x".
+    bool const glued =
+        (pos > 0 && (IsAsciiLetter(s[pos - 1]) || std::string_view("-./,").find(s[pos - 1]) != std::string_view::npos)) ||
+        (after < s.size() && (IsAsciiLetter(s[after]) || Digit(s[after]) ||
+                              std::string_view("-/:").find(s[after]) != std::string_view::npos)) ||
+        s.compare(after, 3, "\xE2\x80\x93") == 0 || s.compare(after, 3, "\xE2\x80\x94") == 0;
+    bool const hyphen = m.str(2) == "-";
+    if (!glued && m[4].matched)
+    {
+      // "a 3-1/2 inch nail": three and a half.
+      if (hyphen)
+        said = m.str(1) + " and " + FractionWords(m.str(3), m.str(4));
+    }
+    else if (!glued)
+    {
+      auto const a = m.str(1);
+      auto b = m.str(3);
+      bool const yearA = a.size() == 4 && a[0] >= '1' && a[0] <= '2';
+      // "1914–18", "1905-06": the end year keeps the start's century.
+      if (yearA && b.size() == 2)
+        b = std::to_string(ToNumber(a) / 100 * 100 + ToNumber(b));
+      bool const yearB = b.size() == 4 && b[0] >= '1' && b[0] <= '2';
+      size_t wordStart = 0;
+      auto const before = WordBefore(s, pos, wordStart);
+      bool const counting = CountingWordBefore(before) || CountingWordAfter(WordAfter(s, after));
+      // Opening hours count down too: "Monday to Friday, 9-5" is "9 to 5". Whole hours 1-12 only.
+      size_t commaStart = 0;
+      std::string const hoursWord =
+          before.empty() && wordStart > 0 && s[wordStart - 1] == ',' ? WordBefore(s, wordStart - 1, commaStart) : before;
+      auto const hourA = ToNumber(a);
+      auto const hourB = ToNumber(b);
+      bool const hours = hyphen && HoursWordBefore(hoursWord) && a.size() <= 2 && b.size() <= 2 &&
+                         hourA >= 1 && hourA <= 12 && hourB >= 1 && hourB <= 12 && hourA != hourB &&
+                         a.find_first_not_of("0123456789") == std::string::npos &&
+                         b.find_first_not_of("0123456789") == std::string::npos;
+      if (hours)
+        said = a + " to " + b;
+      // Scores and "the 9-5 grind" count down; ranges go up.
+      else if (Value(b) > Value(a) && !ScoreWordBefore(before) && (!hyphen || (yearA && yearB) || counting))
+      {
+        said = a + (before == "between" ? " and " : " to ") + b;
+        if ((before == "pp" || before == "p") && wordStart >= last)
+          prefix = s.substr(last, wordStart - last) + (before == "pp" ? "pages " : "page ");
+      }
+    }
+    out += prefix;
+    out += said ? *said : m.str(0);
+    last = after;
+  }
+  out.append(s, last, std::string::npos);
+  return out;
+}
+
+// MARK: - Foreign phrases
+
+namespace
+{
+struct Phrase
+{
+  char const * text;
+  /// One reader-style respelling per word, stressed syllable in capitals.
+  char const * said;
+};
+
+// Phrases the lines quote in another language ("Gire a la izquierda means 'turn left' in Spanish",
+// the template in gps-comments.md). Kokoro's English frontend reads them as English ("jire a la
+// iz-kwer-da", and nothing at all for Japanese), so ForSpeech swaps each word for a stand-in
+// ("fx" + the respelling's letters) that the dictionary says the way the respelling does.
+// Latin-script phrases match ignoring case on word boundaries; other scripts match as written.
+constexpr Phrase kPhrases[] = {
+    // "turn left"
+    {"Gire a la izquierda", "HEE-reh ah lah ees-kee-AIR-dah"},
+    {"Tournez à gauche", "toor-NAY ah GOHSH"},
+    {"Biegen Sie links ab", "BEE-gen zee LINKS ahp"},
+    {"Gira a sinistra", "JEE-rah ah see-NEES-trah"},
+    {"Vire à esquerda", "VEE-ree ah es-KEHR-dah"},
+    {"Sla linksaf", "slah LINKS-ahf"},
+    {"Sväng vänster", "svehng VEN-ster"},
+    {"Skręć w lewo", "skrench v LEH-vo"},
+    {"Поверните налево", "pah-vyer-NEE-tyeh nah-LYEH-vah"},
+    {"左に曲がってください", "hee-DAH-ree nee mah-GAHT-teh koo-dah-SIGH"},
+    {"좌회전하세요", "jwah-HWEH-jun hah-SEH-yo"},
+    {"向左转", "SHYAHNG DZWOH JWAHN"},
+    {"Käänny vasemmalle", "KAHN-noo VAH-sem-mahl-leh"},
+    {"Verte ad sinistram", "WER-teh ahd sin-IS-trahm"},
+    // "turn right", "recalculating", "I told you so"
+    {"Gire a la derecha", "HEE-reh ah lah deh-REH-chah"},
+    {"Tournez à droite", "toor-NAY ah DRWAHT"},
+    {"Recalculando", "reh-kahl-koo-LAHN-doh"},
+    {"Recalcul en cours", "reh-kahl-KOOL ahn KOOR"},
+    {"Te lo dije", "teh loh DEE-heh"},
+    {"Je te l'avais dit", "zhuh tuh lah-VEH DEE"},
+    {"Hab ich dir doch gesagt", "HAHP ish DEER DOKH geh-ZAHKT"},
+    {"Route wird neu berechnet", "ROO-teh VEERT NOY beh-RESH-net"},
+    // "learn to drive"
+    {"Aprende a conducir", "ah-PREN-deh ah kohn-doo-SEER"},
+    {"Apprends à conduire", "ah-PRAHN ah kohn-DWEER"},
+    {"Lern Auto fahren", "LAIRN OW-toh FAH-ren"},
+    {"Impara a guidare", "eem-PAH-rah ah gwee-DAH-reh"},
+    {"Aprenda a dirigir", "ah-PREN-dah ah jee-ree-ZHEER"},
+    {"運転を習ってください", "OON-tehn oh nah-RAHT-teh koo-dah-SIGH"},
+    {"Leer autorijden", "LAYR OW-toh-ray-den"},
+    {"Научись водить", "nah-oo-CHEES vah-DEET"},
+    // "I am an excellent driver"
+    {"Soy un conductor excelente", "SOY oon kohn-dook-TOR ehk-seh-LEN-teh"},
+    {"Je suis un excellent conducteur", "zhuh SWEE uhn ehk-seh-LAHN kohn-dook-TUR"},
+    {"Ich bin ein ausgezeichneter Fahrer", "ISH BIN EYEN OWS-geh-tsighsh-neh-ter FAH-rer"},
+    {"Sono un ottimo guidatore", "SOH-noh oon OHT-tee-moh gwee-dah-TOH-reh"},
+    {"Я отличный водитель", "yah aht-LEECH-nee vah-DEE-tyel"},
+    {"私は運転がとても上手です", "wah-TAH-shee wah OON-tehn gah toh-TEH-moh JOH-zoo dess"},
+};
+
+std::string AsciiLower(std::string s)
+{
+  for (char & c : s)
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return s;
+}
+
+bool WordByte(std::string const & s, size_t i)
+{
+  auto const c = static_cast<unsigned char>(s[i]);
+  return std::isalnum(c) || c >= 0x80;
+}
+
+std::vector<std::string> SplitWords(std::string const & said)
+{
+  std::vector<std::string> out;
+  std::istringstream in(said);
+  for (std::string w; in >> w;)
+    out.push_back(w);
+  return out;
+}
+
+std::string StandIn(std::string const & respelling)
+{
+  std::string out = "fx";
+  for (char c : respelling)
+    if (IsAsciiLetter(c))
+      out += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return out;
+}
+
+/// A respelled word as phonemes. A one-syllable word has no capitals to mark its stress, so it
+/// is stressed when written in capitals ("GOHSH") and unstressed when not ("ah").
+std::optional<std::string> ForeignWordPhonemes(std::string const & respelling)
+{
+  if (respelling.find('-') != std::string::npos)
+    return RespellingPhonemes(respelling);
+  auto ph = RespellingPhonemes("\xCB\x88" + respelling);
+  if (ph && respelling != AsciiLower(respelling))
+    return ph;
+  if (ph)
+    *ph = ReplaceAll(*ph, "\xCB\x88", "");
+  return ph;
+}
+}  // namespace
+
+std::vector<std::pair<std::string, std::string>> const & ForeignPhrases()
+{
+  static std::vector<std::pair<std::string, std::string>> const phrases = [] {
+    std::vector<std::pair<std::string, std::string>> out;
+    for (auto const & p : kPhrases)
+    {
+      std::string standIns;
+      for (auto const & w : SplitWords(p.said))
+        standIns += (standIns.empty() ? "" : " ") + StandIn(w);
+      out.emplace_back(p.text, standIns);
+    }
+    return out;
+  }();
+  return phrases;
+}
+
+std::string Foreign(std::string const & text)
+{
+  std::string s = text;
+  for (auto const & [phrase, standIns] : ForeignPhrases())
+  {
+    bool const latin = IsAsciiLetter(phrase[0]);
+    std::string const needle = latin ? AsciiLower(phrase) : phrase;
+    std::string out;
+    std::string const hay = latin ? AsciiLower(s) : s;
+    size_t last = 0;
+    for (size_t at = hay.find(needle); at != std::string::npos; at = hay.find(needle, at + 1))
+    {
+      size_t const end = at + needle.size();
+      if (at < last || (latin && ((at > 0 && WordByte(s, at - 1)) || (end < s.size() && WordByte(s, end)))))
+        continue;
+      out.append(s, last, at - last);
+      out += standIns;
+      last = end;
+    }
+    out.append(s, last, std::string::npos);
+    s = out;
+  }
+  return s;
+}
+
+// MARK: - Street names abroad
+
+namespace
+{
+struct ForeignWord
+{
+  char const * word;
+  /// Reader-style respelling, stressed syllable in capitals (see kPhrases).
+  char const * said;
+  /// The languages whose particles may follow ("es pt"); the first picks how "de" sounds.
+  char const * langs;
+};
+
+// Street-type words map data carries abroad (and in Miami, LA, Quebec) that English Kokoro reads
+// as English: "Calle Ocho" is "call Ocho", "Straße" loses its ß. Avenue, Boulevard, Plaza and Place
+// read fine in English and are left; Rue does too, but its "de"/"du" don't.
+constexpr ForeignWord kStreetTypes[] = {
+    {"Calle", "KAH-yeh", "es"},          {"Avenida", "ah-veh-NEE-dah", "es pt"},
+    {"Paseo", "pah-SEH-oh", "es"},       {"Calzada", "kahl-SAH-dah", "es"},
+    {"Carrera", "kah-REH-rah", "es"},    {"Carretera", "kah-reh-TEH-rah", "es"},
+    {"Callejón", "kah-yeh-HOHN", "es"},  {"Glorieta", "gloh-RYEH-tah", "es"},
+    {"Rue", "ROO", "fr"},                {"Chemin", "sheh-MAN", "fr"},
+    {"Allée", "ah-LAY", "fr"},           {"Quai", "KAY", "fr"},
+    {"Via", "VEE-ah", "it"},             {"Viale", "vee-AH-leh", "it"},
+    {"Piazza", "pee-AHT-sah", "it"},     {"Vicolo", "VEE-koh-loh", "it"},
+    {"Rua", "HOO-ah", "pt"},             {"Travessa", "trah-VEH-sah", "pt"},
+    {"Praça", "PRAH-sah", "pt"},         {"Straße", "SHTRAH-seh", "de"},
+    {"Strasse", "SHTRAH-seh", "de"},     {"Gasse", "GAH-seh", "de"},
+    {"Platz", "PLAHTS", "de"},
+};
+
+// Little words inside those names: "Paseo de la Reforma", "Rue du Bac", "Via della Spiga".
+constexpr ForeignWord kStreetParticles[] = {
+    {"de", "deh", "es"},   {"del", "dehl", "es"},   {"la", "lah", "es"},     {"las", "lahs", "es"},
+    {"los", "lohs", "es"}, {"de", "duh", "fr"},     {"du", "dew", "fr"},     {"des", "day", "fr"},
+    {"la", "lah", "fr"},   {"le", "luh", "fr"},     {"di", "dee", "it"},     {"del", "dehl", "it"},
+    {"della", "DEL-lah", "it"}, {"dei", "day", "it"}, {"delle", "DEL-leh", "it"},
+    {"degli", "DEL-yee", "it"}, {"de", "deh", "pt"}, {"do", "doo", "pt"},    {"da", "dah", "pt"},
+    {"dos", "doos", "pt"}, {"das", "dahs", "pt"},
+};
+
+bool InLangs(std::string_view langs, std::string_view lang)
+{
+  for (size_t at = langs.find(lang); at != std::string_view::npos; at = langs.find(lang, at + 1))
+    if ((at == 0 || langs[at - 1] == ' ') && (at + lang.size() == langs.size() || langs[at + lang.size()] == ' '))
+      return true;
+  return false;
+}
+
+/// The particle's respelling in the street word's languages, the first language winning.
+char const * StreetParticle(std::string const & word, std::string_view langs)
+{
+  std::string const w = AsciiLower(word);
+  if (w != word && !(std::isupper(static_cast<unsigned char>(word[0])) && AsciiLower(word.substr(1)) == word.substr(1)))
+    return nullptr;
+  std::istringstream in{std::string(langs)};
+  for (std::string lang; in >> lang;)
+    for (auto const & p : kStreetParticles)
+      if (w == p.word && lang == p.langs)
+        return p.said;
+  return nullptr;
+}
+
+/// A word that can carry a street name on: capitalised, a number, or non-ASCII ("Élysées").
+bool NameWord(std::string const & w)
+{
+  auto const c = static_cast<unsigned char>(w[0]);
+  return std::isupper(c) || std::isdigit(c) || c >= 0x80;
+}
+}  // namespace
+
+std::string ForeignStreets(std::string const & text)
+{
+  struct Span
+  {
+    size_t at, end;
+  };
+  std::vector<Span> words;
+  for (size_t i = 0; i < text.size();)
+  {
+    if (!WordByte(text, i))
+    {
+      ++i;
+      continue;
+    }
+    size_t j = i;
+    while (j < text.size() && WordByte(text, j))
+      ++j;
+    words.push_back({i, j});
+    i = j;
+  }
+  auto const word = [&](size_t k) { return text.substr(words[k].at, words[k].end - words[k].at); };
+  // The next word is on the same name: only spaces between, or an elided "d'"/"l'" right after.
+  auto const spaced = [&](size_t k) {
+    for (size_t i = words[k].end; i < words[k + 1].at; ++i)
+      if (text[i] != ' ')
+        return false;
+    return true;
+  };
+  auto const elided = [&](size_t k) {
+    auto const w = AsciiLower(word(k));
+    return (w == "d" || w == "l") && words[k].end < text.size() &&
+           (text[words[k].end] == '\'' || text.compare(words[k].end, 3, "\xE2\x80\x99") == 0);
+  };
+
+  std::vector<std::pair<Span, std::string>> swaps;
+  for (size_t k = 0; k < words.size(); ++k)
+  {
+    std::string const w = word(k);
+    // "Hauptstraße", "Bahnhofstrasse": the type is glued on.
+    for (std::string_view tail : {"stra\xC3\x9F" "e", "strasse"})
+      if (w.size() > tail.size() + 1 && std::isupper(static_cast<unsigned char>(w[0])) &&
+          AsciiLower(w.substr(w.size() - tail.size())) == tail)
+        swaps.push_back({{words[k].at + w.size() - tail.size(), words[k].end}, " " + StandIn(std::string("SHTRAH-seh"))});
+    ForeignWord const * type = nullptr;
+    for (auto const & t : kStreetTypes)
+      if (w == t.word)
+        type = &t;
+    if (!type)
+      continue;
+    bool const atEnd = k + 1 == words.size() || !spaced(k);
+    auto const carriesOn = [&](size_t n) {
+      return NameWord(word(n)) || StreetParticle(word(n), type->langs) || elided(n);
+    };
+    // German types follow the name: "Potsdamer Platz", "Lange Gasse".
+    bool const after = InLangs(type->langs, "de") && k > 0 && spaced(k - 1) && NameWord(word(k - 1));
+    if (!after && (atEnd || !carriesOn(k + 1)))
+      continue;
+    std::string standIns;
+    for (auto const & part : SplitWords(type->said))
+      standIns += (standIns.empty() ? "" : " ") + StandIn(part);
+    swaps.push_back({words[k], standIns});
+    for (size_t n = k + 1; !atEnd && n + 1 < words.size() && spaced(n); ++n)
+    {
+      auto const said = StreetParticle(word(n), type->langs);
+      if (!said || !carriesOn(n + 1))
+        break;
+      swaps.push_back({words[n], StandIn(std::string(said))});
+      k = n;
+    }
+  }
+  if (swaps.empty())
+    return text;
+  std::string out;
+  size_t last = 0;
+  for (auto const & [span, said] : swaps)
+  {
+    out.append(text, last, span.at - last);
+    out += said;
+    last = span.end;
+  }
+  out.append(text, last, std::string::npos);
+  return out;
+}
+
+std::vector<std::string> ForeignStreetRespellings()
+{
+  std::vector<std::string> out;
+  for (auto const & t : kStreetTypes)
+    for (auto const & part : SplitWords(t.said))
+      out.push_back(part);
+  for (auto const & p : kStreetParticles)
+    out.push_back(p.said);
+  return out;
+}
+
+// MARK: - Local place names
+
+namespace
+{
+bool StateWord(std::string const & w, char const * state)
+{
+  if (std::string_view(state) == "PA")
+    return In(w, {"PA", "Penn", "Pennsylvania", "UK", "England", "Berkshire", "Berks"});
+  return In(w, {"TX", "Tex", "Texas"});
+}
+}  // namespace
+
+std::string Brands(std::string const & text)
+{
+  if (text.find("uc") == std::string::npos && text.find("UC") == std::string::npos && text.find('E') == std::string::npos)
+    return text;
+  // "Buc-ee's", "Bucees", "BUC-EE'S": one word the dictionary has, so the hyphen and quote don't split it.
+  static std::regex const bucees("\\b[Bb][Uu][Cc]-?[Ee][Ee](?:'|\xE2\x80\x99)?[Ss]\\b");
+  // "HEB", "H-E-B" (the grocery) are letters; capitals only, so "heb" in a web address or a word stays.
+  static std::regex const heb("\\bH-?E-?B\\b(?!-)");
+  auto s = std::regex_replace(text, bucees, "Buckees");
+  return std::regex_replace(s, heb, "H E B");
+}
+
+std::vector<std::string> BrandWords()
+{
+  std::vector<std::string> out;
+  for (auto const & b : kBrands)
+    out.emplace_back(b.word);
+  return out;
+}
+
+std::string LocalPlaces(std::string const & text)
+{
+  bool any = false;
+  for (auto const & p : kLocalPlaces)
+    any = any || text.find(p.word) != std::string::npos;
+  if (!any)
+    return text;
+  struct Span
+  {
+    size_t at, end;
+  };
+  std::vector<Span> words;
+  for (size_t i = 0; i < text.size();)
+  {
+    if (!IsAsciiLetter(text[i]))
+    {
+      ++i;
+      continue;
+    }
+    size_t j = i;
+    while (j < text.size() && IsAsciiLetter(text[j]))
+      ++j;
+    words.push_back({i, j});
+    i = j;
+  }
+  auto const word = [&](size_t k) { return text.substr(words[k].at, words[k].end - words[k].at); };
+  // Only spaces, or one comma ("Humble, TX"), between two words.
+  auto const adjacent = [&](size_t a, size_t b) {
+    int commas = 0;
+    for (size_t i = words[a].end; i < words[b].at; ++i)
+    {
+      if (text[i] == ',')
+        ++commas;
+      else if (text[i] != ' ')
+        return false;
+    }
+    return commas <= 1;
+  };
+  static Set const placeAfter = {"Rd", "Road", "St", "Street", "Ave", "Avenue", "Dr", "Drive", "Ln", "Lane", "Blvd",
+                                 "Boulevard", "Hwy", "Highway", "Pkwy", "Parkway", "Ct", "Way", "Loop", "County",
+                                 "ISD", "Exit", "Station", "Square", "Plaza", "Center", "Terminal", "Railroad"};
+  static Set const toward = {"to", "onto", "into", "in", "toward", "towards", "near", "from", "via", "through",
+                             "past", "outside", "reach", "leaving", "entering"};
+  std::string out;
+  size_t last = 0;
+  for (size_t k = 0; k < words.size(); ++k)
+  {
+    auto const w = word(k);
+    auto const place = std::find_if(std::begin(kLocalPlaces), std::end(kLocalPlaces),
+                                    [&](LocalPlace const & p) { return w == p.word; });
+    if (place == std::end(kLocalPlaces))
+      continue;
+    // "Burnet Rd", "Humble, TX"; a comma only before the state.
+    bool here = false;
+    if (k + 1 < words.size() && adjacent(k, k + 1))
+    {
+      auto const next = word(k + 1);
+      bool const comma = text.find(',', words[k].end) < words[k + 1].at;
+      here = StateWord(next, place->state) || (!comma && In(next, placeAfter));
+    }
+    // "onto Burnet", "in Humble": the place unless a capitalised word follows ("to Manor House").
+    if (!here && place->afterPreposition && k > 0 && adjacent(k - 1, k) &&
+        text.find(',', words[k - 1].end) >= words[k].at && In(word(k - 1), toward))
+      here = !(k + 1 < words.size() && adjacent(k, k + 1) && text.find(',', words[k].end) >= words[k + 1].at &&
+               std::isupper(static_cast<unsigned char>(text[words[k + 1].at])) && !In(word(k + 1), placeAfter) &&
+               !StateWord(word(k + 1), place->state));
+    if (!here)
+      continue;
+    out.append(text, last, words[k].at - last);
+    out += StandIn(std::string(place->said));
+    last = words[k].end;
+  }
+  out.append(text, last, std::string::npos);
+  return out;
+}
+
+std::vector<std::string> LocalPlaceRespellings()
+{
+  std::vector<std::string> out;
+  for (auto const & p : kLocalPlaces)
+    out.push_back(p.said);
+  return out;
+}
+
+std::string RouteNumber(std::string const & digits)
+{
+  if (digits.empty() || digits.size() > 4 ||
+      !std::all_of(digits.begin(), digits.end(), [](char ch) { return std::isdigit(static_cast<unsigned char>(ch)); }))
+    return digits;
+  if (digits.size() > 1 && digits.front() == '0')
+    return Digits(digits);
+  auto const n = ToNumber(digits);
+  if (n < 100)
+    return SpellNumber(n);
+  // "405" is "four oh five", "183" "one eighty three", "1431" "fourteen thirty one".
+  auto const high = n / 100, low = n % 100;
+  if (low == 0)
+    return (digits.size() == 4 && high % 10 == 0) ? SpellNumber(n) : SpellNumber(high) + " hundred";
+  return SpellNumber(high) + (low < 10 ? " oh " : " ") + SpellNumber(low);
+}
+
+std::string Roads(std::string const & text)
+{
+  // Two-letter state codes in front of a route number. Ones that are also words ("IN 5", "OR 3")
+  // only count with a hyphen ("IN-46").
+  static std::map<std::string, std::pair<char const *, bool>> const states = {
+      {"AK", {"Alaska", false}},        {"AL", {"Alabama", true}},        {"AR", {"Arkansas", false}},
+      {"AZ", {"Arizona", false}},       {"CA", {"California", false}},    {"CO", {"Colorado", true}},
+      {"CT", {"Connecticut", false}},   {"DE", {"Delaware", true}},       {"FL", {"Florida", false}},
+      {"GA", {"Georgia", false}},       {"HI", {"Hawaii", true}},         {"IA", {"Iowa", false}},
+      {"ID", {"Idaho", true}},          {"IL", {"Illinois", false}},      {"IN", {"Indiana", true}},
+      {"KS", {"Kansas", false}},        {"KY", {"Kentucky", false}},      {"LA", {"Louisiana", true}},
+      {"MA", {"Massachusetts", true}},  {"MD", {"Maryland", false}},      {"ME", {"Maine", true}},
+      {"MI", {"Michigan", false}},      {"MN", {"Minnesota", false}},     {"MO", {"Missouri", false}},
+      {"MS", {"Mississippi", false}},   {"MT", {"Montana", false}},       {"NC", {"North Carolina", false}},
+      {"ND", {"North Dakota", false}},  {"NE", {"Nebraska", true}},       {"NH", {"New Hampshire", false}},
+      {"NJ", {"New Jersey", false}},    {"NM", {"New Mexico", false}},    {"NV", {"Nevada", false}},
+      {"NY", {"New York", false}},      {"OH", {"Ohio", true}},           {"OK", {"Oklahoma", true}},
+      {"OR", {"Oregon", true}},         {"PA", {"Pennsylvania", true}},   {"RI", {"Rhode Island", false}},
+      {"SC", {"South Carolina", false}}, {"SD", {"South Dakota", false}}, {"TN", {"Tennessee", false}},
+      {"TX", {"Texas", false}},         {"UT", {"Utah", false}},          {"VA", {"Virginia", false}},
+      {"VT", {"Vermont", false}},       {"WA", {"Washington", false}},    {"WI", {"Wisconsin", false}},
+      {"WV", {"West Virginia", false}}, {"WY", {"Wyoming", false}}};
+  static std::map<std::string, std::string> const names = {
+      {"I", "I"},         {"IH", "I"},           {"US", "yooess"},      {"SR", "State Route"},
+      {"CR", "County Road"}, {"FM", "F M"},      {"RM", "R M"},         {"RR", "Ranch Road"},
+      {"SH", "State Highway"}, {"M", "M"}};
+  // What the prefix says out loud, or nothing when it isn't a route: "PO 5", "TV 2", "IN 5".
+  auto const spoken = [](std::string const & prefix, bool hyphen) -> std::optional<std::string> {
+    if (auto const it = names.find(prefix); it != names.end())
+    {
+      if (prefix == "M" && !hyphen)
+        return std::nullopt;
+      return it->second;
+    }
+    if (auto const st = states.find(prefix); st != states.end())
+    {
+      if (st->second.second && !hyphen)
+        return std::nullopt;
+      return std::string(st->second.first);
+    }
+    if (prefix.size() == 2 && std::isupper(static_cast<unsigned char>(prefix[1])))
+      return std::nullopt;
+    return prefix;
+  };
+  // Business, alternate and bypass routes after the number: "US 290 Bus", "US 183 Alt", "US 87 Byp".
+  // Not when a lowercase word follows that makes it something else ("the I-35 bus stop").
+#define BACKSEAT_ROUTE_PREFIX "Interstate|Highway|Route|Road|Loop|[Ee]xit|I|IH|US|SR|CR|FM|RM|RR|SH|M|[A-Z]{2}"
+#define BACKSEAT_ROUTE_KIND "Bus|BUS|Business|Alt|ALT|Byp|BYP|Bypass"
+  // Signs and traffic feeds write the direction of travel as "I-35 NB", "US-290 WB": northbound,
+  // westbound. Only right after a route ref, so "NB: see below" and a lone "WB" stay as they are.
+  static std::regex const bound(
+      "\\b((?:" BACKSEAT_ROUTE_PREFIX ")(?:-| )\\d{1,4}[A-Z]?(?: (?:" BACKSEAT_ROUTE_KIND ")\\.?)?) (N|S|E|W)B"
+      "(?![A-Za-z0-9])");
+  auto s = Replace(text, bound, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return m.str(1) + " " + Compass(m.str(2)) + "bound";
+  });
+  // OSM joins the refs of a road shared by two routes with ';' ("US 290;TX 71"), signs use '/', and
+  // either may carry a direction first ("US-290 W / TX-71 W", already "West" by now).
+  static std::regex const pair(
+      "\\b(" BACKSEAT_ROUTE_PREFIX ")(-| )(\\d{1,4}[A-Z]?(?: (?:" BACKSEAT_ROUTE_KIND ")\\.?)?"
+      "(?: (?:North|South|East|West)(?:bound)?)?) ?[;/] ?"
+      "(?=(" BACKSEAT_ROUTE_PREFIX ")(-| )\\d)");
+  s = Replace(s, pair, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
+    if (!spoken(m.str(1), m.str(2) == "-") || !spoken(m.str(4), m.str(5) == "-"))
+      return std::nullopt;
+    return m.str(1) + m.str(2) + m.str(3) + " or ";
+  });
+  // Split exits: "Exit 12B-C" is "Exit twelve B and C", "exits 12A-B" "exits twelve A and B".
+  static std::regex const split("\\b([Ee]xits?|EXITS?) (\\d{1,4})([A-Z])-([A-Z])(?![A-Za-z0-9])");
+  s = Replace(s, split, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return m.str(1) + " " + RouteNumber(m.str(2)) + " " + m.str(3) + " and " + m.str(4);
+  });
+  static std::regex const road(
+      "\\b(" BACKSEAT_ROUTE_PREFIX ")(-| )(\\d{1,4})([A-Z]?)"
+      "(?![A-Za-z0-9]|[.,:/]\\d| ?(?:ft|mi|mph|km|m|yd)\\b)"
+      "(?: (" BACKSEAT_ROUTE_KIND ")(\\.)?(?![A-Za-z0-9]| (?:stop|stops|station|lane|lanes|route|routes|key)\\b))?");
+#undef BACKSEAT_ROUTE_PREFIX
+#undef BACKSEAT_ROUTE_KIND
+  auto const before = s;
+  s = Replace(before, road, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    auto const name = spoken(m.str(1), m.str(2) == "-");
+    if (!name)
+      return std::nullopt;
+    std::string out = *name + " " + RouteNumber(m.str(3)) + (m[4].length() > 0 ? " " + m.str(4) : "");
+    if (m[5].matched)
+    {
+      auto const kind = m.str(5);
+      auto const k = static_cast<char>(std::tolower(static_cast<unsigned char>(kind[0])));
+      out += k == 'b' && std::tolower(static_cast<unsigned char>(kind[1])) == 'u' ? " Business"
+             : k == 'a'                                                           ? " Alternate"
+                                                                                  : " Bypass";
+      // "Byp." may end the sentence too: the period stays unless a lowercase word carries on.
+      auto const end = pos + static_cast<size_t>(m.length(0));
+      if (m[6].matched && !(end + 1 < before.size() && before[end] == ' ' &&
+                            std::islower(static_cast<unsigned char>(before[end + 1]))))
+        out += ".";
+    }
+    return out;
+  });
+  // "the 101 Freeway", "the 405 Expressway".
+  static std::regex const after("\\b(\\d{3,4}) (Freeway|Highway|Expressway|Parkway)\\b");
+  return Replace(s, after, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return RouteNumber(m.str(1)) + " " + m.str(2);
+  });
+}
+
+std::string HouseNumbers(std::string const & text)
+{
+  // A 3 or 4 digit number, then up to four name words (a compass point, capitalised words or a
+  // numbered street like "5th"), then a street type: "1600 Pennsylvania Avenue", "4521 Oak Street".
+  static std::regex const address(
+      "\\b(\\d{3,4})(?= (?:(?:North|South|East|West|Northeast|Northwest|Southeast|Southwest) )?"
+      "(?:(?:[A-Z][A-Za-z'.-]*|\\d+(?:st|nd|rd|th)) ){1,4}"
+      "(?:Street|Avenue|Boulevard|Road|Drive|Lane|Court|Parkway|Place|Circle|Terrace|Trail|Square|Way|Plaza)\\b)");
+  auto const out = Replace(text, address, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    // Part of a bigger number ("1,600", "2.500") or a word ("A123"): leave it.
+    if (pos > 0 && (std::isalnum(static_cast<unsigned char>(text[pos - 1])) || text[pos - 1] == ',' ||
+                    text[pos - 1] == '.' || text[pos - 1] == '-' || text[pos - 1] == '#' || text[pos - 1] == '$'))
+      return std::nullopt;
+    return RouteNumber(m.str(1));
+  });
+  // Wisconsin and Illinois grid addresses: a compass letter glued to the number, then a road name.
+  // "N1234 County Road K" is "N twelve thirty four County Road K", "W12345 State Highway 29" "W one twenty
+  // three forty five ..." (loop B106). The letter stays a letter: it is the grid, not a direction to drive.
+  static std::regex const grid(
+      "(^|[\\s,(])([NSEW])(\\d{3,5})(?= (?:[A-Z][A-Za-z'.]* ){0,4}"
+      "(?:Road|Highway|Street|Avenue|Drive|Lane|Route|Court|Parkway|Trail|Way|Circle|Place)\\b)");
+  return Replace(out, grid, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    auto const digits = m.str(3);
+    std::string spoken = RouteNumber(digits);
+    if (digits.size() == 5)
+      spoken = digits[1] == '0' ? Digits(digits) : SpellNumber(digits[0] - '0') + " " + RouteNumber(digits.substr(1));
+    return m.str(1) + m.str(2) + " " + spoken;
+  });
+}
+
+/// Whether `s` has an ASCII digit, or any byte of `bytes`. The passes below are std::regex scans,
+/// slow ones, and most lines have no digit at all: a pass that can't match skips its scan. Checked
+/// right before each pass, on the text as it is then, so skipping never changes what is said.
+bool HasDigit(std::string const & s)
+{
+  return std::any_of(s.begin(), s.end(), [](char c) { return c >= '0' && c <= '9'; });
+}
+
+bool HasAny(std::string const & s, std::string_view bytes) { return s.find_first_of(bytes) != std::string::npos; }
+
+std::string Symbols(std::string const & text)
+{
+  std::string s = text;
+  // Vulgar fractions as the ASCII ones the fraction pass reads: "½ mile" is "1/2 mile", and after
+  // a whole number "1½" is "1 and 1/2".
+  if (HasAny(s, "\xBC\xBD\xBE\x85"))
+  {
+    static std::pair<std::string_view, std::string_view> const kFractions[] = {
+        {"\xC2\xBD", "1/2"}, {"\xC2\xBC", "1/4"}, {"\xC2\xBE", "3/4"}, {"\xE2\x85\x93", "1/3"}, {"\xE2\x85\x94", "2/3"}};
+    for (auto const & [glyph, ascii] : kFractions)
+      for (size_t at = s.find(glyph); at != std::string::npos; at = s.find(glyph, at))
+      {
+        bool const afterDigit = at > 0 && std::isdigit(static_cast<unsigned char>(s[at - 1]));
+        std::string const with = (afterDigit ? " and " : "") + std::string(ascii);
+        s.replace(at, glyph.size(), with);
+        at += with.size();
+      }
+  }
+  // "#5" and "Starbucks #12345" are "number 5": a hash right before digits, at a word start.
+  // "#blessed" and "C#5" are left.
+  if (HasAny(s, "#"))
+  {
+    static std::regex const hash("#(?=\\d)");
+    s = Replace(s, hash, [&](std::smatch const &, size_t pos) -> std::optional<std::string> {
+      if (pos > 0 && !Space(s[pos - 1]) && s[pos - 1] != '(')
+        return std::nullopt;
+      return std::string("number ");
+    });
+  }
+  // Rates after a number or a unit: "$3.49/gal" is "per gallon", "60 mi/hr" and "km/h" "per hour".
+  // "and/or", "w/o" and "24/7" are left.
+  if (HasAny(s, "/"))
+  {
+    static std::regex const rate("\\b([0-9A-Za-z.,]+)/(gal|hr|h|mi|km|day|wk|mo|yr)\\b");
+    s = Replace(s, rate, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
+      static std::set<std::string> const units = {"mi", "km", "m", "ft", "gal", "miles", "kilometers", "meters", "feet"};
+      auto const left = m.str(1);
+      bool const number = std::isdigit(static_cast<unsigned char>(left.back())) &&
+                          std::all_of(left.begin(), left.end(), [](char ch) {
+                            return std::isdigit(static_cast<unsigned char>(ch)) || ch == '.' || ch == ',';
+                          });
+      if (!number && units.count(left) == 0)
+        return std::nullopt;
+      static std::map<std::string, char const *> const per = {
+          {"gal", "gallon"},   {"hr", "hour"}, {"h", "hour"},  {"mi", "mile"},  {"km", "kilometer"},
+          {"day", "day"},      {"wk", "week"}, {"mo", "month"}, {"yr", "year"}};
+      return left + " per " + per.at(m.str(2));
+    });
+  }
+  return s;
+}
+
+namespace
+{
+// The word right before `pos` (one space between) is a/an/the/this/that/each/every, as a whole word.
+bool AfterDeterminer(std::string const & text, size_t pos)
+{
+  if (pos < 2 || text[pos - 1] != ' ')
+    return false;
+  size_t start = pos - 1;
+  while (start > 0 && IsAsciiLetter(text[start - 1]))
+    --start;
+  if (start == pos - 1 || (start > 0 && (std::isalnum(static_cast<unsigned char>(text[start - 1])) ||
+                                         static_cast<unsigned char>(text[start - 1]) >= 0x80)))
+    return false;
+  std::string word = text.substr(start, pos - 1 - start);
+  std::transform(word.begin(), word.end(), word.begin(), [](unsigned char ch) { return std::tolower(ch); });
+  static std::set<std::string> const kDeterminers = {"a", "an", "the", "this", "that", "each", "every"};
+  return kDeterminers.count(word) > 0;
+}
+}  // namespace
+
+std::string DecimalMiles(std::string const & text)
+{
+  static std::regex const re("(\\d{1,2})?\\.(\\d{1,2}) ?(?:mi|miles?)\\b");
+  return Replace(text, re, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    // Glued to something before it: "110.5 mi" (only "10.5" matched), "v1.5", "$0.5", "1,0.5".
+    if (pos > 0)
+    {
+      unsigned char const before = static_cast<unsigned char>(text[pos - 1]);
+      if (std::isalnum(before) || std::string_view(".,-/$#_").find(static_cast<char>(before)) != std::string_view::npos)
+        return std::nullopt;
+    }
+    long long const whole = m[1].matched ? ToNumber(m.str(1)) : 0;
+    std::string const frac = m.str(2);
+    // After a determiner the half or quarter takes no article of its own: "the 0.5 mi road" is "the
+    // half mile road", "every 0.25 mi" "every quarter mile", "a 0.75 mi climb" "a three quarter mile
+    // climb" (BookLyre I-190, CROSS X-041). "bathe 0.5 mi" and "in 0.5 mi" keep "a half mile".
+    bool const determiner = whole == 0 && AfterDeterminer(text, pos);
+    if (frac == "5" || frac == "50")
+      return whole == 0 ? std::string(determiner ? "half mile" : "a half mile")
+                        : std::to_string(whole) + " and a half miles";
+    if (frac == "25")
+      return whole == 0 ? std::string(determiner ? "quarter mile" : "a quarter mile")
+                        : std::to_string(whole) + " and a quarter miles";
+    if (frac == "75")
+      return whole == 0 ? std::string(determiner ? "three quarter mile" : "three quarters of a mile")
+                        : std::to_string(whole) + " and three quarters miles";
+    if (whole != 0 || frac.find_first_not_of('0') == std::string::npos)
+      return std::nullopt;
+    return "point " + Digits(frac) + " miles";
+  });
+}
+
+std::string CompactUnits(std::string const & text)
+{
+  // A number glued to something before it ("v2.0 mi", "x1h", "1.2.0 km") is left.
+  auto const glued = [](std::string const & t, size_t pos) {
+    if (pos == 0)
+      return false;
+    unsigned char const before = static_cast<unsigned char>(t[pos - 1]);
+    return std::isalnum(before) || std::string_view(".,-/$#_").find(static_cast<char>(before)) != std::string_view::npos;
+  };
+  auto s = text;
+  // "2.0 mi", "10.00 miles", "1.0 km": the ".0" says nothing. Only before a unit, so "version 2.0" stays.
+  static std::regex const zero(
+      "\\b(\\d{1,4})\\.0+(?= ?(?:mi|miles?|km|kilometers?|ft|feet|m|meters?|yd|yards?|mph|kph|hrs?|hours?|"
+      "mins?|minutes?|gal|gallons?)\\b)");
+  if (HasAny(s, "."))
+    s = Replace(s, zero, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+      // "0.0 mi" keeps its point (the distance golden reads "zero point zero miles").
+      if (glued(s, pos) || m.str(1).find_first_not_of('0') == std::string::npos)
+        return std::nullopt;
+      return m.str(1);
+    });
+  // "2h 15m", "1h5m", "2 hr 15 m": an m after an hour count is minutes, not meters.
+  static std::regex const hm("\\b(\\d{1,3}) ?(?:h|hr|hrs) ?(\\d{1,2}) ?(?:m|min|mins)\\b");
+  s = Replace(s, hm, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    if (glued(s, pos))
+      return std::nullopt;
+    auto const h = m.str(1), mins = m.str(2);
+    return h + (h == "1" ? " hour " : " hours ") + mins + (mins == "1" ? " minute" : " minutes");
+  });
+  // "1h", "3h left": glued h is hours ("5 h" with a space stays, it may be a letter).
+  static std::regex const hours("\\b(\\d{1,3})h\\b");
+  s = Replace(s, hours, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    if (glued(s, pos))
+      return std::nullopt;
+    // "Apt 2h", "Gate 3h", "Room 12h" name a place, not a time.
+    static std::regex const place("(?:^|\\s)(?:Apt|Apartment|Unit|Suite|Ste|Room|Rm|Gate|Exit|Bay|Box|Lot|Platform)\\.? $",
+                                  std::regex::icase);
+    if (std::regex_search(s.substr(pos >= 12 ? pos - 12 : 0, pos >= 12 ? 12 : pos), place))
+      return std::nullopt;
+    return m.str(1) + (m.str(1) == "1" ? " hour" : " hours");
+  });
+  // Traffic delays: "+12 min" is "12 more minutes", "+1 hr" "1 more hour".
+  static std::regex const plus("\\+(\\d{1,3}) ?(mins?|minutes?|hrs?|hours?)\\b");
+  if (HasAny(s, "+"))
+    s = Replace(s, plus, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+      if (pos > 0 && !std::isspace(static_cast<unsigned char>(s[pos - 1])) && std::string_view("(:").find(s[pos - 1]) == std::string_view::npos)
+        return std::nullopt;
+      bool const one = m.str(1) == "1";
+      bool const hour = m.str(2)[0] == 'h';
+      return m.str(1) + (hour ? (one ? " more hour" : " more hours") : (one ? " more minute" : " more minutes"));
+    });
+  return s;
+}
+
+std::string FractionsWithUnits(std::string const & text)
+{
+  // "1/2 mi" is "a half mile" (not "a half miles"), "3/4 mi" "three quarters of a mile", "2/3 hr"
+  // "two thirds of an hour", "1 1/2 mi" "1 and a half miles", "2 1/2 years" "2 and a half years".
+  // Dates ("1/2/2026"), "11/2" and other fractions are left for the passes after.
+  static std::regex const re(
+      "\\b(?:(\\d{1,3}) (?:and )?)?([123])/([234])(?![\\d/])"
+      "(?: ?(mi|miles?|km|kilometers?|ft|feet|foot|yd|yards?|m|meters?|hrs?|hours?|mins?|minutes?|secs?|"
+      "seconds?|gal|gallons?|inch|inches)\\b)?");
+  struct Unit
+  {
+    char const * one;
+    char const * many;
+  };
+  static std::map<std::string, Unit> const units = {
+      {"mi", {"mile", "miles"}},         {"mile", {"mile", "miles"}},     {"miles", {"mile", "miles"}},
+      {"km", {"kilometer", "kilometers"}}, {"kilometer", {"kilometer", "kilometers"}},
+      {"kilometers", {"kilometer", "kilometers"}}, {"ft", {"foot", "feet"}}, {"feet", {"foot", "feet"}},
+      {"foot", {"foot", "feet"}},        {"yd", {"yard", "yards"}},       {"yard", {"yard", "yards"}},
+      {"yards", {"yard", "yards"}},      {"m", {"meter", "meters"}},      {"meter", {"meter", "meters"}},
+      {"meters", {"meter", "meters"}},   {"hr", {"hour", "hours"}},       {"hrs", {"hour", "hours"}},
+      {"hour", {"hour", "hours"}},       {"hours", {"hour", "hours"}},    {"min", {"minute", "minutes"}},
+      {"mins", {"minute", "minutes"}},   {"minute", {"minute", "minutes"}}, {"minutes", {"minute", "minutes"}},
+      {"sec", {"second", "seconds"}},    {"secs", {"second", "seconds"}}, {"second", {"second", "seconds"}},
+      {"seconds", {"second", "seconds"}}, {"gal", {"gallon", "gallons"}}, {"gallon", {"gallon", "gallons"}},
+      {"gallons", {"gallon", "gallons"}}, {"inch", {"inch", "inches"}},   {"inches", {"inch", "inches"}}};
+  return Replace(text, re, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    auto const frac = m.str(2) + "/" + m.str(3);
+    static std::map<std::string, std::pair<char const *, char const *>> const words = {
+        // {said after a whole number or before a unit that reads fine bare, before "of a"}
+        {"1/2", {"a half", "a half"}},          {"1/4", {"a quarter", "a quarter"}},
+        {"3/4", {"three quarters", "three quarters of"}}, {"1/3", {"a third", "a third of"}},
+        {"2/3", {"two thirds", "two thirds of"}}};
+    auto const w = words.find(frac);
+    if (w == words.end())
+      return std::nullopt;
+    // Glued to something before it: "1.1/2", "x1/2", "-1/2".
+    if (pos > 0 && std::string_view(".,-/$#").find(text[pos - 1]) != std::string_view::npos)
+      return std::nullopt;
+    bool const whole = m[1].matched;
+    if (!whole && !m[4].matched)
+      return std::nullopt;
+    if (whole)
+    {
+      std::string out = m.str(1) + " and " + w->second.first;
+      if (m[4].matched)
+        out += " " + std::string(units.at(m.str(4)).many);
+      return out;
+    }
+    std::string const one = units.at(m.str(4)).one;
+    std::string const before = w->second.second;
+    if (before == w->second.first)  // "a half mile", "a quarter mile": what drivers say.
+      return before + " " + one;
+    return before + (one == "hour" ? " an " : " a ") + one;
+  });
+}
+
+namespace
+{
+// ForSpeech: degrees, "~5", plus-minus, dashes as pauses and " & " (moved out of ForSpeech, loop B111).
+std::string DegreesAndDashes(std::string s)
+{
+  // Temperatures and approximations: "-5°F" is "minus 5 degrees Fahrenheit", "~5" "about 5".
+  // "\xB0" is the second byte of the UTF-8 degree sign, "\xB1" of plus-minus, "\x80" of both dashes.
+  bool const degreeSign = HasDigit(s) && HasAny(s, "\xB0");
+  static std::regex const degrees("(^|[\\s(])-(?=\\d+(?:\\.\\d+)? ?\xC2\xB0)");
+  if (degreeSign)
+    s = std::regex_replace(s, degrees, "$1minus ");
+  static std::regex const degree("(\\d+(?:\\.\\d+)?) ?\xC2\xB0(?: ?([FC])\\b)?");
+  if (degreeSign)
+    s = Replace(s, degree, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    std::string out = m.str(1) + (m.str(1) == "1" ? " degree" : " degrees");
+    if (m[2].matched)
+      out += m.str(2) == "F" ? " Fahrenheit" : " Celsius";
+    return out;
+  });
+  static std::regex const about("~ ?(?=\\d)");
+  if (HasAny(s, "~") && HasDigit(s))
+    s = std::regex_replace(s, about, "about ");
+  static std::regex const plusMinus("\xC2\xB1 ?(?=\\d)");
+  if (HasAny(s, "\xB1") && HasDigit(s))
+    s = std::regex_replace(s, plusMinus, "plus or minus ");
   static std::regex const dash("\\s*(?:\xE2\x80\x94|\xE2\x80\x93)\\s*");
-  s = std::regex_replace(s, dash, ", ");
+  if (HasAny(s, "\x80"))
+    s = std::regex_replace(s, dash, ", ");
   s = ReplaceAll(s, " & ", " and ");
+  return s;
+}
 
-  // The driver's own words first: they know best.
-  s = ApplyUserWords(s);
-  s = PickSenses(s);
-
+// ForSpeech: street types after a name, type-first streets, road separators, Mount/Point and compass points (moved out of ForSpeech, loop B111).
+std::string StreetsAndCompass(std::string s)
+{
   // "Main St", "Elm Dr." after a word, at the end or before punctuation, a lowercase word or a
-  // compass point ("Main St NW"). Not "Dr Smith" or "St Louis". A period after it stays: it was
-  // probably the end of the sentence too.
+  // compass point ("Main St NW"). Not "Dr Smith" or "St Louis". A period after it stays when it
+  // may end the sentence ("Elm Ave. Then right.", "onto Oak Rd."); it goes when the sentence plainly
+  // carries on: ",;:" or a lowercase word next ("Oak Dr. and then left", "Main St., then right"), a
+  // compass point, or a lone letter or number naming the street ("on Ave. B now"; not "A"/"I",
+  // which start sentences).
+  // A suite, apartment, floor or "#200" after the type: "Lamar Blvd Suite 200", "Main St #200" (Symbols
+  // has made the hash "number ").
+  // A separator or another street type after it: "Main St / Elm St", "Main St - Elm St", "Main St (FM
+  // 1960)", "Pkwy Dr" (loop B105).
+#define BACKSEAT_TYPE_AHEAD \
+  "(?:St|Ave|Blvd|Rd|Dr|Ln|Ct|Pkwy|Pl|Cir|Ter|Trl|Sq|Cv|Street|Avenue|Boulevard|Road|Drive|Lane|Court|" \
+  "Parkway|Place|Circle|Terrace|Trail|Square|Cove)(?=$|[\\s,;:!?.)/])"
+#define BACKSEAT_TAIL_AHEAD \
+  "(?:Suite|Apartment|Building|Floor|Room|Space|Department|Office|Trailer|Hangar|Unit) [0-9A-Z]|number \\d"
   static std::regex const street(
-      "(St|Ave|Blvd|Rd|Dr|Ln|Ct|Pkwy|Hwy|Pl|Cir|Ter|Trl|Expy|Fwy|Sq)(?=$|[,;:!?.)]|\\s+(?:[a-z]|(?:NE|NW|SE|SW|N|S|E|W)\\b))");
-  s = Replace(s, street, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
-    if (pos < 2 || s[pos - 1] != ' ' || !IsAsciiLetter(s[pos - 2]))
+      "(St|Ave|Blvd|Rd|Dr|Ln|Ct|Pkwy|Hwy|Pl|Cir|Ter|Trl|Expy|Fwy|Sq|Cv|Xing|Ext)"
+      "(?:\\.(?=[,;:]|\\s+(?:[a-z]|(?:NE|NW|SE|SW|N|S|E|W)\\b|(?:[B-HJ-Z]|\\d+)(?=$|[\\s,;:!?.)])|" BACKSEAT_TAIL_AHEAD "))"
+      "|(?=$|[,;:!?.)]|\\s*/|\\s+-\\s|\\s+\\(|\\s+(?:[a-z]|Ext\\b|(?:NE|NW|SE|SW|N|S|E|W)\\b|" BACKSEAT_TAIL_AHEAD "|"
+      BACKSEAT_TYPE_AHEAD ")))");
+#undef BACKSEAT_TAIL_AHEAD
+#undef BACKSEAT_TYPE_AHEAD
+  if (HasLetterWord(s, {"St", "Ave", "Blvd", "Rd", "Dr", "Ln", "Ct", "Pkwy", "Hwy", "Pl", "Cir", "Ter", "Trl", "Expy",
+                        "Fwy", "Sq", "Cv", "Xing", "Ext"}))
+    s = Replace(s, street, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    // "FM 1960 Rd W", "Hwy 6 Rd": a type right after a route number ends the road's name too (loop B141).
+    if (pos < 2 || s[pos - 1] != ' ' || (!IsAsciiLetter(s[pos - 2]) && !RouteNumberBefore(s, pos)))
       return std::nullopt;
     return Street(m.str(1));
   });
+  // "Shady Crk", "Forest Hts Dr", "Mesa Ctr Ste 100": the rarer USPS suffixes, only after a name.
+  s = MoreStreetTypes(s);
+  // "Frontage Svc Rd" is a service road; "Ave B" and "Ln 5" name the street after its type.
+  static std::regex const service("\\bSvc\\.? (?=(?:Rd|Road|Dr|Drive)\\b)");
+  if (HasLetterWord(s, {"Svc"}))
+    s = std::regex_replace(s, service, "Service ");
+  static std::regex const typeFirst("(^|\\s)(Ave|Cir|Ln)\\.? (?=(?:[A-Z]|\\d+)(?:$|[\\s,;:!?.)]))");
+  if (HasLetterWord(s, {"Ave", "Cir", "Ln"}))
+    s = Replace(s, typeFirst, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return m.str(1) + Street(m.str(2)) + " ";
+  });
+  // "Main Street / Elm Street", "Grand Avenue / CA-1", "Main Street - Elm Street": two road names, so the
+  // slash or dash is a pause (loop B105). "24/7", "and/or" and "1/2 mi" have no road name beside them.
+  s = RoadSeparators(s);
   static std::regex const mount("\\bMt\\.? (?=[A-Z])");
-  s = std::regex_replace(s, mount, "Mount ");
+  if (HasLetterWord(s, {"Mt"}))
+    s = std::regex_replace(s, mount, "Mount ");
+  // "Pt Reyes", "Pt. Loma Blvd": Point before a capitalised name.
+  static std::regex const point("\\bPt\\.? (?=[A-Z][a-z])");
+  if (HasLetterWord(s, {"Pt"}))
+    s = std::regex_replace(s, point, "Point ");
   // Compass points next to a street name: "N Main", "Main St NW".
+  if (!HasLetterWord(s, {"NE", "NW", "SE", "SW", "N", "S", "E", "W"}))
+    return s;
   static std::regex const compassBefore("(NE|NW|SE|SW|N|S|E|W)\\.?(?= [A-Z0-9])");
   s = Replace(s, compassBefore, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (pos > 0 && !Space(s[pos - 1]))
@@ -789,18 +1786,90 @@ std::string ForSpeech(std::string const & text)
   s = Replace(s, compassAfter, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     if (pos < 2 || s[pos - 1] != ' ' || !std::isalnum(static_cast<unsigned char>(s[pos - 2])))
       return std::nullopt;
+    // "Avenue N" in Brooklyn is the letter, not north.
+    size_t start = pos - 1;
+    while (start > 0 && IsAsciiLetter(s[start - 1]))
+      --start;
+    auto const before = s.substr(start, pos - 1 - start);
+    // "Unit E" and "Apartment N" are letters too.
+    if (m.str(1).size() == 1 && (before == "Avenue" || before == "Lane" || before == "Circle" || TailWord(before) ||
+                                 ((before == "Road" || before == "Highway") && CountyRoadBefore(s, start))))
+      return std::nullopt;
     return Compass(m.str(1));
   });
-  // Highways: "I-25" is "I twenty five", "US-36" is "U S thirty six".
-  static std::regex const highway("\\b(I|US|SR|CR)[- ](\\d+)\\b");
-  s = Replace(s, highway, [](std::smatch const & m, size_t) -> std::optional<std::string> {
-    static std::map<std::string, std::string> const names = {
-        {"I", "I"}, {"US", "yooess"}, {"SR", "State Route"}, {"CR", "County Road"}};
-    return names.at(m.str(1)) + " " + m.str(2);
+  return s;
+}
+
+// ForSpeech: money, percent, units, fractions, clock times, ordinals and plain numbers; runs only when a digit is left (moved out of ForSpeech, loop B111).
+// Web error codes the way programmers say them: "Error 404" and "404 not found" are "four oh four", not
+// "four hundred four" (loop B114: the persona's "Error 404: patience not found" joke). Only a 4xx/5xx code
+// with "error" before it or "error"/"not found" after it, so "404 Main St" and "Route 500" keep their reading.
+std::string ErrorCodes(std::string s)
+{
+  static char const * const kDigits[] = {"zero", "one", "two",   "three", "four",
+                                         "five", "six", "seven", "eight", "nine"};
+  auto said = [](std::string const & code) {
+    std::string const first = kDigits[code[0] - '0'];
+    if (code[1] == '0' && code[2] == '0')
+      return first + " hundred";
+    auto digit = [&](char c) { return std::string(c == '0' ? "oh" : kDigits[c - '0']); };
+    return first + " " + digit(code[1]) + " " + digit(code[2]);
+  };
+  static std::regex const before("\\b([Ee]rror|ERROR|HTTP) ([45]\\d\\d)\\b");
+  static std::regex const after("\\b([45]\\d\\d)( (?:[Ee]rror|ERROR|[Nn]ot [Ff]ound|NOT FOUND)\\b)");
+  s = Replace(s, before, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return m.str(1) + " " + said(m.str(2));
   });
+  return Replace(s, after, [&](std::smatch const & m, size_t) -> std::optional<std::string> {
+    return said(m.str(1)) + m.str(2);
+  });
+}
+
+// The cents sign Kokoro drops (loop B138, CROSS X-050): "50¢" is "50 cents", "1¢" "1 cent", "a 5¢ stamp"
+// "a 5 cent stamp" (singular after a/an before a word). Left alone when glued to something before it
+// ("$1.99¢", "x50¢", "1,50¢") or after it ("50¢¢", "50¢s").
+std::string CentsSign(std::string s)
+{
+  static std::string_view const kCent = "\xC2\xA2";
+  if (s.find(kCent) == std::string::npos)
+    return s;
+  static std::regex const cents("(\\d+(?:\\.\\d+)?) ?\xC2\xA2");
+  static std::regex const article("(?:^|[^A-Za-z])[Aa]n? $");
+  auto const original = s;
+  return Replace(s, cents, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    if (pos > 0)
+    {
+      auto const before = static_cast<unsigned char>(original[pos - 1]);
+      if (std::isalnum(before) || before >= 0x80 || std::string_view("_.,$").find(static_cast<char>(before)) != std::string_view::npos)
+        return std::nullopt;
+    }
+    auto const end = pos + static_cast<size_t>(m.length(0));
+    if (end < original.size())
+    {
+      auto const after = static_cast<unsigned char>(original[end]);
+      if (std::isalnum(after) || after == '_' || original.compare(end, kCent.size(), kCent) == 0)
+        return std::nullopt;
+    }
+    auto const amount = m.str(1);
+    // "a 5¢ stamp": the amount describes the next word, so it is singular.
+    bool singular = amount == "1";
+    if (!singular && end + 1 < original.size() && original[end] == ' ' &&
+        std::isalpha(static_cast<unsigned char>(original[end + 1])))
+    {
+      auto const head = original.substr(pos >= 4 ? pos - 4 : 0, pos >= 4 ? 4 : pos);
+      singular = std::regex_search(head, article);
+    }
+    return amount + (singular ? " cent" : " cents");
+  });
+}
+
+std::string NumberWords(std::string s)
+{
   // Money and percentages.
+  s = CentsSign(s);
   static std::regex const money("\\$(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d{2}))?\\b");
-  s = Replace(s, money, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+  if (HasAny(s, "$"))
+    s = Replace(s, money, [](std::smatch const & m, size_t) -> std::optional<std::string> {
     auto const whole = m.str(1);
     std::string out = whole + (whole == "1" ? " dollar" : " dollars");
     if (m[2].matched && m.str(2) != "00")
@@ -811,9 +1880,20 @@ std::string ForSpeech(std::string const & text)
     return out;
   });
   static std::regex const percent("(\\d) ?%");
-  s = std::regex_replace(s, percent, "$1 percent");
+  if (HasAny(s, "%"))
+    s = std::regex_replace(s, percent, "$1 percent");
+  // Fractions before a unit and after a whole number: "1/2 mi" is "a half mile", "1 1/2 mi" "1 and a
+  // half miles".
+  s = CompactUnits(s);
+  if (HasAny(s, "/"))
+    s = FractionsWithUnits(s);
+  // Decimal miles the way drivers say them: "0.5 mi" is "a half mile", "0.25 mi" "a quarter mile",
+  // "0.75 mi" "three quarters of a mile", "2.5 mi" "2 and a half miles", "0.3 mi" "point three miles"
+  // (not "zero point three"). "1.3 mi" keeps "one point three"; km and m are left alone.
+  if (HasAny(s, "."))
+    s = DecimalMiles(s);
   // Units after a number ("1 mile", "3 miles").
-  static std::regex const unit("(\\d) ?(ft|mi|mph|km|m|yd)\\b");
+  static std::regex const unit("(\\d) ?(ft|mi|mph|km|m|yd|hrs|hr|mins|min|secs|sec)\\b");
   s = Replace(s, unit, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     size_t start = pos;
     while (start > 0 && (std::isdigit(static_cast<unsigned char>(s[start - 1])) || s[start - 1] == ',' ||
@@ -822,28 +1902,44 @@ std::string ForSpeech(std::string const & text)
     bool const one = s.substr(start, pos + 1 - start) == "1";
     static std::map<std::string, std::pair<char const *, char const *>> const words = {
         {"ft", {"foot", "feet"}},           {"mi", {"mile", "miles"}},   {"mph", {"mile an hour", "miles an hour"}},
-        {"km", {"kilometer", "kilometers"}}, {"m", {"meter", "meters"}}, {"yd", {"yard", "yards"}}};
+        {"km", {"kilometer", "kilometers"}}, {"m", {"meter", "meters"}}, {"yd", {"yard", "yards"}},
+        {"hr", {"hour", "hours"}},          {"hrs", {"hour", "hours"}},  {"min", {"minute", "minutes"}},
+        {"mins", {"minute", "minutes"}},    {"sec", {"second", "seconds"}}, {"secs", {"second", "seconds"}}};
     auto const & w = words.at(m.str(2));
     return m.str(1) + " " + (one ? w.first : w.second);
   });
   static std::regex const fraction("(\\d+)/(\\d+)");
-  s = Replace(s, fraction, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+  if (HasAny(s, "/"))
+    s = Replace(s, fraction, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     auto const a = m.str(1), b = m.str(2);
+    // "open 24/7" is "twenty four seven"; "24/7/365" is left whole.
+    auto const after = pos + static_cast<size_t>(m.length(0));
+    if (a == "24" && b == "7" && (pos == 0 || !Digit(s[pos - 1])) && (after >= s.size() || s[after] != '/'))
+      return std::string("twenty four seven");
     if (a == "1" && b == "2")
       return std::string("a half");
     if (a == "1" && b == "4")
       return std::string("a quarter");
     if (a == "3" && b == "4")
       return std::string("three quarters");
+    if (a == "1" && b == "3")
+      return std::string("a third");
+    if (a == "2" && b == "3")
+      return std::string("two thirds");
     return a + " over " + b;
   });
-  // Times: "2:30" is "two thirty".
+  // Times: "2:30" is "two thirty", "6:00" "six o'clock"; on a 24-hour clock "22:00" is "twenty two
+  // hundred" and "00:00" "zero hundred" (loop B139). "25:30" and "1:75" aren't times and are left.
   static std::regex const time("\\b(\\d{1,2}):(\\d{2})\\b");
-  s = Replace(s, time, [](std::smatch const & m, size_t) -> std::optional<std::string> {
-    auto const hour = SpellNumber(ToNumber(m.str(1)));
+  if (HasAny(s, ":"))
+    s = Replace(s, time, [](std::smatch const & m, size_t) -> std::optional<std::string> {
+    auto const hours = ToNumber(m.str(1));
     auto const minutes = ToNumber(m.str(2));
+    if (hours > 23 || minutes > 59)
+      return std::nullopt;
+    auto const hour = SpellNumber(hours);
     if (minutes == 0)
-      return hour + " o'clock";
+      return hour + ((hours == 0 || hours > 12) ? " hundred" : " o'clock");
     return hour + (minutes < 10 ? " oh " : " ") + SpellNumber(minutes);
   });
   // Ordinals: "8th Street" is "eighth Street".
@@ -853,20 +1949,99 @@ std::string ForSpeech(std::string const & text)
       return std::nullopt;
     return Ordinal(ToNumber(m.str(1)));
   });
-  // Decimals and plain numbers ("1,200" too). Long ones (phone numbers, zip codes) digit by digit.
+  // Decimals and plain numbers ("1,200" too). Long bare runs (phone numbers, zip codes) digit by digit,
+  // but a comma-grouped number is a quantity whatever its length: "1,250,000" is one million ...
   static std::regex const number("\\b(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d+))?\\b");
   s = Replace(s, number, [](std::smatch const & m, size_t) -> std::optional<std::string> {
     std::string whole;
     for (char ch : m.str(1))
       if (ch != ',')
         whole += ch;
-    std::string said = whole.size() > 6 ? Digits(whole) : SpellNumber(ToNumber(whole));
+    bool const grouped = whole.size() != static_cast<size_t>(m.length(1));
+    size_t const longest = grouped ? 15 : 6;  // 15 digits: SpellNumber's trillions, well inside long long
+    std::string said = whole.size() > longest ? Digits(whole) : SpellNumber(ToNumber(whole));
     if (m[2].matched)
       said += " point " + Digits(m.str(2));
     return said;
   });
+  return s;
+}
 
-  return Ellipses(s);
+}  // namespace
+
+std::string ForSpeech(std::string const & text)
+{
+  std::string s = ReplaceAll(text, "\xC2\xA0", " ");
+  // Web addresses and e-mail first, before the symbol, date and street passes take them apart:
+  // "www.heb.com" is "heb dot com", "jo@example.com" "jo at example dot com".
+  s = WebAddresses(s);
+  // Foreign phrases first, before anything reads their letters as English abbreviations.
+  s = Foreign(s);
+  // Cyrillic map names and quotes the English voice would skip: "улица Ленина" is "ulitsa Lenina".
+  s = Cyrillic(s);
+  // Kana by Hepburn, the same way: "ラーメン" is "ramen", "さくら通り" "sakura 通 ri".
+  s = Kana(s);
+  // Symbols the voice would skip or spell: "½" is "1/2", "#5" "number 5", "/gal" "per gallon".
+  s = Symbols(s);
+  // Dates before ranges and fractions take their parts: "11/6/2026" is "November sixth, twenty twenty
+  // six", "2026-11-06" too, "Nov. 6" "November sixth".
+  if (HasDigit(s))
+    s = Dates(s);
+  // Day abbreviations after dates, so "Sun 11/9" sees the date: "Mon-Fri" is "Monday to Friday".
+  s = Weekdays(s);
+  // Ranges before dashes become pauses: "3–5" is "3 to 5", not "3, 5".
+  if (HasDigit(s))
+    s = Ranges(s);
+  // Clock times before the dash pass can split "9am-5pm".
+  s = Clock(s);
+  // 24-hour military times before years and counts take the four digits: "at 1430 hrs" is "at fourteen
+  // thirty hours", "0600 hours" "oh six hundred hours" (loop B139).
+  if (HasDigit(s))
+    s = MilitaryTimes(s);
+  // Years as years: "in 1868" is "in eighteen sixty eight", "the 1990s" "the nineteen nineties".
+  if (HasDigit(s))
+    s = Years(s);
+  // Two-digit decades: "the 90s" is "the nineties".
+  if (HasDigit(s))
+    s = Decades(s);
+  s = DegreesAndDashes(s);
+
+  // The driver's own words first: they know best.
+  s = ApplyUserWords(s);
+  // Street types abroad: "Calle Ocho" is "KAH-yeh Ocho", "Paseo de la Reforma" keeps its Spanish.
+  s = ForeignStreets(s);
+  // Places said the local way: "Burnet Rd" is BURN-it, "Humble, TX" UM-bul.
+  s = LocalPlaces(s);
+  s = PickSenses(s);
+  // Regnal numbers after a name: "King George VI Ave" is "King George the sixth Ave".
+  s = Regnal(s);
+  // Lettered county roads before the title and street passes take Rd/Hwy: "Co Rd K" is "County Road K".
+  s = CountyRoads(s);
+  // Saint, Doctor, Fort, Junior before the street pass can take them for street types.
+  s = Titles(s);
+  // Suites, apartments and floors after the street: "Lamar Blvd Ste 200" is "Lamar Blvd Suite 200".
+  s = AddressTails(s);
+  // Place-name abbreviations before the street passes: "St. Luke's Med. Ctr." is "Saint Luke's Medical
+  // Center", "Austin-Bergstrom Intl Airport" International, "Acme Inc." Incorporated (loop B108).
+  s = PlaceNameWords(s);
+
+  s = StreetsAndCompass(s);
+  // Store names as one word or letters: "Buc-ee's" is "Buckees", "H-E-B" "H E B" (after the compass
+  // passes, which would make that E east).
+  s = Brands(s);
+  // Highways, routes and exits the way drivers say them: "I-405" is "I four oh five", "FM 1431"
+  // "F M fourteen thirty one", "TX-71" "Texas seventy one", "Exit 238B" "Exit two thirty eight B".
+  if (HasDigit(s))
+    s = ErrorCodes(s);
+  if (HasDigit(s))
+    s = Roads(s);
+  // House numbers in pairs: "1600 Pennsylvania Avenue" is "sixteen hundred ...".
+  if (HasDigit(s))
+    s = HouseNumbers(s);
+  // Everything from here on reads numbers: no digit, nothing left to do.
+  if (!HasDigit(s))
+    return Ellipses(s);
+  return Ellipses(NumberWords(s));
 }
 
 std::vector<std::pair<std::string, std::string>> Lexicon()
@@ -881,6 +2056,38 @@ std::vector<std::pair<std::string, std::string>> Lexicon()
       else if (auto const ph = RespellingPhonemes(said))
         out.emplace_back(w.word, *ph);
     }
+    std::set<std::string> seen;
+    for (auto const & p : kPhrases)
+      for (auto const & w : SplitWords(p.said))
+        if (auto const ph = ForeignWordPhonemes(w); ph && seen.insert(StandIn(w)).second)
+          out.emplace_back(StandIn(w), *ph);
+    for (auto const & w : ForeignStreetRespellings())
+      if (auto const ph = ForeignWordPhonemes(w); ph && seen.insert(StandIn(w)).second)
+        out.emplace_back(StandIn(w), *ph);
+    for (auto const & p : kLocalPlaces)
+      if (auto const ph = RespellingPhonemes(p.said); ph && seen.insert(StandIn(std::string(p.said))).second)
+        out.emplace_back(StandIn(std::string(p.said)), *ph);
+    // Names and places last, never replacing a word or stand-in above.
+    std::set<std::string> taken;
+    for (auto const & [w, ph] : out)
+      taken.insert(w);
+    for (auto const & n : kNames)
+      if (taken.insert(n.word).second)
+        out.emplace_back(n.word, n.phonemes);
+    for (auto const & p : kPlaces)
+    {
+      std::string said = p.said;
+      std::optional<std::string> ph;
+      if (said.size() > 2 && said.front() == '/' && said.back() == '/')
+        ph = said.substr(1, said.size() - 2);
+      else
+        ph = ForeignWordPhonemes(said);
+      if (ph && taken.insert(p.word).second)
+        out.emplace_back(p.word, *ph);
+    }
+    for (auto const & b : kBrands)
+      if (auto const ph = ForeignWordPhonemes(b.said); ph && taken.insert(b.word).second)
+        out.emplace_back(b.word, *ph);
     return out;
   }();
   auto lexicon = builtIn;
@@ -893,19 +2100,32 @@ std::vector<std::pair<std::string, std::string>> Lexicon()
 
 // MARK: - Respellings
 
-namespace
+namespace detail
 {
 std::u32string Decode(std::string const & s)
 {
+  // A byte that can't start a sequence (a stray continuation byte, 0xF8-0xFF) or a lead byte
+  // whose continuation bytes are missing becomes one U+FFFD and only that byte is used up, so a
+  // bad byte in a street name never swallows the letters after it ("\x80Main" kept "Main").
+  // Surrogates (CESU-8 from JNI) still decode as they are and Encode writes them back unchanged.
   std::u32string out;
   for (size_t i = 0; i < s.size();)
   {
     auto const c = static_cast<unsigned char>(s[i]);
-    int len = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : 4;
+    int const len = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : (c >> 3) == 30 ? 4 : 0;
+    bool ok = len > 0 && i + len <= s.size();
+    for (int k = 1; ok && k < len; ++k)
+      ok = (static_cast<unsigned char>(s[i + k]) & 0xC0) == 0x80;
+    if (!ok)
+    {
+      out += U'\uFFFD';
+      ++i;
+      continue;
+    }
     char32_t cp = len == 1 ? c : len == 2 ? (c & 0x1F) : len == 3 ? (c & 0x0F) : (c & 0x07);
-    for (int k = 1; k < len && i + k < s.size(); ++k)
+    for (int k = 1; k < len; ++k)
       cp = (cp << 6) | (static_cast<unsigned char>(s[i + k]) & 0x3F);
-    out += cp;
+    out += cp > 0x10FFFF ? U'\uFFFD' : cp;
     i += len;
   }
   return out;
@@ -916,6 +2136,8 @@ std::string Encode(std::u32string const & s)
   std::string out;
   for (char32_t cp : s)
   {
+    if (cp > 0x10FFFF)
+      cp = 0xFFFD;
     if (cp < 0x80)
       out += static_cast<char>(cp);
     else if (cp < 0x800)
@@ -940,14 +2162,17 @@ std::string Encode(std::u32string const & s)
   return out;
 }
 
-bool Mark(char32_t c)
-{
-  return c == U'\'' || c == U'\u00B4' || c == U'\u02C8';
-}
-
 bool Letter(char32_t c)
 {
   return (c >= U'a' && c <= U'z') || (c >= U'A' && c <= U'Z');
+}
+}  // namespace detail
+
+namespace
+{
+bool Mark(char32_t c)
+{
+  return c == U'\'' || c == U'\u00B4' || c == U'\u02C8';
 }
 
 std::pair<char const *, char32_t const *> const kDigraphVowels[] = {

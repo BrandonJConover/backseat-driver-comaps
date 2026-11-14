@@ -74,6 +74,11 @@ public:
   /// Catches up on turns done (or blown) since the last look, verdict or not.
   void SyncTurns(TripStats const & stats, std::vector<Incident> const & incidents);
 
+  /// The next turn the engine counts (done or blown) went by while the GPS was out: the app never
+  /// saw it, so it neither extends nor breaks the streak, and gets no verdict. Call before telling
+  /// the engine.
+  void TurnUnseen() { ++m_unseen; }
+
   int StoryBeats() const { return m_storyBeat; }
   int Streak() const { return m_streak; }
 
@@ -84,6 +89,10 @@ private:
   int m_badSeen = 0;
   int m_streak = 0;
   size_t m_milestonesSaid = 0;
+  /// Turns still to come in the engine's counts that went by unseen (TurnUnseen).
+  int m_unseen = 0;
+  /// The last SyncTurns caught up on nothing but unseen turns.
+  bool m_lastUnseen = false;
   /// The street of a turn blown this trip, until a clean turn makes up for it.
   std::optional<std::string> m_redeem;
   int m_plainSkipped = 0;
