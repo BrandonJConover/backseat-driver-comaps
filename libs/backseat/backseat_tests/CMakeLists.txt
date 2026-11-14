@@ -79,6 +79,7 @@ add_executable(${PROJECT_NAME}
   persona_doc_lines_test.cpp
   persona_doc_lines_b_test.cpp
   signal_back_test.cpp
+  phantom_direction_test.cpp
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
 target_compile_definitions(${PROJECT_NAME} PRIVATE
