@@ -13,6 +13,7 @@
 #include "backseat/twenty_questions.hpp"
 #include "backseat/voice_command.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <climits>
 #include <cstdint>
@@ -92,8 +93,18 @@ std::string RandomJson(FuzzRng & r)
   return s;
 }
 
+// Which quiz questions one Feed call checks the answer parsers against. Running all ~100 for
+// every fuzz input made this the slowest test in the suite (5 s), so the fuzz loop rotates two
+// per input and counts that every question still gets plenty of inputs. Null means all of them.
+struct QuizPick
+{
+  size_t a;
+  size_t b;
+  std::vector<int> * hits;
+};
+
 // Run every text entry point on one input; returns the longest output seen.
-size_t Feed(std::string const & text)
+size_t Feed(std::string const & text, QuizPick const * pick = nullptr)
 {
   size_t longest = 0;
   auto keep = [&](std::string const & out) { longest = std::max(longest, out.size()); };
@@ -145,10 +156,23 @@ size_t Feed(std::string const & text)
   (void)DriveComesFirst(text);
   (void)DriveComesFirst(text, true);
   (void)AsksForPopQuiz(text);
-  for (auto const & q : QuizQuestions())
+  auto const & questions = QuizQuestions();
+  auto quiz = [&](size_t i)
   {
-    (void)ParseQuizAnswer(q, text);
-    (void)QuizAnswerTakes(q, text);
+    (void)ParseQuizAnswer(questions[i], text);
+    (void)QuizAnswerTakes(questions[i], text);
+    if (pick)
+      ++(*pick->hits)[i];
+  };
+  if (pick)
+  {
+    quiz(pick->a);
+    quiz(pick->b);
+  }
+  else
+  {
+    for (size_t i = 0; i < questions.size(); ++i)
+      quiz(i);
   }
   return longest;
 }
@@ -160,14 +184,18 @@ using namespace backseat::pronunciation;
 TEST(HostileTextNeverThrowsOrBlowsUp)
 {
   FuzzRng r{0x9E3779B97F4A7C15ULL};
+  size_t const n = QuizQuestions().size();
+  std::vector<int> hits(n, 0);
   auto const start = std::chrono::steady_clock::now();
   for (int i = 0; i < 1500; ++i)
   {
     std::string const text = RandomText(r, 1 + r.Below(24));
     size_t longest = 0;
+    size_t const u = static_cast<size_t>(i);
+    QuizPick const pick{u % n, (u * 7 + 3) % n, &hits};
     try
     {
-      longest = Feed(text);
+      longest = Feed(text, &pick);
     }
     catch (...)
     {
@@ -179,6 +207,13 @@ TEST(HostileTextNeverThrowsOrBlowsUp)
   auto const secs =
       std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
   CHECK(secs < 60.0);
+  // Every quiz question's answer parsers still saw a fair share of the garbage.
+  int fewest = hits.empty() ? 0 : hits[0];
+  for (int h : hits)
+    fewest = std::min(fewest, h);
+  if (fewest < 30)
+    std::printf("  quiz question with fewest fuzz inputs got %d (of %zu questions)\n", fewest, n);
+  CHECK(fewest >= 30);
 }
 
 namespace
