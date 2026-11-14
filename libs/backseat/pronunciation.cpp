@@ -1747,7 +1747,8 @@ std::string StreetsAndCompass(std::string s)
   if (HasLetterWord(s, {"St", "Ave", "Blvd", "Rd", "Dr", "Ln", "Ct", "Pkwy", "Hwy", "Pl", "Cir", "Ter", "Trl", "Expy",
                         "Fwy", "Sq", "Cv", "Xing", "Ext"}))
     s = Replace(s, street, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
-    if (pos < 2 || s[pos - 1] != ' ' || !IsAsciiLetter(s[pos - 2]))
+    // "FM 1960 Rd W", "Hwy 6 Rd": a type right after a route number ends the road's name too (loop B141).
+    if (pos < 2 || s[pos - 1] != ' ' || (!IsAsciiLetter(s[pos - 2]) && !RouteNumberBefore(s, pos)))
       return std::nullopt;
     return Street(m.str(1));
   });

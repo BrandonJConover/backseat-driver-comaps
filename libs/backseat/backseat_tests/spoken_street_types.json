@@ -1,5 +1,5 @@
 {
- "about": "Street types abroad said in their own language for map turn instructions (BI-008): 'Calle Ocho' KAH-yeh, 'Paseo de la Reforma' with a Spanish 'de la', 'Rue du Bac' French 'du', 'Via della Spiga' Italian, 'Rua do Ouro' Portuguese, 'Hauptstraße' Haupt SHTRAH-seh, as fx dictionary stand-ins (Lexicon() holds their phonemes). Only before a capitalised word, number or name particle (German types after a name), so 'via I-35' and 'rue the day' stay English; the name itself is left to the voice. Backseat Driver: backseat::pronunciation::ForSpeech / ForeignStreets (libs/backseat/backseat_tests/spoken_street_types.json). BookLyre can take the street-type rows (CROSS). Also (CROSS X-039, BookLyre spoken_titles.json last 9 cases): 'St.' after a capitalised word is Saint when 1-3 name words and a street type follow ('Down St. James Street', 'Slight right St. Clair Ave'); 'Main St. Mary was there' and 'Baker St. Then he left' stay Street.",
+ "about": "Street types abroad said in their own language for map turn instructions (BI-008): 'Calle Ocho' KAH-yeh, 'Paseo de la Reforma' with a Spanish 'de la', 'Rue du Bac' French 'du', 'Via della Spiga' Italian, 'Rua do Ouro' Portuguese, 'Hauptstraße' Haupt SHTRAH-seh, as fx dictionary stand-ins (Lexicon() holds their phonemes). Only before a capitalised word, number or name particle (German types after a name), so 'via I-35' and 'rue the day' stay English; the name itself is left to the voice. Backseat Driver: backseat::pronunciation::ForSpeech / ForeignStreets (libs/backseat/backseat_tests/spoken_street_types.json). BookLyre can take the street-type rows (CROSS). Also (CROSS X-039, BookLyre spoken_titles.json last 9 cases): 'St.' after a capitalised word is Saint when 1-3 name words and a street type follow ('Down St. James Street', 'Slight right St. Clair Ave'); 'Main St. Mary was there' and 'Baker St. Then he left' stay Street. Loop B141 (BI-124): a street type right after a route number ends the name too: 'FM 1960 Rd W' is '... nineteen sixty Road West', 'Hwy 6 Rd', 'SR 7 Ave', 'County Rd 12 St', 'Exit 12 St', 'I-35 Dr'; a bare house number ('Arrive at 1960 Rd W') and a Saint after the number ('Hwy 6 St. Louis') stay as they were.",
  "cases": [
   {
    "input": "Turn left onto Calle Ocho.",
@@ -330,6 +330,58 @@
   {
    "input": "Turn right on Elm St. Mary is waiting",
    "expected": "Turn right on Elm Street. Mary is waiting"
+  },
+  {
+   "input": "Turn right onto FM 1960 Rd W.",
+   "expected": "Turn right onto F M nineteen sixty Road West."
+  },
+  {
+   "input": "Continue on Old Rte 9 Rd.",
+   "expected": "Continue on Old Route nine Road."
+  },
+  {
+   "input": "Turn left onto Hwy 6 Rd.",
+   "expected": "Turn left onto Highway six Road."
+  },
+  {
+   "input": "Keep right onto SR 7 Ave",
+   "expected": "Keep right onto State Route seven Avenue"
+  },
+  {
+   "input": "Turn left onto County Rd 12 St, then right.",
+   "expected": "Turn left onto County Road twelve Street, then right."
+  },
+  {
+   "input": "Take Exit 12 St.",
+   "expected": "Take Exit twelve Street."
+  },
+  {
+   "input": "Turn right onto I-35 Dr.",
+   "expected": "Turn right onto I thirty five Drive."
+  },
+  {
+   "input": "Turn right onto SR-7 Ave NE",
+   "expected": "Turn right onto State Route seven Avenue Northeast"
+  },
+  {
+   "input": "Turn left onto FM 1960 Rd W and keep going",
+   "expected": "Turn left onto F M nineteen sixty Road West and keep going"
+  },
+  {
+   "input": "Take Hwy 6 St. Louis exit",
+   "expected": "Take Highway six Saint Louis exit"
+  },
+  {
+   "input": "Arrive at 1960 Rd W.",
+   "expected": "Arrive at one thousand nine hundred sixty Rd West."
+  },
+  {
+   "input": "Go to 3502 St. Johns Rd",
+   "expected": "Go to thirty five oh two Saint Johns Road"
+  },
+  {
+   "input": "Take Hwy 6 Dr Smith said",
+   "expected": "Take Highway six Doctor Smith said"
   }
  ]
 }

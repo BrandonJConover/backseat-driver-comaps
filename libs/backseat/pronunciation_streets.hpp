@@ -135,6 +135,37 @@ bool CountyRoadBefore(std::string const & s, size_t start)
   return false;
 }
 
+/// A route number right before position `pos` (which starts a street type after one space): "FM 1960 Rd",
+/// "Old Rte 9 Rd", "Hwy 6 Rd", "SR 7 Ave", "County Rd 12 St", "Exit 12 St", "I-35 Dr" (loop B141). A bare
+/// house number ("3502 St. Johns Rd", "Arrive at 1960 Rd W") has no route word before it, so it doesn't count.
+bool RouteNumberBefore(std::string const & s, size_t pos)
+{
+  if (pos < 2 || s[pos - 1] != ' ')
+    return false;
+  size_t end = pos - 1;  // one past the number token
+  size_t start = end;
+  while (start > 0 && !Space(s[start - 1]))
+    --start;
+  std::string const token = s.substr(start, end - start);
+  // "I-35", "SR-7", "CA-1": the route word glued on with a hyphen.
+  static std::regex const glued("[A-Z]{1,3}-\\d{1,4}[A-Z]?");
+  if (std::regex_match(token, glued))
+    return true;
+  static std::regex const number("\\d{1,4}[A-Z]?");
+  if (!std::regex_match(token, number) || start < 2 || s[start - 1] != ' ')
+    return false;
+  size_t wordStart = start - 1;
+  while (wordStart > 0 && !Space(s[wordStart - 1]))
+    --wordStart;
+  std::string word = s.substr(wordStart, start - 1 - wordStart);
+  if (!word.empty() && word.back() == '.')
+    word.pop_back();
+  static std::set<std::string> const routeWords = {
+      "Hwy", "Highway", "Rte", "Route", "Rd", "Road", "FM", "RM", "RR", "SR", "SH", "US", "CR", "Exit",
+      "Interstate", "I", "Fwy", "Freeway", "Loop", "Spur", "Pkwy", "Parkway", "Expy", "Expressway"};
+  return routeWords.count(word) > 0;
+}
+
 /// Lettered county roads and the Co/Twp prefixes the Midwest signs use (loop B106): "County Rd K" is
 /// "County Road K", "Co Rd K" and "CR-K" too, "Hwy KK" "Highway K K", "Twp Rd 12" "Township Road 12",
 /// "Co. Rd. 45" "County Road 45". "Smith & Sons Co.", "CR-V", "Hwy US 10" and "Hwy N" are left.
