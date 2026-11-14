@@ -452,4 +452,59 @@ std::string Weekdays(std::string const & text)
     return out;
   });
 }
+// 24-hour military times (loop B139, CROSS X-051, BookLyre text/spoken_military_times.py): "0600 hours" is
+// "oh six hundred hours", "at 1430 hrs" "at fourteen thirty hours", "2200 hours" "twenty two hundred hours",
+// "0900h" "oh nine hundred hours", "0030" "zero thirty". Only HHMM 0000-2359 + hours/hrs/h, and only when it
+// starts with 0 or right after a time word (at, by, until, till, from, since, before, after, around, about);
+// never before "of" ("1430 hours of work" is a duration). Rooms, years and money keep their reading.
+std::string MilitaryTimeWords(long long hour, long long minute, bool leadingZero)
+{
+  std::string said = hour == 0 ? "zero" : (leadingZero ? "oh " : "") + SpellNumber(hour);
+  if (minute == 0)
+    return said + " hundred";
+  return said + (minute < 10 ? " oh " : " ") + SpellNumber(minute);
+}
+
+std::string MilitaryTimes(std::string const & text)
+{
+  if (text.find_first_of("hH") == std::string::npos)
+    return text;
+  static std::regex const hhmm(
+      "\\b([01]\\d|2[0-3])([0-5]\\d)(?:\\s?(?:hours|Hours|HOURS|hrs|Hrs|HRS)|h)(?![A-Za-z0-9])");
+  static std::set<std::string> const timeWords = {"at",    "by",   "until",  "till",   "from",
+                                                  "since", "before", "after", "around", "about"};
+  static std::regex const of("^\\s+of\\b");
+  return Replace(text, hhmm, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    auto const after = pos + static_cast<size_t>(m.length(0));
+    if (std::regex_search(text.begin() + static_cast<std::ptrdiff_t>(after), text.end(), of))
+      return std::nullopt;
+    bool ok = false;
+    // Right after a time word and one space: "at 1430 hrs", "AT 1800 HRS", "Since 0745 hours".
+    if (pos >= 2 && text[pos - 1] == ' ')
+    {
+      size_t start = pos - 1;
+      while (start > 0 && IsAsciiLetter(text[start - 1]))
+        --start;
+      auto const word = text.substr(start, pos - 1 - start);
+      bool const boundary = start == 0 || !(std::isalnum(static_cast<unsigned char>(text[start - 1])) ||
+                                            text[start - 1] == '_' || static_cast<unsigned char>(text[start - 1]) >= 0x80);
+      auto const lower = Lower(word);
+      bool const cased = !word.empty() &&
+                         (word == lower || word == std::string(1, static_cast<char>(std::toupper(
+                                                                 static_cast<unsigned char>(word[0])))) + lower.substr(1) ||
+                          std::all_of(word.begin(), word.end(), [](char c) { return std::isupper(static_cast<unsigned char>(c)); }));
+      ok = boundary && cased && timeWords.count(lower);
+    }
+    // Or starting with 0 and not glued to anything: "0600 hours", not "$0600" or "Rm#0600".
+    if (!ok && m.str(1)[0] == '0')
+    {
+      unsigned char const prev = pos > 0 ? static_cast<unsigned char>(text[pos - 1]) : ' ';
+      ok = !(std::isalnum(prev) || prev >= 0x80 || std::string_view("_.,$#/:-").find(static_cast<char>(prev)) !=
+                                                       std::string_view::npos);
+    }
+    if (!ok)
+      return std::nullopt;
+    return MilitaryTimeWords(ToNumber(m.str(1)), ToNumber(m.str(2)), m.str(1)[0] == '0') + " hours";
+  });
+}
 }  // namespace backseat::pronunciation

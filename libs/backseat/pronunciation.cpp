@@ -1927,14 +1927,18 @@ std::string NumberWords(std::string s)
       return std::string("two thirds");
     return a + " over " + b;
   });
-  // Times: "2:30" is "two thirty".
+  // Times: "2:30" is "two thirty", "6:00" "six o'clock"; on a 24-hour clock "22:00" is "twenty two
+  // hundred" and "00:00" "zero hundred" (loop B139). "25:30" and "1:75" aren't times and are left.
   static std::regex const time("\\b(\\d{1,2}):(\\d{2})\\b");
   if (HasAny(s, ":"))
     s = Replace(s, time, [](std::smatch const & m, size_t) -> std::optional<std::string> {
-    auto const hour = SpellNumber(ToNumber(m.str(1)));
+    auto const hours = ToNumber(m.str(1));
     auto const minutes = ToNumber(m.str(2));
+    if (hours > 23 || minutes > 59)
+      return std::nullopt;
+    auto const hour = SpellNumber(hours);
     if (minutes == 0)
-      return hour + " o'clock";
+      return hour + ((hours == 0 || hours > 12) ? " hundred" : " o'clock");
     return hour + (minutes < 10 ? " oh " : " ") + SpellNumber(minutes);
   });
   // Ordinals: "8th Street" is "eighth Street".
@@ -1989,6 +1993,10 @@ std::string ForSpeech(std::string const & text)
     s = Ranges(s);
   // Clock times before the dash pass can split "9am-5pm".
   s = Clock(s);
+  // 24-hour military times before years and counts take the four digits: "at 1430 hrs" is "at fourteen
+  // thirty hours", "0600 hours" "oh six hundred hours" (loop B139).
+  if (HasDigit(s))
+    s = MilitaryTimes(s);
   // Years as years: "in 1868" is "in eighteen sixty eight", "the 1990s" "the nineteen nineties".
   if (HasDigit(s))
     s = Years(s);

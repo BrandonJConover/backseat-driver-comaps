@@ -956,3 +956,23 @@ TEST(CentsSignIsSaidAsCents)
     longText += "1¢";
   CHECK(!ForSpeech(longText).empty());
 }
+
+TEST(MilitaryAndTwentyFourHourTimes)
+{
+  // Loop B139, CROSS X-051: BookLyre's military-time cases plus 24-hour colon times.
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_MILITARY_TIMES_PATH);
+  CHECK(cases.size() >= 29);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // A duration stays a count; "1430 h" with a space is not the glued "h".
+  CHECK(ForSpeech("logged 1430 hours of driving").find("fourteen thirty") == std::string::npos);
+  CHECK(ForSpeech("at 1430 h").find("hours") == std::string::npos);
+  // Hostile input stays quick and doesn't throw.
+  std::string longText;
+  for (int i = 0; i < 2000; ++i)
+    longText += "at 0600h 23:59 ";
+  CHECK(!ForSpeech(longText).empty());
+}
