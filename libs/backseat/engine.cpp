@@ -1128,6 +1128,9 @@ void CritiqueEngine::CheckSpeeding(TelemetrySample const & s, TelemetrySample co
 
 void CritiqueEngine::CheckTooSlow(TelemetrySample const & s, std::vector<Commentary> & out)
 {
+  // A stand-in speed nothing backs says nothing about dawdling (B147).
+  if (!s.speedEvidence)
+    return;
   Units const units = m_config.units;
   bool const moving = s.speedMps > FromDisplay(3, units);
   if (!s.speedLimitMps || !moving || *s.speedLimitMps - s.speedMps < FromDisplay(m_config.tooSlowMargin, units))
@@ -1162,6 +1165,9 @@ void CritiqueEngine::CheckTooSlow(TelemetrySample const & s, std::vector<Comment
 
 void CritiqueEngine::CheckStopped(TelemetrySample const & s, std::vector<Commentary> & out)
 {
+  // No speed and no progress since the last fix: neither a new stop nor more of this one (B147).
+  if (!s.speedEvidence)
+    return;
   if (s.speedMps >= 0.5)
   {
     m_stoppedSince.reset();

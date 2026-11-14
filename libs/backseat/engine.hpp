@@ -173,6 +173,8 @@ public:
 
   int Frustration() const;
   TripStats const & Stats() const { return m_stats; }
+  /// Stops counted this trip (each dead stop once, however long).
+  int StopCount() const { return m_stopCount; }
   /// Everything the driver did wrong, in order, with positions. Persist this per trip.
   std::vector<Incident> const & Incidents() const { return m_incidents; }
   /// Grade + heat map. Valid mid-trip too.

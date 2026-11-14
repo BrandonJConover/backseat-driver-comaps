@@ -55,6 +55,11 @@ double constexpr kInstructionNowWithinM = 250;
 double constexpr kInstructionNowWithinS = 15;
 /// Slower than this counts as stopped.
 double constexpr kStoppedMps = 0.5;
+// Reading speed from progress when the GPS has none (B147): fixes further apart than this say nothing,
+// a route distance growing by more than the slack is a reroute, and fixes this vague don't count.
+double constexpr kProgressMaxGapS = 120;
+double constexpr kProgressSlackM = 5;
+double constexpr kProgressAccuracyM = 50;
 /// Faster than this means driving again, not walking around with the phone.
 double constexpr kResumedMps = 4;
 /// Stopped this long away from the destination is a stop the driver chose (gas, food...).
@@ -812,6 +817,10 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & rawRoute)
   double const lostFromT = m_knownSpeedT;
   double const lostAtMps = m_knownSpeedMps.value_or(0);
   bool const speedBack = fix.speedMps >= 0 && m_knownSpeedMps.has_value();
+  // With no GPS speed, the car's progress since the last fix says whether it's moving (B147).
+  std::optional<double> const progressMps = fix.speedMps < 0 ? ProgressSpeed(fix, route) : std::nullopt;
+  m_progress = Progress{fix.tMs, {fix.lat, fix.lon}, fix.accuracyM, route.turnId, route.distToTurnM,
+                        route.state == RouteState::OnRoute};
   // Recorded before Update so the turn-timing holds below already see this fix's speed (loop B82).
   if (fix.speedMps >= 0)
   {
@@ -836,7 +845,19 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & rawRoute)
   else
   {
     s.speedKnown = false;
-    s.speedMps = m_knownSpeedMps && fix.tMs - m_knownSpeedT <= kUnknownSpeedCarryMs ? *m_knownSpeedMps : 0;
+    bool const carried = m_knownSpeedMps && fix.tMs - m_knownSpeedT <= kUnknownSpeedCarryMs;
+    // Progress that shows the car moving beats the stand-in: a 150 s tunnel at 30 m/s read as 0 was a
+    // long stop, a traffic jam and a slow driver (B147). Progress showing it parked counts once the
+    // carried speed runs out; with neither, the stop and too-slow timers skip the sample.
+    if (progressMps && *progressMps >= kStoppedMps)
+      s.speedMps = *progressMps;
+    else if (carried)
+      s.speedMps = *m_knownSpeedMps;
+    else
+    {
+      s.speedMps = progressMps.value_or(0);
+      s.speedEvidence = progressMps.has_value();
+    }
   }
   s.speedLimitMps = fix.speedLimitMps;
   s.lat = fix.lat;
@@ -859,10 +880,15 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & rawRoute)
   }
   TrackTravelMode(fix, route);
   bool const car = InCar(m_travelMode);
-  TrackStop(fix, route);
+  // The stop and traffic trackers read a speed from progress too, and skip a fix with no evidence.
+  Fix judged = fix;
+  if (fix.speedMps < 0 && progressMps &&
+      (*progressMps >= kStoppedMps || !m_knownSpeedMps || fix.tMs - m_knownSpeedT > kUnknownSpeedCarryMs))
+    judged.speedMps = *progressMps;
+  TrackStop(judged, route);
   if (car)
   {
-    TrackTraffic(fix, route);
+    TrackTraffic(judged, route);
     TrackOffRoad(fix);
     TrackLastExit(fix.tMs, route);
     TrackExitSkip(fix, route);
@@ -929,6 +955,32 @@ void Navigator::OnBattery(double tMs, double level, bool charging)
   m_charging = charging;
   if (m_engine && !m_arrived)
     Say(m_engine->OnNav(NavEvent::Battery(std::max(m_lastT, tMs), percent / 100.0, charging)));
+}
+
+std::optional<double> Navigator::ProgressSpeed(Fix const & fix, RouteSnapshot const & route) const
+{
+  if (!m_progress)
+    return std::nullopt;
+  double const dtS = (fix.tMs - m_progress->t) / 1000;
+  if (dtS <= 0 || dtS > kProgressMaxGapS)
+    return std::nullopt;
+  std::optional<double> best;
+  // The route's distance to the same maneuver shrinking (the router extrapolates through tunnels).
+  if (route.state == RouteState::OnRoute && m_progress->onRoute && route.turnId && route.turnId == m_progress->turnId)
+  {
+    double const drop = m_progress->distToTurnM - route.distToTurnM;
+    if (drop >= -kProgressSlackM)
+      best = std::max(0.0, drop) / dtS;
+  }
+  // A move between two accurate fixes; one smaller than their accuracy is jitter, read as parked.
+  if (fix.accuracyM >= 0 && fix.accuracyM < kProgressAccuracyM && m_progress->accuracyM >= 0 &&
+      m_progress->accuracyM < kProgressAccuracyM)
+  {
+    double const moved = DistanceM(m_progress->pos, {fix.lat, fix.lon});
+    double const mps = moved > std::max(fix.accuracyM, m_progress->accuracyM) ? moved / dtS : 0;
+    best = std::max(best.value_or(0), mps);
+  }
+  return best;
 }
 
 void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
@@ -1124,6 +1176,9 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
     m_speeds.clear();
     return;
   }
+  // No speed and no progress to read one from: not a stopped car, just no news (B147).
+  if (fix.speedMps < 0)
+    return;
   m_speeds.push_back({fix.tMs, std::max(0.0, fix.speedMps), *fix.speedLimitMps});
   while (!m_speeds.empty() && fix.tMs - m_speeds.front().t > kTrafficWindowMs)
     m_speeds.erase(m_speeds.begin());

@@ -521,6 +521,9 @@ private:
   /// A navigation-priority line said at `t` (later than now).
   void SayNavLater(double t, std::string const & text);
   void SayNav(double tMs, std::string const & text, double voiceSpeed = 1.0);
+  /// The speed the car's progress since the last fix shows (route distance to the same turn shrinking,
+  /// or a move between two accurate fixes), or nothing when there's no evidence either way (B147).
+  std::optional<double> ProgressSpeed(Fix const & fix, RouteSnapshot const & route) const;
   void TrackStop(Fix const & fix, RouteSnapshot const & route);
   void TrackTraffic(Fix const & fix, RouteSnapshot const & route);
   void ResetTrip();
@@ -889,6 +892,17 @@ private:
   /// Last speed the GPS actually reported, and when; carried through short dropouts (see OnFix).
   std::optional<double> m_knownSpeedMps;
   double m_knownSpeedT = 0;
+  /// Where the last fix put the car, for reading its speed from progress when the GPS gives none (B147).
+  struct Progress
+  {
+    double t = 0;
+    LatLon pos;
+    double accuracyM = -1;
+    std::optional<uint32_t> turnId;
+    double distToTurnM = 0;
+    bool onRoute = false;
+  };
+  std::optional<Progress> m_progress;
   BuildingLookup m_buildingLookup;
   /// This trip started indoors; the "made it out" line is still to come (key, empty if not).
   std::string m_indoorOutKey;
