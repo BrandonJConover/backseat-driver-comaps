@@ -1229,3 +1229,43 @@ TEST(LaneExitAndWhichWayQuestionsSayTheNextTurn)
   CHECK(Heard("avoid this road", AppAction::DifferentRoute));
   CHECK(Heard("how long until we get there", AppAction::TimeLeft));
 }
+
+TEST(HedgedRoadAndZoomChatterIsNotAnOrder)
+{
+  // B159 (BI-141): a road preference or zoom put off to later, hoped for or promised is chatter. Driving safety:
+  // the route changes only on a clear order.
+  for (char const * said : {"i'll zoom in on that later", "no tolls on the way back i hope", "I will avoid highways next time",
+                            "maybe later we can avoid tolls", "we'll take the highway tomorrow", "hopefully no tolls",
+                            "I'm going to zoom out on that later", "I might avoid tolls", "we're gonna skip the highway"})
+  {
+    auto const c = ParseAppCommands(said);
+    if (!c.empty())
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(c.empty());
+  }
+  CHECK(!WordsSupportTool(AppAction::AvoidTolls, "", "maybe later we can avoid tolls"));
+  CHECK(!WordsSupportTool(AppAction::ZoomIn, "", "i'll zoom in on that later"));
+  CHECK(!WordsSupportTool(AppAction::AvoidHighways, "", "I will avoid highways next time"));
+  // Clear orders still fire.
+  auto const only = [](char const * said, AppAction action)
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == action;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    return ok;
+  };
+  CHECK(only("zoom in", AppAction::ZoomIn));
+  CHECK(only("can you zoom in", AppAction::ZoomIn));
+  CHECK(only("avoid tolls", AppAction::AvoidTolls));
+  CHECK(only("no tolls please", AppAction::AvoidTolls));
+  CHECK(only("Let's avoid tolls", AppAction::AvoidTolls));
+  CHECK(only("don't take the highway", AppAction::AvoidHighways));
+  CHECK(only("avoid highways on the way home", AppAction::AvoidHighways));
+  CHECK(WordsSupportTool(AppAction::AvoidTolls, "", "no tolls please"));
+  CHECK(WordsSupportTool(AppAction::ZoomIn, "", "can you zoom in"));
+  // Only the put-off clause is dropped.
+  auto const both = ParseAppCommands("Zoom in. I'll avoid tolls next time.");
+  CHECK_EQUAL(both.size(), size_t(1));
+  CHECK(!both.empty() && both[0].action == AppAction::ZoomIn);
+}

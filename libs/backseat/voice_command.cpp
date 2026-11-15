@@ -118,6 +118,57 @@ bool NegatedAt(std::string const & words, std::vector<size_t> const & starts, si
   return false;
 }
 
+/// "I'll zoom in on that later", "no tolls on the way back I hope", "maybe later we can avoid tolls": a road
+/// preference or zoom put off to some other time is chatter, not an order. The clause around `at` (or the whole
+/// utterance when `at` is npos) says when ("later", "next time", "tomorrow", "someday"), hopes ("I hope",
+/// "hopefully") or puts a future "I'll"/"we will"/"I'm gonna" in the few words before the cue. "Can you zoom in",
+/// "no tolls please" and "let's avoid tolls" stay orders.
+bool DeferredAt(std::string const & words, std::vector<size_t> const & starts, size_t at)
+{
+  size_t from = 0, to = words.size();
+  if (at != std::string::npos)
+    for (size_t const s : starts)
+    {
+      if (s <= at)
+        from = std::max(from, s);
+      else
+        to = std::min(to, s + 1);
+    }
+  std::string const clause = " " + words.substr(from, to - from) + " ";
+  for (char const * when : {" later ", " next time ", " some other time ", " another time ", " tomorrow ",
+                            " someday ", " some day ", " eventually ",
+                            " i hope ", " hopefully ", " i wish ", " if only "})
+    if (clause.find(when) != std::string::npos)
+      return true;
+  std::vector<std::string> before;
+  if (at == std::string::npos)
+  {
+    std::istringstream in(clause);
+    for (std::string w; in >> w;)
+      before.push_back(w);
+  }
+  else
+    before = ClauseBefore(words, starts, at);
+  size_t const first = at == std::string::npos || before.size() <= 5 ? 0 : before.size() - 5;
+  for (size_t i = first; i < before.size(); ++i)
+  {
+    std::string const & w = before[i];
+    std::string const prev = i > 0 ? before[i - 1] : "";
+    if (w == "i'll" || w == "we'll" || w == "gonna" || w == "might" ||
+        (w == "will" && (prev == "i" || prev == "we")) ||
+        (w == "going" && i + 1 < before.size() && before[i + 1] == "to" &&
+         (prev == "i'm" || prev == "im" || prev == "we're" || prev == "were")))
+      return true;
+  }
+  return false;
+}
+
+bool DeferrableAction(AppAction action)
+{
+  return action == AppAction::AvoidTolls || action == AppAction::AllowTolls || action == AppAction::AvoidHighways ||
+         action == AppAction::AllowHighways || action == AppAction::ZoomIn || action == AppAction::ZoomOut;
+}
+
 /// A bare "go to"/"go home" is an order only at the start of a clause or after a word that asks:
 /// "go to work", "okay go to work", "let's go home". Not "should we go to Costco", "she wants to go to Target".
 bool GoIsAnOrder(std::string const & words, std::vector<size_t> const & starts, size_t at)
@@ -826,6 +877,9 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   for (auto & f : found)
     if (auto const flip = opposite(f.second.action); flip != AppAction::Count && NegatedAt(words, starts, f.first))
       f.second.action = flip;
+  // "I'll zoom in on that later", "maybe later we can avoid tolls": put off, not asked for now.
+  found.erase(std::remove_if(found.begin(), found.end(), [&](auto const & f)
+  { return DeferrableAction(f.second.action) && DeferredAt(words, starts, f.first); }), found.end());
   // "Don't cancel the route", "I don't want to go to work": heard, but not asked for.
   found.erase(std::remove_if(found.begin(), found.end(), [&](auto const & f)
   { return opposite(f.second.action) == AppAction::Count && NegatedAt(words, starts, f.first); }), found.end());
@@ -1002,6 +1056,8 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
     }
     return big > 0 && found * 2 >= big;
   };
+  if (DeferrableAction(action) && DeferredAt(CommandWords(spoken), {0}, std::string::npos))
+    return false;
   switch (action)
   {
   case AppAction::NavigateTo:
