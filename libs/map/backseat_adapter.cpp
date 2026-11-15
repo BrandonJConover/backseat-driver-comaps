@@ -1241,30 +1241,14 @@ void BackseatAdapter::CheckBattery(double tMs)
 
 namespace
 {
-// Which side the driver has to move to for a maneuver: the lanes it wants are at one edge of the
-// road and not all of them. Lanes are listed left to right.
-backseat::LaneSide LaneSideFor(routing::turns::lanes::LanesInfo const & lanes)
+// The maneuver's lanes, left to right as OSM lists them: true for the ones the route wants.
+std::vector<bool> WantedLanes(routing::turns::lanes::LanesInfo const & lanes)
 {
-  using routing::turns::lanes::LaneWay;
-  size_t const n = lanes.size();
-  if (n < 2)
-    return backseat::LaneSide::None;
-  size_t first = n, last = 0, count = 0;
-  for (size_t i = 0; i < n; ++i)
-  {
-    if (lanes[i].recommendedWay == LaneWay::None)
-      continue;
-    first = std::min(first, i);
-    last = i;
-    ++count;
-  }
-  if (count == 0 || count == n)
-    return backseat::LaneSide::None;
-  if (first == 0 && last < n - 1)
-    return backseat::LaneSide::Left;
-  if (first > 0 && last == n - 1)
-    return backseat::LaneSide::Right;
-  return backseat::LaneSide::None;
+  std::vector<bool> wanted;
+  wanted.reserve(lanes.size());
+  for (auto const & lane : lanes)
+    wanted.push_back(lane.recommendedWay != routing::turns::lanes::LaneWay::None);
+  return wanted;
 }
 }  // namespace
 
@@ -3210,7 +3194,8 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
       snap.distToTurnM = distanceToTurnM;
       snap.nextStreet = SpeakableStreetName(info.m_nextStreetName);
       snap.control = GuessControl(*route, turn.m_index);
-      snap.laneSide = LaneSideFor(turn.m_lanes);
+      snap.lanes = WantedLanes(turn.m_lanes);
+      snap.laneSide = backseat::LaneAdviceFor(snap.lanes).side;
       // The maneuver after it, for "turn left onto Winesap Drive, then right onto Cameo Lane".
       std::vector<routing::turns::TurnItemDist> next;
       if (route->GetNextTurns(next) && next.size() >= 2 && !next[1].m_turnItem.IsTurnNone())
