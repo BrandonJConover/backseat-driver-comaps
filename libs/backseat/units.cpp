@@ -152,6 +152,29 @@ double RoundTo(double x, int digits)
 {
   if (!std::isfinite(x) || std::fabs(x) >= 1e21)
     return x;
+  // Fast path (loop B163): no printing. y = |x| * 10^d is within half an ulp of the exact product, so
+  // unless y sits within that error of a .5 tie, rounding y half-up picks the same integer n as
+  // ToFixed's exact decimal print. n and 10^d are exact doubles, so n / 10^d is correctly rounded:
+  // the same double strtod makes of ToFixed's "n with d decimals". Near-ties and big values print.
+  if (digits >= 0 && digits <= 15)
+  {
+    static constexpr double kPow10[] = {1e0, 1e1, 1e2,  1e3,  1e4,  1e5,  1e6,  1e7,
+                                        1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15};
+    double const p = kPow10[digits];
+    bool const negative = x < 0;  // -0 is not: (-0).toFixed is "0.00", +0 back
+    double const y = std::fabs(x) * p;
+    if (y < 4503599627370496.0)  // 2^52: y - floor(y) is exact below this
+    {
+      double const whole = std::floor(y);
+      double const frac = y - whole;
+      double const slack = y * 0x1p-50 + 1e-300;  // > the product's rounding error, with margin
+      if (std::fabs(frac - 0.5) > slack)
+      {
+        double const r = (whole + (frac > 0.5 ? 1 : 0)) / p;
+        return negative ? -r : r;
+      }
+    }
+  }
   return std::strtod(ToFixed(x, digits).c_str(), nullptr);
 }
 }  // namespace backseat

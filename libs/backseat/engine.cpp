@@ -359,7 +359,17 @@ CritiqueEngine::CritiqueEngine(EngineConfig config, double startedAt)
 
 int CritiqueEngine::Frustration() const { return static_cast<int>(JsRound(m_frustration)); }
 
-TripReport CritiqueEngine::Report() const { return BuildReport(m_incidents, m_stats); }
+TripReport CritiqueEngine::Report() const
+{
+  if (!m_report || m_reportIncidents != m_incidents.size() || !(m_reportStats == m_stats))
+  {
+    m_report = BuildReport(m_incidents, m_stats);
+    m_reportIncidents = m_incidents.size();
+    m_reportStats = m_stats;
+    ++m_reportBuilds;
+  }
+  return *m_report;
+}
 
 std::vector<Commentary> CritiqueEngine::OnTelemetry(TelemetrySample const & s)
 {
