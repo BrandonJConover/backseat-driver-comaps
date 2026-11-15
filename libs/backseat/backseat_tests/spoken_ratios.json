@@ -1,0 +1,177 @@
+{
+ "about": "Ratios, odds and map scales read 'to', not as clock times (loop B161, CROSS X-063). BookLyre's 33 cases from EpubToM4B tests/fixtures/spoken_ratios.json (auto/loop 9cc06cfb, BACKLOG #238) in Backseat's own spoken numbers, plus map-scale and clock cases. A colon between numbers reads 'to' when a ratio word is among the 3 words before it in its clause, a ratio noun follows, or the right side is 1; verses, am/pm, 'at 1:50', hh:mm:ss, chains and decimals are not ratios (their expected values are Backseat's ordinary reading). Backseat Driver: backseat::pronunciation::ForSpeech / Ratios (libs/backseat/backseat_tests/pronunciation_test.cpp).",
+ "cases": [
+  {
+   "input": "The scale was 1:50.",
+   "expected": "The scale was one to fifty."
+  },
+  {
+   "input": "A 1:50 scale model.",
+   "expected": "A one to fifty scale model."
+  },
+  {
+   "input": "a 1:50-scale model",
+   "expected": "a one to fifty-scale model"
+  },
+  {
+   "input": "The odds were 3:1.",
+   "expected": "The odds were three to one."
+  },
+  {
+   "input": "Odds were 3:1 against him.",
+   "expected": "Odds were three to one against him."
+  },
+  {
+   "input": "the ratio 2:1",
+   "expected": "the ratio two to one"
+  },
+  {
+   "input": "Ratio 3:1",
+   "expected": "Ratio three to one"
+  },
+  {
+   "input": "They won 2:1.",
+   "expected": "They won two to one."
+  },
+  {
+   "input": "outnumbered them 10:1",
+   "expected": "outnumbered them ten to one"
+  },
+  {
+   "input": "the odds of 100:1",
+   "expected": "the odds of one hundred to one"
+  },
+  {
+   "input": "a 3:2 majority",
+   "expected": "a three to two majority"
+  },
+  {
+   "input": "Mix it 3:2 with water.",
+   "expected": "Mix it three to two with water."
+  },
+  {
+   "input": "A 1:25,000 map.",
+   "expected": "A one to twenty five thousand map."
+  },
+  {
+   "input": "I bet 5:1 he loses.",
+   "expected": "I bet five to one he loses."
+  },
+  {
+   "input": "the margin was 52:48",
+   "expected": "the margin was fifty two to forty eight"
+  },
+  {
+   "input": "We met at 1:50.",
+   "expected": "We met at one fifty."
+  },
+  {
+   "input": "The train left 1:50 p.m.",
+   "expected": "The train left one fifty peeem."
+  },
+  {
+   "input": "John 3:16 says so.",
+   "expected": "John three sixteen says so."
+  },
+  {
+   "input": "Genesis 1:1",
+   "expected": "Genesis one:one"
+  },
+  {
+   "input": "Psalm 23:1",
+   "expected": "Psalm twenty three:one"
+  },
+  {
+   "input": "pressed against him at 10:30",
+   "expected": "pressed against him at ten thirty"
+  },
+  {
+   "input": "a 16:9 screen",
+   "expected": "a sixteen:nine screen"
+  },
+  {
+   "input": "1:2:3",
+   "expected": "one:two:three"
+  },
+  {
+   "input": "10:30:15",
+   "expected": "ten thirty:fifteen"
+  },
+  {
+   "input": "ratio 1.5:1",
+   "expected": "ratio one point five:one"
+  },
+  {
+   "input": "scored 2:10",
+   "expected": "scored two ten"
+  },
+  {
+   "input": "odds 3:1:2",
+   "expected": "odds three:one:two"
+  },
+  {
+   "input": "٣:١ odds",
+   "expected": "٣:١ odds"
+  },
+  {
+   "input": "ratio 3:1-2, lap 1:2:3 and 5:60 stayed",
+   "expected": "ratio three:one-two, lap one:two:three and five:sixty stayed"
+  },
+  {
+   "input": "The odds, he said, were 3:2.",
+   "expected": "The odds, he said, were three:two."
+  },
+  {
+   "input": "odds were long; at 4:30 we left",
+   "expected": "odds were long; at four thirty we left"
+  },
+  {
+   "input": "See Heb. 11:1 and Matt. 5:1.",
+   "expected": "See Heb. eleven:one and Matt. five:one."
+  },
+  {
+   "input": "approx. 3:1 odds",
+   "expected": "approx. three to one odds"
+  },
+  {
+   "input": "Map scale 1:24,000",
+   "expected": "Map scale one to twenty four thousand"
+  },
+  {
+   "input": "a 1:50 scale map",
+   "expected": "a one to fifty scale map"
+  },
+  {
+   "input": "odds 3:1",
+   "expected": "odds three to one"
+  },
+  {
+   "input": "the 1:25,000 map",
+   "expected": "the one to twenty five thousand map"
+  },
+  {
+   "input": "5:30 pm",
+   "expected": "five thirty peeem"
+  },
+  {
+   "input": "at 1:50",
+   "expected": "at one fifty"
+  },
+  {
+   "input": "Arrive 10:15 tonight",
+   "expected": "Arrive ten fifteen tonight"
+  },
+  {
+   "input": "it is 2:30 now",
+   "expected": "it is two thirty now"
+  },
+  {
+   "input": "Ratios 4:3 and 16:9 aspect",
+   "expected": "Ratios four to three and sixteen to nine aspect"
+  },
+  {
+   "input": "1:50",
+   "expected": "one fifty"
+  }
+ ]
+}

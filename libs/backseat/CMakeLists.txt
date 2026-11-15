@@ -43,6 +43,7 @@ set(
   pronunciation_text.hpp
   pronunciation_web.hpp
   pronunciation_interjections.hpp
+  pronunciation_ratios.hpp
   pop_quiz.cpp
   pop_quiz.hpp
   quiet_bits.cpp
