@@ -164,6 +164,11 @@ public:
   /// protected by mutex in TrafficCache class.
   void CopyTraffic(traffic::AllMwmTrafficInfo & trafficColoring) const override;
 
+  /// Backseat Driver: jams the phone measured from its own GPS (there's no live traffic feed),
+  /// as the router's traffic map. Replaces the last set; empty clears it. With `rebuild`, the route
+  /// is rebuilt from the car's spot with them, the same way a traffic update would.
+  void SetObservedTraffic(traffic::AllMwmTrafficInfo const & coloring, bool rebuild);
+
   void AssignRouteForTesting(std::shared_ptr<Route> route, RouterResultCode e) { AssignRoute(route, e); }
 
   bool IsSpeedCamLimitExceeded() const { return m_speedCameraManager.IsSpeedLimitExceeded(); }

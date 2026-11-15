@@ -84,6 +84,7 @@ add_executable(${PROJECT_NAME}
   signal_back_test.cpp
   unknown_speed_test.cpp
   phantom_direction_test.cpp
+  traffic_reroute_test.cpp
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
 target_compile_definitions(${PROJECT_NAME} PRIVATE

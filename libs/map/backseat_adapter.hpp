@@ -7,12 +7,18 @@
 #include "backseat/road_bits.hpp"
 #include "backseat/voice_command.hpp"
 
+#include "traffic/speed_groups.hpp"
+#include "traffic/traffic_info.hpp"
+
+#include "indexer/mwm_set.hpp"
+
 #include "platform/location.hpp"
 
 #include "geometry/point2d.hpp"
 
 #include <chrono>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -60,6 +66,14 @@ public:
   /// A real (not extrapolated) GPS fix.
   void OnLocationUpdate(location::GpsInfo const & info, routing::RoutingSession const & session,
                         std::string const & destinationName);
+
+  /// Traffic-aware routing: puts the jam the navigator just measured (backseat::JamReport) on the
+  /// router's traffic map and rebuilds the route around it, or takes a cleared jam off. Call right
+  /// after OnLocationUpdate, on the same thread.
+  void ApplyTraffic(routing::RoutingSession & session);
+  /// A rebuilt route is in (RoutingManager's rebuild callback). When it was ApplyTraffic's, the
+  /// navigator hears whether it found a way around and how much time the jam costs.
+  void OnRouteRebuilt(routing::Route const & route, bool ok);
 
   /// Called when the platform is about to speak: catches route changes since the last fix
   /// and returns the lines to say.
@@ -555,6 +569,29 @@ private:
   std::string m_callerVoiceToWarm;
   mutable std::mutex m_lastTripMutex;
   std::optional<LastTrip> m_lastTrip;
+  /// Traffic-aware routing. The navigator's latest jam report (an empty one: the jam cleared),
+  /// waiting for ApplyTraffic().
+  std::optional<std::optional<backseat::JamReport>> m_jamPending;
+  /// Every jam stretch reported since the car got stuck, as the router's traffic map, by map file.
+  std::map<MwmSet::MwmId, std::shared_ptr<std::map<traffic::TrafficInfo::RoadSegmentId, traffic::SpeedGroup>>>
+      m_observedJams;
+  /// A rebuild around a jam is under way: what the old route looked like, to compare the new one with.
+  struct TrafficAsk
+  {
+    double askedAtMs = 0;
+    /// The jammed road segments ahead of the car on the old route, and how long they run.
+    std::set<traffic::TrafficInfo::RoadSegmentId> jammedAhead;
+    double jamAheadM = 0;
+    /// The old route's time left, without and with the jam counted.
+    double oldLeftS = 0;
+    double jamExtraS = 0;
+    /// Names of the jammed roads, so the way around is named by a road that isn't one of them.
+    std::set<std::string> jamRoads;
+  };
+  std::optional<TrafficAsk> m_trafficAsk;
+  /// The traffic rebuild is in, and the car hasn't been matched to it yet: still "on route".
+  bool m_trafficSettling = false;
+  double m_lastFixMs = 0;
   /// The route being followed, for the road-trip lookups (set with each location update).
   std::shared_ptr<routing::Route const> m_route;
   /// Rest areas, gas, coffee and viewpoints along m_route, by distance from its start; scanned once
