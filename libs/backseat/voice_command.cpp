@@ -556,7 +556,12 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       {AppAction::NextTurn, {" what's the next turn ", " whats the next turn ", " what is the next turn ",
                              " where do i turn ", " when do i turn ", " when's my next turn ", " whens my next turn ",
                              " what's my next turn ", " whats my next turn ", " what's the next direction ",
-                             " whats the next direction ", " next direction "}},
+                             " whats the next direction ", " next direction ",
+                             // Exits, lanes and which way: all answered by saying the next maneuver out loud.
+                             " which exit ", " what exit ", " what's the next exit ", " whats the next exit ",
+                             " what is the next exit ", " which lane ", " what lane ", " stay in this lane ",
+                             " is it a left or a right ", " is it left or right ", " left or right ",
+                             " right or left "}},
       {AppAction::BeNicer, {" be nicer ", " be nice ", " nicer to me ", " stop being mean ", " stop being so mean ", " be kinder "}},
       {AppAction::BeMeaner, {" be meaner ", " be mean ", " meaner to me ", " be more mean "}},
       {AppAction::GradeSoFar, {" grade me ", " grade so far ", " what's my grade ", " whats my grade ", " how am i doing ",
@@ -578,7 +583,9 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       {AppAction::CurrentSpeed, {" how fast am i ", " how fast are we ", " what's my speed ", " whats my speed ",
                                  " what is my speed ", " what speed am i "}},
       {AppAction::CurrentRoad, {" what road ", " what street ", " which road ", " which street ", " what highway ",
-                                " road is this ", " street is this "}},
+                                " road is this ", " street is this ", " this road called ", " this street called ",
+                                " what's this road ", " whats this road ", " what is this road ", " what's this street ",
+                                " whats this street ", " what is this street "}},
       {AppAction::ArrivalTime, {" what time will we ", " what time will i ", " what time do we ", " what time do i ",
                                 " when will we arrive ", " when will i arrive ", " arrival time ", " what's our arrival ",
                                 " whats our arrival "}},
@@ -1034,7 +1041,7 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::SpeedLimit: return saidAny({"limit"}) || saidAny({"fast"});
   case AppAction::CurrentSpeed: return saidAny({"fast", "speed"});
   case AppAction::CurrentRoad: return saidAny({"road", "street", "highway"});
-  case AppAction::NextTurn: return saidAny({"turn", "direction"});
+  case AppAction::NextTurn: return saidAny({"turn", "direction", "exit", "lane"}) || (saidAny({"left"}) && saidAny({"right"}));
   case AppAction::ArrivalTime: return saidAny({"time", "arrive", "arrival"});
   case AppAction::DifferentRoute:
     return saidAny({"reroute", "closed", "blocked", "detour", "closure"}) ||
