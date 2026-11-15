@@ -1192,3 +1192,40 @@ TEST(PastTenseTripQuestionsArentTimeLeft)
   CHECK(Heard("how far to the next gas station", AppAction::FindAlongRoute));
   CHECK(Heard("how far is my next turn", AppAction::NextTurn));
 }
+
+TEST(LaneExitAndWhichWayQuestionsSayTheNextTurn)
+{
+  // B158 (BI-140): exits, lanes and "left or right" are all the next maneuver; "what's this road called" is the road.
+  for (char const * said : {"which exit", "what exit do i take", "what's the next exit", "Which lane?",
+                            "what lane should i be in", "do i stay in this lane", "is it a left or a right",
+                            "left or right", "what\xE2\x80\x99s the next exit", "how far is the next exit"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == AppAction::NextTurn;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(ok);
+    CHECK(WordsSupportTool(AppAction::NextTurn, "", said));
+  }
+  for (char const * said : {"what's this road called", "what is this street called", "whats this road"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == AppAction::CurrentRoad;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(ok);
+    CHECK(WordsSupportTool(AppAction::CurrentRoad, "", said));
+  }
+  // Narration with left/right in it isn't a question.
+  for (char const * said : {"I left my phone at home", "turn left at the light", "you were right about that"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = std::none_of(c.begin(), c.end(), [](AppCommand const & x) { return x.action == AppAction::NextTurn; });
+    if (!ok)
+      std::printf("  \"%s\" heard next turn\n", said);
+    CHECK(ok);
+  }
+  CHECK(!WordsSupportTool(AppAction::NextTurn, "", "I left my phone at home"));
+  CHECK(Heard("avoid this road", AppAction::DifferentRoute));
+  CHECK(Heard("how long until we get there", AppAction::TimeLeft));
+}
