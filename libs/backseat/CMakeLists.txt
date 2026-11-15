@@ -44,6 +44,8 @@ set(
   pronunciation_web.hpp
   pronunciation_interjections.hpp
   pronunciation_ratios.hpp
+  pronunciation_spelling.hpp
+  pronunciation_spelling_data.hpp
   pop_quiz.cpp
   pop_quiz.hpp
   quiet_bits.cpp

@@ -7,6 +7,7 @@
 #include "backseat/pronunciation_measures.hpp"
 #include "backseat/pronunciation_interjections.hpp"
 #include "backseat/pronunciation_ratios.hpp"
+#include "backseat/pronunciation_spelling.hpp"
 
 #include <algorithm>
 #include <array>
@@ -663,6 +664,12 @@ std::string FractionWords(std::string const & a, std::string const & b)
   return a + "/" + b;
 }
 }  // namespace
+
+void SetBritishSpelling(bool british) { g_britishSpelling.store(british, std::memory_order_relaxed); }
+
+bool BritishSpelling() { return g_britishSpelling.load(std::memory_order_relaxed); }
+
+std::string RespellVariant(std::string const & text) { return SpellingVariants(text); }
 
 void SetUserWords(std::string const & lines)
 {
@@ -2062,6 +2069,9 @@ std::string ForSpeech(std::string const & text)
 
   // The driver's own words first: they know best.
   s = ApplyUserWords(s);
+  // British/American spellings the voice's lexicon lacks, toward the one it has: "Grey St" is "Gray St",
+  // "Theatre District" "Theater District" for the American voice (loop B162, CROSS X-061).
+  s = SpellingVariants(s);
   // Street types abroad: "Calle Ocho" is "KAH-yeh Ocho", "Paseo de la Reforma" keeps its Spanish.
   s = ForeignStreets(s);
   // Places said the local way: "Burnet Rd" is BURN-it, "Humble, TX" UM-bul.
