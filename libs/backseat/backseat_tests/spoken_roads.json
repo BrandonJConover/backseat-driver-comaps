@@ -460,6 +460,91 @@
    "input": "Exit E123 Terminal",
    "language": "en",
    "expected": "Exit E123 Terminal"
+  },
+  {
+   "input": "Take Spur 366",
+   "language": "en",
+   "expected": "Take Spur three sixty six"
+  },
+  {
+   "input": "Take Spur 366 North",
+   "language": "en",
+   "expected": "Take Spur three sixty six North"
+  },
+  {
+   "input": "Exit to Spur 69.",
+   "language": "en",
+   "expected": "Exit to Spur sixty nine."
+  },
+  {
+   "input": "Take Beltway 8 W",
+   "language": "en",
+   "expected": "Take Beltway eight West"
+  },
+  {
+   "input": "Take Park Road 1C",
+   "language": "en",
+   "expected": "Take Park Road one C"
+  },
+  {
+   "input": "Take I-35 Bus. N.",
+   "language": "en",
+   "expected": "Take I thirty five Business North."
+  },
+  {
+   "input": "Take I-35 Bus. N",
+   "language": "en",
+   "expected": "Take I thirty five Business North"
+  },
+  {
+   "input": "Take US 183 Alt. S",
+   "language": "en",
+   "expected": "Take yooess one eighty three Alternate South"
+  },
+  {
+   "input": "Take US-290 Bus. West.",
+   "language": "en",
+   "expected": "Take yooess two ninety Business West."
+  },
+  {
+   "input": "Take US 59 Byp. E then right",
+   "language": "en",
+   "expected": "Take yooess fifty nine Bypass East then right"
+  },
+  {
+   "input": "Take US 290 Bus.",
+   "language": "en",
+   "expected": "Take yooess two ninety Business."
+  },
+  {
+   "input": "Take I-35 Bus. Now go.",
+   "language": "en",
+   "expected": "Take I thirty five Business. Now go."
+  },
+  {
+   "input": "Catch the bus. Then walk",
+   "language": "en",
+   "expected": "Catch the bus. Then walk"
+  },
+  {
+   "input": "Spur of the moment",
+   "language": "en",
+   "expected": "Spur of the moment"
+  },
+  {
+   "input": "Spur 5 miles ahead",
+   "language": "en",
+   "expected": "Spur five miles ahead"
+  },
+  {
+   "input": "Beltway traffic is heavy",
+   "language": "en",
+   "expected": "Beltway traffic is heavy"
+  },
+  {
+   "input": "The I-35 bus stop",
+   "language": "en",
+   "expected": "The I thirty five bus stop"
   }
  ]
 }

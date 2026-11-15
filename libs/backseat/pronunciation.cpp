@@ -1382,7 +1382,7 @@ std::string Roads(std::string const & text)
   };
   // Business, alternate and bypass routes after the number: "US 290 Bus", "US 183 Alt", "US 87 Byp".
   // Not when a lowercase word follows that makes it something else ("the I-35 bus stop").
-#define BACKSEAT_ROUTE_PREFIX "Interstate|Highway|Route|Road|Loop|[Ee]xit|I|IH|US|SR|CR|FM|RM|RR|SH|M|[A-Z]{2}"
+#define BACKSEAT_ROUTE_PREFIX "Interstate|Highway|Route|Road|Loop|Spur|Beltway|[Ee]xit|I|IH|US|SR|CR|FM|RM|RR|SH|M|[A-Z]{2}"
 #define BACKSEAT_ROUTE_KIND "Bus|BUS|Business|Alt|ALT|Byp|BYP|Bypass"
   // Signs and traffic feeds write the direction of travel as "I-35 NB", "US-290 WB": northbound,
   // westbound. Only right after a route ref, so "NB: see below" and a lone "WB" stay as they are.
@@ -1411,7 +1411,8 @@ std::string Roads(std::string const & text)
   static std::regex const road(
       "\\b(" BACKSEAT_ROUTE_PREFIX ")(-| )(\\d{1,4})([A-Z]?)"
       "(?![A-Za-z0-9]|[.,:/]\\d| ?(?:ft|mi|mph|km|m|yd)\\b)"
-      "(?: (" BACKSEAT_ROUTE_KIND ")(\\.)?(?![A-Za-z0-9]| (?:stop|stops|station|lane|lanes|route|routes|key)\\b))?");
+      "(?: (" BACKSEAT_ROUTE_KIND ")(\\.)?(?![A-Za-z0-9]| (?:stop|stops|station|lane|lanes|route|routes|key)\\b)"
+      "(?: ([NSEW])(?![A-Za-z0-9]))?)?");
 #undef BACKSEAT_ROUTE_PREFIX
 #undef BACKSEAT_ROUTE_KIND
   auto const before = s;
@@ -1427,10 +1428,20 @@ std::string Roads(std::string const & text)
       out += k == 'b' && std::tolower(static_cast<unsigned char>(kind[1])) == 'u' ? " Business"
              : k == 'a'                                                           ? " Alternate"
                                                                                   : " Bypass";
-      // "Byp." may end the sentence too: the period stays unless a lowercase word carries on.
+      // "I-35 Bus. N." is "Business North.": the abbreviation's dot goes and the direction letter is
+      // said (loop B167). The direction's own dot still ends the sentence.
+      if (m[7].matched)
+        return out + " " + Compass(m.str(7));
+      // "Byp." may end the sentence too: the period stays unless a lowercase word or a spelled-out
+      // direction carries on ("US 290 Bus. West").
       auto const end = pos + static_cast<size_t>(m.length(0));
-      if (m[6].matched && !(end + 1 < before.size() && before[end] == ' ' &&
-                            std::islower(static_cast<unsigned char>(before[end + 1]))))
+      static std::regex const direction(" (?:North|South|East|West)(?:east|west)?(?:bound)?\\b");
+      bool const carriesOn =
+          end + 1 < before.size() && before[end] == ' ' &&
+          (std::islower(static_cast<unsigned char>(before[end + 1])) ||
+           std::regex_search(before.begin() + static_cast<std::ptrdiff_t>(end), before.end(), direction,
+                             std::regex_constants::match_continuous));
+      if (m[6].matched && !carriesOn)
         out += ".";
     }
     return out;
