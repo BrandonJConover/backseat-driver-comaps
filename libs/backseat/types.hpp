@@ -66,7 +66,9 @@ enum class HazardKind
   Construction,
   Debris,
   Crash,
-  StalledCar
+  StalledCar,
+  /// A fixed speed camera on the route (the map's highway=speed_camera points).
+  SpeedCamera
 };
 
 /// Places the GPS itself wants to visit.
@@ -153,6 +155,8 @@ struct NavEvent
   // HazardAhead
   HazardKind hazard = HazardKind::Police;
   std::optional<std::string> id;
+  /// A speed camera's own limit, when the map has one (else the posted limit counts).
+  std::optional<double> limitMps;
   // PoiAhead, DestinationSet
   std::string name;
   StopWish wish = StopWish::Other;

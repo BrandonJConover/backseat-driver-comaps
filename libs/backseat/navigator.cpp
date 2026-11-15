@@ -94,6 +94,18 @@ double constexpr kTollStartM = 200;
 double constexpr kTollWindowMs = 90000;
 /// Two toll stretches with less free road than this between them are one toll road.
 double constexpr kTollFreeGapM = 2000;
+/// Speed cameras: the warning comes this many seconds out at the current speed, kept between
+/// these distances; closer than kCameraTooLateM it's no longer a warning, so it's skipped.
+double constexpr kCameraWarnS = 15;
+double constexpr kCameraWarnMinM = 250;
+double constexpr kCameraWarnMaxM = 600;
+double constexpr kCameraTooLateM = 80;
+/// The camera dropped off the route ahead within this far of the car: the car drove past it.
+double constexpr kCameraPassedWithinM = 120;
+/// Cameras in a row (an enforcement zone) get one line a minute between them, at most.
+double constexpr kCameraEveryMs = 60000;
+/// Auto mode, driver within the limit: an easy heads-up this often at most.
+double constexpr kCameraHeadsUpEveryMs = 600000;
 /// A pull-over this soon after serious speeding is probably the police.
 double constexpr kPoliceAfterSpeedingMs = 120000;
 /// "Serious" speeding: this far over the limit (~10 mph).
@@ -756,6 +768,15 @@ RouteSnapshot CleanRoute(RouteSnapshot route, double lastDistToTurnM)
     route.ferryAheadM.reset();
   if (route.tollAheadM && !sane(*route.tollAheadM, kMaxRouteM))
     route.tollAheadM.reset();
+  if (!route.cameraAheadM || !sane(*route.cameraAheadM, kMaxRouteM) || !route.cameraAt ||
+      !std::isfinite(route.cameraAt->lat) || !std::isfinite(route.cameraAt->lon))
+  {
+    route.cameraAheadM.reset();
+    route.cameraAt.reset();
+    route.cameraLimitMps.reset();
+  }
+  if (route.cameraLimitMps && !(std::isfinite(*route.cameraLimitMps) && *route.cameraLimitMps > 0 && *route.cameraLimitMps < 100))
+    route.cameraLimitMps.reset();
   // A grade is a fraction (0.06 = 6%); past 100% it's not a road.
   if (route.gradeAhead && !(std::isfinite(*route.gradeAhead) && std::abs(*route.gradeAhead) <= 1))
     route.gradeAhead.reset();
@@ -899,6 +920,7 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & rawRoute)
     }
     TrackPlateGame(fix.tMs, {fix.lat, fix.lon}, fix.speedMps, route);
     TrackLongDrive(fix.tMs, route);
+    TrackSpeedCamera(fix, route);
   }
   TrackFear(fix, route);
   TrackSights(fix, route);
@@ -1167,6 +1189,90 @@ void Navigator::TrackToll(Fix const & fix, RouteSnapshot const & route)
   m_tollSaid = true;
   Trace("nav.tollStart", {{"ahead_m", LogNum(*route.tollAheadM, 0)}});
   SayLine(fix.tMs, Category::Idle, "toll.start", DriverVars());
+}
+
+void Navigator::TrackSpeedCamera(Fix const & fix, RouteSnapshot const & route)
+{
+  std::optional<std::string> id;
+  if (route.cameraAt && route.cameraAheadM)
+    id = "camera@" + LogNum(route.cameraAt->lat, 5) + "," + LogNum(route.cameraAt->lon, 5);
+  double const speed = fix.speedMps >= 0 ? fix.speedMps : m_knownSpeedMps.value_or(0);
+  bool const chatty = m_talk != TalkLevel::DirectionsOnly;
+  // The camera being watched is no longer ahead. Close to it a moment ago: the car just went past.
+  if (m_camera && (!id || *id != m_camera->id))
+  {
+    CameraWatch const passed = *m_camera;
+    m_camera.reset();
+    std::optional<double> const limit = passed.limitMps ? passed.limitMps : fix.speedLimitMps;
+    // Its own warning was said, or no camera has had a line for a while (cameras in a row get one).
+    bool const fresh = passed.said || fix.tMs - m_lastCameraLineT >= kCameraEveryMs;
+    if (m_engine && route.state == RouteState::OnRoute && passed.aheadM <= kCameraPassedWithinM && fix.speedMps >= 0 &&
+        limit && chatty && fresh)
+    {
+      Vars const vars{{"speed", std::to_string(std::lround(ToDisplay(fix.speedMps, m_config.units)))},
+                      {"limit", std::to_string(std::lround(ToDisplay(*limit, m_config.units)))}};
+      if (m_engine->Over(fix.speedMps, *limit))
+      {
+        Trace("nav.camera", {{"what", "flash"}, {"id", passed.id}, {"mph", LogNum(fix.speedMps * 2.23694, 0)}});
+        SayLine(fix.tMs, Category::Speeding, "camera.flash", vars);
+        m_engine->HushSpeeding(fix.tMs + kCameraEveryMs);
+        m_lastCameraLineT = fix.tMs;
+      }
+      else if (passed.warnedSpeeding)
+      {
+        Trace("nav.camera", {{"what", "slowed"}, {"id", passed.id}});
+        SayLine(fix.tMs, Category::Speeding, "camera.slowed", vars);
+        m_lastCameraLineT = fix.tMs;
+      }
+    }
+  }
+  if (!id || m_cameraAlerts == CameraAlerts::Off || route.state != RouteState::OnRoute || !m_engine)
+    return;
+  if (!m_camera)
+  {
+    m_camera.emplace();
+    m_camera->id = *id;
+  }
+  m_camera->aheadM = *route.cameraAheadM;
+  m_camera->limitMps = route.cameraLimitMps;
+  if (m_camera->warned || speed < MovingMps())
+    return;
+  double const warnM = std::clamp(speed * kCameraWarnS, kCameraWarnMinM, kCameraWarnMaxM);
+  if (m_camera->aheadM > warnM)
+    return;
+  // One chance per camera: a warning that can't go now would only come late.
+  m_camera->warned = true;
+  std::optional<double> const limit = route.cameraLimitMps ? route.cameraLimitMps : fix.speedLimitMps;
+  bool const speeding = limit && m_engine->Over(speed, *limit);
+  char const * skip = nullptr;
+  if (m_camera->aheadM < kCameraTooLateM)
+    skip = "too_late";
+  else if (fix.tMs - m_lastCameraLineT < kCameraEveryMs)
+    skip = "camera_row";
+  else if (!speeding && m_cameraAlerts == CameraAlerts::Speeding &&
+           (!chatty || (m_cameraHeadsUps > 0 && fix.tMs - m_lastCameraHeadsUpT < kCameraHeadsUpEveryMs)))
+    skip = "heads_up_rested";
+  // A turn call coming up owns the air; only a speeding warning cuts in.
+  else if (!speeding && route.turnId && route.distToTurnM < kIdleQuietM)
+    skip = "turn_near";
+  Trace("nav.camera", {{"what", skip ? "skip" : speeding ? "warn_speeding" : "heads_up"},
+                       {"why", skip ? skip : ""},
+                       {"ahead_m", LogNum(m_camera->aheadM, 0)},
+                       {"limit", limit ? LogNum(*limit * 2.23694, 0) : ""},
+                       {"mph", LogNum(speed * 2.23694, 0)}});
+  if (skip)
+    return;
+  m_camera->warnedSpeeding = speeding;
+  m_camera->said = true;
+  m_lastCameraLineT = fix.tMs;
+  if (!speeding)
+  {
+    ++m_cameraHeadsUps;
+    m_lastCameraHeadsUpT = fix.tMs;
+  }
+  NavEvent e = NavEvent::HazardAhead(fix.tMs, HazardKind::SpeedCamera, m_camera->aheadM, m_camera->id);
+  e.limitMps = route.cameraLimitMps;
+  Say(m_engine->OnNav(e));
 }
 
 void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
@@ -2700,6 +2806,9 @@ void Navigator::ResetTrip()
   m_knownSpeedMps.reset();
   m_pullOverSaid = false;
   m_policeSaid = false;
+  m_camera.reset();
+  m_lastCameraLineT = m_lastCameraHeadsUpT = -1e18;
+  m_cameraHeadsUps = 0;
   m_lastBadSpeedingT.reset();
   m_badSpeedingSince.reset();
   m_onBridge = false;

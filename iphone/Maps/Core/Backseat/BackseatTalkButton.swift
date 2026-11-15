@@ -58,14 +58,16 @@ import UIKit
 }
 
 /// While a route is followed: a speed card (a real SPEED LIMIT sign next to your speed, which goes
-/// orange when over), and square Report and Draw buttons, on the leading edge of the map. Added on
-/// top of CoMaps' own navigation views; remove the install call to take it out.
+/// orange when over, plus a camera badge when a speed camera is within 1 km), and square Report and
+/// Draw buttons, on the leading edge of the map. Added on top of CoMaps' own navigation views;
+/// remove the install call to take it out.
 final class BackseatDriveOverlay: NSObject {
   private static var stack: UIStackView?
   private static var sign: BackseatSpeedLimitSign?
   private static var speedLabel: UILabel?
   private static var unitLabel: UILabel?
   private static var speedCard: UIView?
+  private static var cameraBadge: UIImageView?
   private static var draw: UIButton?
   private static var timer: Timer?
 
@@ -83,7 +85,14 @@ final class BackseatDriveOverlay: NSObject {
     speedColumn.axis = .vertical
     speedColumn.alignment = .center
     speedColumn.spacing = -4
-    let speedRow = UIStackView(arrangedSubviews: [sign, speedColumn])
+    // A speed camera within 1 km: a camera glyph beside the speed, orange if the car is over.
+    let cameraBadge = UIImageView(image: UIImage(systemName: "camera.fill"))
+    cameraBadge.tintColor = BackseatTheme.text
+    cameraBadge.contentMode = .scaleAspectFit
+    cameraBadge.isHidden = true
+    cameraBadge.widthAnchor.constraint(equalToConstant: 22).isActive = true
+    cameraBadge.heightAnchor.constraint(equalToConstant: 22).isActive = true
+    let speedRow = UIStackView(arrangedSubviews: [sign, speedColumn, cameraBadge])
     speedRow.axis = .horizontal
     speedRow.alignment = .center
     speedRow.spacing = 10
@@ -129,6 +138,7 @@ final class BackseatDriveOverlay: NSObject {
     self.speedLabel = speedLabel
     self.unitLabel = unitLabel
     self.speedCard = speedCard
+    self.cameraBadge = cameraBadge
     self.draw = draw
 
     NotificationCenter.default.addObserver(forName: BackseatTalkButton.navigationVisibilityChanged, object: nil,
@@ -143,6 +153,9 @@ final class BackseatDriveOverlay: NSObject {
       }
     }
   }
+
+  /// A speed camera this close shows its badge on the speed card.
+  private static let cameraBadgeMeters = 1000.0
 
   /// Under this far from the turn, it's "turn now".
   private static let turnNowMeters = 40.0
@@ -171,10 +184,15 @@ final class BackseatDriveOverlay: NSObject {
     speedLabel.textColor = over ? BackseatTheme.hot : BackseatTheme.text
     speedCard.layer.borderColor = (over ? BackseatTheme.hot : UIColor.clear).cgColor
     BackseatMotion.breathe(speedCard.layer, on: over)
+    let cameraMeters = MWMBackseatRewriter.speedCameraAheadMeters
+    let camera = cameraMeters >= 0 && cameraMeters <= cameraBadgeMeters
+    cameraBadge?.isHidden = !camera
+    cameraBadge?.tintColor = over ? BackseatTheme.hot : BackseatTheme.text
     checkTurnNow()
-    speedCard.accessibilityLabel = limitMps > 0
+    let speedText = limitMps > 0
       ? "\(speed.valueAsString) \(speed.unit), limit \(Measure(asSpeed: limitMps).valueAsString)"
       : "\(speed.valueAsString) \(speed.unit)"
+    speedCard.accessibilityLabel = camera ? speedText + ", speed camera ahead" : speedText
     let drawLabel = speedMps < BackseatSketch.parkedMps ? "Draw route" : "Draw route (passenger)"
     if draw?.accessibilityLabel != drawLabel {
       draw?.accessibilityLabel = drawLabel

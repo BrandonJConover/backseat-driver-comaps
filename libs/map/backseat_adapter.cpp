@@ -1166,6 +1166,13 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
   }
   m_speedMps = info.m_speed;
   m_speedLimitMps = fix.speedLimitMps.value_or(-1);
+  // The app's speed camera setting (Never / Auto / Always) decides which cameras get a line.
+  switch (session.GetSpeedCamManager().GetMode())
+  {
+  case routing::SpeedCameraManagerMode::Never: m_navigator.SetCameraAlerts(backseat::CameraAlerts::Off); break;
+  case routing::SpeedCameraManagerMode::Always: m_navigator.SetCameraAlerts(backseat::CameraAlerts::Always); break;
+  default: m_navigator.SetCameraAlerts(backseat::CameraAlerts::Speeding); break;
+  }
   if (m_debugLog.SampleDue(fix.tMs))
     backseat::Trace("fix", {{"lat", backseat::LogNum(fix.lat, 4)},
                             {"lon", backseat::LogNum(fix.lon, 4)},
@@ -1174,7 +1181,8 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
                             {"bearing", backseat::LogNum(fix.bearingDeg, 0)},
                             {"acc_m", backseat::LogNum(info.m_horizontalAccuracy, 0)},
                             {"route", RouteStateName(route.state)},
-                            {"turn_m", backseat::LogNum(route.distToTurnM, 0)}});
+                            {"turn_m", backseat::LogNum(route.distToTurnM, 0)},
+                            {"cam_m", route.cameraAheadM ? backseat::LogNum(*route.cameraAheadM, 0) : ""}});
   m_navigator.OnFix(fix, route);
   CheckBattery(fix.tMs);
   bool const inTrip = m_navigator.InTrip();
@@ -3105,6 +3113,7 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
   using routing::SessionState;
   backseat::RouteSnapshot snap;
   m_secondsLeft = -1;
+  m_cameraAheadM = -1;
   if (!session.IsActive() || !session.IsFollowing())
     return snap;
   auto const route = session.GetRouteForTests();
@@ -3235,6 +3244,47 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
       }
       snap.curveAheadM = backseat::CurveAheadM(ahead, 450);
     }
+    SetCameraAhead(*route, snap);
   }
   return snap;
+}
+
+void BackseatAdapter::SetCameraAhead(routing::Route const & route, backseat::RouteSnapshot & snap) const
+{
+  // The map's speed cameras (highway=speed_camera) sit on the route's segments, each at a fraction
+  // of its segment. Segment i runs from segment i-1's junction to its own.
+  double constexpr kLookAheadM = 2000;
+  m_cameraAheadM = -1;
+  auto const & followed = route.GetFollowedPolyline();
+  auto const & segments = route.GetRouteSegments();
+  if (!followed.IsValid() || segments.empty())
+    return;
+  double const passedM = route.GetCurrentDistanceFromBeginMeters();
+  size_t const from = followed.GetCurrentIter().m_ind;
+  for (size_t i = from > 0 ? from - 1 : 0; i < segments.size(); ++i)
+  {
+    double const startM = i > 0 ? segments[i - 1].GetDistFromBeginningMeters() : 0;
+    if (startM - passedM > kLookAheadM)
+      return;
+    auto const & cams = segments[i].GetSpeedCams();
+    if (cams.empty())
+      continue;
+    double const lengthM = segments[i].GetDistFromBeginningMeters() - startM;
+    m2::PointD const a = i > 0 ? segments[i - 1].GetJunction().GetPoint() : followed.GetPolyline().Front();
+    m2::PointD const b = segments[i].GetJunction().GetPoint();
+    for (auto const & cam : cams)
+    {
+      double const atM = startM + lengthM * cam.m_coef;
+      if (atM <= passedM)
+        continue;
+      if (atM - passedM > kLookAheadM)
+        return;
+      snap.cameraAheadM = atM - passedM;
+      snap.cameraAt = ToBackseatLatLon(a + (b - a) * cam.m_coef);
+      if (cam.m_maxSpeedKmPH > 0 && cam.m_maxSpeedKmPH != routing::SpeedCameraOnRoute::kNoSpeedInfo)
+        snap.cameraLimitMps = measurement_utils::KmphToMps(cam.m_maxSpeedKmPH);
+      m_cameraAheadM = *snap.cameraAheadM;
+      return;
+    }
+  }
 }

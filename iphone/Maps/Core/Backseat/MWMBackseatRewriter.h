@@ -61,6 +61,8 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 @property(class, nonatomic, readonly) double metersToNextTurn;
 /// The speed limit here while following a route, m/s: -1 unknown, 0 unlimited.
 @property(class, nonatomic, readonly) double speedLimitMps;
+/// Meters to the next speed camera on the route, -1 when none is within 2 km.
+@property(class, nonatomic, readonly) double speedCameraAheadMeters;
 
 /// Who's in the car, for the roasts. Pronouns are "they", "he" or "she". Setting any of these
 /// reloads the navigator's personality at once.
