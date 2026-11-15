@@ -10,6 +10,8 @@
 #include "routing/routing_session.hpp"
 #include "routing/turns.hpp"
 
+#include "traffic/traffic_cache.hpp"
+
 #include "indexer/feature_meta.hpp"
 #include "indexer/classificator.hpp"
 #include "indexer/data_source.hpp"
@@ -504,6 +506,7 @@ BackseatAdapter::BackseatAdapter()
 })
 {
   m_navigator.SetPlateLog(LoadPlates(), &SavePlates);
+  m_navigator.SetJamReporter([this](std::optional<backseat::JamReport> const & jam) { m_jamPending = jam; });
   m_navigator.SetTwentyLog(LoadTwenty(), &SaveTwenty);
   m_navigator.SetSaidLog(LoadSaid(), &SaveSaid);
   m_navigator.SetAchievements(LoadAchievements(), &SaveAchievements);
@@ -1175,6 +1178,10 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
                             {"acc_m", backseat::LogNum(info.m_horizontalAccuracy, 0)},
                             {"route", RouteStateName(route.state)},
                             {"turn_m", backseat::LogNum(route.distToTurnM, 0)}});
+  m_lastFixMs = fix.tMs;
+  // Matched to the route rebuilt around a jam: from here on it's an ordinary route.
+  if (m_trafficSettling && session.IsOnRoute())
+    m_trafficSettling = false;
   m_navigator.OnFix(fix, route);
   CheckBattery(fix.tMs);
   bool const inTrip = m_navigator.InTrip();
@@ -3099,6 +3106,208 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
   return out;
 }
 
+namespace
+{
+/// Below this much route left, a jam isn't worth a new route: the ETA is close enough already.
+double constexpr kTrafficRerouteMinLeftM = 2000;
+/// A traffic rebuild that hasn't come back by now is given up on.
+double constexpr kTrafficAskTimeoutMs = 60000;
+/// The new route leaves the jam this much sooner than the old one: it's a way around, not the same road.
+double constexpr kWayAroundMinM = 300;
+
+/// How many times longer the router takes a segment in this group: the bucket's top speed as a
+/// share of free flow, plus the 1.8 penalty CarEstimator adds to anything slowed (edge_estimator.cpp).
+double TrafficSlowdown(traffic::SpeedGroup group)
+{
+  static double constexpr kTopPercent[] = {8, 16, 33, 58, 83, 100};
+  auto const i = static_cast<size_t>(group);
+  if (i >= std::size(kTopPercent) || group == traffic::SpeedGroup::G5)
+    return 1;
+  return 100.0 / kTopPercent[i] * 1.8;
+}
+
+traffic::TrafficInfo::RoadSegmentId RoadSegmentOf(routing::Segment const & segment)
+{
+  return {segment.GetFeatureId(), static_cast<uint16_t>(segment.GetSegmentIdx()),
+          segment.IsForward() ? traffic::TrafficInfo::RoadSegmentId::kForwardDirection
+                              : traffic::TrafficInfo::RoadSegmentId::kReverseDirection};
+}
+
+/// What a road on the route is called out loud: its number ("I-25") or its name.
+std::string RoadNameOf(routing::RouteSegment const & segment)
+{
+  auto const & road = segment.GetRoadNameInfo();
+  std::string const name = !road.m_ref.empty() ? road.m_ref : road.m_name;
+  return SpeakableStreetName(name);
+}
+
+/// The segment's time on the route: when it ends minus when the one before it ended.
+double SegmentTimeS(std::vector<routing::RouteSegment> const & segments, size_t i)
+{
+  return segments[i].GetTimeFromBeginningSec() - (i > 0 ? segments[i - 1].GetTimeFromBeginningSec() : 0);
+}
+double SegmentStartM(std::vector<routing::RouteSegment> const & segments, size_t i)
+{
+  return i > 0 ? segments[i - 1].GetDistFromBeginningMeters() : 0;
+}
+}  // namespace
+
+void BackseatAdapter::ApplyTraffic(routing::RoutingSession & session)
+{
+  if (m_trafficAsk && m_lastFixMs - m_trafficAsk->askedAtMs > kTrafficAskTimeoutMs)
+  {
+    backseat::Trace("traffic.rebuildLost", {});
+    m_trafficAsk.reset();
+  }
+  if (!m_jamPending)
+    return;
+  auto const jam = *std::exchange(m_jamPending, std::nullopt);
+  auto const route = session.IsActive() ? session.GetRouteForTests() : nullptr;
+  bool const following = route && route->IsValid() && route->GetFollowedPolyline().IsValid() &&
+                         session.IsOnRoute();
+  static std::vector<routing::RouteSegment> const kNoSegments;
+  auto const & segments = following ? route->GetRouteSegments() : kNoSegments;
+  double const hereM = following ? route->GetCurrentDistanceFromBeginMeters() : 0;
+
+  if (!jam)
+  {
+    // Moving again: off the map. If the route still runs through the slow stretch, rebuild it once
+    // so the ETA stops counting a jam that's gone.
+    m_observedJams.clear();
+    bool slowAhead = false;
+    for (size_t i = 0; i < segments.size() && !slowAhead; ++i)
+      slowAhead = segments[i].GetDistFromBeginningMeters() > hereM &&
+                  segments[i].GetTraffic() != traffic::SpeedGroup::Unknown;
+    traffic::AllMwmTrafficInfo none;
+    if (slowAhead && !m_trafficAsk)
+    {
+      m_trafficAsk.emplace();
+      m_trafficAsk->askedAtMs = m_lastFixMs;
+      m_trafficAsk->oldLeftS = route->GetCurrentTimeToEndSec();
+      backseat::Trace("traffic.unmark", {{"rebuild", "yes"}});
+      session.SetObservedTraffic(none, true /* rebuild */);
+    }
+    else
+    {
+      session.SetObservedTraffic(none, false /* rebuild */);
+    }
+    return;
+  }
+  if (!following || m_trafficAsk)
+    return;
+
+  // The measured stretch keeps its own speed; the guess ahead of the car is marked a step faster,
+  // so a guess alone doesn't send the driver on a long detour.
+  auto const measured = traffic::GetSpeedGroupByPercentage(jam->speedShare * 100);
+  auto const guessed = static_cast<traffic::SpeedGroup>(
+      std::min(static_cast<int>(measured) + 1, static_cast<int>(traffic::SpeedGroup::G4)));
+  TrafficAsk ask;
+  ask.askedAtMs = m_lastFixMs;
+  ask.oldLeftS = route->GetCurrentTimeToEndSec();
+  int marked = 0;
+  for (size_t i = 0; i < segments.size(); ++i)
+  {
+    double const startM = SegmentStartM(segments, i);
+    double const endM = segments[i].GetDistFromBeginningMeters();
+    if (endM < hereM - jam->behindM)
+      continue;
+    if (startM > hereM + jam->aheadM)
+      break;
+    auto const & segment = segments[i].GetSegment();
+    auto const & feature = segments[i].GetRoadNameInfo().m_mwmId;
+    if (!segment.IsRealSegment() || !feature.IsValid() || feature.m_index != segment.GetFeatureId())
+      continue;
+    auto const group = endM <= hereM ? measured : guessed;
+    auto & mwm = m_observedJams[feature.m_mwmId];
+    if (!mwm)
+      mwm = std::make_shared<std::map<traffic::TrafficInfo::RoadSegmentId, traffic::SpeedGroup>>();
+    auto const id = RoadSegmentOf(segment);
+    // Marked before: keep the slower of the two readings.
+    auto const [it, added] = mwm->emplace(id, group);
+    if (!added)
+      it->second = std::min(it->second, group);
+    ++marked;
+    if (endM <= hereM)
+      continue;
+    double const share = (endM - std::max(startM, hereM)) / std::max(1.0, endM - startM);
+    ask.jammedAhead.insert(id);
+    ask.jamAheadM += endM - std::max(startM, hereM);
+    ask.jamExtraS += SegmentTimeS(segments, i) * share * (TrafficSlowdown(group) - 1);
+    if (auto name = RoadNameOf(segments[i]); !name.empty())
+      ask.jamRoads.insert(std::move(name));
+  }
+  double const leftM = route->GetCurrentDistanceToEndMeters();
+  backseat::Trace("traffic.mark", {{"segments", std::to_string(marked)},
+                                   {"group", std::to_string(static_cast<int>(measured))},
+                                   {"extra_s", backseat::LogNum(ask.jamExtraS, 0)},
+                                   {"left_m", backseat::LogNum(leftM, 0)}});
+  if (marked == 0)
+    return;
+  traffic::AllMwmTrafficInfo coloring;
+  for (auto const & [mwmId, jammed] : m_observedJams)
+  {
+    auto copy = std::make_shared<traffic::TrafficInfo::Coloring>();
+    for (auto const & [id, group] : *jammed)
+      (*copy)[id] = group;
+    coloring[mwmId] = std::move(copy);
+  }
+  // Almost there: the jam goes on the map for the ETA, but a whole new route isn't worth it.
+  bool const rebuild = leftM >= kTrafficRerouteMinLeftM;
+  if (rebuild)
+    m_trafficAsk = std::move(ask);
+  session.SetObservedTraffic(coloring, rebuild);
+}
+
+void BackseatAdapter::OnRouteRebuilt(routing::Route const & route, bool ok)
+{
+  if (!m_trafficAsk)
+    return;
+  TrafficAsk const ask = *std::exchange(m_trafficAsk, std::nullopt);
+  if (!ok || !route.IsValid())
+  {
+    backseat::Trace("traffic.rebuildFailed", {});
+    return;
+  }
+  m_trafficSettling = true;
+  auto const & segments = route.GetRouteSegments();
+  backseat::TrafficReroute result;
+  double jamNewM = 0;
+  bool leftJam = false;
+  for (size_t i = 0; i < segments.size(); ++i)
+  {
+    double const lenM = segments[i].GetDistFromBeginningMeters() - SegmentStartM(segments, i);
+    auto const & segment = segments[i].GetSegment();
+    bool const jammed = segment.IsRealSegment() && ask.jammedAhead.count(RoadSegmentOf(segment)) > 0;
+    if (jammed)
+      jamNewM += lenM;
+    // What the rest of the jam costs on this route (its segment times already count it).
+    double const slow = TrafficSlowdown(segments[i].GetTraffic());
+    result.delayS += SegmentTimeS(segments, i) * (1 - 1 / slow);
+    // The first named road off the jam is the way around.
+    if (!leftJam && !jammed && i > 0 && segment.IsRealSegment())
+    {
+      std::string name = RoadNameOf(segments[i]);
+      if (!name.empty() && !ask.jamRoads.count(name))
+      {
+        leftJam = true;
+        result.via = std::move(name);
+      }
+    }
+  }
+  result.newRoute = jamNewM + kWayAroundMinM < ask.jamAheadM;
+  double const newLeftS = route.GetTotalTimeSec();
+  if (result.newRoute)
+    result.savedS = std::max(0.0, ask.oldLeftS + ask.jamExtraS - newLeftS);
+  else
+    result.via.clear();
+  backseat::Trace("traffic.rebuilt", {{"new", result.newRoute ? "yes" : "no"},
+                                      {"old_left_s", backseat::LogNum(ask.oldLeftS + ask.jamExtraS, 0)},
+                                      {"new_left_s", backseat::LogNum(newLeftS, 0)},
+                                      {"jam_m", backseat::LogNum(ask.jamAheadM, 0)},
+                                      {"jam_new_m", backseat::LogNum(jamNewM, 0)}});
+  m_navigator.OnTrafficReroute(m_lastFixMs, result);
+}
+
 backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const & session,
                                                   std::string const & destinationName) const
 {
@@ -3118,9 +3327,15 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
   {
   case SessionState::OnRoute: snap.state = backseat::RouteState::OnRoute; break;
   case SessionState::RouteNotStarted:
+    // Rebuilt around a jam from where the car is: it never left the road.
+    snap.state = m_trafficSettling ? backseat::RouteState::OnRoute : backseat::RouteState::NotStarted;
+    break;
   case SessionState::RouteBuilding: snap.state = backseat::RouteState::NotStarted; break;
-  case SessionState::RouteNeedsRebuild:
   case SessionState::RouteRebuilding:
+    // Rebuilding around a jam isn't the driver going off route.
+    snap.state = m_trafficAsk ? backseat::RouteState::OnRoute : backseat::RouteState::OffRoute;
+    break;
+  case SessionState::RouteNeedsRebuild:
   case SessionState::OffRoute: snap.state = backseat::RouteState::OffRoute; break;
   case SessionState::RouteFinished: snap.state = backseat::RouteState::Finished; break;
   case SessionState::NoValidRoute:
