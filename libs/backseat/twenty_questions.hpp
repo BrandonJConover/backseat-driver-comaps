@@ -107,6 +107,8 @@ struct TwentyHeard
     Hint,
     GiveUp,
     Quit,
+    /// "How many questions left", "how many have I asked": the score so far, not a question.
+    Count,
     Unclear
   };
   Kind kind = Kind::Unclear;

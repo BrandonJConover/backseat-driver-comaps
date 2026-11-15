@@ -521,6 +521,16 @@ TwentyHeard ParseTwentyHeard(std::string const & spoken)
     h.kind = TwentyHeard::Kind::Hint;
     return h;
   }
+  // "How many questions left", "how many do I have left", "how many have I asked": asking the score.
+  // "How many legs does it have" is still a question about the thing.
+  if ((TqHas(w, "how many") || TqHas(w, "how much")) &&
+      TqHasAny(w, {"question", "questions", "guess", "guesses", "tries", "left", "to go", "asked", "used", "have i had",
+                   "do i get", "do i have", "remaining"}) &&
+      !TqHasAny(w, {"does it", "do they", "is it", "has it", "can it", "would it", "will it", "it have", "it got"}))
+  {
+    h.kind = TwentyHeard::Kind::Count;
+    return h;
+  }
   bool article = false;
   auto const rests = AfterCues(w, article);
   for (auto const & rest : rests)
@@ -721,6 +731,9 @@ std::optional<TwentyQuestions::Reply> TwentyQuestions::OnDriverSaid(std::string 
   {
     bool const playing = heard.kind == TwentyHeard::Kind::Question || heard.kind == TwentyHeard::Kind::Guess ||
                          heard.kind == TwentyHeard::Kind::UnknownGuess;
+    // "How many questions do I get?" before saying yes: all twenty, and it's still waiting for a yes.
+    if (heard.kind == TwentyHeard::Kind::Count)
+      return Make("twenty.count", tier);
     if (!playing)
     {
       YesNo const yn = heard.kind == TwentyHeard::Kind::Quit ? YesNo::No : ParseYesNo(spoken);
@@ -755,6 +768,8 @@ TwentyQuestions::Reply TwentyQuestions::Answered(TwentyHeard const & heard, int 
   case TwentyHeard::Kind::Unclear: return Make("twenty.unclear", tier);
   case TwentyHeard::Kind::GiveUp: return End("twenty.giveUp", true, tier);
   case TwentyHeard::Kind::Quit: return End("twenty.quit", true, tier);
+  // Not a question: asking how many are left doesn't use one up.
+  case TwentyHeard::Kind::Count: return Make(QuestionsLeft() == 1 ? "twenty.lastOne" : "twenty.count", tier);
   case TwentyHeard::Kind::Guess: return Guessed(heard.thing, tier);
   case TwentyHeard::Kind::UnknownGuess:
     m_asked++;
