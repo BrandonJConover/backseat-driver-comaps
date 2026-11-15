@@ -1187,3 +1187,29 @@ TEST(BritishAndAmericanSpellingsReadTheLexiconsOwnWord)
   CHECK_EQUAL(RespellVariant("\xE2\x80"), std::string("\xE2\x80"));
   CHECK(!ForSpeech(std::string(20000, 'y')).empty());
 }
+
+TEST(PhoneNumbersAreSaidDigitByDigit)
+{
+  // Loop B168 (BI-148): golden cases shared with BookLyre; ranges, years, scores and amounts stay.
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_PHONE_NUMBERS_PATH);
+  CHECK(cases.size() >= 20);
+  int phones = 0;
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+    // Idempotent: a phone number said once has no digits left for a second pass to take.
+    CHECK_EQUAL(ForSpeech(c.expected), c.expected);
+    phones += c.expected.find(" one one") != std::string::npos || c.expected.find(", ") != std::string::npos ? 1 : 0;
+  }
+  CHECK(phones >= 15);
+  // Glued or half-built numbers are left whole and don't crash.
+  CHECK_EQUAL(ForSpeech("A512-555-0134"), ForSpeech("A512-555-0134"));
+  CHECK(!ForSpeech("(512").empty());
+  CHECK(!ForSpeech("+1").empty());
+  CHECK(!ForSpeech("1-800-").empty());
+  CHECK(!ForSpeech("9-1-").empty());
+  CHECK(!ForSpeech("call 911-").empty());
+  CHECK_EQUAL(ForSpeech("v1.512.555.0134"), ForSpeech("v1.512.555.0134"));
+  CHECK(ForSpeech("Call 512-555-01345").find("oh one three four") == std::string::npos);
+}

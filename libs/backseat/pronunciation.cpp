@@ -7,6 +7,7 @@
 #include "backseat/pronunciation_measures.hpp"
 #include "backseat/pronunciation_interjections.hpp"
 #include "backseat/pronunciation_ratios.hpp"
+#include "backseat/pronunciation_phones.hpp"
 #include "backseat/pronunciation_spelling.hpp"
 
 #include <algorithm>
@@ -2045,6 +2046,11 @@ std::string ForSpeech(std::string const & text)
   // Interjections the voice would skip, before the passes that read "arr. 10:15" or "50 mph": "Shh." is
   // "Shush.", "Hmph" "Humph", "Mm-hmm" "Uh-huh" (loop B160, CROSS X-062).
   s = Interjections(s);
+  // Phone numbers digit by digit before the ratio, range, date and number passes split them:
+  // "512-555-0134" is "five one two, five five five, oh one three four", "dial 911" "dial nine one one"
+  // (loop B168).
+  if (HasDigit(s))
+    s = PhoneNumbers(s);
   // Ratios, odds and map scales before the date, range and clock passes read the colon: "a 1:50 scale
   // map" is "a 1 to 50 scale map", "odds 3:1" "odds 3 to 1"; "at 1:50" and "5:30 pm" stay times
   // (loop B161, CROSS X-063).
