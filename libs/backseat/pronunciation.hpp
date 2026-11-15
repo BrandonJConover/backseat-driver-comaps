@@ -134,6 +134,18 @@ std::vector<std::pair<std::string, std::string>> const & ForeignPhrases();
 /// the stand-ins for the driver's own words too, so hand it to the voice again after SetUserWords.
 std::vector<std::pair<std::string, std::string>> Lexicon();
 
+/// British and American spellings swapped toward the voice's lexicon: the American Kokoro lexicon
+/// has no "grey", "theatre", "colour" or "fibre", so "Grey St" reads "Gray St" and "the Theatre's"
+/// "the Theater's"; a British voice gets the other way ("color" -> "colour"). Case, possessives and
+/// plain suffixes kept; all-caps words and pairs said differently (aluminium) are left. Part of
+/// ForSpeech; golden cases shared with BookLyre in backseat_tests/spoken_spelling_variants.json
+/// (CROSS X-061, loop B162).
+std::string RespellVariant(std::string const & text);
+/// Which lexicon RespellVariant aims at: false (default) the American one, true the British one, for
+/// a British voice. Any thread.
+void SetBritishSpelling(bool british);
+bool BritishSpelling();
+
 /// The driver's own pronunciations, one "word<TAB>say it as" per line; they win over everything
 /// else here. "Say it as" is plain words ("wine sap"), a respelling with the loud syllable in
 /// capitals ("WINE-sap"), or Misaki IPA between slashes. A word can be a phrase ("Mt Hood").

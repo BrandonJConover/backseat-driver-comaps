@@ -1099,3 +1099,91 @@ TEST(InterjectionsMatchTheGoldenCasesSharedWithBookLyre)
   longText += std::string(20000, 'h');
   CHECK(!ForSpeech(longText).empty());
 }
+
+TEST(BritishAndAmericanSpellingsReadTheLexiconsOwnWord)
+{
+  // Loop B162, CROSS X-061: "Grey St" and "Theatre District" reached the guesser (the American lexicon
+  // has no grey/theatre). Golden cases shared with BookLyre; en-GB cases run with a British voice.
+  struct BritishOff
+  {
+    ~BritishOff() { SetBritishSpelling(false); }
+  } reset;
+  CHECK(!BritishSpelling());
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_SPELLING_VARIANTS_PATH);
+  CHECK(cases.size() >= 50);
+  int british = 0;
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    SetBritishSpelling(c.language == "en-GB");
+    british += c.language == "en-GB" ? 1 : 0;
+    CHECK_EQUAL(RespellVariant(c.input), c.expected);
+  }
+  CHECK(british >= 8);
+  SetBritishSpelling(false);
+
+  // Every pair of the shared table reads the lexicon's own word, and the lexicon's words stay.
+  std::ifstream in(BACKSEAT_SPELLING_VARIANTS_TABLE_PATH);
+  std::stringstream buffer;
+  buffer << in.rdbuf();
+  auto const json = buffer.str();
+  auto const gbAt = json.find("\"gb\"");
+  CHECK(json.find("\"us\"") != std::string::npos && gbAt != std::string::npos);
+  int pairs[2] = {0, 0};
+  for (size_t at = json.find("\"us\""); at != std::string::npos;)
+  {
+    auto const k0 = json.find('"', json.find('\n', at) + 1);
+    if (k0 == std::string::npos)
+      break;
+    auto const k1 = json.find('"', k0 + 1);
+    auto const v0 = json.find('"', k1 + 1);
+    auto const v1 = json.find('"', v0 + 1);
+    if (v1 == std::string::npos || json.compare(k1, 4, "\": \"") != 0)
+    {
+      at = json.find('\n', k0);  // a section key or the closing brace
+      continue;
+    }
+    auto const key = json.substr(k0 + 1, k1 - k0 - 1), value = json.substr(v0 + 1, v1 - v0 - 1);
+    bool const gb = k0 > gbAt;
+    SetBritishSpelling(gb);
+    CHECK_EQUAL(RespellVariant(key), value);
+    std::string upper = key;
+    upper[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(upper[0])));
+    CHECK_EQUAL(RespellVariant(upper).substr(1), value.substr(1));
+    ++pairs[gb ? 1 : 0];
+    at = v1;
+  }
+  SetBritishSpelling(false);
+  CHECK(pairs[0] >= 3000);
+  CHECK(pairs[1] >= 1000);
+  for (bool gb : {false, true})
+  {
+    SetBritishSpelling(gb);
+    for (auto const & [word, phonemes] : Lexicon())
+      CHECK_EQUAL(RespellVariant(word), word);
+  }
+  SetBritishSpelling(false);
+
+  // In ForSpeech, after the driver's own words and before the street pass.
+  CHECK_EQUAL(ForSpeech("Turn left onto Grey St toward the Theatre District."),
+              std::string("Turn left onto Gray Street toward the Theater District."));
+  CHECK_EQUAL(ForSpeech(ForSpeech("the Grey Theatre's colours")), ForSpeech("the Grey Theatre's colours"));
+  // The driver's own word for the street wins over the respelling.
+  SetUserWords("Grey St\tgree street\n");
+  CHECK_EQUAL(ForSpeech("Turn onto Grey St."), std::string("Turn onto gree street."));
+  SetUserWords("");
+  SetBritishSpelling(true);
+  CHECK_EQUAL(ForSpeech("the Theater District"), std::string("the Theatre District"));
+  SetBritishSpelling(false);
+  CHECK_EQUAL(ForSpeech("the Theater District"), std::string("the Theater District"));
+
+  // Hostile input stays quick and doesn't throw.
+  std::string longText;
+  for (int i = 0; i < 3000; ++i)
+    longText += "'grey' Colours'' \xE2\x80\x99\xE2\x80\x99s greys\xE2\x80\x94Th\xC3\xA9 \xE2\x80 ";
+  CHECK(!RespellVariant(longText).empty());
+  CHECK_EQUAL(RespellVariant("'"), std::string("'"));
+  CHECK_EQUAL(RespellVariant("\xE2\x80\x99\xE2\x80\x99"), std::string("\xE2\x80\x99\xE2\x80\x99"));
+  CHECK_EQUAL(RespellVariant("\xE2\x80"), std::string("\xE2\x80"));
+  CHECK(!ForSpeech(std::string(20000, 'y')).empty());
+}
