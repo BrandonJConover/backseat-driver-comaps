@@ -562,7 +562,17 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       {AppAction::DifferentRoute, {" different route ", " another route ", " other route ", " better route ",
                                    " alternate route ", " alternative route ", " another way ", " different way ",
                                    " reroute ", " re route ", " faster route ", " quicker route ", " shorter route ",
-                                   " faster way ", " quicker way "}},
+                                   " faster way ", " quicker way ",
+                                   // A closure said out loud is a reroute: the driver can't do anything else with it.
+                                   " the road is closed ", " the road's closed ", " this road is closed ",
+                                   " this road's closed ", " road is closed ", " road's closed ", " road closed ahead ",
+                                   " the road is blocked ", " the road's blocked ", " this road is blocked ",
+                                   " this road's blocked ", " road is blocked ", " road's blocked ", " road closure ",
+                                   " the bridge is out ", " the bridge is closed ", " the bridge's out ",
+                                   " the exit is closed ", " the exit's closed ", " the ramp is closed ",
+                                   " the ramp's closed ", " exit is closed ", " ramp is closed ", " we can't go this way ",
+                                   " we cant go this way ", " can't go this way ", " cant go this way ",
+                                   " avoid this road ", " there's a detour ", " theres a detour ", " there is a detour "}},
       {AppAction::TakeMeBack, {" take me back ", " take us back ", " go back to where ", " head back ",
                                " back where we started ", " back to the start "}},
       {AppAction::TimeLeft, {" how long ", " how much longer ", " are we there yet ", " time left ", " when will we get ",
@@ -640,6 +650,10 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                                              " i didn't catch that ", " didnt catch that ", " i didnt catch that "};
     if (std::any_of(std::begin(kSayAgain), std::end(kSayAgain), [&whole](char const * s) { return whole == s; }))
       found.push_back({0, AppCommand{AppAction::RepeatInstruction, {}}});
+    // "Road closed!" said on its own is a closure; "the road closed last year" is history.
+    for (char const * closed : {" road closed ", " road blocked ", " roads closed ", " detour ", " detour ahead "})
+      if (whole == closed)
+        found.push_back({0, AppCommand{AppAction::DifferentRoute, {}}});
     // "Speed limit?" said on its own asks for it; "the speed limit here is silly" is chatter.
     for (char const * limit : {" speed limit ", " the speed limit ", " speed limit here "})
       if (whole == limit)
@@ -995,7 +1009,9 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::NextTurn: return saidAny({"turn", "direction"});
   case AppAction::ArrivalTime: return saidAny({"time", "arrive", "arrival"});
   case AppAction::DifferentRoute:
-    return saidAny({"reroute"}) || (saidAny({"route", "way"}) && saidAny({"different", "another", "other", "better", "alternate",
+    return saidAny({"reroute", "closed", "blocked", "detour", "closure"}) ||
+           (saidAny({"bridge"}) && saidAny({"out"})) || (saidAny({"avoid"}) && saidAny({"road"})) ||
+           (saidAny({"can't", "cant"}) && saidAny({"way"})) || (saidAny({"route", "way"}) && saidAny({"different", "another", "other", "better", "alternate",
                                                                          "alternative", "faster", "quicker", "shorter", "re"}));
   case AppAction::TakeMeBack: return saidAny({"back", "start"});
   case AppAction::BeNicer: return saidAny({"nice", "nicer", "kinder", "mean"});
