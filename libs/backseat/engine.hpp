@@ -177,8 +177,11 @@ public:
   int StopCount() const { return m_stopCount; }
   /// Everything the driver did wrong, in order, with positions. Persist this per trip.
   std::vector<Incident> const & Incidents() const { return m_incidents; }
-  /// Grade + heat map. Valid mid-trip too.
+  /// Grade + heat map. Valid mid-trip too. Built once and reused until an incident or a stat changes
+  /// (arrival asks for it 3-4 times; each build rounds every heat-map cell).
   TripReport Report() const;
+  /// How many times Report() actually rebuilt (tests and traces; cached calls don't count).
+  int ReportBuilds() const { return m_reportBuilds; }
   EngineConfig const & Config() const { return m_config; }
   /// The driver changed units mid-trip: speeds, distances and thresholds follow from the next sample.
   void SetUnits(Units units) { m_config = ForUnits(m_config, units); }
@@ -362,5 +365,11 @@ private:
   std::vector<Incident> m_incidents;
   bool m_arrived = false;
   TripStats m_stats;
+  /// Report() cache: the report plus the incident count and stats it was built from. Incidents are only
+  /// ever appended, so a count and a stats match mean nothing it reads has changed.
+  mutable std::optional<TripReport> m_report;
+  mutable size_t m_reportIncidents = 0;
+  mutable TripStats m_reportStats;
+  mutable int m_reportBuilds = 0;
 };
 }  // namespace backseat

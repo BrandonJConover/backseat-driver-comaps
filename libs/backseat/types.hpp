@@ -352,6 +352,9 @@ struct TripStats
   int reroutes = 0;
   int turnsCompleted = 0;
   int roastsDelivered = 0;
+
+  /// Field-wise; the engine's cached report is reused only while the stats it was built from still match.
+  bool operator==(TripStats const &) const = default;
 };
 
 char const * ToString(Category c);
