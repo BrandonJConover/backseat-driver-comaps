@@ -527,6 +527,9 @@ private:
   extrapolation::Extrapolator m_extrapolator;
   /// Backseat Driver: replaces the stock voice prompts with the critique engine's lines.
   BackseatAdapter m_backseat;
+  /// The newest position the route was checked against (a real fix or the Extrapolator's), so a
+  /// route rebuilt after leaving the old one can find the car the moment it arrives.
+  std::unique_ptr<location::GpsInfo> m_lastRouteCheck;
 
   std::vector<dp::DrapeID> m_drapeSubroutes;
   mutable std::mutex m_drapeSubroutesMutex;

@@ -3227,6 +3227,7 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
     if (!turn.IsTurnNone())
     {
       snap.turnId = turn.m_index;
+      snap.routeId = route->GetRouteId();
       snap.turn = ToTurnKind(turn);
       snap.distToTurnM = distanceToTurnM;
       snap.nextStreet = SpeakableStreetName(info.m_nextStreetName);
