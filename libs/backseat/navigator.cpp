@@ -1610,6 +1610,9 @@ void Navigator::Update(double t, RouteSnapshot const & route)
       bool const nearTurn = m_turnId && m_lastDistToTurnM < kMissedTurnWithinM;
       bool const asked = t - m_lastVoiceCommandT < kNoRerouteRoastAfterCommandMs;
       m_missPending.reset();
+      // A wrong-way swing at the turn, now backed by the route: "That was a left. I said right."
+      if (!asked)
+        Say(m_engine->LeftRoute(t));
       if (nearTurn)
       {
         bool const unseen = FixGapAt(t);
@@ -1783,6 +1786,7 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   EngineConfig config = m_config;
   config.saidLog = &m_said;
   config.speechAware = true;
+  config.confirmWrongTurns = true;
   if (config.speedingRenagMaxMs == 0)
     config.speedingRenagMaxMs = kSpeedingRenagMaxMs;
   if (config.implausibleMps2 == 0)

@@ -6,6 +6,7 @@
 #include "backseat/units.hpp"
 
 #include <algorithm>
+#include <utility>
 #include <cctype>
 #include <cmath>
 #include <limits>
@@ -20,6 +21,10 @@ namespace
 double constexpr kNever = -std::numeric_limits<double>::infinity();
 /// A heading swing counts as taking (or botching) the pending turn only this close to it.
 double constexpr kWrongTurnWithinM = 120;
+/// confirmWrongTurns: still on the route and this much closer to the turn after the swing means the
+/// swing was the road bending, and a swing the route hasn't backed up after this long is dropped.
+double constexpr kWrongBendProgressM = 25;
+double constexpr kWrongConfirmMs = 20000;
 /// Getting this much closer to the maneuver keeps a pending turn alive (loop B146).
 double constexpr kAliveProgressM = 20;
 /// The far countdown call comes at least this many seconds out at the current speed...
@@ -435,6 +440,9 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
   {
   case NavEvent::Type::Instruction:
   {
+    // A new maneuver: a swing still waiting was about the old one, and the route never left.
+    m_wrongPending.reset();
+    m_leftRouteAt.reset();
     m_hasDestination = true;
     m_lastInstructionText = e.text;
     m_lastInstructionDistanceM = e.distanceM;
@@ -508,6 +516,8 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
       SayTurnDone(out, e.t, *m_pendingTurn);
     bool const doneSaid = m_turnDoneSaid;
     m_turnDoneSaid = false;
+    // The router says the turn was done right: the swing was a bend.
+    m_wrongPending.reset();
     m_pendingTurn.reset();
     m_straight.reset();
     m_stats.turnsCompleted++;
@@ -522,6 +532,17 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     break;
   }
   case NavEvent::Type::Progress:
+    if (m_wrongPending)
+    {
+      // Still on the route and well closer to the turn: the swing was the road, not the driver.
+      if (m_pendingTurn && e.distanceM < m_wrongPending->distM - kWrongBendProgressM)
+      {
+        m_pendingTurn->wrongSaid = false;
+        m_wrongPending.reset();
+      }
+      else if (e.t - m_wrongPending->t > kWrongConfirmMs)
+        m_wrongPending.reset();
+    }
     if (m_pendingTurn)
     {
       auto & p = *m_pendingTurn;
@@ -643,6 +664,9 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
   }
   case NavEvent::Type::WrongTurn: WrongTurn(out, e.t, e.expected, e.turned, e.at); break;
   case NavEvent::Type::MissedTurn:
+    // The router agrees the turn went wrong: the swing that saw which way is the line to say.
+    if (m_wrongPending)
+      SayWrongPending(out, e.t);
     m_pendingTurn.reset();
     // Routing usually reports a wrong-way turn as "missed" too. It was already roasted.
     if (e.t - m_lastWrongTurnAt < 20000)
@@ -731,6 +755,15 @@ void CritiqueEngine::CheckTurnDirection(TelemetrySample const & s, std::vector<C
     return;
   TurnDirection const turned = delta > 0 ? TurnDirection::Right : TurnDirection::Left;
   m_headings.clear();
+  bool const routeLeft = m_leftRouteAt && s.t - *m_leftRouteAt < kWrongConfirmMs;
+  if (turned != m_pendingTurn->dir && m_config.confirmWrongTurns && !routeLeft)
+  {
+    // A road that bends left just before a right turn swings the heading the same way a wrong turn
+    // does. Wait for the route: off it, or a missed turn, and this is said then.
+    m_pendingTurn->wrongSaid = true;  // no second verdict on this maneuver while it waits
+    m_wrongPending = WrongPending{s.t, m_pendingTurn->dir, turned, m_pendingTurn->distM};
+    return;
+  }
   if (turned == m_pendingTurn->dir)
   {
     if (m_pendingTurn->stage >= 4)
@@ -1009,6 +1042,23 @@ std::optional<std::string> CritiqueEngine::Grievance() const
   case IncidentKind::Traffic: return std::string("ignoring my route");
   default: return std::nullopt;
   }
+}
+
+std::vector<Commentary> CritiqueEngine::LeftRoute(double t)
+{
+  std::vector<Commentary> out;
+  m_leftRouteAt = t;
+  if (m_wrongPending)
+    SayWrongPending(out, t);
+  return out;
+}
+
+void CritiqueEngine::SayWrongPending(std::vector<Commentary> & out, double t)
+{
+  auto const pending = *std::exchange(m_wrongPending, std::nullopt);
+  if (t - pending.t > kWrongConfirmMs)
+    return;
+  WrongTurn(out, t, pending.expected, pending.turned);
 }
 
 void CritiqueEngine::WrongTurn(std::vector<Commentary> & out, double t, TurnDirection expected, TurnDirection turned,

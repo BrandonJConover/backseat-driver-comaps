@@ -11,6 +11,7 @@ add_executable(${PROJECT_NAME}
   highway_claims_test.cpp
   long_approach_test.cpp
   start_movement_test.cpp
+  wrong_turn_confirm_test.cpp
   final_call_soak_test.cpp
   exit_after_merge_test.cpp
   exit_skip_test.cpp

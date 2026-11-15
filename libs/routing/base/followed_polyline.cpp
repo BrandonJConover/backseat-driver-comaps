@@ -130,7 +130,7 @@ Iter FollowedPolyline::GetBestProjection(m2::RectD const & posRect, DistanceFn c
   return GetClosestProjectionInInterval(posRect, distFn, hoppingBorderIdx, m_nextCheckpointIndex);
 }
 
-Iter FollowedPolyline::GetBestMatchingProjection(m2::RectD const & posRect) const
+Iter FollowedPolyline::GetBestMatchingProjection(m2::RectD const & posRect, SegmentFilter const & acceptFar) const
 {
   CHECK_EQUAL(m_segProj.size() + 1, m_poly.GetSize(), ());
   // At first trying to find a projection to two closest route segments of route which is close
@@ -142,15 +142,20 @@ Iter FollowedPolyline::GetBestMatchingProjection(m2::RectD const & posRect) cons
     return iter;
   // If a projection to the 3 closest route segments is not found tries to find projection to other route
   // segments of current subroute.
-  return GetClosestMatchingProjectionInInterval(posRect, hoppingBorderIdx, m_nextCheckpointIndex);
+  return GetClosestMatchingProjectionInInterval(posRect, hoppingBorderIdx, m_nextCheckpointIndex, acceptFar);
 }
 
 bool FollowedPolyline::UpdateMatchingProjection(m2::RectD const & posRect)
 {
+  return UpdateMatchingProjection(posRect, SegmentFilter{});
+}
+
+bool FollowedPolyline::UpdateMatchingProjection(m2::RectD const & posRect, SegmentFilter const & acceptFar)
+{
   ASSERT(m_current.IsValid(), ());
   ASSERT_LESS(m_current.m_ind, m_poly.GetSize() - 1, ());
 
-  auto const iter = GetBestMatchingProjection(posRect);
+  auto const iter = GetBestMatchingProjection(posRect, acceptFar);
 
   if (iter.IsValid())
   {
@@ -210,7 +215,7 @@ void FollowedPolyline::GetCurrentDirectionPoint(m2::PointD & pt, double toleranc
 }
 
 Iter FollowedPolyline::GetClosestMatchingProjectionInInterval(m2::RectD const & posRect, size_t startIdx,
-                                                              size_t endIdx) const
+                                                              size_t endIdx, SegmentFilter const & accept) const
 {
   CHECK_LESS_OR_EQUAL(endIdx, m_segProj.size(), ());
   CHECK_LESS_OR_EQUAL(startIdx, endIdx, ());
@@ -229,6 +234,8 @@ Iter FollowedPolyline::GetClosestMatchingProjectionInInterval(m2::RectD const & 
 
     double const dp = mercator::DistanceOnEarth(pt, currPos);
     if (dp >= minDist)
+      continue;
+    if (accept && !accept(i))
       continue;
 
     nearestIter = Iter(pt, i);
