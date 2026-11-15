@@ -9,6 +9,7 @@
 #include <iterator>
 #include <map>
 #include <sstream>
+#include <string_view>
 
 namespace backseat
 {
@@ -1498,12 +1499,19 @@ std::optional<Passenger> ParsePassengerAnswer(std::string const & spoken)
   return {};
 }
 
-std::optional<size_t> ParseChoice(std::string const & spoken, std::vector<std::string> const & names)
+namespace
 {
-  if (names.empty())
-    return {};
-  std::string const words = CommandWords(spoken);
+/// ParseChoice on words already run through CommandWords, without negation or "whichever".
+std::optional<size_t> PlainChoice(std::string const & words, std::vector<std::string> const & names)
+{
   auto const has = [&words](char const * w) { return words.find(w) != std::string::npos; };
+  // "The middle one" only means something for 3, 5... results; never let its " one " pick the first.
+  if (has(" middle "))
+  {
+    if (names.size() >= 3 && names.size() % 2 == 1)
+      return names.size() / 2;
+    return {};
+  }
   static std::vector<std::vector<char const *>> const kOrdinals = {
       {" first ", " number one ", " one ", " 1 ", " 1st ", " top "},
       {" second ", " number two ", " two ", " 2 ", " 2nd "},
@@ -1541,11 +1549,40 @@ std::optional<size_t> ParseChoice(std::string const & spoken, std::vector<std::s
   }
   if (byName && matches == 1)
     return byName;
+  // A bare " one " is in "the second one" too, so it only means the first when nothing else is said.
   for (size_t i = 0; i < kOrdinals.size() && i < names.size(); ++i)
     for (char const * o : kOrdinals[i])
-      if (has(o))
+      if (std::string_view(o) != " one " && has(o))
         return i;
+  if (has(" one "))
+    return 0;
   return {};
+}
+}  // namespace
+
+std::optional<size_t> ParseChoice(std::string const & spoken, std::vector<std::string> const & names)
+{
+  if (names.empty())
+    return {};
+  std::string const words = CommandWords(spoken);
+  // "Not the first one", "not Shell", "anything but the last": drop that one, take the closest left.
+  for (char const * cue : {" not ", " anything but ", " anything except ", " other than ", " except ", " besides "})
+  {
+    auto const at = words.find(cue);
+    if (at == std::string::npos)
+      continue;
+    // "Not sure", "not bad": nothing named after the cue is no choice at all.
+    auto const excluded = PlainChoice(words.substr(at + std::string(cue).size() - 1), names);
+    if (!excluded || names.size() < 2)
+      return {};
+    return *excluded == 0 ? size_t(1) : size_t(0);
+  }
+  for (char const * any : {" whichever ", " either one ", " either ", " any of them ", " any one ", " anyone ",
+                           " doesn't matter ", " doesnt matter ", " don't care ", " dont care ", " you pick ",
+                           " you choose ", " surprise me "})
+    if (words.find(any) != std::string::npos)
+      return 0;
+  return PlainChoice(words, names);
 }
 
 int CountVoiceName(std::string const & spoken, std::string const & name)
