@@ -1,0 +1,385 @@
+{
+ "about": "Interjections the voice can't say, respelled to words it can (loop B160, CROSS X-062): shh/sh->shush, tsk->tut, argh->aargh, hmph/hmpf/mmph/hrmph/Mph->humph, hrmm/hrm->hmm, brr->burr, pff/pfft/pft/phht/psh/pssh->pish, whoo->woo, hee->he, bleh->bleah, erm/umm->um, ahh/ohh/uhh/aww/eww->ah/oh/uh/aw/ew, heh->ha, hehe->haha, hehehe/hahaha/mwahaha/bwahaha->ha ha ha, woohoo->whoopee, achoo->ah chew, ack->ach, wha->wah, nuh-uh->uh-uh, mhm/mhmm/mm-hmm/mm-hm->uh-huh, grr->growl, zzz->snore, arr->are, yarr->yah are. Ported from EpubToM4B tests/fixtures/spoken_interjections.json (36f6b65, auto/loop) plus Backseat persona lines and map names. Expected values are Backseat's whole ForSpeech output, so four BookLyre cases read differently for other passes ('Kloze' heteronym, '...' after a word as a comma pause, 'fifty miles an hour', 'nine forty'). Left out: the Spanish case (ForSpeech has no language). Backseat adds: a capitalised interjection before a street type names the street ('Mph Rd', 'Ack St').",
+ "cases": [
+  {
+   "input": "Shh, listen.",
+   "expected": "Shush, listen."
+  },
+  {
+   "input": "Shhhhh! They'll hear us.",
+   "expected": "Shush! They'll hear us."
+  },
+  {
+   "input": "\"SHH!\" she hissed.",
+   "expected": "\"SHUSH!\" she hissed."
+  },
+  {
+   "input": "Sh-sh, it's all right.",
+   "expected": "Shush, shush, it's all right."
+  },
+  {
+   "input": "Sh! Quiet.",
+   "expected": "Shush! Quiet."
+  },
+  {
+   "input": "Tsk, tsk. What a mess.",
+   "expected": "Tut, tut. What a mess."
+  },
+  {
+   "input": "\"Tsk-tsk,\" said Aunt May.",
+   "expected": "\"Tut, tut,\" said Aunt May."
+  },
+  {
+   "input": "Argh! My foot!",
+   "expected": "Aargh! My foot!"
+  },
+  {
+   "input": "ARRGH, not again.",
+   "expected": "AARGH, not again."
+  },
+  {
+   "input": "Hmph. Suit yourself.",
+   "expected": "Humph. Suit yourself."
+  },
+  {
+   "input": "\"Hmpf,\" he grunted.",
+   "expected": "\"Humph,\" he grunted."
+  },
+  {
+   "input": "Mmph, mmph!",
+   "expected": "Humph, humph!"
+  },
+  {
+   "input": "Hrmph. Indeed.",
+   "expected": "Humph. Indeed."
+  },
+  {
+   "input": "Mph. Fine.",
+   "expected": "Humph. Fine."
+  },
+  {
+   "input": "Hrmm, let me think.",
+   "expected": "Hmm, let me think."
+  },
+  {
+   "input": "Brr, it's cold.",
+   "expected": "Burr, it's cold."
+  },
+  {
+   "input": "Brrrr! Close the door.",
+   "expected": "Burr! Kloze the door."
+  },
+  {
+   "input": "Pfft. As if.",
+   "expected": "Pish. As if."
+  },
+  {
+   "input": "Pff, whatever.",
+   "expected": "Pish, whatever."
+  },
+  {
+   "input": "Pft, nonsense.",
+   "expected": "Pish, nonsense."
+  },
+  {
+   "input": "Phht! Gone.",
+   "expected": "Pish! Gone."
+  },
+  {
+   "input": "Psh, that's nothing.",
+   "expected": "Pish, that's nothing."
+  },
+  {
+   "input": "Hee-hee, got you!",
+   "expected": "He, he, got you!"
+  },
+  {
+   "input": "Whoo! We won!",
+   "expected": "Woo! We won!"
+  },
+  {
+   "input": "Bleh. Cold soup again.",
+   "expected": "Bleah. Cold soup again."
+  },
+  {
+   "input": "Erm, I'm not sure.",
+   "expected": "Um, I'm not sure."
+  },
+  {
+   "input": "He paused. \"erm... yes.\"",
+   "expected": "He paused. \"um, yes.\""
+  },
+  {
+   "input": "Tutsk is a made-up name.",
+   "expected": "Tutsk is a made-up name."
+  },
+  {
+   "input": "He drove 50 mph down the lane.",
+   "expected": "He drove fifty miles an hour down the lane."
+  },
+  {
+   "input": "Speeds are given in mph here.",
+   "expected": "Speeds are given in mph here."
+  },
+  {
+   "input": "The ERM team met at noon.",
+   "expected": "The ERM team met at noon."
+  },
+  {
+   "input": "Pshaw, said the old man.",
+   "expected": "Pshaw, said the old man."
+  },
+  {
+   "input": "The bashh sound repeated.",
+   "expected": "The bashh sound repeated."
+  },
+  {
+   "input": "She whooped and hollered.",
+   "expected": "She whooped and hollered."
+  },
+  {
+   "input": "Hmm, maybe.",
+   "expected": "Hmm, maybe."
+  },
+  {
+   "input": "He shushed them.",
+   "expected": "He shushed them."
+  },
+  {
+   "input": "Ugh. Fine.",
+   "expected": "Ugh. Fine."
+  },
+  {
+   "input": "The heel of his boot.",
+   "expected": "The heel of his boot."
+  },
+  {
+   "input": "Then run sh script.sh to start.",
+   "expected": "Then run sh script.sh to start."
+  },
+  {
+   "input": "\"Ahh!\" she said.",
+   "expected": "\"Ah!\" she said."
+  },
+  {
+   "input": "\"Ohh!\" she said.",
+   "expected": "\"Oh!\" she said."
+  },
+  {
+   "input": "\"Uhh!\" she said.",
+   "expected": "\"Uh!\" she said."
+  },
+  {
+   "input": "\"Umm!\" she said.",
+   "expected": "\"Um!\" she said."
+  },
+  {
+   "input": "\"Aww!\" she said.",
+   "expected": "\"Aw!\" she said."
+  },
+  {
+   "input": "\"Eww!\" she said.",
+   "expected": "\"Ew!\" she said."
+  },
+  {
+   "input": "\"Heh!\" she said.",
+   "expected": "\"Ha!\" she said."
+  },
+  {
+   "input": "\"Hehe!\" she said.",
+   "expected": "\"Haha!\" she said."
+  },
+  {
+   "input": "\"Hehehe!\" she said.",
+   "expected": "\"Ha ha ha!\" she said."
+  },
+  {
+   "input": "\"Hahaha!\" she said.",
+   "expected": "\"Ha ha ha!\" she said."
+  },
+  {
+   "input": "\"Woohoo!\" she said.",
+   "expected": "\"Whoopee!\" she said."
+  },
+  {
+   "input": "\"Mwahaha!\" she said.",
+   "expected": "\"Ha ha ha!\" she said."
+  },
+  {
+   "input": "\"Bwahaha!\" she said.",
+   "expected": "\"Ha ha ha!\" she said."
+  },
+  {
+   "input": "\"Achoo!\" she said.",
+   "expected": "\"Ah chew!\" she said."
+  },
+  {
+   "input": "\"Ack!\" she said.",
+   "expected": "\"Ach!\" she said."
+  },
+  {
+   "input": "\"Wha!\" she said.",
+   "expected": "\"Wah!\" she said."
+  },
+  {
+   "input": "\"Hrm!\" she said.",
+   "expected": "\"Hmm!\" she said."
+  },
+  {
+   "input": "\"Pssh!\" she said.",
+   "expected": "\"Pish!\" she said."
+  },
+  {
+   "input": "\"Nuh-uh!\" she said.",
+   "expected": "\"Uh-uh!\" she said."
+  },
+  {
+   "input": "\"Mhm!\" she said.",
+   "expected": "\"Uh-huh!\" she said."
+  },
+  {
+   "input": "\"Mhmm!\" she said.",
+   "expected": "\"Uh-huh!\" she said."
+  },
+  {
+   "input": "\"Mm-hmm!\" she said.",
+   "expected": "\"Uh-huh!\" she said."
+  },
+  {
+   "input": "\"Mm-hm!\" she said.",
+   "expected": "\"Uh-huh!\" she said."
+  },
+  {
+   "input": "\"Grr!\" she said.",
+   "expected": "\"Growl!\" she said."
+  },
+  {
+   "input": "\"Zzz!\" she said.",
+   "expected": "\"Snore!\" she said."
+  },
+  {
+   "input": "\"Arr!\" she said.",
+   "expected": "\"Are!\" she said."
+  },
+  {
+   "input": "\"Yarr!\" she said.",
+   "expected": "\"Yah are!\" she said."
+  },
+  {
+   "input": "\"Ummmm, I forgot,\" he said.",
+   "expected": "\"Um, I forgot,\" he said."
+  },
+  {
+   "input": "Heh-heh. Got you.",
+   "expected": "Ha, ha. Got you."
+  },
+  {
+   "input": "\"MWAHAHA!\" cackled the witch.",
+   "expected": "\"HA HA HA!\" cackled the witch."
+  },
+  {
+   "input": "\"Arrrr, me hearties!\"",
+   "expected": "\"Are, me hearties!\""
+  },
+  {
+   "input": "\"Zzzzz,\" went Tom.",
+   "expected": "\"Snore,\" went Tom."
+  },
+  {
+   "input": "Dep. 9:40, arr. 10:15.",
+   "expected": "Dep. nine forty, arr. ten fifteen."
+  },
+  {
+   "input": "ARR rose ten percent.",
+   "expected": "ARR rose ten percent."
+  },
+  {
+   "input": "ZZZ Top played all night.",
+   "expected": "ZZZ Top played all night."
+  },
+  {
+   "input": "Mr. Ackerman waved.",
+   "expected": "Mr. Ackerman waved."
+  },
+  {
+   "input": "The ACK packet arrived.",
+   "expected": "The ACK packet arrived."
+  },
+  {
+   "input": "Theheheh and haha.",
+   "expected": "Theheheh and haha."
+  },
+  {
+   "input": "\"Hehehe-ish,\" she said.",
+   "expected": "\"Hehehe-ish,\" she said."
+  },
+  {
+   "input": "Mhm's echo.",
+   "expected": "Mhm's echo."
+  },
+  {
+   "input": "Achoos all round.",
+   "expected": "Achoos all round."
+  },
+  {
+   "input": "Shh. I'm quiet now. Enjoy the silence. It won't last.",
+   "expected": "Shush. I'm quiet now. Enjoy the silence. It won't last."
+  },
+  {
+   "input": "Brr. Could you warm up the car? Or at least your driving.",
+   "expected": "Burr. Could you warm up the car? Or at least your driving."
+  },
+  {
+   "input": "Aww. Okay. I'll be slightly less mean for the next block.",
+   "expected": "Aw. Okay. I'll be slightly less mean for the next block."
+  },
+  {
+   "input": "Hee hee. You really fell for it.",
+   "expected": "He he. You really fell for it."
+  },
+  {
+   "input": "Grrrr. Recalculating.",
+   "expected": "Growl. Recalculating."
+  },
+  {
+   "input": "Mm-hmm, sure you did.",
+   "expected": "Uh-huh, sure you did."
+  },
+  {
+   "input": "Nuh-uh, not that exit.",
+   "expected": "Uh-uh, not that exit."
+  },
+  {
+   "input": "Sh-sh-sh, the turn is coming.",
+   "expected": "Shush, shush, shush, the turn is coming."
+  },
+  {
+   "input": "“Shh,” I said.",
+   "expected": "“Shush,” I said."
+  },
+  {
+   "input": "Turn left on Mph Rd.",
+   "expected": "Turn left on Mph Road."
+  },
+  {
+   "input": "Ack St is next.",
+   "expected": "Ack Street is next."
+  },
+  {
+   "input": "Take Exit 4, ARR 10:15.",
+   "expected": "Take Exit four, ARR ten fifteen."
+  },
+  {
+   "input": "Umm I forgot.",
+   "expected": "Um I forgot."
+  },
+  {
+   "input": "Ahhh, traffic.",
+   "expected": "Ah, traffic."
+  },
+  {
+   "input": "Shhh’s a word now?",
+   "expected": "Shhh’s a word now?"
+  }
+ ]
+}
