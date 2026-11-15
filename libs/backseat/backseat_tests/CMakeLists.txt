@@ -17,6 +17,7 @@ add_executable(${PROJECT_NAME}
   hostile_route_test.cpp
   offroute_blip_test.cpp
   then_chaining_test.cpp
+  street_names_test.cpp
   roundabout_exit_test.cpp
   roundabout_exit_countdown_test.cpp
   delivery_test.cpp

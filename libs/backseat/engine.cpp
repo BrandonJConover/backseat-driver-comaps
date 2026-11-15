@@ -260,6 +260,16 @@ std::string DirectionText(std::string const & text, double distanceM, Units unit
   return "In " + distance + ", " + at + LowerFirst(text) + ".";
 }
 
+std::string FinalCallText(std::string const & instruction)
+{
+  static std::regex const exit(R"(^(Take (?:exit \S+|the exit) on the (?:left|right))\b)", std::regex::icase);
+  std::string const first = FirstManeuver(instruction);
+  std::smatch m;
+  if (std::regex_search(first, m, exit))
+    return m[1].str() + instruction.substr(first.size());
+  return instruction;
+}
+
 std::string RoundaboutExitOf(std::string const & instruction)
 {
   static std::regex const exit(
@@ -858,7 +868,7 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
       return;
     }
     p.stage = 2;
-    out.push_back(Make(t, Category::Instruction, "Now, " + LowerFirst(p.text) + ".", Priority::Nav));
+    out.push_back(Make(t, Category::Instruction, "Now, " + LowerFirst(FinalCallText(p.text)) + ".", Priority::Nav));
     return;
   }
   else if (p.stage <= 2 && distanceM <= 5)
@@ -923,7 +933,7 @@ double CritiqueEngine::FinalDueM(double t, PendingTurn const & p) const
   double const mps = m_lastSample ? m_lastSample->speedMps : 0;
   if (mps < m_config.rollingMps)
     return base;
-  std::string const call = "Now, " + LowerFirst(p.text) + ".";
+  std::string const call = "Now, " + LowerFirst(FinalCallText(p.text)) + ".";
   double const needMs = std::max(0.0, m_talkingUntil - t) + SpeakingMs(call) + kLinePauseMs + kFinalClearMs;
   return std::max(base, mps * std::min(needMs / 1000, kFinalCallMaxS));
 }
@@ -997,9 +1007,14 @@ std::optional<std::string> CritiqueEngine::Grievance() const
   std::optional<std::string> street;
   if (last->detail)
   {
-    static std::regex const re(R"(\b(?:onto|on|at)\s+(.+)$)", std::regex::icase);
+    // "exit 42B" for a numbered exit; else the street, skipping "on the right" ("Take the exit on
+    // the right onto Elm" was "missing the right onto Elm").
+    static std::regex const exit(R"(\btake (exit \S+) on the)", std::regex::icase);
+    static std::regex const onto(R"(\b(?:onto|for)\s+(.+)$)", std::regex::icase);
+    static std::regex const re(R"(\b(?:on|at)\s+(?!the (?:left|right)\b)(.+)$)", std::regex::icase);
+    std::string const first = FirstManeuver(*last->detail);
     std::smatch m;
-    if (std::regex_search(*last->detail, m, re))
+    if (std::regex_search(first, m, exit) || std::regex_search(first, m, onto) || std::regex_search(first, m, re))
       street = m[1].str();
   }
   switch (last->kind)

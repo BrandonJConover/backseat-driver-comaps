@@ -143,6 +143,10 @@ TurnShape TurnShapeOf(std::string const & text);
 /// "Turn left onto Elm Street, then right onto Oak Lane" -> "Turn left onto Elm Street".
 std::string FirstManeuver(std::string const & text);
 
+/// The plain call a few seconds before the maneuver: "Now, turn left onto Elm Street." At an exit
+/// it stops at the number, since the sign was read already: "Now, take exit 42B on the right."
+std::string FinalCallText(std::string const & instruction);
+
 /// Which roundabout exit an instruction names: "At the roundabout, take the third exit onto Oak
 /// Street" -> "third", "take exit 12" -> "12", anything else -> "" (loop B99).
 std::string RoundaboutExitOf(std::string const & instruction);
