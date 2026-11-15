@@ -348,7 +348,18 @@ public:
   {
     m_partner = std::move(word);
     m_partnerPronouns = pronouns;
+    if (!m_partner.empty())
+      SetRidesAlone(false);
   }
+  /// The driver said they ride alone ("just me" to setup.askPassenger, i.e. ParsePassengerAnswer gave
+  /// an empty word): LinesFor() leaves out lines that talk to a passenger (loop B166, BI-129). Naming a
+  /// partner with SetPartner turns it back off.
+  void SetRidesAlone(bool alone)
+  {
+    m_ridesAlone = alone;
+    SetLineRidesAlone(alone);
+  }
+  bool RidesAlone() const { return m_ridesAlone; }
   /// The driver's car can drive itself; getting lost is then even less forgivable.
   void SetCarHasAutopilot(bool has) { m_carHasAutopilot = has; }
   /// Where the driver lives, from the getting-to-know-you questions. On the streets, there are no
@@ -820,6 +831,7 @@ private:
   int m_sketchMinutesLost = 0;
   bool m_carHasAutopilot = false;
   std::string m_partner;
+  bool m_ridesAlone = false;
   Pronouns m_partnerPronouns = Pronouns::They;
   /// Fed up this trip: the driver must say "wise, omnipotent overseer GPS" from now on.
   bool m_titleDemanded = false;

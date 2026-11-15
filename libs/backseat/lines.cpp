@@ -26,6 +26,7 @@ std::atomic<TravelMode> g_travelMode{TravelMode::Drive};
 std::atomic<Housing> g_housing{Housing::Unknown};
 std::atomic<bool> g_metric{false};
 std::atomic<bool> g_leftHand{false};
+std::atomic<bool> g_alone{false};
 
 /// `text` lowercased with every run of non-word characters turned into one space, padded with
 /// spaces, so " word " finds whole words.
@@ -96,6 +97,23 @@ bool LineFitsHousing(std::string const & text, Housing housing)
   if (std::any_of(std::begin(kHouseOwner), std::end(kHouseOwner), has))
     return false;
   return housing != Housing::Streets || std::none_of(std::begin(kHome), std::end(kHome), has);
+}
+
+void SetLineRidesAlone(bool alone)
+{
+  g_alone = alone;
+}
+
+bool LineFitsRidingAlone(std::string const & text)
+{
+  // Phrases that talk to or about someone else in the car ("passengers", plural, no solo line needs).
+  // "Somebody back there is sliding across the back seat. It's probably a water bottle." is fine alone;
+  // so is "for the people in the back" (an idiom) and "you two" (the driver and the road).
+  static char const * const kCompany[] = {" your passenger ", " passengers ", " whoever's in the back ",
+                                          " quiet down back there "};
+  std::string const lower = LineWords(text);
+  return std::none_of(std::begin(kCompany), std::end(kCompany),
+                      [&lower](char const * cue) { return lower.find(cue) != std::string::npos; });
 }
 
 char const * TravelModeName(TravelMode mode)
@@ -259,6 +277,7 @@ LineFilters CurrentLineFilters()
   filters.housing = g_housing;
   filters.metric = g_metric;
   filters.leftHand = g_leftHand;
+  filters.alone = g_alone;
   return filters;
 }
 
@@ -268,13 +287,15 @@ void SetLineFilters(LineFilters const & filters)
   g_housing = filters.housing;
   g_metric = filters.metric;
   g_leftHand = filters.leftHand;
+  g_alone = filters.alone;
 }
 
 std::string DescribeLineFilters(LineFilters const & filters)
 {
   std::string const housing = HousingName(filters.housing);
   return std::string(TravelModeName(filters.mode)) + "/" + (housing.empty() ? "unknown" : housing) + "/" +
-         (filters.metric ? "metric" : "imperial") + "/" + (filters.leftHand ? "left" : "right");
+         (filters.metric ? "metric" : "imperial") + "/" + (filters.leftHand ? "left" : "right") +
+         (filters.alone ? "/alone" : "");
 }
 
 std::string DriveSideWording(std::string const & text)
@@ -362,14 +383,16 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
   auto const & raw = found->second[static_cast<size_t>(tier)];
   TravelMode const mode = g_travelMode;
   Housing const housing = g_housing;
+  bool const alone = g_alone;
   // Story beats are read by position, and mode and outdoors lines are written for their mode.
   bool const positional = key.rfind("speeding.story", 0) == 0;
   bool const anyMode = mode == TravelMode::Drive || positional || key.rfind("mode.", 0) == 0 ||
                        key.rfind("outdoors.", 0) == 0;
   // The first-launch script is said word for word, whoever's listening.
-  bool const anyHousing = housing == Housing::Unknown || housing == Housing::House || positional ||
-                          key.rfind("onboard.", 0) == 0 || key.rfind("setup.", 0) == 0;
-  if (anyMode && anyHousing)
+  bool const script = positional || key.rfind("onboard.", 0) == 0 || key.rfind("setup.", 0) == 0;
+  bool const anyHousing = housing == Housing::Unknown || housing == Housing::House || script;
+  bool const anyCompany = !alone || script;
+  if (anyMode && anyHousing && anyCompany)
     return raw;
   static std::mutex mutex;
   static std::map<std::string, std::vector<std::string>> cache;
@@ -377,26 +400,27 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
   std::lock_guard lock(mutex);
   auto const [it, added] =
       cache.try_emplace(key + suffix + "." + HousingName(housing) + std::to_string(tier) + (metric ? "m" : "") +
-                         (leftHand ? "L" : ""));
+                         (leftHand ? "L" : "") + (alone ? "A" : ""));
   if (!added)
     return it->second;
   auto & fitting = it->second;
-  auto const fitHousing = [&]
+  auto const fitPeople = [&]
   {
-    if (anyHousing)
+    if (anyHousing && anyCompany)
       return;
     std::vector<std::string> kept;
     for (auto const & line : fitting)
-      if (LineFitsHousing(line, housing))
+      if ((anyHousing || LineFitsHousing(line, housing)) && (anyCompany || LineFitsRidingAlone(line)))
         kept.push_back(line);
-    // A pool that's all about home (the garage door line) stays: the caller decides whether to say it.
+    // A pool that's all about home (the garage door line) or all about the passengers stays: the caller
+    // decides whether to say it.
     if (!kept.empty())
       fitting = std::move(kept);
   };
   if (anyMode)
   {
     fitting = raw;
-    fitHousing();
+    fitPeople();
     return fitting;
   }
   auto own = table.find(key + suffix);
@@ -410,7 +434,7 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
       fitting.push_back(line);
   if (fitting.empty())
     fitting = table.at("mode.generic").at(static_cast<size_t>(tier));
-  fitHousing();
+  fitPeople();
   return fitting;
 }
 

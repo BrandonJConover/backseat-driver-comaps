@@ -65,6 +65,14 @@ void SetLineHousing(Housing housing);
 /// jokes for the streets; no lawn, driveway or mortgage jokes for an apartment.
 bool LineFitsHousing(std::string const & text, Housing housing);
 
+/// Whether the driver said they ride alone ("No, just me" to setup.askPassenger; loop B166, BI-129).
+/// Off (someone may be riding along) until told.
+void SetLineRidesAlone(bool alone);
+/// Whether `text` is fine to say to a driver riding alone: no "ask your passenger", "whoever's in the
+/// back" or "excuse me, passengers" for an empty car. Lines that only joke about the back seat (the
+/// water bottle sliding around) or call the driver and the road "you two" still fit.
+bool LineFitsRidingAlone(std::string const & text);
+
 /// Whether LinesFor() answers for a metric driver: the few lines with a distance written into them
 /// ("we moved four feet", "for a quarter mile") come back in meters and kilometers. Off until told.
 void SetLineMetric(bool metric);
@@ -98,23 +106,27 @@ struct LineFilters
   Housing housing = Housing::Unknown;
   bool metric = false;
   bool leftHand = false;
+  bool alone = false;
 
   bool operator==(LineFilters const & o) const
   {
-    return mode == o.mode && housing == o.housing && metric == o.metric && leftHand == o.leftHand;
+    return mode == o.mode && housing == o.housing && metric == o.metric && leftHand == o.leftHand &&
+           alone == o.alone;
   }
   bool operator!=(LineFilters const & o) const { return !(*this == o); }
 };
 LineFilters CurrentLineFilters();
-/// Puts all four back (default-constructed LineFilters: driving, housing unknown, imperial, right-hand).
+/// Puts them all back (default-constructed LineFilters: driving, housing unknown, imperial, right-hand,
+/// maybe not alone).
 void SetLineFilters(LineFilters const & filters);
-/// "drive/unknown/imperial/right"-style summary, for test failure messages and traces.
+/// "drive/unknown/imperial/right"-style summary (plus "/alone" for a solo driver), for test failure
+/// messages and traces.
 std::string DescribeLineFilters(LineFilters const & filters);
 
 /// Templates for `key` at `tier` (0..2), for the current travel mode: what fits it, plus `key`.walk,
 /// `key`.bike, `key`.hike (or else `key`.walk) or `key`.offroad if there are any, or mode.generic when
-/// nothing fits. Lines that don't fit the driver's housing are left out too, unless that would leave
-/// none. An unknown key or a tier outside 0..2 gives an empty pool (and a
+/// nothing fits. Lines that don't fit the driver's housing, or that need a passenger the solo driver
+/// doesn't have, are left out too, unless that would leave none. An unknown key or a tier outside 0..2 gives an empty pool (and a
 /// "lines.missing" trace) instead of throwing.
 std::vector<std::string> const & LinesFor(std::string const & key, int tier);
 

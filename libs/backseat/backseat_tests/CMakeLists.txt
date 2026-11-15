@@ -76,6 +76,7 @@ add_executable(${PROJECT_NAME}
   turn_words_test.cpp
   drive_side_test.cpp
   line_filters_test.cpp
+  riding_alone_test.cpp
   unseen_turns_test.cpp
   repeat_near_turn_test.cpp
   commute_soak_test.cpp
