@@ -7,6 +7,7 @@
 #include "map/transit/transit_reader.hpp"
 #include "map/user_mark.hpp"
 
+#include "backseat/debug_log.hpp"
 #include "backseat/route_sketch.hpp"
 
 #include "routing/absent_regions_finder.hpp"
@@ -464,6 +465,16 @@ void RoutingManager::OnRebuildRouteReady(Route const & route, RouterResultCode c
     return;
 
   auto const hasWarnings = InsertRoute(route);
+  // Backseat: off the route, the new one starts where the car was when it left. It used to wait for
+  // the next position to find the car on it, and the platform only asks what to say on a real GPS
+  // fix, so the first direction came up to a second or two after the route was ready. Find the car
+  // now; the platform asks for the direction right away (route ready callback below).
+  if (m_lastRouteCheck && m_routingSession.IsFollowing() && !m_routingSession.IsOnRoute())
+  {
+    auto const check = *m_lastRouteCheck;
+    CheckLocationForRouting(check);
+    backseat::Trace("route.rebuilt", {{"matched", m_routingSession.IsOnRoute() ? "yes" : "no"}});
+  }
   CallRouteBuilded(hasWarnings ? RouterResultCode::HasWarnings : code, storage::CountriesSet());
 }
 
@@ -1447,9 +1458,14 @@ void RoutingManager::CheckLocationForRouting(location::GpsInfo const & info)
   if (!IsRoutingActive())
     return;
 
+  if (m_lastRouteCheck)
+    *m_lastRouteCheck = info;
+  else
+    m_lastRouteCheck = std::make_unique<location::GpsInfo>(info);
   SessionState const state = m_routingSession.OnLocationPositionChanged(info);
   if (state == SessionState::RouteNeedsRebuild)
   {
+    backseat::Trace("route.offroute", {});
     m_routingSession.RebuildRoute(
         mercator::FromLatLon(info.m_latitude, info.m_longitude), [this](Route const & route, RouterResultCode code)
     { OnRebuildRouteReady(route, code); }, nullptr /* needMoreMapsCallback */, nullptr /* removeRouteCallback */,

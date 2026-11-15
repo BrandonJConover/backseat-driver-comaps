@@ -509,6 +509,10 @@ static BOOL gBackseatStartWhenReady = NO;
   }
   // Backseat: a drawn route gets the GPS's opinion once it's built.
   [BackseatSketch routeReady];
+  // Backseat: a route rebuilt mid-drive (off the old one) says its first direction now, not at the
+  // next GPS fix. The core has already found the car on it.
+  if ([MWMRouter isOnRoute])
+    [[MWMTextToSpeech tts] playRouteNotifications:[MWMRouter routeNotifications]];
 }
 
 - (void)processRouteBuilderEvent:(routing::RouterResultCode)code
