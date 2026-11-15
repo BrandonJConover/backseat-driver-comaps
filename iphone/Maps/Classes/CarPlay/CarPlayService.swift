@@ -845,6 +845,8 @@ final class CarPlayService: NSObject {
     mapTemplate.mapDelegate = self
     setRootTemplate(mapTemplate, reason: reason)
     router?.startNavigationSession(forTrip: trip, template: mapTemplate)
+    // A trip already running on the phone moved to the car screen.
+    BackseatCarTrip.started()
     if let estimates = createEstimates(routeInfo: routeInfo) {
       mapTemplate.tripEstimateStyle = rootTemplateStyle
       mapTemplate.updateEstimates(estimates, for: trip)
@@ -868,22 +870,35 @@ final class CarPlayService: NSObject {
       }
       return
     }
-    guard let startPoint = MWMRoutePoint(lastLocationAndType: .start, intermediateIndex: 0),
-          let endPoint = MWMRoutePoint(cgPoint: bookmark.mercatorPoint,
+    guard let endPoint = MWMRoutePoint(cgPoint: bookmark.mercatorPoint,
                                        title: bookmark.prefferedName,
                                        subtitle: bookmark.address,
                                        type: .finish,
                                        intermediateIndex: 0) else {
-      LOG(.warning, "\(CarPlayLogging.carPlay) dashboardNavigation failed reason=noPositionFix")
+      LOG(.warning, "\(CarPlayLogging.carPlay) dashboardNavigation failed reason=noEndPoint")
       return
+    }
+    LOG(.info, "\(CarPlayLogging.carPlay) dashboardNavigation begin bookmark=\(bookmark.bookmarkId)")
+    navigateDirectly(to: endPoint)
+  }
+
+  /// Backseat Driver's one tap to drive on the car screen: build the route from here to `endPoint`
+  /// and start navigating as soon as it's ready, with no preview to confirm. Returns false (and does
+  /// nothing) when the car screen isn't up or there's no position fix yet.
+  @discardableResult
+  @objc func navigateDirectly(to endPoint: MWMRoutePoint) -> Bool {
+    guard isCarplayActivated, let router, interfaceController != nil,
+          let startPoint = MWMRoutePoint(lastLocationAndType: .start, intermediateIndex: 0) else {
+      LOG(.warning, "\(CarPlayLogging.carPlay) directNavigation failed router=\(router != nil) interfaceController=\(interfaceController != nil)")
+      return false
     }
     if router.currentTrip != nil {
       cancelCurrentTrip()
     }
     let trip = router.createTrip(startPoint: startPoint, endPoint: endPoint)
     pendingDashboardNavigationTrip = trip
-    LOG(.info, "\(CarPlayLogging.carPlay) dashboardNavigation begin bookmark=\(bookmark.bookmarkId)")
     router.buildRoute(trip: trip)
+    return true
   }
 
   func pushTemplate(_ templateToPush: CPTemplate, animated: Bool) {
@@ -914,6 +929,7 @@ final class CarPlayService: NSObject {
     LOG(.info, "\(CarPlayLogging.carPlay) cancelCurrentTrip begin")
     pendingDashboardNavigationTrip = nil
     router?.cancelTrip()
+    BackseatCarTrip.ended()
     if let carplayVC = carplayVC {
       carplayVC.hideSpeedControl()
     }
@@ -987,6 +1003,8 @@ final class CarPlayService: NSObject {
                                   secondaryAction: nil,
                                   duration: 0)
     mapTemplate.present(navigationAlert: alert, animated: true)
+    // Backseat Driver: the grade replaces this as soon as the trip report is in.
+    BackseatCarPlay.awaitGrade(on: mapTemplate, done: doneAction)
   }
 
   func updateVisibleViewPortState(_ state: CPViewPortState) {
@@ -1224,6 +1242,7 @@ extension CarPlayService: CPMapTemplateDelegate {
     }
     router.startNavigationSession(forTrip: trip, template: rootMapTemplate)
     router.startRoute()
+    BackseatCarTrip.started()
     if let estimates = createEstimates(routeInfo: info) {
       rootMapTemplate.updateEstimates(estimates, for: trip)
     }
@@ -1398,6 +1417,7 @@ extension CarPlayService: CarPlayRouterListener {
     pendingDashboardNavigationTrip = nil
     if router?.currentTrip == nil { return }
     router?.finishTrip()
+    BackseatCarTrip.ended()
     if let carplayVC = carplayVC {
       carplayVC.hideSpeedControl()
     }

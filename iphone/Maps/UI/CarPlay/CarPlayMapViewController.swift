@@ -18,6 +18,8 @@ final class CarPlayMapViewController: MWMViewController {
 
   override func viewDidLoad() {
     super.viewDidLoad()
+    // Backseat Driver: the GPS's face and Patience meter on the car screen while a trip is on.
+    BackseatCaption.installOnCar(in: view)
   }
 
   override func viewDidLayoutSubviews() {

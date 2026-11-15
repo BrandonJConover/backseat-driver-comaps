@@ -110,6 +110,10 @@ final class ListTemplateBuilder {
       configureSelectionHandler(for: item)
       return item
     })
+    // Backseat Driver: one tap back to where the last trip started, above the recent searches.
+    if let headBack = BackseatCarPlay.headBackSection() {
+      return [headBack, CPListSection(items: items)]
+    }
     return [CPListSection(items: items)]
   }
 
