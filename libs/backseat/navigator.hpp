@@ -62,6 +62,18 @@ enum class TurnKind
   Destination
 };
 
+/// Speed camera lines, from the app's speed camera setting.
+enum class CameraAlerts
+{
+  /// Never: nothing said about cameras.
+  Off,
+  /// Auto (the default): a warning whenever the car is over the camera's limit; otherwise an easy
+  /// heads-up now and then (the first camera of the trip, then at most one every 10 minutes).
+  Speeding,
+  /// Always: every camera gets a line.
+  Always
+};
+
 /// How much the GPS says besides directions ("shut up", "talk less", "talk more").
 enum class TalkLevel
 {
@@ -155,6 +167,12 @@ struct RouteSnapshot
   /// How far along the route the next toll stretch starts (BI-113); 0 while driving on one, unset
   /// when the rest of the route is toll-free.
   std::optional<double> tollAheadM;
+  /// The next speed camera on the route, when one is within reach: how far ahead along the route,
+  /// where it stands (the same camera keeps its spot across reroutes), and its own limit when the
+  /// map has one. Unset when there's none.
+  std::optional<double> cameraAheadM;
+  std::optional<LatLon> cameraAt;
+  std::optional<double> cameraLimitMps;
 };
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
@@ -471,6 +489,8 @@ public:
 
   /// "Shut up" keeps the turns (DirectionsOnly); "talk less" halves the remarks. Kept across trips.
   void SetTalkLevel(TalkLevel level);
+  /// Which speed cameras get a line (CameraAlerts). Cheap to call on every fix.
+  void SetCameraAlerts(CameraAlerts alerts) { m_cameraAlerts = alerts; }
   TalkLevel GetTalkLevel() const { return m_talk; }
 
   /// Pop quizzes (pop_quiz.hpp) need the driver to answer out loud, so they only happen once the
@@ -614,6 +634,8 @@ private:
   void TrackFerry(Fix const & fix, RouteSnapshot const & route);
   void HoldStopForFerry(RouteSnapshot const & route);
   void TrackToll(Fix const & fix, RouteSnapshot const & route);
+  /// Speed cameras: a warning on the way up to one, and a word as the car passes it.
+  void TrackSpeedCamera(Fix const & fix, RouteSnapshot const & route);
   void TrackMusic(double tMs, RouteSnapshot const & route);
   /// The trip started indoors: say so, and maybe remark on it once the car gets out.
   void SayIndoorStart(double tMs, RouteSnapshot const & route);
@@ -741,6 +763,24 @@ private:
   std::optional<double> m_tollWindowT;
   /// The driver said "avoid tolls" this trip: a toll anyway is the route's doing, no joke.
   bool m_avoidTollsSaid = false;
+  CameraAlerts m_cameraAlerts = CameraAlerts::Speeding;
+  /// The speed camera coming up, followed until the car passes it.
+  struct CameraWatch
+  {
+    std::string id;
+    double aheadM = 0;
+    std::optional<double> limitMps;
+    /// Its one chance at a warning has come (said or skipped).
+    bool warned = false;
+    /// The warning was said (not skipped), and whether it caught the driver speeding.
+    bool said = false;
+    bool warnedSpeeding = false;
+  };
+  std::optional<CameraWatch> m_camera;
+  /// The last line about any camera, and the last easy heads-up (not speeding).
+  double m_lastCameraLineT = -1e18;
+  double m_lastCameraHeadsUpT = -1e18;
+  int m_cameraHeadsUps = 0;
   bool m_policeSaid = false;
   std::optional<double> m_lastLimitMps;
   std::string m_country;
