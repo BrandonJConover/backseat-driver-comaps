@@ -1121,3 +1121,40 @@ TEST(SpeedLimitTimeMuteAndDirectionPhrasings)
   CHECK(WordsSupportTool(AppAction::Mute, "", "turn off the voice"));
   CHECK(WordsSupportTool(AppAction::NextTurn, "", "what's the next direction"));
 }
+
+TEST(RoadClosedReportsReroute)
+{
+  // B156 (BI-138): a closure said out loud asks for another way; the driver can't do anything else with it.
+  for (char const * said : {"the road is closed", "The road's closed!", "the road\xE2\x80\x99s closed", "road closed",
+                            "Road closed ahead", "road closed!", "this road's blocked", "this road\xE2\x80\x99s blocked",
+                            "the road is blocked up here", "the bridge is out", "the exit is closed", "the exit's closed",
+                            "the ramp is closed", "we can't go this way", "we can\xE2\x80\x99t go this way",
+                            "avoid this road", "there's a detour", "there\xE2\x80\x99s a detour", "ugh there's a detour",
+                            "detour", "road closure up ahead"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == AppAction::DifferentRoute;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(ok);
+    CHECK(WordsSupportTool(AppAction::DifferentRoute, "", said));
+  }
+  // Closed shops, history and windows aren't closures on the route.
+  for (char const * chatter : {"the store is closed", "the road closed last year", "close the window",
+                               "is that place still open", "the road isn't closed", "the road was closed yesterday",
+                               "they took a detour through the woods in that movie", "the exit was fine",
+                               "don't avoid this road"})
+  {
+    auto const c = ParseAppCommands(chatter);
+    bool const ok = std::none_of(c.begin(), c.end(), [](AppCommand const & x) { return x.action == AppAction::DifferentRoute; });
+    if (!ok)
+      std::printf("  chatter \"%s\" heard a reroute\n", chatter);
+    CHECK(ok);
+  }
+  CHECK(ParseAppCommands("the store is closed").empty());
+  CHECK(ParseAppCommands("the road closed last year").empty());
+  CHECK(!WordsSupportTool(AppAction::DifferentRoute, "", "the route is fine"));
+  // What already worked still does.
+  CHECK(Heard("find a different route", AppAction::DifferentRoute));
+  CHECK(Heard("what road is this", AppAction::CurrentRoad));
+}
