@@ -126,6 +126,10 @@ using Observers = NSHashTable<Observer>;
     BackseatKokoroVoice.shared.systemIsSpeaking = ^BOOL {
       return weakSelf.speechSynthesizer.isSpeaking;
     };
+    // A line that went stale while the system voice had it (the driver tapped past its screen).
+    BackseatKokoroVoice.shared.stopSystemVoice = ^{
+      [weakSelf.speechSynthesizer stopSpeakingAtBoundary:AVSpeechBoundaryImmediate];
+    };
     [BackseatKokoroVoice.shared start];
   }
   return self;

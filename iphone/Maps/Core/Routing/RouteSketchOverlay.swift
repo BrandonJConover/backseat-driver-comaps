@@ -595,6 +595,7 @@ final class RouteSketchOverlay: UIView {
     displayLink?.invalidate()
     displayLink = nil
     removeFromSuperview()
+    KokoroVoice.shared.dropLines(forScreen: Self.screen)
     onDone?()
   }
 
@@ -939,7 +940,7 @@ private final class TouchSink: UIView {
     let overlay = RouteSketchOverlay(mapView: controller.mapView)
     overlay.frame = controller.view.bounds
     overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-    overlay.onErase = { say(MWMBackseatRewriter.sketchCleared()) }
+    overlay.onErase = { say(MWMBackseatRewriter.sketchCleared(), screen: Self.screen) }
     MWMRouter.beginSketchSession()
     MWMRouter.setDrawModeOpen(true)
     controller.view.addSubview(overlay)
@@ -950,9 +951,16 @@ private final class TouchSink: UIView {
     say(MWMBackseatRewriter.takeSketchVerdict())
   }
 
-  private static func say(_ line: String) {
+  /// The sketch screen's lines ("rub out" quips) are dropped if it closes before they're said.
+  private static let screen = "routeSketch"
+
+  private static func say(_ line: String, screen: String? = nil) {
     guard !line.isEmpty, MWMTextToSpeech.isTTSEnabled() else { return }
-    KokoroVoice.shared.sayReply(line, voiceID: nil) { MWMTextToSpeech.tts().play(line) }
+    if let screen {
+      KokoroVoice.shared.sayReply(line, voiceID: nil, screen: screen) { MWMTextToSpeech.tts().play(line) }
+    } else {
+      KokoroVoice.shared.sayReply(line, voiceID: nil) { MWMTextToSpeech.tts().play(line) }
+    }
   }
 
   static func button(title: String = "Plan route") -> UIButton {
