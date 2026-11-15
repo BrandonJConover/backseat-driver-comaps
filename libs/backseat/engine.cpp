@@ -1033,8 +1033,13 @@ std::optional<std::string> CritiqueEngine::Grievance() const
 {
   if (m_snubbedAt)
     return "not stopping at " + *m_snubbedAt;
-  auto const last = std::find_if(m_incidents.rbegin(), m_incidents.rend(), [](Incident const & i)
-                                 { return i.kind != IncidentKind::Rerouted && i.kind != IncidentKind::LongStop; });
+  // A jam the driver followed my directions into is no grudge: "ignoring my route" would be a lie.
+  bool const jamIsGrudge = !m_config.trafficBlameNeedsDetour || m_jamBlamesRoute;
+  auto const last = std::find_if(m_incidents.rbegin(), m_incidents.rend(), [jamIsGrudge](Incident const & i)
+                                 {
+                                   return i.kind != IncidentKind::Rerouted && i.kind != IncidentKind::LongStop &&
+                                          (jamIsGrudge || i.kind != IncidentKind::Traffic);
+                                 });
   if (last == m_incidents.rend())
     return std::nullopt;
   std::optional<std::string> street;
