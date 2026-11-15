@@ -119,6 +119,11 @@ struct EngineConfig
   /// it (LeftRoute) or the router called the turn missed. Still on the route and closing in on the turn,
   /// it was a bend in the road and nothing is said. The Navigator turns it on; off keeps TS parity.
   bool confirmWrongTurns = false;
+  /// Jam lines that blame the driver's route ("Why did you go this way? I told you to take I-25.") only
+  /// when the driver went their own way first (NoteDetour); a jam on the route as given gets
+  /// traffic.start.onRoute / traffic.onRoute, which blame the traffic instead. The Navigator turns it
+  /// on; off by default so the TS engine's parity trace still holds.
+  bool trafficBlameNeedsDetour = false;
   Rng rng;
   LineSource * lineSource = nullptr;
   /// Lines said on earlier trips, so picks avoid them too. Not owned; null keeps it per trip.
@@ -179,6 +184,15 @@ public:
   /// the stop, the stop may be a jam about to be called, and "We've been stopped for a while" eight
   /// seconds before "Traffic. Great." is one remark too many (BI-056).
   void HoldLongStop(double untilMs) { m_longStopHoldUntil = untilMs; }
+  /// The driver went against the directions: left the route and got rerouted, or drew their own,
+  /// slower route (`wholeTrip`). A jam called within kDetourBlamesJamMs of it (or any time, for a drawn
+  /// route) may blame the route they chose (trafficBlameNeedsDetour). A missed turn and a reroute
+  /// roast count on their own; the Navigator calls this for the reroutes it keeps quiet about.
+  void NoteDetour(double t, bool wholeTrip = false);
+  /// The jam being called is one the driver's own route choice can take the blame for.
+  bool JamBlamesRoute() const { return m_jamBlamesRoute; }
+  /// How long after a detour a new jam still counts as the detour's fault.
+  static constexpr double kDetourBlamesJamMs = 20 * 60000;
 
   int Frustration() const;
   TripStats const & Stats() const { return m_stats; }
@@ -186,8 +200,11 @@ public:
   int StopCount() const { return m_stopCount; }
   /// Everything the driver did wrong, in order, with positions. Persist this per trip.
   std::vector<Incident> const & Incidents() const { return m_incidents; }
-  /// Grade + heat map. Valid mid-trip too.
+  /// Grade + heat map. Valid mid-trip too. Built once and reused until an incident or a stat changes
+  /// (arrival asks for it 3-4 times; each build rounds every heat-map cell).
   TripReport Report() const;
+  /// How many times Report() actually rebuilt (tests and traces; cached calls don't count).
+  int ReportBuilds() const { return m_reportBuilds; }
   EngineConfig const & Config() const { return m_config; }
   /// The driver changed units mid-trip: speeds, distances and thresholds follow from the next sample.
   void SetUnits(Units units) { m_config = ForUnits(m_config, units); }
@@ -345,6 +362,14 @@ private:
   std::optional<double> m_lastInstructionDistanceM;
   std::optional<LatLon> m_position;
   std::optional<std::string> m_trafficAlternate;  // set while stuck in heavy traffic
+  /// The last time the driver went their own way (NoteDetour), and whether it lasts the trip.
+  std::optional<double> m_lastDetourAt;
+  bool m_detourWholeTrip = false;
+  /// Decided when a jam is called: may its lines blame the driver's route?
+  bool m_jamBlamesRoute = true;
+  bool DetourBlamesJam(double t) const;
+  /// "traffic" when the jam may blame the route, "traffic.onRoute" when it may not.
+  char const * TrafficKey() const { return m_jamBlamesRoute ? "traffic" : "traffic.onRoute"; }
   /// The left/right turn we're waiting for, so a turn the other way can be caught.
   std::optional<PendingTurn> m_pendingTurn;
   std::optional<StraightNag> m_straight;
@@ -383,5 +408,11 @@ private:
   std::vector<Incident> m_incidents;
   bool m_arrived = false;
   TripStats m_stats;
+  /// Report() cache: the report plus the incident count and stats it was built from. Incidents are only
+  /// ever appended, so a count and a stats match mean nothing it reads has changed.
+  mutable std::optional<TripReport> m_report;
+  mutable size_t m_reportIncidents = 0;
+  mutable TripStats m_reportStats;
+  mutable int m_reportBuilds = 0;
 };
 }  // namespace backseat

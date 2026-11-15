@@ -50,6 +50,17 @@ bool LineClaimsHighway(std::string const & text)
                      [&lower](char const * w) { return lower.find(" " + std::string(w) + " ") != std::string::npos; });
 }
 
+bool LineBlamesRoute(std::string const & text)
+{
+  static char const * const kBlame[] = {"{alternate}", "told you so", "told you to take", "told you not to take",
+                                        "told you to avoid", "the other road", "listened to me", "ignore me"};
+  std::string lower;
+  for (char const c : text)
+    lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return std::any_of(std::begin(kBlame), std::end(kBlame),
+                     [&lower](char const * w) { return lower.find(w) != std::string::npos; });
+}
+
 void SetLineTravelMode(TravelMode mode)
 {
   g_travelMode = mode;
@@ -464,7 +475,7 @@ void Warm(bool metric, bool leftHand)
       "Mon-Fri 9am-5pm, 3\xE2\x80\x93""5 min, ~20 ft, \xC2\xB1""2 km, -5\xC2\xB0""F \xE2\x80\x94 50% off $1,234.99/gal & #5.",
       "On 11/6/2026 or 2026-11-06 or Nov. 6 in the 1990s and 90s, at 10:30, 24/7, \xC2\xBD.",
       "King George VI Ave to St. John's Svc Rd, Ave B, Mt Hood, 1600 Pennsylvania Ave, US-101, SR 71.",
-      "See www.example.com or jo@example.com about Calle Ocho, rue de la Paix and Burnet Rd.",
+      "See www.example.com or jo@example.com about Calle Ocho, rue de la Paix and Burnet Rd, the Grey Theatre's colours.",
       "\xD1\x83\xD0\xBB\xD0\xB8\xD1\x86\xD0\xB0 \xE3\x83\xA9\xE3\x83\xBC\xE3\x83\xA1\xE3\x83\xB3 lead the way, read it, live here.",
   };
   for (char const * probe : kProbes)

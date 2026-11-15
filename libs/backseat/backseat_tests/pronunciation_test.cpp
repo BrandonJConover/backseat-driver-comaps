@@ -977,6 +977,35 @@ TEST(MilitaryAndTwentyFourHourTimes)
   CHECK(!ForSpeech(longText).empty());
 }
 
+TEST(RatiosOddsAndScalesReadTo)
+{
+  // Loop B161, CROSS X-063: BookLyre's ratio cases plus map scales; clock times, verses and chains stay.
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_RATIOS_PATH);
+  CHECK(cases.size() >= 40);
+  int changed = 0;
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+    changed += c.expected.find(" to ") != std::string::npos ? 1 : 0;
+  }
+  CHECK(changed >= 15);
+  // No colon left between two number words in a ratio, and the clock readings are untouched.
+  CHECK_EQUAL(ForSpeech("a 1:50 scale map"), std::string("a one to fifty scale map"));
+  CHECK_EQUAL(ForSpeech("odds 3:1"), std::string("odds three to one"));
+  CHECK_EQUAL(ForSpeech("Turn at 1:50"), std::string("Turn at one fifty"));
+  CHECK(ForSpeech("Arrive 5:30 pm").find(" to ") == std::string::npos);
+  // Idempotent on its own output, and the curly-quote clause mark ends the cue window.
+  CHECK_EQUAL(ForSpeech(ForSpeech("the odds were 3:1")), ForSpeech("the odds were 3:1"));
+  CHECK(ForSpeech("odds \xE2\x80\x9Cwe left 3:2").find(" to ") == std::string::npos);
+  // Hostile input stays quick and doesn't throw.
+  std::string longText;
+  for (int i = 0; i < 2000; ++i)
+    longText += "odds 3:1 1:2:3 :: 9: :5 1234:5 ";
+  CHECK(!ForSpeech(longText).empty());
+  CHECK(!ForSpeech(std::string(5000, ':')).empty());
+}
+
 TEST(FeetAndInchesReadAsHeights)
 {
   // Loop B149, BI-125: clearance signs and heights in straight, curly and prime marks, and "ft N in".
@@ -1043,4 +1072,118 @@ TEST(DottedTitlesBeforeNames)
   for (int i = 0; i < 2000; ++i)
     longText += "Lt. Col. Capt. ";
   CHECK(!ForSpeech(longText).empty());
+}
+
+TEST(InterjectionsMatchTheGoldenCasesSharedWithBookLyre)
+{
+  // Loop B160, CROSS X-062: "Shh." and "Brr." in the line bank were silent (no lexicon entry).
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_INTERJECTIONS_PATH);
+  CHECK(cases.size() >= 90);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // Every stand-in is said at the start of a line, and stays as written glued to a word.
+  for (char const * w : {"Shh", "Tsk", "Hmph", "Brr", "Pfft", "Ahh", "Umm", "Mhm", "Grr", "Zzz", "Achoo", "Woohoo"})
+  {
+    std::string const word(w);
+    CHECK(ForSpeech(word + ", fine.").find(word + ",") == std::string::npos);
+    CHECK(ForSpeech("x" + word + ", fine.").find("x" + word + ",") != std::string::npos);
+    CHECK(ForSpeech(word + "y, fine.").find(word + "y,") != std::string::npos);
+  }
+  // Hostile input stays quick and doesn't throw.
+  std::string longText;
+  for (int i = 0; i < 3000; ++i)
+    longText += "Shhhhhhh-sh-Mm-hmm Zzzzz ";
+  longText += std::string(20000, 'h');
+  CHECK(!ForSpeech(longText).empty());
+}
+
+TEST(BritishAndAmericanSpellingsReadTheLexiconsOwnWord)
+{
+  // Loop B162, CROSS X-061: "Grey St" and "Theatre District" reached the guesser (the American lexicon
+  // has no grey/theatre). Golden cases shared with BookLyre; en-GB cases run with a British voice.
+  struct BritishOff
+  {
+    ~BritishOff() { SetBritishSpelling(false); }
+  } reset;
+  CHECK(!BritishSpelling());
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_SPELLING_VARIANTS_PATH);
+  CHECK(cases.size() >= 50);
+  int british = 0;
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    SetBritishSpelling(c.language == "en-GB");
+    british += c.language == "en-GB" ? 1 : 0;
+    CHECK_EQUAL(RespellVariant(c.input), c.expected);
+  }
+  CHECK(british >= 8);
+  SetBritishSpelling(false);
+
+  // Every pair of the shared table reads the lexicon's own word, and the lexicon's words stay.
+  std::ifstream in(BACKSEAT_SPELLING_VARIANTS_TABLE_PATH);
+  std::stringstream buffer;
+  buffer << in.rdbuf();
+  auto const json = buffer.str();
+  auto const gbAt = json.find("\"gb\"");
+  CHECK(json.find("\"us\"") != std::string::npos && gbAt != std::string::npos);
+  int pairs[2] = {0, 0};
+  for (size_t at = json.find("\"us\""); at != std::string::npos;)
+  {
+    auto const k0 = json.find('"', json.find('\n', at) + 1);
+    if (k0 == std::string::npos)
+      break;
+    auto const k1 = json.find('"', k0 + 1);
+    auto const v0 = json.find('"', k1 + 1);
+    auto const v1 = json.find('"', v0 + 1);
+    if (v1 == std::string::npos || json.compare(k1, 4, "\": \"") != 0)
+    {
+      at = json.find('\n', k0);  // a section key or the closing brace
+      continue;
+    }
+    auto const key = json.substr(k0 + 1, k1 - k0 - 1), value = json.substr(v0 + 1, v1 - v0 - 1);
+    bool const gb = k0 > gbAt;
+    SetBritishSpelling(gb);
+    CHECK_EQUAL(RespellVariant(key), value);
+    std::string upper = key;
+    upper[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(upper[0])));
+    CHECK_EQUAL(RespellVariant(upper).substr(1), value.substr(1));
+    ++pairs[gb ? 1 : 0];
+    at = v1;
+  }
+  SetBritishSpelling(false);
+  CHECK(pairs[0] >= 3000);
+  CHECK(pairs[1] >= 1000);
+  for (bool gb : {false, true})
+  {
+    SetBritishSpelling(gb);
+    for (auto const & [word, phonemes] : Lexicon())
+      CHECK_EQUAL(RespellVariant(word), word);
+  }
+  SetBritishSpelling(false);
+
+  // In ForSpeech, after the driver's own words and before the street pass.
+  CHECK_EQUAL(ForSpeech("Turn left onto Grey St toward the Theatre District."),
+              std::string("Turn left onto Gray Street toward the Theater District."));
+  CHECK_EQUAL(ForSpeech(ForSpeech("the Grey Theatre's colours")), ForSpeech("the Grey Theatre's colours"));
+  // The driver's own word for the street wins over the respelling.
+  SetUserWords("Grey St\tgree street\n");
+  CHECK_EQUAL(ForSpeech("Turn onto Grey St."), std::string("Turn onto gree street."));
+  SetUserWords("");
+  SetBritishSpelling(true);
+  CHECK_EQUAL(ForSpeech("the Theater District"), std::string("the Theatre District"));
+  SetBritishSpelling(false);
+  CHECK_EQUAL(ForSpeech("the Theater District"), std::string("the Theater District"));
+
+  // Hostile input stays quick and doesn't throw.
+  std::string longText;
+  for (int i = 0; i < 3000; ++i)
+    longText += "'grey' Colours'' \xE2\x80\x99\xE2\x80\x99s greys\xE2\x80\x94Th\xC3\xA9 \xE2\x80 ";
+  CHECK(!RespellVariant(longText).empty());
+  CHECK_EQUAL(RespellVariant("'"), std::string("'"));
+  CHECK_EQUAL(RespellVariant("\xE2\x80\x99\xE2\x80\x99"), std::string("\xE2\x80\x99\xE2\x80\x99"));
+  CHECK_EQUAL(RespellVariant("\xE2\x80"), std::string("\xE2\x80"));
+  CHECK(!ForSpeech(std::string(20000, 'y')).empty());
 }

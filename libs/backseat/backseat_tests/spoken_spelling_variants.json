@@ -1,0 +1,295 @@
+{
+ "about": "British/American spellings respelled toward the voice's lexicon (loop B162, CROSS X-061). BookLyre's SpellingVariantsTest cases (EpubToM4B auto/loop 9ca83052, BACKLOG #236) plus map names; table = backseat_tests/spelling_variants.json (BookLyre tests/fixtures/spelling_variants.json). language en-US = American voice (default), en-GB = British voice. Case, possessives and plain suffixes kept; all-caps, words glued to digits or accented letters, and words the table lacks are left. Backseat Driver: backseat::pronunciation::RespellVariant (libs/backseat/backseat_tests/pronunciation_test.cpp).",
+ "cases": [
+  {
+   "input": "grey",
+   "language": "en-US",
+   "expected": "gray"
+  },
+  {
+   "input": "Grey",
+   "language": "en-US",
+   "expected": "Gray"
+  },
+  {
+   "input": "GREY",
+   "language": "en-US",
+   "expected": "GREY"
+  },
+  {
+   "input": "colour",
+   "language": "en-US",
+   "expected": "color"
+  },
+  {
+   "input": "colour's",
+   "language": "en-US",
+   "expected": "color's"
+  },
+  {
+   "input": "colours",
+   "language": "en-US",
+   "expected": "colors"
+  },
+  {
+   "input": "colours'",
+   "language": "en-US",
+   "expected": "colors'"
+  },
+  {
+   "input": "Colour’s",
+   "language": "en-US",
+   "expected": "Color’s"
+  },
+  {
+   "input": "COLOUR'S",
+   "language": "en-US",
+   "expected": "COLOUR'S"
+  },
+  {
+   "input": "honour",
+   "language": "en-US",
+   "expected": "honor"
+  },
+  {
+   "input": "favourite",
+   "language": "en-US",
+   "expected": "favorite"
+  },
+  {
+   "input": "theatre",
+   "language": "en-US",
+   "expected": "theater"
+  },
+  {
+   "input": "behaviour",
+   "language": "en-US",
+   "expected": "behavior"
+  },
+  {
+   "input": "jewellery",
+   "language": "en-US",
+   "expected": "jewelry"
+  },
+  {
+   "input": "pyjamas",
+   "language": "en-US",
+   "expected": "pajamas"
+  },
+  {
+   "input": "realised",
+   "language": "en-US",
+   "expected": "realized"
+  },
+  {
+   "input": "apologise",
+   "language": "en-US",
+   "expected": "apologize"
+  },
+  {
+   "input": "catalogue",
+   "language": "en-US",
+   "expected": "catalog"
+  },
+  {
+   "input": "programme",
+   "language": "en-US",
+   "expected": "program"
+  },
+  {
+   "input": "programmes",
+   "language": "en-US",
+   "expected": "programs"
+  },
+  {
+   "input": "gray",
+   "language": "en-US",
+   "expected": "gray"
+  },
+  {
+   "input": "aluminium",
+   "language": "en-US",
+   "expected": "aluminium"
+  },
+  {
+   "input": "colourful",
+   "language": "en-US",
+   "expected": "colorful"
+  },
+  {
+   "input": "greyish",
+   "language": "en-US",
+   "expected": "grayish"
+  },
+  {
+   "input": "10 kilometres",
+   "language": "en-US",
+   "expected": "10 kilometers"
+  },
+  {
+   "input": "500 metres",
+   "language": "en-US",
+   "expected": "500 meters"
+  },
+  {
+   "input": "40 litres of fuel",
+   "language": "en-US",
+   "expected": "40 liters of fuel"
+  },
+  {
+   "input": "fibre",
+   "language": "en-US",
+   "expected": "fiber"
+  },
+  {
+   "input": "mould",
+   "language": "en-US",
+   "expected": "mold"
+  },
+  {
+   "input": "plough",
+   "language": "en-US",
+   "expected": "plow"
+  },
+  {
+   "input": "manoeuvre",
+   "language": "en-US",
+   "expected": "maneuver"
+  },
+  {
+   "input": "City Centre",
+   "language": "en-US",
+   "expected": "City Centre"
+  },
+  {
+   "input": "Harbour Rd",
+   "language": "en-US",
+   "expected": "Harbour Rd"
+  },
+  {
+   "input": "Grey St",
+   "language": "en-US",
+   "expected": "Gray St"
+  },
+  {
+   "input": "Theatre District",
+   "language": "en-US",
+   "expected": "Theater District"
+  },
+  {
+   "input": "Turn left onto Grey St toward the Theatre District.",
+   "language": "en-US",
+   "expected": "Turn left onto Gray St toward the Theater District."
+  },
+  {
+   "input": "Royal Opera House, Covent Garden Theatre",
+   "language": "en-US",
+   "expected": "Royal Opera House, Covent Garden Theater"
+  },
+  {
+   "input": "I said 'grey', not 'gray'.",
+   "language": "en-US",
+   "expected": "I said 'gray', not 'gray'."
+  },
+  {
+   "input": "“Grey” St",
+   "language": "en-US",
+   "expected": "“Gray” St"
+  },
+  {
+   "input": "grey—blue",
+   "language": "en-US",
+   "expected": "gray—blue"
+  },
+  {
+   "input": "grey-blue",
+   "language": "en-US",
+   "expected": "gray-blue"
+  },
+  {
+   "input": "grey…",
+   "language": "en-US",
+   "expected": "gray…"
+  },
+  {
+   "input": "Théâtre de la Ville",
+   "language": "en-US",
+   "expected": "Théâtre de la Ville"
+  },
+  {
+   "input": "grey2",
+   "language": "en-US",
+   "expected": "grey2"
+  },
+  {
+   "input": "Greyhound station",
+   "language": "en-US",
+   "expected": "Greyhound station"
+  },
+  {
+   "input": "The colour of the Grey Theatre's programme",
+   "language": "en-US",
+   "expected": "The color of the Gray Theater's program"
+  },
+  {
+   "input": "color",
+   "language": "en-GB",
+   "expected": "colour"
+  },
+  {
+   "input": "Color",
+   "language": "en-GB",
+   "expected": "Colour"
+  },
+  {
+   "input": "favorite",
+   "language": "en-GB",
+   "expected": "favourite"
+  },
+  {
+   "input": "theater",
+   "language": "en-GB",
+   "expected": "theatre"
+  },
+  {
+   "input": "behavior",
+   "language": "en-GB",
+   "expected": "behaviour"
+  },
+  {
+   "input": "jewelry",
+   "language": "en-GB",
+   "expected": "jewellery"
+  },
+  {
+   "input": "catalog",
+   "language": "en-GB",
+   "expected": "catalogue"
+  },
+  {
+   "input": "honor's",
+   "language": "en-GB",
+   "expected": "honour's"
+  },
+  {
+   "input": "Theater District",
+   "language": "en-GB",
+   "expected": "Theatre District"
+  },
+  {
+   "input": "grey",
+   "language": "en-GB",
+   "expected": "grey"
+  },
+  {
+   "input": "aluminum",
+   "language": "en-GB",
+   "expected": "aluminum"
+  },
+  {
+   "input": "COLOR",
+   "language": "en-GB",
+   "expected": "COLOR"
+  }
+ ]
+}

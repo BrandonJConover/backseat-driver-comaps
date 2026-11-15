@@ -5,6 +5,9 @@
 #include "backseat/pronunciation_dates.hpp"
 #include "backseat/pronunciation_web.hpp"
 #include "backseat/pronunciation_measures.hpp"
+#include "backseat/pronunciation_interjections.hpp"
+#include "backseat/pronunciation_ratios.hpp"
+#include "backseat/pronunciation_spelling.hpp"
 
 #include <algorithm>
 #include <array>
@@ -661,6 +664,12 @@ std::string FractionWords(std::string const & a, std::string const & b)
   return a + "/" + b;
 }
 }  // namespace
+
+void SetBritishSpelling(bool british) { g_britishSpelling.store(british, std::memory_order_relaxed); }
+
+bool BritishSpelling() { return g_britishSpelling.load(std::memory_order_relaxed); }
+
+std::string RespellVariant(std::string const & text) { return SpellingVariants(text); }
 
 void SetUserWords(std::string const & lines)
 {
@@ -2022,6 +2031,14 @@ std::string ForSpeech(std::string const & text)
   s = Cyrillic(s);
   // Kana by Hepburn, the same way: "ラーメン" is "ramen", "さくら通り" "sakura 通 ri".
   s = Kana(s);
+  // Interjections the voice would skip, before the passes that read "arr. 10:15" or "50 mph": "Shh." is
+  // "Shush.", "Hmph" "Humph", "Mm-hmm" "Uh-huh" (loop B160, CROSS X-062).
+  s = Interjections(s);
+  // Ratios, odds and map scales before the date, range and clock passes read the colon: "a 1:50 scale
+  // map" is "a 1 to 50 scale map", "odds 3:1" "odds 3 to 1"; "at 1:50" and "5:30 pm" stay times
+  // (loop B161, CROSS X-063).
+  if (HasDigit(s))
+    s = Ratios(s);
   // Feet and inches before Symbols and Decades take the marks: "13'6\"" is "13 feet 6 inches" (loop B149).
   if (HasDigit(s))
     s = FeetAndInches(s);
@@ -2052,6 +2069,9 @@ std::string ForSpeech(std::string const & text)
 
   // The driver's own words first: they know best.
   s = ApplyUserWords(s);
+  // British/American spellings the voice's lexicon lacks, toward the one it has: "Grey St" is "Gray St",
+  // "Theatre District" "Theater District" for the American voice (loop B162, CROSS X-061).
+  s = SpellingVariants(s);
   // Street types abroad: "Calle Ocho" is "KAH-yeh Ocho", "Paseo de la Reforma" keeps its Spanish.
   s = ForeignStreets(s);
   // Places said the local way: "Burnet Rd" is BURN-it, "Humble, TX" UM-bul.

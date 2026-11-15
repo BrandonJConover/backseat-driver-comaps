@@ -6,6 +6,7 @@ add_executable(${PROJECT_NAME}
   check.hpp
   timing.hpp
   engine_test.cpp
+  jam_blame_test.cpp
   jerk_settle_test.cpp
   countdown_distance_test.cpp
   highway_claims_test.cpp
@@ -43,6 +44,7 @@ add_executable(${PROJECT_NAME}
   quiet_bits_test.cpp
   report_test.cpp
   report_speed_test.cpp
+  report_cache_test.cpp
   listen_speed_test.cpp
   achievements_test.cpp
   rundown_test.cpp
@@ -117,6 +119,10 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
   BACKSEAT_SPOKEN_FEET_INCHES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_feet_inches.json"
   BACKSEAT_SPOKEN_FRACTION_UNITS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_fraction_units.json"
   BACKSEAT_SPOKEN_DOTTED_TITLES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_dotted_titles.json"
+  BACKSEAT_SPOKEN_INTERJECTIONS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_interjections.json"
+  BACKSEAT_SPOKEN_RATIOS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_ratios.json"
+  BACKSEAT_SPOKEN_SPELLING_VARIANTS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_spelling_variants.json"
+  BACKSEAT_SPELLING_VARIANTS_TABLE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spelling_variants.json"
   BACKSEAT_YES_NO_PATH="${CMAKE_CURRENT_SOURCE_DIR}/yes_no.json"
   BACKSEAT_CLIP_PACING_PATH="${CMAKE_CURRENT_SOURCE_DIR}/clip_pacing_boundaries.json")
 add_test(NAME ${PROJECT_NAME} COMMAND ${PROJECT_NAME})

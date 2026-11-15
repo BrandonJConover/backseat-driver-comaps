@@ -322,6 +322,39 @@ TEST(SearchChoicesAreHeard)
   CHECK(!ParseChoice("first", {}));
 }
 
+TEST(SearchChoicesHearMiddleNegationAndWhichever)
+{
+  std::vector<std::string> const three = {"Shell", "Speedway Gas", "Circle K on Main"};
+  CHECK(ParseChoice("the middle one", three) == size_t(1));
+  CHECK(ParseChoice("the second one", three) == size_t(1));
+  CHECK(ParseChoice("the third one", three) == size_t(2));
+  CHECK(ParseChoice("that one", three) == size_t(0));
+  CHECK(ParseChoice("not the first one", three) == size_t(1));
+  CHECK(ParseChoice("not that one", three) == size_t(1));
+  CHECK(ParseChoice("not Shell", three) == size_t(1));
+  CHECK(ParseChoice("not the last one", three) == size_t(0));
+  CHECK(ParseChoice("not the middle one", three) == size_t(0));
+  CHECK(ParseChoice("anything but Speedway", three) == size_t(0));
+  CHECK(ParseChoice("whichever", three) == size_t(0));
+  CHECK(ParseChoice("either one", three) == size_t(0));
+  CHECK(ParseChoice("any of them", three) == size_t(0));
+  CHECK(ParseChoice("it doesn't matter", three) == size_t(0));
+  CHECK(ParseChoice("the one on Main", three) == size_t(2));
+  CHECK(!ParseChoice("not sure", three));
+  CHECK(!ParseChoice("hmm", three));
+  std::vector<std::string> const two = {"Shell", "Speedway Gas"};
+  CHECK(!ParseChoice("the middle one", two));
+  CHECK(ParseChoice("not the first one", two) == size_t(1));
+  CHECK(ParseChoice("not that one", two) == size_t(1));
+  CHECK(ParseChoice("whichever", two) == size_t(0));
+  CHECK(!ParseChoice("not that one", {"Shell"}));
+  std::vector<std::string> const four = {"Shell", "Speedway Gas", "Circle K", "Sinclair"};
+  CHECK(!ParseChoice("the middle one", four));
+  CHECK(ParseChoice("not the second one", four) == size_t(0));
+  CHECK(ParseChoice("doesn't matter", four) == size_t(0));
+  CHECK(ParseChoice("number four", four) == size_t(3));
+}
+
 TEST(HandEditedProfileIsCalledOut)
 {
   DriverProfile const before{"Brandon", "he", "34"};
@@ -1087,4 +1120,152 @@ TEST(SpeedLimitTimeMuteAndDirectionPhrasings)
   }
   CHECK(WordsSupportTool(AppAction::Mute, "", "turn off the voice"));
   CHECK(WordsSupportTool(AppAction::NextTurn, "", "what's the next direction"));
+}
+
+TEST(RoadClosedReportsReroute)
+{
+  // B156 (BI-138): a closure said out loud asks for another way; the driver can't do anything else with it.
+  for (char const * said : {"the road is closed", "The road's closed!", "the road\xE2\x80\x99s closed", "road closed",
+                            "Road closed ahead", "road closed!", "this road's blocked", "this road\xE2\x80\x99s blocked",
+                            "the road is blocked up here", "the bridge is out", "the exit is closed", "the exit's closed",
+                            "the ramp is closed", "we can't go this way", "we can\xE2\x80\x99t go this way",
+                            "avoid this road", "there's a detour", "there\xE2\x80\x99s a detour", "ugh there's a detour",
+                            "detour", "road closure up ahead"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == AppAction::DifferentRoute;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(ok);
+    CHECK(WordsSupportTool(AppAction::DifferentRoute, "", said));
+  }
+  // Closed shops, history and windows aren't closures on the route.
+  for (char const * chatter : {"the store is closed", "the road closed last year", "close the window",
+                               "is that place still open", "the road isn't closed", "the road was closed yesterday",
+                               "they took a detour through the woods in that movie", "the exit was fine",
+                               "don't avoid this road"})
+  {
+    auto const c = ParseAppCommands(chatter);
+    bool const ok = std::none_of(c.begin(), c.end(), [](AppCommand const & x) { return x.action == AppAction::DifferentRoute; });
+    if (!ok)
+      std::printf("  chatter \"%s\" heard a reroute\n", chatter);
+    CHECK(ok);
+  }
+  CHECK(ParseAppCommands("the store is closed").empty());
+  CHECK(ParseAppCommands("the road closed last year").empty());
+  CHECK(!WordsSupportTool(AppAction::DifferentRoute, "", "the route is fine"));
+  // What already worked still does.
+  CHECK(Heard("find a different route", AppAction::DifferentRoute));
+  CHECK(Heard("what road is this", AppAction::CurrentRoad));
+}
+
+TEST(PastTenseTripQuestionsArentTimeLeft)
+{
+  // B157 (BI-139): the trip so far (or a meeting that ran long) isn't how long is LEFT.
+  for (char const * said : {"how long have we been driving", "how long have we been on the road", "how far did we go",
+                            "how far have we come", "how many miles have we driven", "how long was that meeting",
+                            "How long were we stuck back there?", "how far have we gone so far",
+                            "how long we\xE2\x80\x99ve been driving", "how many miles did i drive today"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = std::none_of(c.begin(), c.end(), [](AppCommand const & x) { return x.action == AppAction::TimeLeft; });
+    if (!ok)
+      std::printf("  \"%s\" heard time left\n", said);
+    CHECK(ok);
+    CHECK(!WordsSupportTool(AppAction::TimeLeft, "", said));
+  }
+  CHECK(ParseAppCommands("how long have we been driving").empty());
+  CHECK(ParseAppCommands("how far did we go").empty());
+  // The trip ahead still asks for the time left, past tense or not.
+  for (char const * said : {"how long until we get there", "how much longer", "how far is it", "how many miles left",
+                            "how far have we got to go", "how long did it say until we get there",
+                            "how long will it take", "how much longer do we have", "are we there yet"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == AppAction::TimeLeft;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(ok);
+    CHECK(WordsSupportTool(AppAction::TimeLeft, "", said));
+  }
+  // Places and turns are unchanged.
+  CHECK(Heard("how far to the next gas station", AppAction::FindAlongRoute));
+  CHECK(Heard("how far is my next turn", AppAction::NextTurn));
+}
+
+TEST(LaneExitAndWhichWayQuestionsSayTheNextTurn)
+{
+  // B158 (BI-140): exits, lanes and "left or right" are all the next maneuver; "what's this road called" is the road.
+  for (char const * said : {"which exit", "what exit do i take", "what's the next exit", "Which lane?",
+                            "what lane should i be in", "do i stay in this lane", "is it a left or a right",
+                            "left or right", "what\xE2\x80\x99s the next exit", "how far is the next exit"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == AppAction::NextTurn;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(ok);
+    CHECK(WordsSupportTool(AppAction::NextTurn, "", said));
+  }
+  for (char const * said : {"what's this road called", "what is this street called", "whats this road"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == AppAction::CurrentRoad;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(ok);
+    CHECK(WordsSupportTool(AppAction::CurrentRoad, "", said));
+  }
+  // Narration with left/right in it isn't a question.
+  for (char const * said : {"I left my phone at home", "turn left at the light", "you were right about that"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = std::none_of(c.begin(), c.end(), [](AppCommand const & x) { return x.action == AppAction::NextTurn; });
+    if (!ok)
+      std::printf("  \"%s\" heard next turn\n", said);
+    CHECK(ok);
+  }
+  CHECK(!WordsSupportTool(AppAction::NextTurn, "", "I left my phone at home"));
+  CHECK(Heard("avoid this road", AppAction::DifferentRoute));
+  CHECK(Heard("how long until we get there", AppAction::TimeLeft));
+}
+
+TEST(HedgedRoadAndZoomChatterIsNotAnOrder)
+{
+  // B159 (BI-141): a road preference or zoom put off to later, hoped for or promised is chatter. Driving safety:
+  // the route changes only on a clear order.
+  for (char const * said : {"i'll zoom in on that later", "no tolls on the way back i hope", "I will avoid highways next time",
+                            "maybe later we can avoid tolls", "we'll take the highway tomorrow", "hopefully no tolls",
+                            "I'm going to zoom out on that later", "I might avoid tolls", "we're gonna skip the highway"})
+  {
+    auto const c = ParseAppCommands(said);
+    if (!c.empty())
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(c.empty());
+  }
+  CHECK(!WordsSupportTool(AppAction::AvoidTolls, "", "maybe later we can avoid tolls"));
+  CHECK(!WordsSupportTool(AppAction::ZoomIn, "", "i'll zoom in on that later"));
+  CHECK(!WordsSupportTool(AppAction::AvoidHighways, "", "I will avoid highways next time"));
+  // Clear orders still fire.
+  auto const only = [](char const * said, AppAction action)
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == action;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    return ok;
+  };
+  CHECK(only("zoom in", AppAction::ZoomIn));
+  CHECK(only("can you zoom in", AppAction::ZoomIn));
+  CHECK(only("avoid tolls", AppAction::AvoidTolls));
+  CHECK(only("no tolls please", AppAction::AvoidTolls));
+  CHECK(only("Let's avoid tolls", AppAction::AvoidTolls));
+  CHECK(only("don't take the highway", AppAction::AvoidHighways));
+  CHECK(only("avoid highways on the way home", AppAction::AvoidHighways));
+  CHECK(WordsSupportTool(AppAction::AvoidTolls, "", "no tolls please"));
+  CHECK(WordsSupportTool(AppAction::ZoomIn, "", "can you zoom in"));
+  // Only the put-off clause is dropped.
+  auto const both = ParseAppCommands("Zoom in. I'll avoid tolls next time.");
+  CHECK_EQUAL(both.size(), size_t(1));
+  CHECK(!both.empty() && both[0].action == AppAction::ZoomIn);
 }

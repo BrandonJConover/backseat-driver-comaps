@@ -249,7 +249,8 @@ std::optional<Passenger> ParsePassengerAnswer(std::string const & spoken);
 std::optional<Passenger> MentionedPartner(std::string const & spoken);
 
 /// Which search result the driver meant: "the first one", "number two", "the closest", "the one on
-/// Main" (a word only that result's name has). `names` are the results read out, closest first.
+/// Main" (a word only that result's name has), "the middle one" (odd counts of 3+), "not the first one" /
+/// "not Shell" (the closest of the rest), "whichever" (the closest). `names` are the results read out, closest first.
 std::optional<size_t> ParseChoice(std::string const & spoken, std::vector<std::string> const & names);
 
 /// A voice the platform can speak in.

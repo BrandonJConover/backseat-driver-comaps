@@ -9,6 +9,7 @@
 #include <iterator>
 #include <map>
 #include <sstream>
+#include <string_view>
 
 namespace backseat
 {
@@ -115,6 +116,57 @@ bool NegatedAt(std::string const & words, std::vector<size_t> const & starts, si
       return true;
   }
   return false;
+}
+
+/// "I'll zoom in on that later", "no tolls on the way back I hope", "maybe later we can avoid tolls": a road
+/// preference or zoom put off to some other time is chatter, not an order. The clause around `at` (or the whole
+/// utterance when `at` is npos) says when ("later", "next time", "tomorrow", "someday"), hopes ("I hope",
+/// "hopefully") or puts a future "I'll"/"we will"/"I'm gonna" in the few words before the cue. "Can you zoom in",
+/// "no tolls please" and "let's avoid tolls" stay orders.
+bool DeferredAt(std::string const & words, std::vector<size_t> const & starts, size_t at)
+{
+  size_t from = 0, to = words.size();
+  if (at != std::string::npos)
+    for (size_t const s : starts)
+    {
+      if (s <= at)
+        from = std::max(from, s);
+      else
+        to = std::min(to, s + 1);
+    }
+  std::string const clause = " " + words.substr(from, to - from) + " ";
+  for (char const * when : {" later ", " next time ", " some other time ", " another time ", " tomorrow ",
+                            " someday ", " some day ", " eventually ",
+                            " i hope ", " hopefully ", " i wish ", " if only "})
+    if (clause.find(when) != std::string::npos)
+      return true;
+  std::vector<std::string> before;
+  if (at == std::string::npos)
+  {
+    std::istringstream in(clause);
+    for (std::string w; in >> w;)
+      before.push_back(w);
+  }
+  else
+    before = ClauseBefore(words, starts, at);
+  size_t const first = at == std::string::npos || before.size() <= 5 ? 0 : before.size() - 5;
+  for (size_t i = first; i < before.size(); ++i)
+  {
+    std::string const & w = before[i];
+    std::string const prev = i > 0 ? before[i - 1] : "";
+    if (w == "i'll" || w == "we'll" || w == "gonna" || w == "might" ||
+        (w == "will" && (prev == "i" || prev == "we")) ||
+        (w == "going" && i + 1 < before.size() && before[i + 1] == "to" &&
+         (prev == "i'm" || prev == "im" || prev == "we're" || prev == "were")))
+      return true;
+  }
+  return false;
+}
+
+bool DeferrableAction(AppAction action)
+{
+  return action == AppAction::AvoidTolls || action == AppAction::AllowTolls || action == AppAction::AvoidHighways ||
+         action == AppAction::AllowHighways || action == AppAction::ZoomIn || action == AppAction::ZoomOut;
 }
 
 /// A bare "go to"/"go home" is an order only at the start of a clause or after a word that asks:
@@ -496,6 +548,29 @@ std::pair<size_t, std::string> HowFarToPlace(std::string const & words, char con
       return {ask, kind};
   return {0, {}};
 }
+
+/// "How long have we been driving?", "how far did we go?", "how long was that meeting?": the trip so far (or
+/// anything else in the past), not the time LEFT. Still the trip ahead when it says what's left ("how far have we
+/// got to go", "how long did it say until we get there"). `words` is CommandWords output.
+bool PastTenseTripQuestion(std::string const & words)
+{
+  size_t ask = std::string::npos;
+  for (char const * how : {" how long ", " how far ", " how much longer ", " how much further ", " how much farther ",
+                           " how many miles ", " how many more miles ", " how many kilometers ", " how many minutes ",
+                           " how many hours "})
+    ask = std::min(ask, words.find(how));
+  if (ask == std::string::npos)
+    return false;
+  for (char const * ahead : {" left ", " to go ", " remaining ", " until ", " till ", " til ", " got ", " say ",
+                             " said ", " get there ", " arrive ", " will ", " do we ", " is it "})
+    if (words.find(ahead, ask) != std::string::npos)
+      return false;
+  for (char const * past : {" did ", " was ", " were ", " have we ", " have i ", " has it ", " had we ", " we've ",
+                            " i've ", " weve ", " ive ", " been ", " so far "})
+    if (words.find(past, ask) != std::string::npos)
+      return true;
+  return false;
+}
 }  // namespace
 
 std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
@@ -532,7 +607,12 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       {AppAction::NextTurn, {" what's the next turn ", " whats the next turn ", " what is the next turn ",
                              " where do i turn ", " when do i turn ", " when's my next turn ", " whens my next turn ",
                              " what's my next turn ", " whats my next turn ", " what's the next direction ",
-                             " whats the next direction ", " next direction "}},
+                             " whats the next direction ", " next direction ",
+                             // Exits, lanes and which way: all answered by saying the next maneuver out loud.
+                             " which exit ", " what exit ", " what's the next exit ", " whats the next exit ",
+                             " what is the next exit ", " which lane ", " what lane ", " stay in this lane ",
+                             " is it a left or a right ", " is it left or right ", " left or right ",
+                             " right or left "}},
       {AppAction::BeNicer, {" be nicer ", " be nice ", " nicer to me ", " stop being mean ", " stop being so mean ", " be kinder "}},
       {AppAction::BeMeaner, {" be meaner ", " be mean ", " meaner to me ", " be more mean "}},
       {AppAction::GradeSoFar, {" grade me ", " grade so far ", " what's my grade ", " whats my grade ", " how am i doing ",
@@ -554,14 +634,26 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       {AppAction::CurrentSpeed, {" how fast am i ", " how fast are we ", " what's my speed ", " whats my speed ",
                                  " what is my speed ", " what speed am i "}},
       {AppAction::CurrentRoad, {" what road ", " what street ", " which road ", " which street ", " what highway ",
-                                " road is this ", " street is this "}},
+                                " road is this ", " street is this ", " this road called ", " this street called ",
+                                " what's this road ", " whats this road ", " what is this road ", " what's this street ",
+                                " whats this street ", " what is this street "}},
       {AppAction::ArrivalTime, {" what time will we ", " what time will i ", " what time do we ", " what time do i ",
                                 " when will we arrive ", " when will i arrive ", " arrival time ", " what's our arrival ",
                                 " whats our arrival "}},
       {AppAction::DifferentRoute, {" different route ", " another route ", " other route ", " better route ",
                                    " alternate route ", " alternative route ", " another way ", " different way ",
                                    " reroute ", " re route ", " faster route ", " quicker route ", " shorter route ",
-                                   " faster way ", " quicker way "}},
+                                   " faster way ", " quicker way ",
+                                   // A closure said out loud is a reroute: the driver can't do anything else with it.
+                                   " the road is closed ", " the road's closed ", " this road is closed ",
+                                   " this road's closed ", " road is closed ", " road's closed ", " road closed ahead ",
+                                   " the road is blocked ", " the road's blocked ", " this road is blocked ",
+                                   " this road's blocked ", " road is blocked ", " road's blocked ", " road closure ",
+                                   " the bridge is out ", " the bridge is closed ", " the bridge's out ",
+                                   " the exit is closed ", " the exit's closed ", " the ramp is closed ",
+                                   " the ramp's closed ", " exit is closed ", " ramp is closed ", " we can't go this way ",
+                                   " we cant go this way ", " can't go this way ", " cant go this way ",
+                                   " avoid this road ", " there's a detour ", " theres a detour ", " there is a detour "}},
       {AppAction::TakeMeBack, {" take me back ", " take us back ", " go back to where ", " head back ",
                                " back where we started ", " back to the start "}},
       {AppAction::TimeLeft, {" how long ", " how much longer ", " are we there yet ", " time left ", " when will we get ",
@@ -639,6 +731,10 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                                              " i didn't catch that ", " didnt catch that ", " i didnt catch that "};
     if (std::any_of(std::begin(kSayAgain), std::end(kSayAgain), [&whole](char const * s) { return whole == s; }))
       found.push_back({0, AppCommand{AppAction::RepeatInstruction, {}}});
+    // "Road closed!" said on its own is a closure; "the road closed last year" is history.
+    for (char const * closed : {" road closed ", " road blocked ", " roads closed ", " detour ", " detour ahead "})
+      if (whole == closed)
+        found.push_back({0, AppCommand{AppAction::DifferentRoute, {}}});
     // "Speed limit?" said on its own asks for it; "the speed limit here is silly" is chatter.
     for (char const * limit : {" speed limit ", " the speed limit ", " speed limit here "})
       if (whole == limit)
@@ -700,6 +796,9 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       if (!heardAction(AppAction::FindAlongRoute))
         found.push_back({place.first, AppCommand{AppAction::FindAlongRoute, place.second}});
     }
+  // "How long have we been driving?", "how far did we go?": the trip so far isn't the time left.
+  if (heardAction(AppAction::TimeLeft) && PastTenseTripQuestion(words))
+    drop(AppAction::TimeLeft);
   if (words.find(" back to ") != std::string::npos && words.find(" back to where ") == std::string::npos &&
       words.find(" back to the start ") == std::string::npos)
     drop(AppAction::TakeMeBack);
@@ -778,6 +877,9 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   for (auto & f : found)
     if (auto const flip = opposite(f.second.action); flip != AppAction::Count && NegatedAt(words, starts, f.first))
       f.second.action = flip;
+  // "I'll zoom in on that later", "maybe later we can avoid tolls": put off, not asked for now.
+  found.erase(std::remove_if(found.begin(), found.end(), [&](auto const & f)
+  { return DeferrableAction(f.second.action) && DeferredAt(words, starts, f.first); }), found.end());
   // "Don't cancel the route", "I don't want to go to work": heard, but not asked for.
   found.erase(std::remove_if(found.begin(), found.end(), [&](auto const & f)
   { return opposite(f.second.action) == AppAction::Count && NegatedAt(words, starts, f.first); }), found.end());
@@ -954,6 +1056,8 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
     }
     return big > 0 && found * 2 >= big;
   };
+  if (DeferrableAction(action) && DeferredAt(CommandWords(spoken), {0}, std::string::npos))
+    return false;
   switch (action)
   {
   case AppAction::NavigateTo:
@@ -964,6 +1068,8 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::Unmute: return saidAny({"unmute", "un", "talk", "speak", "sound", "back"});
   case AppAction::RepeatInstruction: return saidAny({"repeat", "again", "what", "what's", "whats", "next", "where"});
   case AppAction::TimeLeft:
+    if (PastTenseTripQuestion(CommandWords(spoken)))
+      return false;
     return saidAny({"long", "far", "eta", "time", "when", "there", "minutes", "left", "longer", "further", "farther",
                     "miles", "kilometers", "distance", "remaining"});
   case AppAction::ReportPolice: return saidAny({"police", "cop", "cops", "pulled", "pulling", "trooper", "sheriff", "officer"});
@@ -991,10 +1097,12 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::SpeedLimit: return saidAny({"limit"}) || saidAny({"fast"});
   case AppAction::CurrentSpeed: return saidAny({"fast", "speed"});
   case AppAction::CurrentRoad: return saidAny({"road", "street", "highway"});
-  case AppAction::NextTurn: return saidAny({"turn", "direction"});
+  case AppAction::NextTurn: return saidAny({"turn", "direction", "exit", "lane"}) || (saidAny({"left"}) && saidAny({"right"}));
   case AppAction::ArrivalTime: return saidAny({"time", "arrive", "arrival"});
   case AppAction::DifferentRoute:
-    return saidAny({"reroute"}) || (saidAny({"route", "way"}) && saidAny({"different", "another", "other", "better", "alternate",
+    return saidAny({"reroute", "closed", "blocked", "detour", "closure"}) ||
+           (saidAny({"bridge"}) && saidAny({"out"})) || (saidAny({"avoid"}) && saidAny({"road"})) ||
+           (saidAny({"can't", "cant"}) && saidAny({"way"})) || (saidAny({"route", "way"}) && saidAny({"different", "another", "other", "better", "alternate",
                                                                          "alternative", "faster", "quicker", "shorter", "re"}));
   case AppAction::TakeMeBack: return saidAny({"back", "start"});
   case AppAction::BeNicer: return saidAny({"nice", "nicer", "kinder", "mean"});
@@ -1498,12 +1606,19 @@ std::optional<Passenger> ParsePassengerAnswer(std::string const & spoken)
   return {};
 }
 
-std::optional<size_t> ParseChoice(std::string const & spoken, std::vector<std::string> const & names)
+namespace
 {
-  if (names.empty())
-    return {};
-  std::string const words = CommandWords(spoken);
+/// ParseChoice on words already run through CommandWords, without negation or "whichever".
+std::optional<size_t> PlainChoice(std::string const & words, std::vector<std::string> const & names)
+{
   auto const has = [&words](char const * w) { return words.find(w) != std::string::npos; };
+  // "The middle one" only means something for 3, 5... results; never let its " one " pick the first.
+  if (has(" middle "))
+  {
+    if (names.size() >= 3 && names.size() % 2 == 1)
+      return names.size() / 2;
+    return {};
+  }
   static std::vector<std::vector<char const *>> const kOrdinals = {
       {" first ", " number one ", " one ", " 1 ", " 1st ", " top "},
       {" second ", " number two ", " two ", " 2 ", " 2nd "},
@@ -1541,11 +1656,40 @@ std::optional<size_t> ParseChoice(std::string const & spoken, std::vector<std::s
   }
   if (byName && matches == 1)
     return byName;
+  // A bare " one " is in "the second one" too, so it only means the first when nothing else is said.
   for (size_t i = 0; i < kOrdinals.size() && i < names.size(); ++i)
     for (char const * o : kOrdinals[i])
-      if (has(o))
+      if (std::string_view(o) != " one " && has(o))
         return i;
+  if (has(" one "))
+    return 0;
   return {};
+}
+}  // namespace
+
+std::optional<size_t> ParseChoice(std::string const & spoken, std::vector<std::string> const & names)
+{
+  if (names.empty())
+    return {};
+  std::string const words = CommandWords(spoken);
+  // "Not the first one", "not Shell", "anything but the last": drop that one, take the closest left.
+  for (char const * cue : {" not ", " anything but ", " anything except ", " other than ", " except ", " besides "})
+  {
+    auto const at = words.find(cue);
+    if (at == std::string::npos)
+      continue;
+    // "Not sure", "not bad": nothing named after the cue is no choice at all.
+    auto const excluded = PlainChoice(words.substr(at + std::string(cue).size() - 1), names);
+    if (!excluded || names.size() < 2)
+      return {};
+    return *excluded == 0 ? size_t(1) : size_t(0);
+  }
+  for (char const * any : {" whichever ", " either one ", " either ", " any of them ", " any one ", " anyone ",
+                           " doesn't matter ", " doesnt matter ", " don't care ", " dont care ", " you pick ",
+                           " you choose ", " surprise me "})
+    if (words.find(any) != std::string::npos)
+      return 0;
+  return PlainChoice(words, names);
 }
 
 int CountVoiceName(std::string const & spoken, std::string const & name)

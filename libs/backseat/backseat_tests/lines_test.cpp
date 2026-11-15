@@ -743,3 +743,43 @@ TEST(RecurringDriveKeysHaveThickUpperTiers)
     for (auto const & line : LinesFor("lastExit", tier))
       CHECK(line.find("{distance}") != std::string::npos || line.find("{DISTANCE}") != std::string::npos);
 }
+
+TEST(StreakAndBlameKeysHaveThickUpperTiers)
+{
+  // Loop B155 (BI-128 batch 2): streak, redemption, GPS-back, hot-groceries and arrival-blame keys had one shout
+  // each, so every long clean streak or every lost signal ended on the same line. Every tier now has at least four
+  // lines, nothing repeats a lower tier, the top tier shouts, and the street keys still name the street.
+  auto const & data = LineData();
+  for (char const * key : {"turnCompleted.streak6", "turnCompleted.streak10", "turnCompleted.streakBig",
+                           "turnCompleted.redemption", "gps.back", "hot.groceries", "arrived.blame"})
+  {
+    auto const it = data.find(key);
+    CHECK(it != data.end());
+    if (it == data.end())
+      continue;
+    for (int tier = 0; tier < 3; ++tier)
+    {
+      if (it->second[tier].size() < 4)
+        std::printf("    %s tier %d has %zu lines\n", key, tier, it->second[tier].size());
+      CHECK(it->second[tier].size() >= 4);
+    }
+    CHECK_EQUAL(CrossTierRepeats(it->second, true), 0);
+    for (auto const & line : it->second[2])
+    {
+      bool shouts = false;
+      for (size_t i = 0; i + 2 < line.size(); ++i)
+        shouts = shouts || (std::isupper(static_cast<unsigned char>(line[i])) &&
+                            std::isupper(static_cast<unsigned char>(line[i + 1])) &&
+                            std::isupper(static_cast<unsigned char>(line[i + 2])));
+      CHECK(shouts);
+    }
+  }
+  // The street keys always say which street, and the big streak always says the count.
+  for (char const * key : {"turnCompleted.redemption", "arrived.blame"})
+    for (int tier = 0; tier < 3; ++tier)
+      for (auto const & line : LinesFor(key, tier))
+        CHECK(line.find("{street}") != std::string::npos || line.find("{STREET}") != std::string::npos);
+  for (int tier = 0; tier < 3; ++tier)
+    for (auto const & line : LinesFor("turnCompleted.streakBig", tier))
+      CHECK(line.find("{n}") != std::string::npos || line.find("{N}") != std::string::npos);
+}

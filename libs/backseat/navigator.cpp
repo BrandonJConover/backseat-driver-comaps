@@ -1691,10 +1691,11 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     if (missed)
       SayMissedTurn(t, std::exchange(missed, std::nullopt)->unseen);
   };
-  // Back before the joke was due. It still counts, quietly.
+  // Back before the joke was due. It still counts, quietly, and so does the detour (jam blame).
   if (std::exchange(m_rerouteRoastDueAt, std::nullopt))
   {
     ++m_reroutes;
+    m_engine->NoteDetour(t);
     Say(m_engine->OnNav(NavEvent::Rerouted(t, true)));
   }
 
@@ -1829,6 +1830,7 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   config.saidLog = &m_said;
   config.speechAware = true;
   config.confirmWrongTurns = true;
+  config.trafficBlameNeedsDetour = true;
   if (config.speedingRenagMaxMs == 0)
     config.speedingRenagMaxMs = kSpeedingRenagMaxMs;
   if (config.implausibleMps2 == 0)
@@ -2016,6 +2018,9 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
     if (verdict.key == "sketch.slower")
       m_sketchMinutesLost = verdict.minutes;
   }
+  // Their own, slower route over mine: a jam on it is their doing, the whole trip.
+  if (m_sketchMinutesLost > 0)
+    m_engine->NoteDetour(t, true);
   // The first trip's rundown is a speed run: every turn, rattled off, then a request for music.
   // After that, a drawn route gets "We're doing your route" instead of the rundown.
   if (askWalk)
@@ -3139,6 +3144,16 @@ bool Navigator::Parked() const
 
 std::vector<std::string> Navigator::RoadFit(std::string const & key, std::vector<std::string> options) const
 {
+  // Followed the directions into this jam: no "I told you so" about the road.
+  if (key == "traffic.standstill" && m_engine && !m_engine->JamBlamesRoute())
+  {
+    std::vector<std::string> fair;
+    for (auto const & l : options)
+      if (!LineBlamesRoute(l))
+        fair.push_back(l);
+    if (!fair.empty())
+      options = std::move(fair);
+  }
   if (key != "straight.later" && key != "traffic.standstill")
     return options;
   std::optional<bool> const motorway = m_road.OnMotorway();
