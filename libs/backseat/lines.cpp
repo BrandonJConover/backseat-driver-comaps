@@ -1,6 +1,7 @@
 #include "backseat/lines.hpp"
 
 #include "backseat/debug_log.hpp"
+#include "backseat/pick_index.hpp"
 
 #include "backseat/lines_data.hpp"
 #include "backseat/pronunciation.hpp"
@@ -594,7 +595,7 @@ std::string const & SaidLog::Pick(std::string const & key, std::vector<std::stri
   if (fresh.empty())
     for (auto const & l : options)
       fresh.push_back(&l);
-  std::string const & line = *fresh[std::min(fresh.size() - 1, static_cast<size_t>(std::floor(r * fresh.size())))];
+  std::string const & line = *fresh[PickIndex(r, fresh.size())];
   recent.erase(std::remove(recent.begin(), recent.end(), line), recent.end());
   recent.push_back(line);
   size_t const keep = std::min(kSaidKeep, options.size() - 1);

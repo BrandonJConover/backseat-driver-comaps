@@ -1,6 +1,7 @@
 #include "backseat/engine.hpp"
 
 #include "backseat/debug_log.hpp"
+#include "backseat/pick_index.hpp"
 
 #include "backseat/lines.hpp"
 #include "backseat/units.hpp"
@@ -1372,7 +1373,7 @@ std::string CritiqueEngine::Pick(std::string const & key, int tier)
     if (std::find(recent.begin(), recent.end(), l) == recent.end())
       fresh.push_back(l);
   auto const & pool = fresh.empty() ? options : fresh;
-  std::string const line = pool[static_cast<size_t>(std::floor(m_config.rng() * pool.size()))];
+  std::string const line = pool[PickIndex(m_config.rng(), pool.size())];
   // Remember up to 2 recent lines, but always leave at least one fresh option.
   // (Like JS slice(-n), keeping "the last 0" keeps everything.)
   recent.push_back(line);

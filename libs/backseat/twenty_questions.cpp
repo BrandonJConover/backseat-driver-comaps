@@ -1,5 +1,6 @@
 #include "backseat/twenty_questions.hpp"
 
+#include "backseat/pick_index.hpp"
 #include "backseat/plate_game.hpp"
 #include "backseat/types.hpp"
 
@@ -691,7 +692,7 @@ void TwentyQuestions::Pick(std::set<std::string> const & nearby, bool night)
     options = pool(false, true);
   if (options.empty())
     options = pool(false, false);
-  m_thing = options[std::min(options.size() - 1, static_cast<size_t>(roll() * options.size()))];
+  m_thing = options[PickIndex(roll(), options.size())];
   m_log.recent.push_back(kThings[m_thing].name);
   while (m_log.recent.size() > kRecentKeep)
     m_log.recent.pop_front();
@@ -790,7 +791,7 @@ TwentyQuestions::Reply TwentyQuestions::Answered(TwentyHeard const & heard, int 
     }
     if (fresh.empty())
       return Make("twenty.noHint", tier);
-    Trait const t = fresh[std::min(fresh.size() - 1, static_cast<size_t>((m_rng ? m_rng() : 0) * fresh.size()))];
+    Trait const t = fresh[PickIndex(m_rng ? m_rng() : 0, fresh.size())];
     m_askedTraits.insert(static_cast<int>(t) * 2);
     m_asked++;
     r = Make("twenty.hint", tier, {{"fact", Fact(t)}});
@@ -953,6 +954,6 @@ std::string TwentyQuestions::Line(std::string const & key, int tier)
     return m_picker(key, tier);
   auto const & options = LinesFor(key, tier);
   double const r = m_rng ? m_rng() : 0;
-  return options[std::min(options.size() - 1, static_cast<size_t>(r * options.size()))];
+  return options[PickIndex(r, options.size())];
 }
 }  // namespace backseat

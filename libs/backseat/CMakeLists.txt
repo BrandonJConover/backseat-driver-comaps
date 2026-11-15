@@ -23,6 +23,7 @@ set(
   lines.hpp
   lines_data.cpp
   lines_data.hpp
+  pick_index.hpp
   mileage.cpp
   mileage.hpp
   navigator.cpp

@@ -41,6 +41,7 @@ add_executable(${PROJECT_NAME}
   report_test.cpp
   report_speed_test.cpp
   report_cache_test.cpp
+  rng_pick_test.cpp
   listen_speed_test.cpp
   achievements_test.cpp
   rundown_test.cpp

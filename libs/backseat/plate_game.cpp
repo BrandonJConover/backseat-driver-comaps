@@ -1,6 +1,7 @@
 #include "backseat/plate_game.hpp"
 
 #include "backseat/lines.hpp"
+#include "backseat/pick_index.hpp"
 #include "backseat/voice_command.hpp"
 
 #include <algorithm>
@@ -610,7 +611,7 @@ std::string PlateGame::Pick(std::string const & key, int tier)
   if (fresh.empty())
     fresh = options;
   double const r = m_rng ? m_rng() : 0;
-  std::string const & line = fresh[std::min(fresh.size() - 1, static_cast<size_t>(r * fresh.size()))];
+  std::string const & line = fresh[PickIndex(r, fresh.size())];
   m_lastPicked[key] = line;
   return line;
 }

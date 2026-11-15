@@ -1,6 +1,7 @@
 #include "backseat/history.hpp"
 
 #include "backseat/lines.hpp"
+#include "backseat/pick_index.hpp"
 #include "backseat/units.hpp"
 
 #include <algorithm>
@@ -225,11 +226,9 @@ TripPrediction PredictTrip(std::vector<TripRecord> const & history, TripPlan con
   {
     auto const big = kBigger.find(&lines);
     if (said && big != kBigger.end())
-      return said->Pick(big->second.first, big->second.second, rng());
-    // Same clamp as SaidLog::Pick: NaN or negative -> first line, 1 or more -> last (was out of bounds).
-    double const r = rng();
-    size_t const i = r > 0 ? static_cast<size_t>(std::floor(std::min(r, 1.0) * lines.size())) : 0;
-    return lines[std::min(i, lines.size() - 1)];
+      return said->Pick(big->second.first, big->second.second, rng ? rng() : 0);
+    // NaN or negative -> first line, 1 or more -> last (was out of bounds).
+    return lines[PickIndex(rng ? rng() : 0, lines.size())];
   };
 
   TripPrediction p;

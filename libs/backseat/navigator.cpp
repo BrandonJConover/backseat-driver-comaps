@@ -3,6 +3,7 @@
 #include "backseat/debug_log.hpp"
 #include "backseat/lines.hpp"
 #include "backseat/lines_data.hpp"
+#include "backseat/pick_index.hpp"
 #include "backseat/route_sketch.hpp"
 #include "backseat/rundown.hpp"
 #include "backseat/twenty_questions.hpp"
@@ -2439,7 +2440,7 @@ std::string Navigator::OutdoorBit(double r) const
   add("outdoors.oppressed", true);
   if (keys.empty())
     return {};
-  return keys[std::min(keys.size() - 1, static_cast<size_t>(r * keys.size()))];
+  return keys[PickIndex(r, keys.size())];
 }
 
 void Navigator::SayOutdoorBit(double t, std::string const & key)

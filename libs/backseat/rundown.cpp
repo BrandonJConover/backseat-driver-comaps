@@ -1,5 +1,6 @@
 #include "backseat/rundown.hpp"
 
+#include "backseat/pick_index.hpp"
 #include "backseat/report.hpp"
 
 #include <algorithm>
@@ -65,10 +66,8 @@ std::vector<std::string> const kReturnGreetings = {
 
 std::string const & PickFrom(std::vector<std::string> const & xs, Rng const & rng)
 {
-  // Same clamp as SaidLog::Pick: NaN or negative -> first, 1 or more -> last (was out of bounds).
-  double const r = rng();
-  size_t const i = r > 0 ? static_cast<size_t>(std::floor(std::min(r, 1.0) * xs.size())) : 0;
-  return xs[std::min(i, xs.size() - 1)];
+  // NaN or negative -> first, 1 or more -> last (was out of bounds).
+  return xs[PickIndex(rng ? rng() : 0, xs.size())];
 }
 
 std::string Join(std::vector<std::string> const & parts, std::string const & sep)
