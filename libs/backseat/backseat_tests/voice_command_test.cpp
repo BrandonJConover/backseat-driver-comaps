@@ -322,6 +322,39 @@ TEST(SearchChoicesAreHeard)
   CHECK(!ParseChoice("first", {}));
 }
 
+TEST(SearchChoicesHearMiddleNegationAndWhichever)
+{
+  std::vector<std::string> const three = {"Shell", "Speedway Gas", "Circle K on Main"};
+  CHECK(ParseChoice("the middle one", three) == size_t(1));
+  CHECK(ParseChoice("the second one", three) == size_t(1));
+  CHECK(ParseChoice("the third one", three) == size_t(2));
+  CHECK(ParseChoice("that one", three) == size_t(0));
+  CHECK(ParseChoice("not the first one", three) == size_t(1));
+  CHECK(ParseChoice("not that one", three) == size_t(1));
+  CHECK(ParseChoice("not Shell", three) == size_t(1));
+  CHECK(ParseChoice("not the last one", three) == size_t(0));
+  CHECK(ParseChoice("not the middle one", three) == size_t(0));
+  CHECK(ParseChoice("anything but Speedway", three) == size_t(0));
+  CHECK(ParseChoice("whichever", three) == size_t(0));
+  CHECK(ParseChoice("either one", three) == size_t(0));
+  CHECK(ParseChoice("any of them", three) == size_t(0));
+  CHECK(ParseChoice("it doesn't matter", three) == size_t(0));
+  CHECK(ParseChoice("the one on Main", three) == size_t(2));
+  CHECK(!ParseChoice("not sure", three));
+  CHECK(!ParseChoice("hmm", three));
+  std::vector<std::string> const two = {"Shell", "Speedway Gas"};
+  CHECK(!ParseChoice("the middle one", two));
+  CHECK(ParseChoice("not the first one", two) == size_t(1));
+  CHECK(ParseChoice("not that one", two) == size_t(1));
+  CHECK(ParseChoice("whichever", two) == size_t(0));
+  CHECK(!ParseChoice("not that one", {"Shell"}));
+  std::vector<std::string> const four = {"Shell", "Speedway Gas", "Circle K", "Sinclair"};
+  CHECK(!ParseChoice("the middle one", four));
+  CHECK(ParseChoice("not the second one", four) == size_t(0));
+  CHECK(ParseChoice("doesn't matter", four) == size_t(0));
+  CHECK(ParseChoice("number four", four) == size_t(3));
+}
+
 TEST(HandEditedProfileIsCalledOut)
 {
   DriverProfile const before{"Brandon", "he", "34"};
