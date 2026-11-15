@@ -381,13 +381,30 @@ struct LongDriveRemark
 LongDriveRemark constexpr kLongDriveRemarks[] = {
     {20, "longDrive.posture"}, {50, "longDrive.smell"}, {90, "longDrive.metal"}};
 double constexpr kLongDriveQuietM = 1000;
-/// Traffic: judged over this window, a crawl is under kCrawlShare of the limit on average,
-/// and it's over once the average is back above kClearShare.
+/// Traffic: a crawl is under kCrawlShare of the road's speed on average, and it's over once the
+/// average is back above kClearShare. Judged over kTrafficQuickMs, so a highway that locks up is
+/// called within about half a minute, except where waiting is normal (a red light ahead, the next
+/// turn's queue): there it takes the whole kTrafficWindowMs, longer than any light.
 double constexpr kTrafficWindowMs = 90000;
+double constexpr kTrafficQuickMs = 30000;
 double constexpr kCrawlShare = 0.3;
 double constexpr kClearShare = 0.6;
 /// Only roads at least this fast count; crawling down a 25 mph street is just driving.
 double constexpr kTrafficMinLimitMps = 15;  // ~34 mph
+/// Many roads have no posted limit on the map. Then the pace the driver was keeping stands in,
+/// once it's highway-ish: rises within seconds, settles over a couple of minutes on a slower road.
+double constexpr kTrafficMinCruiseMps = 20;  // ~45 mph
+double constexpr kCruiseRiseMs = 5000;
+double constexpr kCruiseSettleMs = 120000;
+/// Stopped or barely creeping says nothing about the road's speed, so the pace holds.
+double constexpr kCruiseHoldBelowMps = 3;
+/// A dead stop (never creeping since) reads as a jam quickly only on a road this fast; slower than
+/// that it could be pulling over, which has its own lines (TrackStop).
+double constexpr kFreewayMps = 24.5;  // ~55 mph
+/// Stopped this close before the next maneuver is waiting to turn, not a jam (yet).
+double constexpr kTurnQueueM = 150;
+/// How far ahead along the route a red light's queue can reach.
+double constexpr kLightQueueAheadM = 180;
 double constexpr kTrafficClearedChance = 0.5;
 
 double DistanceM(LatLon const & a, LatLon const & b)
@@ -731,40 +748,127 @@ void Navigator::TrackStop(Fix const & fix, RouteSnapshot const & route)
   }
 }
 
+namespace
+{
+/// The point `m` meters from `from` heading `bearingDeg`; flat-earth, fine for a few hundred meters.
+LatLon PointAhead(LatLon const & from, double bearingDeg, double m)
+{
+  double constexpr kMPerDegLat = 111320;
+  double const rad = bearingDeg * M_PI / 180;
+  return {from.lat + m * std::cos(rad) / kMPerDegLat,
+          from.lon + m * std::sin(rad) / (kMPerDegLat * std::cos(from.lat * M_PI / 180))};
+}
+}  // namespace
+
+bool Navigator::WaitingIsNormal(Fix const & fix, RouteSnapshot const & route) const
+{
+  if (route.distToTurnM > 0 && route.distToTurnM < kTurnQueueM)
+    return true;
+  if (!m_lightLookup)
+    return false;
+  LatLon const here{fix.lat, fix.lon};
+  if (m_lightLookup(here))
+    return true;
+  double const bearing = route.routeBearingDeg >= 0 ? route.routeBearingDeg : fix.bearingDeg;
+  if (bearing < 0)
+    return false;
+  // The lookup covers a light's whole queue around a point, so a few points reach the light.
+  for (double m = 60; m <= kLightQueueAheadM; m += 60)
+    if (m_lightLookup(PointAhead(here, bearing, m)))
+      return true;
+  return false;
+}
+
 void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
 {
-  if (route.state != RouteState::OnRoute || !fix.speedLimitMps || *fix.speedLimitMps < kTrafficMinLimitMps)
+  double const mps = std::max(0.0, fix.speedMps);
+  // The driver's own pace, for roads the map has no limit for. Held while in a jam or stopped, or
+  // it would sink to the jam's speed and call the jam cleared.
+  if (!m_inTraffic && fix.speedMps >= 0)
+  {
+    double const dt = m_cruiseT < 0 ? 0 : std::clamp(fix.tMs - m_cruiseT, 0.0, 5000.0);
+    if (m_cruiseT < 0)
+      m_cruiseMps = mps;
+    else if (mps > m_cruiseMps)
+      m_cruiseMps += (mps - m_cruiseMps) * std::min(1.0, dt / kCruiseRiseMs);
+    else if (mps >= kCruiseHoldBelowMps)
+      m_cruiseMps -= (m_cruiseMps - mps) * std::min(1.0, dt / kCruiseSettleMs);
+    m_cruiseT = fix.tMs;
+  }
+  std::optional<double> roadMps = fix.speedLimitMps;
+  if (!roadMps && m_cruiseMps >= kTrafficMinCruiseMps)
+    roadMps = m_cruiseMps;
+  if (route.state != RouteState::OnRoute || !roadMps || *roadMps < kTrafficMinLimitMps)
   {
     m_speeds.clear();
     return;
   }
-  m_speeds.push_back({fix.tMs, std::max(0.0, fix.speedMps), *fix.speedLimitMps});
+  m_speeds.push_back({fix.tMs, mps, *roadMps});
   while (!m_speeds.empty() && fix.tMs - m_speeds.front().t > kTrafficWindowMs)
     m_speeds.erase(m_speeds.begin());
-  // Need most of a window before judging.
-  if (fix.tMs - m_speeds.front().t < kTrafficWindowMs * 0.8)
-    return;
-  double speed = 0;
-  double limit = 0;
-  for (auto const & s : m_speeds)
+  // Share of the road's speed over the last `windowMs`; empty without most of a window to judge.
+  // `deadStop`: the car stopped in that window and hasn't moved since.
+  bool deadStop = false;
+  auto const shareOver = [&](double windowMs) -> std::optional<double>
   {
-    speed += s.mps;
-    limit += s.limitMps;
-  }
-  double const share = speed / limit;
-  if (!m_inTraffic && share < kCrawlShare)
+    double speed = 0;
+    double limit = 0;
+    double first = fix.tMs;
+    bool stopped = false;
+    deadStop = false;
+    for (auto const & s : m_speeds)
+    {
+      if (fix.tMs - s.t > windowMs)
+        continue;
+      first = std::min(first, s.t);
+      speed += s.mps;
+      limit += s.limitMps;
+      if (s.mps < kStoppedMps)
+        stopped = deadStop = true;
+      else if (stopped)
+        deadStop = false;
+    }
+    if (fix.tMs - first < windowMs * 0.8 || limit <= 0)
+      return {};
+    return speed / limit;
+  };
+  auto const quick = shareOver(kTrafficQuickMs);
+  if (!m_inTraffic)
   {
+    bool crawl = false;
+    char const * why = "";
+    // Stock still since stopping, right after serious speeding, is the police (TrackStop).
+    bool const police = m_lastBadSpeedingT && fix.tMs - *m_lastBadSpeedingT < kPoliceAfterSpeedingMs;
+    bool const mightBePullingOver = deadStop && (*roadMps < kFreewayMps || police);
+    if (quick && *quick < kCrawlShare && !mightBePullingOver && !WaitingIsNormal(fix, route))
+    {
+      crawl = true;
+      why = "quick";
+    }
+    else if (auto const slow = shareOver(kTrafficWindowMs); slow && *slow < kCrawlShare)
+    {
+      crawl = true;
+      why = "window";
+    }
+    if (!crawl)
+      return;
     m_inTraffic = true;
     m_stopGo.Reset();
+    Trace("traffic", {{"jam", "1"},
+                      {"why", why},
+                      {"share", LogNum(quick.value_or(-1), 2)},
+                      {"road_mph", LogNum(*roadMps * 2.23694, 0)},
+                      {"posted", fix.speedLimitMps ? "1" : "0"}});
     std::optional<std::string> alternate;
     if (m_alternateLookup)
       alternate = m_alternateLookup({fix.lat, fix.lon});
     Say(m_engine->OnNav(NavEvent::Traffic(fix.tMs, true, alternate)));
   }
-  else if (m_inTraffic && share > kClearShare)
+  else if (quick && *quick > kClearShare)
   {
     m_inTraffic = false;
     m_stopGo.Reset();
+    Trace("traffic", {{"jam", "0"}, {"share", LogNum(*quick, 2)}});
     Say(m_engine->OnNav(NavEvent::Traffic(fix.tMs, false)));
     // "Traffic's clearing up. Try to act like you've done this before." Half the time.
     if ((m_config.rng ? m_config.rng() : 0) < kTrafficClearedChance)
@@ -2051,6 +2155,8 @@ void Navigator::ResetTrip()
   m_stopSince.reset();
   m_speeds.clear();
   m_inTraffic = false;
+  m_cruiseMps = 0;
+  m_cruiseT = -1;
   m_heldPlateLines.clear();
   m_twenty.NewTrip();
   m_heldTwentyLines.clear();

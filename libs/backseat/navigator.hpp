@@ -413,6 +413,8 @@ private:
   void SayNav(double tMs, std::string const & text, double voiceSpeed = 1.0);
   void TrackStop(Fix const & fix, RouteSnapshot const & route);
   void TrackTraffic(Fix const & fix, RouteSnapshot const & route);
+  /// A red light or the next turn is right ahead, where sitting still for a while is normal.
+  bool WaitingIsNormal(Fix const & fix, RouteSnapshot const & route) const;
   void ResetTrip();
   /// A maneuver was done: counts lefts in a row and unlocks NASCAR Driver on the third.
   void CountLefts(double t);
@@ -712,6 +714,10 @@ private:
   };
   std::vector<SpeedSample> m_speeds;
   bool m_inTraffic = false;
+  /// The pace the driver was keeping (stands in for a missing posted limit), and when it was last
+  /// updated. Held still while in a jam.
+  double m_cruiseMps = 0;
+  double m_cruiseT = -1;
   StopGo m_stopGo;
   AlternateLookup m_alternateLookup;
 

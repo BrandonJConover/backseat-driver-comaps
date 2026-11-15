@@ -321,6 +321,112 @@ TEST(NavigatorLeavesSlowSideStreetsAlone)
   CHECK(!Has(nav.TakeLines(), Category::Traffic));
 }
 
+namespace
+{
+/// Cruise at `mph` for two minutes, then sit still; seconds into the stop until a traffic line
+/// (-1 if none within `stopSeconds`). Whether a pull-over line came first lands in `pulledOver`.
+int SecondsToJamCall(Navigator & nav, RouteSnapshot const & r, double mph, std::optional<double> limit,
+                     int stopSeconds, bool * pulledOver = nullptr)
+{
+  double const mps = FromDisplay(mph, Units::Mph);
+  for (int s = 0; s <= 120; ++s)
+    nav.OnFix(At(s * 1000.0, mps, limit), r);
+  nav.TakeLines();
+  for (int s = 1; s <= stopSeconds; ++s)
+  {
+    // Braking to a stop over the first few seconds.
+    double const v = std::max(0.0, mps * (1 - s / 6.0));
+    nav.OnFix(At((120 + s) * 1000.0, v, limit), r);
+    auto const lines = nav.TakeLines();
+    if (pulledOver && Has(lines, Category::PullOver))
+      *pulledOver = true;
+    if (Has(lines, Category::Traffic))
+      return s;
+  }
+  return -1;
+}
+}  // namespace
+
+TEST(NavigatorCallsAHighwayJamWithinHalfAMinute)
+{
+  Navigator nav(Config());
+  bool pulledOver = false;
+  double const limit = FromDisplay(65, Units::Mph);
+  int const s = SecondsToJamCall(nav, Far(), 65, limit, 120, &pulledOver);
+  CHECK(s > 0 && s <= 30);
+  // A jam on the highway isn't pulling over.
+  CHECK(!pulledOver);
+}
+
+TEST(NavigatorCallsAJamWhereTheMapHasNoLimit)
+{
+  Navigator nav(Config());
+  int const s = SecondsToJamCall(nav, Far(), 65, std::nullopt, 120);
+  CHECK(s > 0 && s <= 30);
+}
+
+TEST(NavigatorCallsACrawlQuickly)
+{
+  Navigator nav(Config());
+  double const limit = FromDisplay(65, Units::Mph);
+  for (int s = 0; s <= 120; ++s)
+    nav.OnFix(At(s * 1000.0, limit, limit), Far());
+  nav.TakeLines();
+  int calledAt = -1;
+  for (int s = 1; s <= 120 && calledAt < 0; ++s)
+  {
+    nav.OnFix(At((120 + s) * 1000.0, FromDisplay(8, Units::Mph), limit), Far());
+    if (Has(nav.TakeLines(), Category::Traffic))
+      calledAt = s;
+  }
+  CHECK(calledAt > 0 && calledAt <= 30);
+}
+
+TEST(NavigatorCallsInchingAlongQuickly)
+{
+  // A 45 mph road: stopped ten seconds, inch forward three, again and again.
+  Navigator nav(Config());
+  double const limit = FromDisplay(45, Units::Mph);
+  for (int s = 0; s <= 120; ++s)
+    nav.OnFix(At(s * 1000.0, limit, limit), Far());
+  nav.TakeLines();
+  int calledAt = -1;
+  for (int s = 1; s <= 120 && calledAt < 0; ++s)
+  {
+    double const v = s % 13 < 10 ? 0 : FromDisplay(4, Units::Mph);
+    nav.OnFix(At((120 + s) * 1000.0, v, limit), Far());
+    if (Has(nav.TakeLines(), Category::Traffic))
+      calledAt = s;
+  }
+  CHECK(calledAt > 0 && calledAt <= 35);
+}
+
+TEST(NavigatorGivesARedLightItsFullCycle)
+{
+  Navigator nav(Config());
+  RouteSnapshot r = Far();
+  r.routeBearingDeg = 0;
+  // The light is a couple hundred meters up the road: only points ahead are near it.
+  nav.SetTrafficLightLookup([](LatLon const & p) { return p.lat > 39.7012; });
+  double const limit = FromDisplay(45, Units::Mph);
+  CHECK_EQUAL(SecondsToJamCall(nav, r, 45, limit, 60), -1);
+}
+
+TEST(NavigatorLetsTheDriverWaitToTurn)
+{
+  Navigator nav(Config());
+  RouteSnapshot r = Far();
+  r.distToTurnM = 80;
+  double const limit = FromDisplay(45, Units::Mph);
+  CHECK_EQUAL(SecondsToJamCall(nav, r, 45, limit, 60), -1);
+}
+
+TEST(NavigatorLeavesUnpostedSideStreetsAlone)
+{
+  Navigator nav(Config());
+  CHECK_EQUAL(SecondsToJamCall(nav, Far(), 30, std::nullopt, 120), -1);
+}
+
 TEST(NavigatorWarnsAboutTheBatteryOnce)
 {
   Navigator nav(Config());
