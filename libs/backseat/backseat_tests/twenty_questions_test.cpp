@@ -423,7 +423,7 @@ TEST(TwentyEveryLineFills)
                            "twenty.wrongClose", "twenty.wrongFar", "twenty.wrongUnknown", "twenty.hint",
                            "twenty.noHint", "twenty.left", "twenty.lastOne", "twenty.win", "twenty.winFast",
                            "twenty.lose", "twenty.giveUp", "twenty.quit", "twenty.nudge", "twenty.timeout",
-                           "twenty.arrived", "twenty.resume", "twenty.nearby", "twenty.offerAgain"})
+                           "twenty.arrived", "twenty.resume", "twenty.nearby", "twenty.offerAgain", "twenty.count"})
     for (int tier = 0; tier < 3; ++tier)
     {
       std::string const k = key;
@@ -738,4 +738,74 @@ TEST(DriveComesFirstMatchesTheQuiz)
   CHECK(!DriveComesFirst("Do you have to go to a gas station to get it?", true));
   CHECK(DriveComesFirst("Do I go left to get it?", true));
   CHECK(DriveComesFirst("which way do I turn to get it?", true));
+}
+
+TEST(TwentyCountsWithoutUsingAQuestion)
+{
+  // B153: "how many questions left" is the score, not a question about the thing.
+  for (char const * said : {"how many questions left", "How many do I have left?", "how many questions have I asked",
+                            "how many questions do I get", "how many guesses do I have left", "how many to go?",
+                            "How many questions have I used?"})
+    CHECK_EQUAL(static_cast<int>(ParseTwentyHeard(said).kind), static_cast<int>(Kind::Count));
+  // Still questions about the thing.
+  CHECK_EQUAL(static_cast<int>(ParseTwentyHeard("how many legs does it have").kind), static_cast<int>(Kind::Question));
+  CHECK(ParseTwentyHeard("does it have questions left").kind != Kind::Count);
+  CHECK(ParseTwentyHeard("is it on the left").kind != Kind::Count);
+
+  auto g = TqGameWith("a stop sign");
+  for (int i = 0; i < 7; ++i)
+    g.OnDriverSaid(i % 2 ? "is it a deer" : "is it a cat", 1000.0 * i, 0);
+  CHECK_EQUAL(g.QuestionsLeft(), 13);
+  auto const r = g.OnDriverSaid("how many questions do I have left?", 8000, 0);
+  CHECK(r.has_value());
+  CHECK(r->key == "twenty.count");
+  CHECK(r->text.find("13") != std::string::npos);
+  CHECK(TqNoPlaceholders(r->text));
+  CHECK(!r->over);
+  // Asking didn't cost one.
+  CHECK_EQUAL(g.QuestionsLeft(), 13);
+  for (int tier = 1; tier < 3; ++tier)
+  {
+    auto const loud = g.OnDriverSaid("how many questions left", 9000, tier);
+    CHECK(loud->text.find("13") != std::string::npos);
+  }
+  CHECK_EQUAL(g.QuestionsLeft(), 13);
+  // With one left it says so in words.
+  for (int i = 0; i < 12; ++i)
+    g.OnDriverSaid(i % 2 ? "is it a deer" : "is it a cat", 10000.0 + 1000 * i, 0);
+  CHECK_EQUAL(g.QuestionsLeft(), 1);
+  CHECK(g.OnDriverSaid("how many left", 30000, 0)->key == "twenty.lastOne");
+  CHECK_EQUAL(g.QuestionsLeft(), 1);
+}
+
+TEST(TwentyCountLinesStayInCharacter)
+{
+  for (int tier = 0; tier < 3; ++tier)
+  {
+    auto const & lines = LinesFor("twenty.count", tier);
+    CHECK(lines.size() >= 3);
+    for (auto const & line : lines)
+    {
+      std::string lower = line;
+      std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
+      for (char const * eyes : {"screen", "look at", "phone", "tap", "eyes"})
+        CHECK(lower.find(eyes) == std::string::npos);
+      CHECK(TqNoPlaceholders(Fill(line, {{"left", "5"}, {"used", "15"}})));
+    }
+  }
+}
+
+TEST(TwentyCountIsTheGamesNotTheRoute)
+{
+  Navigator nav = TqNavigator();
+  double t = kTqDayMs;
+  double dist = 60000;
+  TqDrive(nav, t, 30, 1, dist);
+  nav.OnDriverSaid(t, "let's play twenty questions");
+  TqDrive(nav, t, 5, 1, dist);
+  CHECK(nav.TwentyTakes("how many questions do I have left"));
+  nav.OnDriverSaid(t, "how many questions do I have left");
+  auto const said = TqGame(TqDrive(nav, t, 5, 1, dist));
+  CHECK_EQUAL(said.size(), size_t{1});
+  CHECK(said.empty() || said[0].text.find("20") != std::string::npos);
 }

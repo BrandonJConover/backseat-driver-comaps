@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <initializer_list>
 #include <iterator>
 #include <map>
@@ -510,10 +511,12 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       {AppAction::CancelRoute, {" cancel the route ", " cancel route ", " cancel navigation ", " cancel the navigation ",
                                 " stop navigation ", " stop navigating ", " end the route ", " end route ",
                                 " end navigation ", " cancel the trip ", " end the trip ", " forget the route ",
-                                " cancel directions ", " stop the directions ", " stop directions "}},
+                                " cancel directions ", " stop the directions ", " stop directions ",
+                                " stop the navigation "}},
       {AppAction::Unmute, {" unmute ", " un mute ", " you can talk again ", " talk to me again ", " start talking again ",
                            " sound back on ", " turn the sound back on ", " you can speak again "}},
-      {AppAction::Mute, {" mute ", " mute yourself ", " mute everything ", " turn off the sound ", " turn the sound off "}},
+      {AppAction::Mute, {" mute ", " mute yourself ", " mute everything ", " turn off the sound ", " turn the sound off ",
+                         " turn off the voice ", " turn the voice off ", " voice off ", " sound off "}},
       // A hush keeps the turns: going silent at the next exit isn't what anyone asked for.
       {AppAction::DirectionsOnly, {" be quiet ", " shut up ", " stop talking ", " quiet please ", " go quiet ", " hush ",
                                    " just directions ", " just the directions ", " only directions ", " directions only ",
@@ -528,7 +531,8 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                                       " what was that ", " say again ", " repeat yourself "}},
       {AppAction::NextTurn, {" what's the next turn ", " whats the next turn ", " what is the next turn ",
                              " where do i turn ", " when do i turn ", " when's my next turn ", " whens my next turn ",
-                             " what's my next turn ", " whats my next turn "}},
+                             " what's my next turn ", " whats my next turn ", " what's the next direction ",
+                             " whats the next direction ", " next direction "}},
       {AppAction::BeNicer, {" be nicer ", " be nice ", " nicer to me ", " stop being mean ", " stop being so mean ", " be kinder "}},
       {AppAction::BeMeaner, {" be meaner ", " be mean ", " meaner to me ", " be more mean "}},
       {AppAction::GradeSoFar, {" grade me ", " grade so far ", " what's my grade ", " whats my grade ", " how am i doing ",
@@ -545,7 +549,8 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                              " where's the next stop ", " wheres the next stop ", " where is the next stop ",
                              " how far is the next stop ", " how far is the stop "}},
       {AppAction::SpeedLimit, {" what's the speed limit ", " whats the speed limit ", " what is the speed limit ",
-                               " how fast can i go "}},
+                               " how fast can i go ", " what's my speed limit ", " whats my speed limit ",
+                               " what is my speed limit "}},
       {AppAction::CurrentSpeed, {" how fast am i ", " how fast are we ", " what's my speed ", " whats my speed ",
                                  " what is my speed ", " what speed am i "}},
       {AppAction::CurrentRoad, {" what road ", " what street ", " which road ", " which street ", " what highway ",
@@ -564,7 +569,8 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                              " how far ", " how much further ", " how much farther ", " how many miles ",
                              " how many more miles ", " how many kilometers ", " how many more kilometers ",
                              " miles left ", " miles to go ", " kilometers left ", " kilometers to go ",
-                             " distance remaining ", " distance left ", " remaining distance "}},
+                             " distance remaining ", " distance left ", " remaining distance ", " minutes left ",
+                             " how many minutes ", " how much time is left ", " how much time left "}},
       {AppAction::AvoidTolls, {" avoid tolls ", " avoid toll ", " no tolls ", " no toll roads ", " avoid the tolls ",
                                " without tolls ", " skip the tolls ", " no toll ", " stay off toll roads ", " stay off the toll roads ",
                                " stay off the toll road ", " stay off the tolls ", " skip toll roads ", " skip the toll roads ",
@@ -608,6 +614,9 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       auto const at = words.find(phrase);
       if (at == std::string::npos)
         continue;
+      // "What's my speed limit?" asks for the limit, not the speedometer.
+      if (c.action == AppAction::CurrentSpeed && words.compare(at + std::strlen(phrase), 6, "limit ") == 0)
+        continue;
       AppCommand command{c.action, {}};
       if (c.action == AppAction::ChangeVoice)
         command.argument = VoiceArgument(words);
@@ -630,6 +639,10 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                                              " i didn't catch that ", " didnt catch that ", " i didnt catch that "};
     if (std::any_of(std::begin(kSayAgain), std::end(kSayAgain), [&whole](char const * s) { return whole == s; }))
       found.push_back({0, AppCommand{AppAction::RepeatInstruction, {}}});
+    // "Speed limit?" said on its own asks for it; "the speed limit here is silly" is chatter.
+    for (char const * limit : {" speed limit ", " the speed limit ", " speed limit here "})
+      if (whole == limit)
+        found.push_back({0, AppCommand{AppAction::SpeedLimit, {}}});
   }
   // "Use the echo voice" / "switch to heart voice": a voice named without the cue words above.
   if (voiceNamed && std::none_of(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::ChangeVoice; }))
@@ -947,7 +960,7 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
     return argumentSaid() || ParseDestinationCommand(spoken) ||
            saidAny({"take", "navigate", "drive", "directions", "route", "head", "bring", "go"});
   case AppAction::CancelRoute: return saidAny({"cancel", "stop", "end", "forget", "quit"});
-  case AppAction::Mute: return saidAny({"mute", "quiet", "shut", "hush", "silence", "stop", "sound"});
+  case AppAction::Mute: return saidAny({"mute", "quiet", "shut", "hush", "silence", "stop", "sound", "voice"});
   case AppAction::Unmute: return saidAny({"unmute", "un", "talk", "speak", "sound", "back"});
   case AppAction::RepeatInstruction: return saidAny({"repeat", "again", "what", "what's", "whats", "next", "where"});
   case AppAction::TimeLeft:
@@ -978,7 +991,7 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::SpeedLimit: return saidAny({"limit"}) || saidAny({"fast"});
   case AppAction::CurrentSpeed: return saidAny({"fast", "speed"});
   case AppAction::CurrentRoad: return saidAny({"road", "street", "highway"});
-  case AppAction::NextTurn: return saidAny({"turn"});
+  case AppAction::NextTurn: return saidAny({"turn", "direction"});
   case AppAction::ArrivalTime: return saidAny({"time", "arrive", "arrival"});
   case AppAction::DifferentRoute:
     return saidAny({"reroute"}) || (saidAny({"route", "way"}) && saidAny({"different", "another", "other", "better", "alternate",

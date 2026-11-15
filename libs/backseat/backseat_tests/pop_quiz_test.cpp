@@ -464,7 +464,7 @@ TEST(QuizHearsNotAndChangesOfMind)
   CHECK(ParseQuizAnswer(PqQuestion("canberra"), "A, no wait, I don't know").kind == QuizHeard::Kind::GiveUp);
   // What already worked still does.
   CHECK(ParseQuizAnswer(PqQuestion("canberra"), "I don't know").kind == QuizHeard::Kind::GiveUp);
-  CHECK(ParseQuizAnswer(PqQuestion("canberra"), "I'm not sure").kind == QuizHeard::Kind::Unclear);
+  CHECK(ParseQuizAnswer(PqQuestion("canberra"), "I'm not sure").kind == QuizHeard::Kind::GiveUp);
   CHECK_EQUAL(PqPick("canberra", "I'm not sure, I think it's Canberra"), 2);
   CHECK_EQUAL(PqPick("canberra", "a or b"), -1);
   // "Not at all" is a choice of its own.
@@ -472,4 +472,42 @@ TEST(QuizHearsNotAndChangesOfMind)
   CHECK_EQUAL(PqPick("eiffel", "I think not"), 2);
   CHECK_EQUAL(PqPick("eiffel", "six inches"), 0);
   CHECK_EQUAL(PqPick("eiffel", "C"), 2);
+}
+
+TEST(PopQuizHearsMiddleNumbersAndNotSure)
+{
+  // B152: places by "middle" and by a bare number, on a question whose choices say no numbers.
+  CHECK_EQUAL(PqPick("canberra", "the middle one"), 1);
+  CHECK_EQUAL(PqPick("canberra", "I'll take the middle one"), 1);
+  CHECK_EQUAL(PqPick("canberra", "middle"), 1);
+  CHECK_EQUAL(PqPick("canberra", "number two"), 1);
+  CHECK_EQUAL(PqPick("canberra", "number 2"), 1);
+  CHECK_EQUAL(PqPick("canberra", "option 3"), 2);
+  CHECK_EQUAL(PqPick("canberra", "two"), 1);
+  CHECK_EQUAL(PqPick("canberra", "2"), 1);
+  CHECK_EQUAL(PqPick("canberra", "three"), 2);
+  CHECK_EQUAL(PqPick("canberra", "one"), 0);
+  // "One" next to a place is the place, not choice A.
+  CHECK_EQUAL(PqPick("canberra", "the second one"), 1);
+  CHECK_EQUAL(PqPick("canberra", "the last one"), 2);
+  CHECK_EQUAL(PqPick("canberra", "that one"), -1);
+  // A number a choice says is that choice, not a place.
+  CHECK_EQUAL(PqPick("followDistance", "three"), 1);
+  CHECK_EQUAL(PqPick("followDistance", "3"), 1);
+  CHECK_EQUAL(PqPick("followDistance", "one"), 0);
+  CHECK_EQUAL(PqPick("followDistance", "number two"), 1);
+  CHECK_EQUAL(PqPick("followDistance", "two"), 1);
+  CHECK_EQUAL(PqPick("octopus", "three"), 1);
+  CHECK_EQUAL(PqPick("octopus", "1"), 0);
+  CHECK_EQUAL(PqPick("followDistance", "the middle one"), 1);
+  // Giving up, said other ways.
+  for (char const * s : {"I'm not sure", "not sure", "no clue", "next question", "not a clue", "Next question, please"})
+    CHECK(ParseQuizAnswer(PqQuestion("canberra"), s).kind == QuizHeard::Kind::GiveUp);
+  // Still a pick or still nothing.
+  CHECK_EQUAL(PqPick("canberra", "I'm not sure, I think it's Canberra"), 2);
+  CHECK_EQUAL(PqPick("canberra", "not sure, the middle one"), 1);
+  CHECK_EQUAL(PqPick("canberra", "a or b"), -1);
+  CHECK_EQUAL(PqPick("canberra", "definitely not A"), -1);
+  CHECK_EQUAL(PqPick("canberra", "two or three"), -1);
+  CHECK(ParseQuizAnswer(PqQuestion("canberra"), "I'm sure it's B").kind == QuizHeard::Kind::Choice);
 }

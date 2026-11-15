@@ -61,7 +61,7 @@ struct QuizHeard
   enum class Kind
   {
     Choice,
-    /// "I don't know", "pass", "no idea".
+    /// "I don't know", "pass", "no idea", "I'm not sure", "next question".
     GiveUp,
     /// Nothing that picks one choice: the radio, a sneeze, "uh".
     Unclear
@@ -72,7 +72,8 @@ struct QuizHeard
   bool named = false;
 };
 /// The choice named by its words ("octagon"), its letter ("B", "bee", "option c") or its place
-/// ("the second one"). Words win: "three" answers "3 seconds" before it means "C".
+/// ("the second one", "the middle one", a bare "two" when no choice says 2). Words win: "three" answers
+/// "3 seconds" before it means "C".
 QuizHeard ParseQuizAnswer(QuizQuestion const & q, std::string const & spoken);
 
 /// "Can you repeat the question?", "what were the choices?", "say that again".

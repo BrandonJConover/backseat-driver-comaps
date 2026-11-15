@@ -696,3 +696,50 @@ TEST(EveryKeyHasLinesForEveryModeHousingUnitAndTier)
   CHECK_EQUAL(empty, 0);
   CHECK(checked > 1000);
 }
+
+TEST(RecurringDriveKeysHaveThickUpperTiers)
+{
+  // Loop B145 (BI-128 batch 1): keys a commuter hears on every trip had one or two lines in their upper tiers, so a
+  // frustrated driver heard "CURVE. AHEAD. I KNEW." on every curvy commute. Every tier now has at least four
+  // lines, no new line repeats a lower tier, and the shouting tier shouts.
+  auto const & data = LineData();
+  for (char const * key : {"curve.ahead", "curve.accelerate", "road.rough", "straight.curve", "straight.later",
+                           "straight.serious.more", "lastExit", "start.slow"})
+  {
+    auto const it = data.find(key);
+    CHECK(it != data.end());
+    if (it == data.end())
+      continue;
+    for (int tier = 0; tier < 3; ++tier)
+    {
+      if (it->second[tier].size() < 4)
+        std::printf("    %s tier %d has %zu lines\n", key, tier, it->second[tier].size());
+      CHECK(it->second[tier].size() >= 4);
+    }
+    CHECK_EQUAL(CrossTierRepeats(it->second, true), 0);
+    for (auto const & line : it->second[2])
+    {
+      bool shouts = false;
+      for (size_t i = 0; i + 2 < line.size(); ++i)
+        shouts = shouts || (std::isupper(static_cast<unsigned char>(line[i])) &&
+                            std::isupper(static_cast<unsigned char>(line[i + 1])) &&
+                            std::isupper(static_cast<unsigned char>(line[i + 2])));
+      CHECK(shouts);
+    }
+  }
+  // The curve keys stay "slow down": none of them ever eggs the driver on.
+  for (char const * key : {"curve.ahead", "curve.accelerate", "straight.curve"})
+    for (int tier = 0; tier < 3; ++tier)
+      for (auto const & line : LinesFor(key, tier))
+      {
+        std::string lower;
+        for (char c : line)
+          lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        for (char const * bad : {"speed up", "hit the gas", "floor it", "step on it", "go faster", "faster!"})
+          CHECK(lower.find(bad) == std::string::npos);
+      }
+  // lastExit keeps its distance in every line, so the real gap is always said.
+  for (int tier = 0; tier < 3; ++tier)
+    for (auto const & line : LinesFor("lastExit", tier))
+      CHECK(line.find("{distance}") != std::string::npos || line.find("{DISTANCE}") != std::string::npos);
+}

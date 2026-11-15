@@ -99,7 +99,7 @@
   {
    "input": "The 3/4 mile mark.",
    "language": "en",
-   "expected": "The three quarters of a mile mark."
+   "expected": "The three quarter mile mark."
   },
   {
    "input": "By 1/2 tank you should stop.",

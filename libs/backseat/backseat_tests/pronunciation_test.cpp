@@ -998,6 +998,28 @@ TEST(FeetAndInchesReadAsHeights)
   CHECK(!ForSpeech(longText).empty());
 }
 
+TEST(FractionGlyphsAndUnitPeriods)
+{
+  // Loop B150, BI-133, CROSS X-057: unit periods mid-sentence, no doubled article before a fraction,
+  // fractions and numbers with mph/kg/lb/oz/t.
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_FRACTION_UNITS_PATH);
+  CHECK(cases.size() >= 30);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // The fraction pass alone: no article after a determiner, units it didn't know before.
+  CHECK_EQUAL(FractionsWithUnits("a 1/2 mi walk"), std::string("a half mile walk"));
+  CHECK_EQUAL(FractionsWithUnits("3/4 kg"), std::string("three quarters of a kilogram"));
+  CHECK_EQUAL(FractionsWithUnits("by 1/2"), std::string("by 1/2"));
+  // Hostile input stays quick and doesn't throw.
+  std::string longText;
+  for (int i = 0; i < 2000; ++i)
+    longText += "a \xC2\xBD mi. t 5 t- 3 lb. ";
+  CHECK(!ForSpeech(longText).empty());
+}
+
 TEST(DottedTitlesBeforeNames)
 {
   // Loop B140, CROSS X-052: BookLyre's dotted-title cases plus street names with a rank in them.

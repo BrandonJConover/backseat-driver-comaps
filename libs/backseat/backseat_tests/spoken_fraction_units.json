@@ -1,0 +1,133 @@
+{
+ "about": "Unit abbreviations and fraction glyphs (loop B150, BI-133, CROSS X-057). An abbreviation's period is dropped when the sentence goes on in lowercase or a comma follows, kept at the end and before a capital; after a/an/the/this/that/each/every a fraction takes no article of its own ('a ½ mile' a half mile, 'the ¼ mile mark' the quarter mile mark, 'the 3/4 mile mark' the three quarter mile mark); fractions glued to mph/kg/lb/oz read with the unit ('¾ kg' three quarters of a kilogram, '2½ mph' two and a half miles an hour); kg/lb/lbs/oz/t after a number are kilograms/pounds/ounces/tons, a weight between a determiner and a noun is singular ('a 5 lb bag' a five pound bag). Guards: Mt./St., 'a lb of', t-shirts, final periods. X-057 wording '½ mi.' is 'a half mile' here (Backseat's distance goldens say 'a half mile', not 'half a mile'). Backseat Driver: backseat::pronunciation::ForSpeech (libs/backseat/backseat_tests/pronunciation_test.cpp).",
+ "cases": [
+  {
+   "input": "½ mi.",
+   "expected": "a half mile."
+  },
+  {
+   "input": "1½ km",
+   "expected": "one and a half kilometers"
+  },
+  {
+   "input": "¾ kg",
+   "expected": "three quarters of a kilogram"
+  },
+  {
+   "input": "2½ mph",
+   "expected": "two and a half miles an hour"
+  },
+  {
+   "input": "In 3 mi. turn right",
+   "expected": "In three miles turn right"
+  },
+  {
+   "input": "In 500 ft. take the ramp.",
+   "expected": "In five hundred feet take the ramp."
+  },
+  {
+   "input": "½ mi. ahead, keep left.",
+   "expected": "a half mile ahead, keep left."
+  },
+  {
+   "input": "In 3 mi., then left.",
+   "expected": "In three miles, then left."
+  },
+  {
+   "input": "Drive 2 hr. then rest.",
+   "expected": "Drive two hours then rest."
+  },
+  {
+   "input": "Only 10 mins. left.",
+   "expected": "Only ten minutes left."
+  },
+  {
+   "input": "a ½ mile",
+   "expected": "a half mile"
+  },
+  {
+   "input": "the ¼ mile mark",
+   "expected": "the quarter mile mark"
+  },
+  {
+   "input": "The 3/4 mile mark.",
+   "expected": "The three quarter mile mark."
+  },
+  {
+   "input": "That ¾ mi climb.",
+   "expected": "That three quarter mile climb."
+  },
+  {
+   "input": "Weight limit 10 t",
+   "expected": "Weight limit ten tons"
+  },
+  {
+   "input": "Weight limit 10 t.",
+   "expected": "Weight limit ten tons."
+  },
+  {
+   "input": "1½ lb of beans",
+   "expected": "one and a half pounds of beans"
+  },
+  {
+   "input": "¾ oz",
+   "expected": "three quarters of an ounce"
+  },
+  {
+   "input": "16 oz of coffee",
+   "expected": "sixteen ounces of coffee"
+  },
+  {
+   "input": "3 kg of apples",
+   "expected": "three kilograms of apples"
+  },
+  {
+   "input": "1 lb",
+   "expected": "one pound"
+  },
+  {
+   "input": "a 5 lb bag",
+   "expected": "a five pound bag"
+  },
+  {
+   "input": "the 10 t truck",
+   "expected": "the ten ton truck"
+  },
+  {
+   "input": "Mt. Hood",
+   "expected": "Mount Hood"
+  },
+  {
+   "input": "St. Louis",
+   "expected": "Saint Louis"
+  },
+  {
+   "input": "a lb of",
+   "expected": "a lb of"
+  },
+  {
+   "input": "t-shirt",
+   "expected": "t-shirt"
+  },
+  {
+   "input": "2 t-shirts",
+   "expected": "two t-shirts"
+  },
+  {
+   "input": "Exit in 2 km.",
+   "expected": "Exit in two kilometers."
+  },
+  {
+   "input": "Exit in 2 km. Then keep left.",
+   "expected": "Exit in two kilometers. Then keep left."
+  },
+  {
+   "input": "Speed 45 mph. Slow down.",
+   "expected": "Speed forty five miles an hour. Slow down."
+  },
+  {
+   "input": "Traffic for 4 mi. Sorry.",
+   "expected": "Traffic for four miles. Sorry."
+  }
+ ]
+}

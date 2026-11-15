@@ -1639,7 +1639,7 @@ std::string FractionsWithUnits(std::string const & text)
   static std::regex const re(
       "\\b(?:(\\d{1,3}) (?:and )?)?([123])/([234])(?![\\d/])"
       "(?: ?(mi|miles?|km|kilometers?|ft|feet|foot|yd|yards?|m|meters?|hrs?|hours?|mins?|minutes?|secs?|"
-      "seconds?|gal|gallons?|inch|inches)\\b)?");
+      "seconds?|gal|gallons?|inch|inches|mph|kg|kilograms?|lbs?|pounds?|oz|ounces?)\\b)?");
   struct Unit
   {
     char const * one;
@@ -1656,7 +1656,13 @@ std::string FractionsWithUnits(std::string const & text)
       {"mins", {"minute", "minutes"}},   {"minute", {"minute", "minutes"}}, {"minutes", {"minute", "minutes"}},
       {"sec", {"second", "seconds"}},    {"secs", {"second", "seconds"}}, {"second", {"second", "seconds"}},
       {"seconds", {"second", "seconds"}}, {"gal", {"gallon", "gallons"}}, {"gallon", {"gallon", "gallons"}},
-      {"gallons", {"gallon", "gallons"}}, {"inch", {"inch", "inches"}},   {"inches", {"inch", "inches"}}};
+      {"gallons", {"gallon", "gallons"}}, {"inch", {"inch", "inches"}},   {"inches", {"inch", "inches"}},
+      // Loop B150 (CROSS X-057): speeds and weights take the same reading ("2 1/2 mph", "3/4 kg").
+      {"mph", {"mile an hour", "miles an hour"}}, {"kg", {"kilogram", "kilograms"}},
+      {"kilogram", {"kilogram", "kilograms"}}, {"kilograms", {"kilogram", "kilograms"}},
+      {"lb", {"pound", "pounds"}},       {"lbs", {"pound", "pounds"}},    {"pound", {"pound", "pounds"}},
+      {"pounds", {"pound", "pounds"}},   {"oz", {"ounce", "ounces"}},     {"ounce", {"ounce", "ounces"}},
+      {"ounces", {"ounce", "ounces"}}};
   return Replace(text, re, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
     auto const frac = m.str(2) + "/" + m.str(3);
     static std::map<std::string, std::pair<char const *, char const *>> const words = {
@@ -1681,10 +1687,19 @@ std::string FractionsWithUnits(std::string const & text)
       return out;
     }
     std::string const one = units.at(m.str(4)).one;
+    // After a determiner the fraction takes no article of its own, as DecimalMiles does: "a 1/2 mile
+    // walk" is "a half mile walk" (not "a a half"), "the 1/4 mile mark" "the quarter mile mark", "that
+    // 3/4 mile climb" "that three quarter mile climb" (loop B150, BI-133).
+    if (AfterDeterminer(text, pos))
+    {
+      static std::map<std::string, char const *> const bare = {
+          {"1/2", "half"}, {"1/4", "quarter"}, {"3/4", "three quarter"}, {"1/3", "third"}, {"2/3", "two thirds"}};
+      return std::string(bare.at(frac)) + " " + one;
+    }
     std::string const before = w->second.second;
     if (before == w->second.first)  // "a half mile", "a quarter mile": what drivers say.
       return before + " " + one;
-    return before + (one == "hour" ? " an " : " a ") + one;
+    return before + ((one == "hour" || one == "ounce") ? " an " : " a ") + one;
   });
 }
 
@@ -1886,6 +1901,12 @@ std::string NumberWords(std::string s)
   // Fractions before a unit and after a whole number: "1/2 mi" is "a half mile", "1 1/2 mi" "1 and a
   // half miles".
   s = CompactUnits(s);
+  // An abbreviation's period isn't the end of the sentence when the sentence goes on: "In 3 mi. turn
+  // right" is "In three miles turn right", "½ mi., then" "a half mile, then" (loop B150, BI-133). Kept
+  // at the end of the text and before a capital ("Exit in 2 km. Then keep left").
+  static std::regex const unitPeriod("(\\d ?(?:mi|km|ft|yd|mph|hrs?|mins?|secs?|kg|lbs?|oz))\\.(?=,| [a-z])");
+  if (HasAny(s, "."))
+    s = std::regex_replace(s, unitPeriod, "$1");
   if (HasAny(s, "/"))
     s = FractionsWithUnits(s);
   // Decimal miles the way drivers say them: "0.5 mi" is "a half mile", "0.25 mi" "a quarter mile",
@@ -1894,18 +1915,37 @@ std::string NumberWords(std::string s)
   if (HasAny(s, "."))
     s = DecimalMiles(s);
   // Units after a number ("1 mile", "3 miles").
-  static std::regex const unit("(\\d) ?(ft|mi|mph|km|m|yd|hrs|hr|mins|min|secs|sec)\\b");
+  static std::regex const unit("(\\d) ?(ft|mi|mph|km|m|yd|hrs|hr|mins|min|secs|sec|kg|lbs|lb|oz|t)\\b");
   s = Replace(s, unit, [&](std::smatch const & m, size_t pos) -> std::optional<std::string> {
+    // A lone t is tons only as a separate word: "Weight limit 10 t" (loop B150), not "10t", "2 t-shirts"
+    // or "5 t's".
+    if (m.str(2) == "t")
+    {
+      auto const end = pos + static_cast<size_t>(m.length(0));
+      if (m.length(0) == 2 || (end < s.size() && (s[end] == '-' || s[end] == '\'')))
+        return std::nullopt;
+    }
     size_t start = pos;
     while (start > 0 && (std::isdigit(static_cast<unsigned char>(s[start - 1])) || s[start - 1] == ',' ||
                          s[start - 1] == '.'))
       --start;
-    bool const one = s.substr(start, pos + 1 - start) == "1";
+    bool one = s.substr(start, pos + 1 - start) == "1";
+    // A weight before a noun describes it, so it is singular: "a 5 lb bag" is "a five pound bag", "the
+    // 10 t truck" "the ten ton truck"; "a 5 lb of flour" and "5 lb bags" keep the plural (loop B150).
+    static std::set<std::string> const kWeights = {"kg", "lb", "lbs", "oz", "t"};
+    if (!one && kWeights.count(m.str(2)) && AfterDeterminer(s, start))
+    {
+      auto const end = pos + static_cast<size_t>(m.length(0));
+      one = end + 1 < s.size() && s[end] == ' ' && std::islower(static_cast<unsigned char>(s[end + 1])) &&
+            s.compare(end + 1, 3, "of ") != 0 && s.compare(end, 3, " of") != 0;
+    }
     static std::map<std::string, std::pair<char const *, char const *>> const words = {
         {"ft", {"foot", "feet"}},           {"mi", {"mile", "miles"}},   {"mph", {"mile an hour", "miles an hour"}},
         {"km", {"kilometer", "kilometers"}}, {"m", {"meter", "meters"}}, {"yd", {"yard", "yards"}},
         {"hr", {"hour", "hours"}},          {"hrs", {"hour", "hours"}},  {"min", {"minute", "minutes"}},
-        {"mins", {"minute", "minutes"}},    {"sec", {"second", "seconds"}}, {"secs", {"second", "seconds"}}};
+        {"mins", {"minute", "minutes"}},    {"sec", {"second", "seconds"}}, {"secs", {"second", "seconds"}},
+        {"kg", {"kilogram", "kilograms"}},  {"lb", {"pound", "pounds"}}, {"lbs", {"pound", "pounds"}},
+        {"oz", {"ounce", "ounces"}},        {"t", {"ton", "tons"}}};
     auto const & w = words.at(m.str(2));
     return m.str(1) + " " + (one ? w.first : w.second);
   });

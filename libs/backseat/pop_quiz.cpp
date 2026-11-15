@@ -213,6 +213,13 @@ std::string QuizNumberWord(std::string const & w)
   return {};
 }
 
+/// "one"/"1" to "three"/"3" as a choice's place (1-3), else 0.
+int QuizSmallNumber(std::string const & w)
+{
+  std::string const n = QuizNumberWord(w).empty() ? w : QuizNumberWord(w);
+  return n == "1" ? 1 : n == "2" ? 2 : n == "3" ? 3 : 0;
+}
+
 std::set<std::string> QuizChoiceWords(char const * choice)
 {
   std::set<std::string> words;
@@ -267,7 +274,7 @@ QuizHeard ParsePlainQuizAnswer(QuizQuestion const & q, std::vector<std::string> 
   for (size_t k = 0; k < words.size(); ++k)
   {
     std::string w = words[k];
-    bool const place = k > 0 && QuizAmong(words[k - 1], {"first", "second", "third", "last", "the", "that", "this"});
+    bool const place = k > 0 && QuizAmong(words[k - 1], {"first", "second", "third", "last", "middle", "the", "that", "this"});
     if (!QuizNumberWord(w).empty() && !(w == "one" && place))
       w = QuizNumberWord(w);
     if (QuizFiller(w) && QuizNumberWord(words[k]).empty())
@@ -299,16 +306,23 @@ QuizHeard ParsePlainQuizAnswer(QuizQuestion const & q, std::vector<std::string> 
       pick = 1;
     else if (QuizAmong(w, {"third", "3rd", "last"}))
       pick = 2;
-    else if (cued && QuizAmong(w, {"a", "ay", "eh"}))
+    else if (w == "middle")
+      pick = 1;
+    else if (cued && QuizAmong(w, {"a", "ay", "eh"}) && !(k + 1 < words.size() && words[k + 1] == "clue"))
       pick = 0;
     else if (cued && QuizAmong(w, {"b", "bee", "be"}) && !(w == "be" && k + 1 < words.size()))
       pick = 1;
     else if (cued && QuizAmong(w, {"c", "see", "sea", "si"}))
       pick = 2;
-    else if (k > 0 && QuizAmong(words[k - 1], {"option", "number"}) && !QuizNumberWord(w).empty())
+    else if (k > 0 && QuizAmong(words[k - 1], {"option", "number"}) && QuizSmallNumber(w) > 0)
+      pick = QuizSmallNumber(w) - 1;
+    else if (cued && QuizSmallNumber(w) > 0 && (w != "one" || words.size() == 1))
     {
-      int const n = std::stoi(QuizNumberWord(w));
-      pick = n >= 1 && n <= 3 ? n - 1 : -1;
+      // A bare "two" or "2" is a place only when no choice says that number ("3 seconds" hears "three").
+      // "One" is mostly "that one", "the middle one": only alone.
+      std::string const n = std::to_string(QuizSmallNumber(w));
+      bool const inChoices = std::any_of(own.begin(), own.end(), [&n](auto const & o) { return o.count(n) > 0; });
+      pick = inChoices ? -1 : QuizSmallNumber(w) - 1;
     }
     if (pick >= 0)
     {
@@ -324,7 +338,8 @@ QuizHeard ParsePlainQuizAnswer(QuizQuestion const & q, std::vector<std::string> 
   for (auto const & w : words)
     padded += w + " ";
   for (char const * cue : {" dont know ", " no idea ", " pass ", " skip ", " give up ", " no clue ", " beats me ",
-                           " i have no ", " who knows ", " idk "})
+                           " i have no ", " who knows ", " idk ", " not sure ", " next question ",
+                           " not a clue "})
     if (padded.find(cue) != std::string::npos)
       return {QuizHeard::Kind::GiveUp, -1};
   return heard;
@@ -380,7 +395,10 @@ QuizHeard ParseQuizNegations(QuizQuestion const & q, std::vector<std::string> co
   bool any = false;
   for (size_t k = 0; k < words.size();)
   {
-    bool const negation = QuizNegationWord(words[k]) && !inChoice(words[k], -1);
+    // "Not sure" and "not a clue" give up; they don't rule out what follows ("not sure, the middle one").
+    bool const givingUp = (k + 1 < words.size() && words[k + 1] == "sure") ||
+                          (k + 2 < words.size() && words[k + 1] == "a" && words[k + 2] == "clue");
+    bool const negation = QuizNegationWord(words[k]) && !inChoice(words[k], -1) && !givingUp;
     if (!negation)
     {
       rest.push_back(words[k++]);
