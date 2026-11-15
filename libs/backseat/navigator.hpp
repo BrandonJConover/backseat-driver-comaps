@@ -80,6 +80,21 @@ enum class LaneSide
   Right
 };
 
+/// What to say about the lanes for a maneuver, from the map's lanes (left to right, true for the
+/// ones the route wants). Empty `phrase` and None side: nothing worth saying (all lanes work, none
+/// do, or the ones that do are scattered).
+struct LaneAdvice
+{
+  /// Which edge of the road the wanted lanes are on; None when they are in the middle.
+  LaneSide side = LaneSide::None;
+  /// How many lanes the route wants, and how many there are.
+  int use = 0;
+  int of = 0;
+  /// The lanes, in words: "left lane", "right two lanes", "middle lane", "second lane from the left".
+  std::string phrase;
+};
+LaneAdvice LaneAdviceFor(std::vector<bool> const & lanes);
+
 /// Which part of a roundabout the next maneuver is (the router's Enter/StayOn/LeaveRoundAbout).
 enum class RoundaboutLeg
 {
@@ -101,6 +116,9 @@ struct RouteSnapshot
   Control control = Control::None;
   /// The next maneuver needs the left or right lanes (and not the ones in the middle).
   LaneSide laneSide = LaneSide::None;
+  /// The next maneuver's lanes from the map, left to right, true for the ones to use (OSM turn:lanes).
+  /// Empty if the map has none; then `laneSide` alone decides the lane call.
+  std::vector<bool> lanes;
   /// The maneuver after the next one, and how far past it, if the host knows (-1 if not).
   TurnKind thenTurn = TurnKind::None;
   std::string thenStreet;

@@ -30,7 +30,9 @@ namespace
 int constexpr kOnRouteMissedCount = 10;
 int constexpr kAnnounceRouteMissedCount = 20;
 
-double constexpr kShowLanesMinDistInMeters = 500.0;
+// Backseat Driver: lanes show as far out as the voice calls them ("Use the right two lanes", up to
+// 1500 m), so the screen never lags the voice.
+double constexpr kShowLanesMinDistInMeters = 1500.0;
 
 // @TODO The distance may depend on the current speed.
 double constexpr kShowPedestrianTurnInMeters = 20.0;

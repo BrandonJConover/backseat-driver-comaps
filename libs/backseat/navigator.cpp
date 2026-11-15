@@ -1691,12 +1691,30 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   // "I'm going to need you to get over into the left lane. Use your blinkers this time." Once per
   // maneuver, early enough to move over and close enough that it's about this one.
   // A few seconds after the direction itself, so the two don't run together.
-  if (route.laneSide != LaneSide::None && m_laneSaidFor != route.turnId && !m_instructionDueAt &&
-      t - m_turnSaidAt >= kLaneAfterDirectionMs && route.distToTurnM >= kLaneSayMinM &&
-      route.distToTurnM <= kLaneSayMaxM)
+  // With the map's lanes: "Use the right two lanes." / "Use the middle lane." for more than one
+  // lane or ones in the middle; one lane at an edge keeps the plain left/right call.
+  if (m_laneSaidFor != route.turnId && !m_instructionDueAt && t - m_turnSaidAt >= kLaneAfterDirectionMs &&
+      route.distToTurnM >= kLaneSayMinM && route.distToTurnM <= kLaneSayMaxM)
   {
-    m_laneSaidFor = route.turnId;
-    SayLine(t, Category::Instruction, route.laneSide == LaneSide::Left ? "lane.left" : "lane.right");
+    LaneAdvice advice = LaneAdviceFor(route.lanes);
+    if (route.lanes.empty())
+      advice.side = route.laneSide;
+    std::string key;
+    if (!advice.phrase.empty() && (advice.side == LaneSide::None || advice.use > 1))
+      key = advice.side == LaneSide::None ? "lane.middle" : "lane.many";
+    else if (advice.side != LaneSide::None)
+      key = advice.side == LaneSide::Left ? "lane.left" : "lane.right";
+    if (!key.empty())
+    {
+      m_laneSaidFor = route.turnId;
+      Trace("nav.lane", {{"id", std::to_string(*route.turnId)},
+                         {"key", key},
+                         {"lanes", advice.phrase},
+                         {"use", std::to_string(advice.use)},
+                         {"of", std::to_string(advice.of)},
+                         {"dist_m", LogNum(route.distToTurnM, 0)}});
+      SayLine(t, Category::Instruction, key, {{"lanes", advice.phrase}});
+    }
   }
   // The arrival was called from too far out to tell the side: "It's on your right", once, when close
   // enough, a few seconds after any direction so the two don't run together (loop B119).
@@ -1711,6 +1729,69 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     }
   }
   m_lastDistToTurnM = route.distToTurnM;
+}
+
+LaneAdvice LaneAdviceFor(std::vector<bool> const & lanes)
+{
+  LaneAdvice a;
+  int const n = static_cast<int>(lanes.size());
+  int first = n, last = -1, count = 0;
+  for (int i = 0; i < n; ++i)
+  {
+    if (!lanes[i])
+      continue;
+    first = std::min(first, i);
+    last = i;
+    ++count;
+  }
+  // One lane, every lane, or none: nothing to move over for.
+  if (n < 2 || count == 0 || count == n)
+    return a;
+  a.use = count;
+  a.of = n;
+  if (first == 0 && last < n - 1)
+    a.side = LaneSide::Left;
+  else if (first > 0 && last == n - 1)
+    a.side = LaneSide::Right;
+  // Scattered lanes ("the first and the fourth"): the side, if any, but no words for it.
+  if (last - first + 1 != count)
+    return a;
+  static char const * const kCount[] = {"", "", "two", "three", "four", "five", "six"};
+  static char const * const kOrdinal[] = {"", "first", "second", "third", "fourth", "fifth", "sixth"};
+  int constexpr kMaxWords = 6;
+  if (a.side != LaneSide::None)
+  {
+    std::string const edge = a.side == LaneSide::Left ? "left" : "right";
+    if (count == 1)
+      a.phrase = edge + " lane";
+    else if (count <= kMaxWords)
+      a.phrase = edge + " " + kCount[count] + " lanes";
+    return a;
+  }
+  // In the middle. Positions counted from the nearer edge, 1-based.
+  int const fromLeft = first + 1;
+  int const fromRight = n - last;
+  if (fromLeft == fromRight)
+  {
+    if (count == 1)
+      a.phrase = "middle lane";
+    else if (count <= kMaxWords)
+      a.phrase = std::string("middle ") + kCount[count] + " lanes";
+    return a;
+  }
+  bool const nearLeft = fromLeft < fromRight;
+  int const nearPos = nearLeft ? fromLeft : fromRight;
+  int const farPos = nearPos + count - 1;
+  if (farPos > kMaxWords)
+    return a;
+  std::string const edge = nearLeft ? "left" : "right";
+  if (count == 1)
+    a.phrase = std::string(kOrdinal[nearPos]) + " lane from the " + edge;
+  else if (count == 2)
+    a.phrase = std::string(kOrdinal[nearPos]) + " and " + kOrdinal[farPos] + " lanes from the " + edge;
+  else
+    a.phrase = std::string(kOrdinal[nearPos]) + " through " + kOrdinal[farPos] + " lanes from the " + edge;
+  return a;
 }
 
 std::string Navigator::DestinationSideNow(RouteSnapshot const & route) const
