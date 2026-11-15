@@ -1044,3 +1044,29 @@ TEST(DottedTitlesBeforeNames)
     longText += "Lt. Col. Capt. ";
   CHECK(!ForSpeech(longText).empty());
 }
+
+TEST(InterjectionsMatchTheGoldenCasesSharedWithBookLyre)
+{
+  // Loop B160, CROSS X-062: "Shh." and "Brr." in the line bank were silent (no lexicon entry).
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_INTERJECTIONS_PATH);
+  CHECK(cases.size() >= 90);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+  }
+  // Every stand-in is said at the start of a line, and stays as written glued to a word.
+  for (char const * w : {"Shh", "Tsk", "Hmph", "Brr", "Pfft", "Ahh", "Umm", "Mhm", "Grr", "Zzz", "Achoo", "Woohoo"})
+  {
+    std::string const word(w);
+    CHECK(ForSpeech(word + ", fine.").find(word + ",") == std::string::npos);
+    CHECK(ForSpeech("x" + word + ", fine.").find("x" + word + ",") != std::string::npos);
+    CHECK(ForSpeech(word + "y, fine.").find(word + "y,") != std::string::npos);
+  }
+  // Hostile input stays quick and doesn't throw.
+  std::string longText;
+  for (int i = 0; i < 3000; ++i)
+    longText += "Shhhhhhh-sh-Mm-hmm Zzzzz ";
+  longText += std::string(20000, 'h');
+  CHECK(!ForSpeech(longText).empty());
+}
