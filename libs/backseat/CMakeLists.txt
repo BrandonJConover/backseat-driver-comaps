@@ -31,6 +31,8 @@ set(
   onboarding.hpp
   plate_game.cpp
   plate_game.hpp
+  place_search.cpp
+  place_search.hpp
   pronunciation.cpp
   pronunciation.hpp
   pronunciation_backup.cpp

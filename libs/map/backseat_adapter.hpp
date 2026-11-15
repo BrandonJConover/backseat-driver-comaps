@@ -4,6 +4,7 @@
 #include "backseat/mileage.hpp"
 #include "backseat/navigator.hpp"
 #include "backseat/onboarding.hpp"
+#include "backseat/place_search.hpp"
 #include "backseat/road_bits.hpp"
 #include "backseat/voice_command.hpp"
 
@@ -287,6 +288,14 @@ public:
   };
   /// Previous destinations, most driven first (most recent breaks ties).
   std::vector<PastRoute> PastRoutes(size_t max) const;
+  /// Other ways to search for `query` when it found nothing ("star bucks" -> "starbucks"), in the order
+  /// to try them.
+  std::vector<std::string> SearchVariants(std::string const & query) const;
+  /// The order to offer search results in: the name asked for, then places driven to before, then nearest.
+  std::vector<size_t> RankSearchResults(std::string const & query,
+                                        std::vector<backseat::PlaceCandidate> const & candidates) const;
+  /// A place driven to before by the name asked for, for when the map search finds nothing at all.
+  std::optional<PastRoute> PastRouteNamed(std::string const & query) const;
   /// Call when AskWhereTo() got no answer (about 45 s of silence). Says "Deciding to play it safe
   /// today, huh?" if the car hasn't moved since; empty otherwise.
   std::string NoAnswerToWhereTo();
