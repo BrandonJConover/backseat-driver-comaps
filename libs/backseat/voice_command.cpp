@@ -1,5 +1,7 @@
 #include "backseat/voice_command.hpp"
 
+#include "backseat/place_search.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -1003,16 +1005,25 @@ bool PlaceMatches(std::string const & asked, std::string const & name)
   std::string squashed;
   for (auto const & word : WordsOf(name))
     squashed += word;
-  size_t big = 0, found = 0;
+  auto const nameWords = WordsOf(name);
+  size_t big = 0, found = 0, close = 0;
   for (auto const & word : WordsOf(asked))
   {
     if (IsSmallWord(word))
       continue;
     ++big;
     // Squashed so "walmart" finds "Wal-Mart".
-    found += squashed.find(word) != std::string::npos ? 1 : 0;
+    if (squashed.find(word) != std::string::npos)
+      ++found;
+    // The recognizer's spelling: "chipotlay" is "Chipotle", "mcdonalds" is "McDonald's".
+    else if (std::any_of(nameWords.begin(), nameWords.end(), [&](auto const & n) { return WordsClose(word, n); }))
+      ++close;
   }
-  return big == 0 || found * 2 >= big;
+  // A near miss counts half, and only next to a real match or alone: "peace Lutheran" is two near
+  // misses of "Latheron Place", not a match.
+  if (found == 0 && big > 1)
+    close = 0;
+  return big == 0 || found * 2 + close >= big;
 }
 
 bool IsJunkAnswer(std::string const & topic, std::string const & fact)

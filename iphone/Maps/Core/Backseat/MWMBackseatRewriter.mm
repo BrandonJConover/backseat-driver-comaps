@@ -13,6 +13,7 @@
 #include <CoreApi/Framework.h>
 
 #include "backseat/onboarding.hpp"
+#include "backseat/place_search.hpp"
 #include "backseat/pronunciation.hpp"
 #include "backseat/rewriter.hpp"
 #include "backseat/voice_command.hpp"
@@ -26,6 +27,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -390,6 +392,51 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   if (confirm)
     *confirm = speech.confirm;
   return @(speech.line.c_str());
+}
+
++ (NSString *)searchableQuery:(NSString *)spoken
+{
+  auto const query = backseat::SearchableQuery(spoken.UTF8String ?: "");
+  return query.empty() ? spoken : @(query.c_str());
+}
+
++ (NSArray<NSString *> *)searchVariants:(NSString *)query
+{
+  NSMutableArray<NSString *> * variants = [NSMutableArray array];
+  for (auto const & v : GetFramework().GetRoutingManager().BackseatSearchVariants(query.UTF8String ?: ""))
+    [variants addObject:@(v.c_str())];
+  return variants;
+}
+
++ (NSArray<NSNumber *> *)rankSearchResults:(NSString *)query
+                                     names:(NSArray<NSString *> *)names
+                                 distances:(NSArray<NSNumber *> *)distances
+                                 latitudes:(NSArray<NSNumber *> *)latitudes
+                                longitudes:(NSArray<NSNumber *> *)longitudes
+{
+  std::vector<backseat::PlaceCandidate> candidates;
+  NSUInteger const count = MIN(MIN(names.count, distances.count), MIN(latitudes.count, longitudes.count));
+  for (NSUInteger i = 0; i < count; ++i)
+  {
+    backseat::PlaceCandidate c{names[i].UTF8String ?: "", distances[i].doubleValue, std::nullopt};
+    double const lat = latitudes[i].doubleValue;
+    double const lon = longitudes[i].doubleValue;
+    if (std::isfinite(lat) && std::isfinite(lon))
+      c.at = backseat::LatLon{lat, lon};
+    candidates.push_back(std::move(c));
+  }
+  NSMutableArray<NSNumber *> * order = [NSMutableArray array];
+  for (size_t const i : GetFramework().GetRoutingManager().BackseatRankSearchResults(query.UTF8String ?: "", candidates))
+    [order addObject:@(i)];
+  return order;
+}
+
++ (nullable NSDictionary<NSString *, id> *)pastRouteNamed:(NSString *)query
+{
+  auto const route = GetFramework().GetRoutingManager().BackseatPastRouteNamed(query.UTF8String ?: "");
+  if (!route)
+    return nil;
+  return @{@"label": @(route->label.c_str()), @"lat": @(route->lat), @"lon": @(route->lon)};
 }
 
 + (NSString *)pickSearchResult:(NSString *)answer index:(NSInteger *)index confirm:(BOOL *)confirm
