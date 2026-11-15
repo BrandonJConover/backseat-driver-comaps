@@ -15,7 +15,7 @@
   },
   {
    "input": "Welcome to Humble, TX.",
-   "expected": "Welcome to fxumbul, TX."
+   "expected": "Welcome to fxumbul, Texas."
   },
   {
    "input": "You are now in Humble.",
@@ -31,7 +31,7 @@
   },
   {
    "input": "Continue to Palestine, TX.",
-   "expected": "Continue to fxpaluhsteen, TX."
+   "expected": "Continue to fxpaluhsteen, Texas."
   },
   {
    "input": "Turn right onto Palestine Ave",
@@ -79,7 +79,7 @@
   },
   {
    "input": "Continue to Reading, PA.",
-   "expected": "Continue to fxreding, PA."
+   "expected": "Continue to fxreding, Pennsylvania."
   },
   {
    "input": "Exit toward Reading.",

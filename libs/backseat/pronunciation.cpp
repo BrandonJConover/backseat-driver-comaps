@@ -8,6 +8,7 @@
 #include "backseat/pronunciation_interjections.hpp"
 #include "backseat/pronunciation_ratios.hpp"
 #include "backseat/pronunciation_phones.hpp"
+#include "backseat/pronunciation_states.hpp"
 #include "backseat/pronunciation_spelling.hpp"
 
 #include <algorithm>
@@ -1341,24 +1342,7 @@ std::string Roads(std::string const & text)
 {
   // Two-letter state codes in front of a route number. Ones that are also words ("IN 5", "OR 3")
   // only count with a hyphen ("IN-46").
-  static std::map<std::string, std::pair<char const *, bool>> const states = {
-      {"AK", {"Alaska", false}},        {"AL", {"Alabama", true}},        {"AR", {"Arkansas", false}},
-      {"AZ", {"Arizona", false}},       {"CA", {"California", false}},    {"CO", {"Colorado", true}},
-      {"CT", {"Connecticut", false}},   {"DE", {"Delaware", true}},       {"FL", {"Florida", false}},
-      {"GA", {"Georgia", false}},       {"HI", {"Hawaii", true}},         {"IA", {"Iowa", false}},
-      {"ID", {"Idaho", true}},          {"IL", {"Illinois", false}},      {"IN", {"Indiana", true}},
-      {"KS", {"Kansas", false}},        {"KY", {"Kentucky", false}},      {"LA", {"Louisiana", true}},
-      {"MA", {"Massachusetts", true}},  {"MD", {"Maryland", false}},      {"ME", {"Maine", true}},
-      {"MI", {"Michigan", false}},      {"MN", {"Minnesota", false}},     {"MO", {"Missouri", false}},
-      {"MS", {"Mississippi", false}},   {"MT", {"Montana", false}},       {"NC", {"North Carolina", false}},
-      {"ND", {"North Dakota", false}},  {"NE", {"Nebraska", true}},       {"NH", {"New Hampshire", false}},
-      {"NJ", {"New Jersey", false}},    {"NM", {"New Mexico", false}},    {"NV", {"Nevada", false}},
-      {"NY", {"New York", false}},      {"OH", {"Ohio", true}},           {"OK", {"Oklahoma", true}},
-      {"OR", {"Oregon", true}},         {"PA", {"Pennsylvania", true}},   {"RI", {"Rhode Island", false}},
-      {"SC", {"South Carolina", false}}, {"SD", {"South Dakota", false}}, {"TN", {"Tennessee", false}},
-      {"TX", {"Texas", false}},         {"UT", {"Utah", false}},          {"VA", {"Virginia", false}},
-      {"VT", {"Vermont", false}},       {"WA", {"Washington", false}},    {"WI", {"Wisconsin", false}},
-      {"WV", {"West Virginia", false}}, {"WY", {"Wyoming", false}}};
+  static auto const & states = StateCodes();
   static std::map<std::string, std::string> const names = {
       {"I", "I"},         {"IH", "I"},           {"US", "yooess"},      {"SR", "State Route"},
       {"CR", "County Road"}, {"FM", "F M"},      {"RM", "R M"},         {"RR", "Ranch Road"},
@@ -2051,6 +2035,9 @@ std::string ForSpeech(std::string const & text)
   // (loop B168).
   if (HasDigit(s))
     s = PhoneNumbers(s);
+  // A state code after a city is the state, and a ZIP after it digit by digit: "Austin, TX 78701" is
+  // "Austin, Texas seven eight seven oh one", "Portland, OR now" "Portland, Oregon now" (loop B169).
+  s = CityStates(s);
   // Ratios, odds and map scales before the date, range and clock passes read the colon: "a 1:50 scale
   // map" is "a 1 to 50 scale map", "odds 3:1" "odds 3 to 1"; "at 1:50" and "5:30 pm" stay times
   // (loop B161, CROSS X-063).

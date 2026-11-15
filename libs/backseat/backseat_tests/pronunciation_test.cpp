@@ -1213,3 +1213,25 @@ TEST(PhoneNumbersAreSaidDigitByDigit)
   CHECK_EQUAL(ForSpeech("v1.512.555.0134"), ForSpeech("v1.512.555.0134"));
   CHECK(ForSpeech("Call 512-555-01345").find("oh one three four") == std::string::npos);
 }
+
+TEST(CityStatesSayTheStateAndZip)
+{
+  // Loop B169 (BI-149): golden cases shared with BookLyre; conversation ("Yes, OK.") keeps its words.
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_CITY_STATES_PATH);
+  CHECK(cases.size() >= 25);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+    // Idempotent: a state said once is a name, a ZIP said once has no digits left.
+    CHECK_EQUAL(ForSpeech(c.expected), c.expected);
+  }
+  // Half-built text doesn't crash or change.
+  CHECK_EQUAL(ForSpeech("Austin, "), std::string("Austin, "));
+  CHECK_EQUAL(ForSpeech(", TX"), std::string(", TX"));
+  CHECK_EQUAL(ForSpeech("Austin, D.C"), ForSpeech("Austin, D.C"));
+  CHECK(ForSpeech("Austin, TX 787011").find("seven eight seven oh one") == std::string::npos);
+  CHECK(ForSpeech("Austin, TX 78701-12").find("seven eight seven oh one") == std::string::npos);
+  // The local-place pass still sees the state: "Humble, TX" is UM-bul.
+  CHECK_EQUAL(ForSpeech("Humble, TX"), std::string("fxumbul, Texas"));
+}
