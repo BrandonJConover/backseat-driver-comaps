@@ -14,22 +14,26 @@ namespace
 NSTimeInterval constexpr kWeatherEverySec = 15 * 60;
 /// The nearest station is looked up again after the car has moved this far (degrees, ~10 km).
 double constexpr kStationMoveDeg = 0.1;
-/// NWS asks every client to say who it is. Add a contact address or site here if you have one.
-NSString * const kUserAgent = @"(Backseat Driver iOS app)";
+/// NWS and MET Norway both ask every client to say who it is; MET Norway also wants a way to reach
+/// the developer (it refuses requests without one), so this names the project's site.
+NSString * const kUserAgent = @"BackseatDriver/1.0 github.com/BrandonJConover/backseat-driver";
 
 nw_path_monitor_t gMonitor;
 NSTimer * gWeatherTimer;
 NSString * gStationUrl;
 double gStationLat = 1000;
 double gStationLon = 1000;
+/// NWS only covers the US. Where it has no station (Canada, everywhere else) the weather comes from
+/// MET Norway's free worldwide forecast instead, remembered per ~10 km cell like the station.
+bool gOutsideNws = false;
 
 BackseatAdapter & Backseat() { return GetFramework().GetRoutingManager().GetBackseat(); }
 
-void GetJson(NSString * url, void (^done)(NSDictionary * _Nullable json))
+void GetJson(NSString * url, void (^done)(NSDictionary * _Nullable json), NSString * accept = @"application/geo+json")
 {
   NSMutableURLRequest * request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]];
   [request setValue:kUserAgent forHTTPHeaderField:@"User-Agent"];
-  [request setValue:@"application/geo+json" forHTTPHeaderField:@"Accept"];
+  [request setValue:accept forHTTPHeaderField:@"Accept"];
   request.timeoutInterval = 20;
   [[NSURLSession.sharedSession dataTaskWithRequest:request
                                  completionHandler:^(NSData * data, NSURLResponse * response, NSError * error) {
@@ -76,6 +80,41 @@ void FetchObservation()
   });
 }
 
+/// A number from MET Norway's JSON; `fallback` when missing.
+double MetNumber(NSDictionary * details, NSString * key, double fallback)
+{
+  id value = [details isKindOfClass:NSDictionary.class] ? details[key] : nil;
+  return [value isKindOfClass:NSNumber.class] ? [value doubleValue] : fallback;
+}
+
+/// Weather from MET Norway (api.met.no, free, CC BY 4.0, covers the whole world). Its symbol code
+/// ("lightsnow", "rainshowers_day", "fog", "clearsky_night") carries the same words WeatherFromNws
+/// looks for in an NWS description, so it goes through the same path. Wind comes in m/s already.
+void FetchMet(double lat, double lon)
+{
+  NSString * url = [NSString
+      stringWithFormat:@"https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=%.2f&lon=%.2f", lat, lon];
+  GetJson(url, ^(NSDictionary * json) {
+    NSArray * series = json[@"properties"][@"timeseries"];
+    NSDictionary * now = [series isKindOfClass:NSArray.class] && series.count ? series[0][@"data"] : nil;
+    if (![now isKindOfClass:NSDictionary.class])
+      return;
+    NSDictionary * details = now[@"instant"][@"details"];
+    id symbol = now[@"next_1_hours"][@"summary"][@"symbol_code"];
+    if (![symbol isKindOfClass:NSString.class])
+      symbol = now[@"next_6_hours"][@"summary"][@"symbol_code"];
+    NSString * description = [symbol isKindOfClass:NSString.class] ? symbol : @"";
+    double const wind = MetNumber(details, @"wind_speed", -1);
+    double const gust = MetNumber(details, @"wind_speed_of_gust", -1);
+    double const tempC = MetNumber(details, @"air_temperature", NAN);
+    dispatch_async(dispatch_get_main_queue(), ^{
+      backseat::Trace("weather", {{"source", "met.no"}, {"text", description.UTF8String},
+                                {"wind", std::to_string(wind)}, {"temp", std::to_string(tempC)}});
+      Backseat().OnWeather(description.UTF8String, wind, gust, tempC);
+    });
+  }, @"application/json");
+}
+
 void RefreshWeather()
 {
   auto & framework = GetFramework();
@@ -88,16 +127,30 @@ void RefreshWeather()
   // Only a rough position leaves the phone: two decimals, about a kilometer.
   double const lat = std::round(ll.m_lat * 100) / 100;
   double const lon = std::round(ll.m_lon * 100) / 100;
-  if (gStationUrl && std::fabs(lat - gStationLat) < kStationMoveDeg && std::fabs(lon - gStationLon) < kStationMoveDeg)
+  if ((gStationUrl || gOutsideNws) && std::fabs(lat - gStationLat) < kStationMoveDeg &&
+      std::fabs(lon - gStationLon) < kStationMoveDeg)
   {
-    FetchObservation();
+    if (gOutsideNws)
+      FetchMet(lat, lon);
+    else
+      FetchObservation();
     return;
   }
   NSString * points = [NSString stringWithFormat:@"https://api.weather.gov/points/%.2f,%.2f", lat, lon];
   GetJson(points, ^(NSDictionary * json) {
     NSString * stations = json[@"properties"][@"observationStations"];
     if (![stations isKindOfClass:NSString.class])
-      return;  // outside the US, or NWS is down
+    {
+      // Outside the US (or NWS is down): MET Norway instead, for this cell.
+      dispatch_async(dispatch_get_main_queue(), ^{
+        gStationUrl = nil;
+        gOutsideNws = true;
+        gStationLat = lat;
+        gStationLon = lon;
+        FetchMet(lat, lon);
+      });
+      return;
+    }
     GetJson(stations, ^(NSDictionary * list) {
       NSArray * features = list[@"features"];
       NSString * station = [features isKindOfClass:NSArray.class] && features.count ? features[0][@"id"] : nil;
@@ -105,6 +158,7 @@ void RefreshWeather()
         return;
       dispatch_async(dispatch_get_main_queue(), ^{
         gStationUrl = station;
+        gOutsideNws = false;
         gStationLat = lat;
         gStationLon = lon;
         FetchObservation();

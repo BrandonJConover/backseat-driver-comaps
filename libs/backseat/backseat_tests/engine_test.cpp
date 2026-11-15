@@ -365,3 +365,17 @@ TEST(ABendFarFromTheNextTurnIsNotAWrongTurn)
       out.push_back(c);
   CHECK_EQUAL(WrongTurnLines(out), 0);
 }
+
+TEST(KilometerThresholdsMatchTheMileOnes)
+{
+  EngineConfig const kmh = ForUnits(EngineConfig{}, Units::Kmh);
+  CHECK(kmh.units == Units::Kmh);
+  CHECK_EQUAL(kmh.clearlyOver, 6);
+  CHECK_EQUAL(kmh.wayOver, 16);
+  CHECK_EQUAL(kmh.tooSlowMargin, 25.0);
+  CHECK_EQUAL(kmh.speedingTolerance, 0);
+  EngineConfig const back = ForUnits(kmh, Units::Mph);
+  CHECK_EQUAL(back.clearlyOver, 4);
+  CHECK_EQUAL(back.wayOver, 10);
+  CHECK_EQUAL(back.tooSlowMargin, 15.0);
+}

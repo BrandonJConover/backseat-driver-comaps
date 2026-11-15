@@ -19,6 +19,7 @@
 #include "indexer/ftypes_matcher.hpp"
 #include "indexer/scales.hpp"
 
+#include "platform/measurement_utils.hpp"
 #include "platform/platform.hpp"
 #include "platform/settings.hpp"
 
@@ -397,6 +398,14 @@ std::optional<std::string> PlateRegionOfMap(std::string const & countryId)
     return region.substr(0, region.find('_'));
   }
   return {};
+}
+
+/// Miles or kilometers, from the app's Units setting. CoMaps fills it in from the phone's region on
+/// first launch (a Canadian phone gets kilometers), and the driver can change it in Settings.
+backseat::Units AppUnits()
+{
+  return measurement_utils::GetMeasurementUnits() == measurement_utils::Units::Imperial ? backseat::Units::Mph
+                                                                                         : backseat::Units::Kmh;
 }
 
 char const * const kDebugLogKey = "BackseatDebugLog";
@@ -1152,7 +1161,16 @@ std::string BackseatAdapter::ChatInstructions(std::string const & voiceName)
 void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::RoutingSession const & session,
                                        std::string const & destinationName)
 {
+  m_navigator.SetUnits(AppUnits());
   m_here = mercator::FromLatLon(info.m_latitude, info.m_longitude);
+  if (m_countryInfo && (!m_countryAt || mercator::DistanceOnEarth(*m_countryAt, *m_here) > 5000))
+  {
+    // "Canada_Ontario_Toronto" is in Canada. Looked up again every 5 km, which is plenty for a border.
+    m_countryAt = m_here;
+    std::string const id = m_countryInfo().GetRegionCountryId(*m_here);
+    if (!id.empty())
+      m_navigator.SetCountry(id.substr(0, id.find('_')));
+  }
   m_route = session.IsActive() ? session.GetRouteForTests() : nullptr;
   auto route = Snapshot(session, destinationName);
   if (route.state == backseat::RouteState::OnRoute)
@@ -2559,7 +2577,7 @@ BackseatAdapter::SearchSpeech BackseatAdapter::SpeakSearchResults(std::string co
   std::string list;
   for (size_t i = 0; i < results.size(); ++i)
     list += std::string(i ? ". " : "") + kOrdinal[i] + ", " + results[i].name + ", " +
-            backseat::FormatDistance(results[i].distanceM, backseat::Units::Mph) + " away";
+            backseat::FormatDistance(results[i].distanceM, AppUnits()) + " away";
   speech.line = m_navigator.Reply("search.results", {{"count", std::to_string(results.size())}, {"list", list}});
   m_results = std::move(results);
   return speech;

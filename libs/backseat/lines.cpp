@@ -9,6 +9,8 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <string>
+#include <utility>
 #include <map>
 #include <mutex>
 #include <sstream>
@@ -19,6 +21,7 @@ namespace
 {
 std::atomic<TravelMode> g_travelMode{TravelMode::Drive};
 std::atomic<Housing> g_housing{Housing::Unknown};
+std::atomic<bool> g_metric{false};
 
 /// `text` lowercased with every run of non-word characters turned into one space, padded with
 /// spaces, so " word " finds whole words.
@@ -136,9 +139,63 @@ bool LineFitsMode(std::string const & text, TravelMode mode)
   return mode != TravelMode::Hike || std::none_of(std::begin(kStreets), std::end(kStreets), has);
 }
 
+void SetLineMetric(bool metric) { g_metric = metric; }
+
+std::string MetricWording(std::string const & text)
+{
+  // Whole phrases, so a body part ("one foot in front of the other") or a fact ("twelve miles an
+  // hour in 1899") is left alone. Distances are rounded the way the joke needs, not converted exactly.
+  static std::pair<char const *, char const *> const kPhrases[] = {
+      {"a quarter mile ago", "a few hundred meters ago"},
+      {"for a quarter mile", "for a few hundred meters"},
+      {"For a quarter mile", "For a few hundred meters"},
+      {"for a hundred miles", "for a hundred and fifty kilometers"},
+      {"hundreds of miles", "hundreds of kilometers"},
+      {"for miles", "for kilometers"},
+      {"two whole miles", "three whole kilometers"},
+      {"Two miles of nothing", "Three kilometers of nothing"},
+      {"many miles later", "many kilometers later"},
+      {"the miles go by", "the kilometers go by"},
+      {"Ten feet of glory", "Three meters of glory"},
+      {"moved four feet", "moved a meter"},
+      {"moved three feet", "moved one meter"},
+      {"three miles an hour", "five kilometers an hour"},
+      {"It's miles.", "It's kilometers."},
+  };
+  std::string out = text;
+  for (auto const & [from, to] : kPhrases)
+  {
+    std::string const f = from;
+    for (size_t at = out.find(f); at != std::string::npos; at = out.find(f, at + std::char_traits<char>::length(to)))
+      out.replace(at, f.size(), to);
+  }
+  return out;
+}
+
+namespace
+{
+/// The line table as a metric driver hears it: built once, the first time it's needed.
+LineTable const & MetricLineData()
+{
+  static LineTable const table = []
+  {
+    LineTable t = LineData();
+    for (auto & [key, tiers] : t)
+      for (auto & lines : tiers)
+        for (auto & line : lines)
+          line = MetricWording(line);
+    return t;
+  }();
+  return table;
+}
+
+}  // namespace
+
 std::vector<std::string> const & LinesFor(std::string const & key, int tier)
 {
-  auto const & raw = LineData().at(key).at(static_cast<size_t>(tier));
+  bool const metric = g_metric;
+  LineTable const & table = metric ? MetricLineData() : LineData();
+  auto const & raw = table.at(key).at(static_cast<size_t>(tier));
   TravelMode const mode = g_travelMode;
   Housing const housing = g_housing;
   // Story beats are read by position, and mode and outdoors lines are written for their mode.
@@ -154,7 +211,8 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
   static std::map<std::string, std::vector<std::string>> cache;
   std::string const suffix = std::string(".") + TravelModeName(mode);
   std::lock_guard lock(mutex);
-  auto const [it, added] = cache.try_emplace(key + suffix + "." + HousingName(housing) + std::to_string(tier));
+  auto const [it, added] =
+      cache.try_emplace(key + suffix + "." + HousingName(housing) + std::to_string(tier) + (metric ? "m" : ""));
   if (!added)
     return it->second;
   auto & fitting = it->second;
@@ -176,17 +234,17 @@ std::vector<std::string> const & LinesFor(std::string const & key, int tier)
     fitHousing();
     return fitting;
   }
-  auto own = LineData().find(key + suffix);
+  auto own = table.find(key + suffix);
   // A hike borrows the walk's lines where it has none of its own.
-  if (own == LineData().end() && mode == TravelMode::Hike)
-    own = LineData().find(key + ".walk");
-  if (own != LineData().end())
+  if (own == table.end() && mode == TravelMode::Hike)
+    own = table.find(key + ".walk");
+  if (own != table.end())
     fitting = own->second.at(static_cast<size_t>(tier));
   for (auto const & line : raw)
     if (LineFitsMode(line, mode))
       fitting.push_back(line);
   if (fitting.empty())
-    fitting = LineData().at("mode.generic").at(static_cast<size_t>(tier));
+    fitting = table.at("mode.generic").at(static_cast<size_t>(tier));
   fitHousing();
   return fitting;
 }
