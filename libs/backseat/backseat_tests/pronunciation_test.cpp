@@ -977,6 +977,35 @@ TEST(MilitaryAndTwentyFourHourTimes)
   CHECK(!ForSpeech(longText).empty());
 }
 
+TEST(RatiosOddsAndScalesReadTo)
+{
+  // Loop B161, CROSS X-063: BookLyre's ratio cases plus map scales; clock times, verses and chains stay.
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_RATIOS_PATH);
+  CHECK(cases.size() >= 40);
+  int changed = 0;
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+    changed += c.expected.find(" to ") != std::string::npos ? 1 : 0;
+  }
+  CHECK(changed >= 15);
+  // No colon left between two number words in a ratio, and the clock readings are untouched.
+  CHECK_EQUAL(ForSpeech("a 1:50 scale map"), std::string("a one to fifty scale map"));
+  CHECK_EQUAL(ForSpeech("odds 3:1"), std::string("odds three to one"));
+  CHECK_EQUAL(ForSpeech("Turn at 1:50"), std::string("Turn at one fifty"));
+  CHECK(ForSpeech("Arrive 5:30 pm").find(" to ") == std::string::npos);
+  // Idempotent on its own output, and the curly-quote clause mark ends the cue window.
+  CHECK_EQUAL(ForSpeech(ForSpeech("the odds were 3:1")), ForSpeech("the odds were 3:1"));
+  CHECK(ForSpeech("odds \xE2\x80\x9Cwe left 3:2").find(" to ") == std::string::npos);
+  // Hostile input stays quick and doesn't throw.
+  std::string longText;
+  for (int i = 0; i < 2000; ++i)
+    longText += "odds 3:1 1:2:3 :: 9: :5 1234:5 ";
+  CHECK(!ForSpeech(longText).empty());
+  CHECK(!ForSpeech(std::string(5000, ':')).empty());
+}
+
 TEST(FeetAndInchesReadAsHeights)
 {
   // Loop B149, BI-125: clearance signs and heights in straight, curly and prime marks, and "ft N in".
