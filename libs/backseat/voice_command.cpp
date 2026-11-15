@@ -497,6 +497,29 @@ std::pair<size_t, std::string> HowFarToPlace(std::string const & words, char con
       return {ask, kind};
   return {0, {}};
 }
+
+/// "How long have we been driving?", "how far did we go?", "how long was that meeting?": the trip so far (or
+/// anything else in the past), not the time LEFT. Still the trip ahead when it says what's left ("how far have we
+/// got to go", "how long did it say until we get there"). `words` is CommandWords output.
+bool PastTenseTripQuestion(std::string const & words)
+{
+  size_t ask = std::string::npos;
+  for (char const * how : {" how long ", " how far ", " how much longer ", " how much further ", " how much farther ",
+                           " how many miles ", " how many more miles ", " how many kilometers ", " how many minutes ",
+                           " how many hours "})
+    ask = std::min(ask, words.find(how));
+  if (ask == std::string::npos)
+    return false;
+  for (char const * ahead : {" left ", " to go ", " remaining ", " until ", " till ", " til ", " got ", " say ",
+                             " said ", " get there ", " arrive ", " will ", " do we ", " is it "})
+    if (words.find(ahead, ask) != std::string::npos)
+      return false;
+  for (char const * past : {" did ", " was ", " were ", " have we ", " have i ", " has it ", " had we ", " we've ",
+                            " i've ", " weve ", " ive ", " been ", " so far "})
+    if (words.find(past, ask) != std::string::npos)
+      return true;
+  return false;
+}
 }  // namespace
 
 std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
@@ -715,6 +738,9 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       if (!heardAction(AppAction::FindAlongRoute))
         found.push_back({place.first, AppCommand{AppAction::FindAlongRoute, place.second}});
     }
+  // "How long have we been driving?", "how far did we go?": the trip so far isn't the time left.
+  if (heardAction(AppAction::TimeLeft) && PastTenseTripQuestion(words))
+    drop(AppAction::TimeLeft);
   if (words.find(" back to ") != std::string::npos && words.find(" back to where ") == std::string::npos &&
       words.find(" back to the start ") == std::string::npos)
     drop(AppAction::TakeMeBack);
@@ -979,6 +1005,8 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::Unmute: return saidAny({"unmute", "un", "talk", "speak", "sound", "back"});
   case AppAction::RepeatInstruction: return saidAny({"repeat", "again", "what", "what's", "whats", "next", "where"});
   case AppAction::TimeLeft:
+    if (PastTenseTripQuestion(CommandWords(spoken)))
+      return false;
     return saidAny({"long", "far", "eta", "time", "when", "there", "minutes", "left", "longer", "further", "farther",
                     "miles", "kilometers", "distance", "remaining"});
   case AppAction::ReportPolice: return saidAny({"police", "cop", "cops", "pulled", "pulling", "trooper", "sheriff", "officer"});

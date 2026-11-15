@@ -1158,3 +1158,37 @@ TEST(RoadClosedReportsReroute)
   CHECK(Heard("find a different route", AppAction::DifferentRoute));
   CHECK(Heard("what road is this", AppAction::CurrentRoad));
 }
+
+TEST(PastTenseTripQuestionsArentTimeLeft)
+{
+  // B157 (BI-139): the trip so far (or a meeting that ran long) isn't how long is LEFT.
+  for (char const * said : {"how long have we been driving", "how long have we been on the road", "how far did we go",
+                            "how far have we come", "how many miles have we driven", "how long was that meeting",
+                            "How long were we stuck back there?", "how far have we gone so far",
+                            "how long we\xE2\x80\x99ve been driving", "how many miles did i drive today"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = std::none_of(c.begin(), c.end(), [](AppCommand const & x) { return x.action == AppAction::TimeLeft; });
+    if (!ok)
+      std::printf("  \"%s\" heard time left\n", said);
+    CHECK(ok);
+    CHECK(!WordsSupportTool(AppAction::TimeLeft, "", said));
+  }
+  CHECK(ParseAppCommands("how long have we been driving").empty());
+  CHECK(ParseAppCommands("how far did we go").empty());
+  // The trip ahead still asks for the time left, past tense or not.
+  for (char const * said : {"how long until we get there", "how much longer", "how far is it", "how many miles left",
+                            "how far have we got to go", "how long did it say until we get there",
+                            "how long will it take", "how much longer do we have", "are we there yet"})
+  {
+    auto const c = ParseAppCommands(said);
+    bool const ok = c.size() == 1 && c[0].action == AppAction::TimeLeft;
+    if (!ok)
+      std::printf("  \"%s\" heard %zu commands\n", said, c.size());
+    CHECK(ok);
+    CHECK(WordsSupportTool(AppAction::TimeLeft, "", said));
+  }
+  // Places and turns are unchanged.
+  CHECK(Heard("how far to the next gas station", AppAction::FindAlongRoute));
+  CHECK(Heard("how far is my next turn", AppAction::NextTurn));
+}
