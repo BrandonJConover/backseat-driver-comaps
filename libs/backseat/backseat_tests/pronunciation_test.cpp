@@ -1235,3 +1235,25 @@ TEST(CityStatesSayTheStateAndZip)
   // The local-place pass still sees the state: "Humble, TX" is UM-bul.
   CHECK_EQUAL(ForSpeech("Humble, TX"), std::string("fxumbul, Texas"));
 }
+
+TEST(UkRoadsSayTheirNumbers)
+{
+  // Loop B170 (BI-151): golden cases shared with BookLyre; paper sizes, vitamins and seats keep their codes.
+  auto const cases = GoldenCases(BACKSEAT_SPOKEN_UK_ROADS_PATH);
+  CHECK(cases.size() >= 30);
+  for (auto const & c : cases)
+  {
+    CHECK(!c.input.empty());
+    CHECK_EQUAL(ForSpeech(c.input), c.expected);
+    // Idempotent: a road said once has no digits left.
+    CHECK_EQUAL(ForSpeech(c.expected), c.expected);
+  }
+  // Half-built and edge text doesn't crash.
+  CHECK_EQUAL(ForSpeech("the M"), std::string("the M"));
+  CHECK_EQUAL(ForSpeech("the A0"), ForSpeech("the A0"));
+  CHECK(ForSpeech("the M25(").find("twenty five") != std::string::npos);
+  CHECK(ForSpeech("Take the A12345").find("one two three four") == std::string::npos);
+  CHECK_EQUAL(ForSpeech("J"), std::string("J"));
+  // The US route pass still owns hyphenated refs: Michigan's M-25.
+  CHECK_EQUAL(ForSpeech("Turn onto M-25"), std::string("Turn onto M twenty five"));
+}

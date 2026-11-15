@@ -46,6 +46,7 @@ set(
   pronunciation_interjections.hpp
   pronunciation_ratios.hpp
   pronunciation_phones.hpp
+  pronunciation_uk_roads.hpp
   pronunciation_states.hpp
   pronunciation_spelling.hpp
   pronunciation_spelling_data.hpp

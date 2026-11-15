@@ -8,6 +8,7 @@
 #include "backseat/pronunciation_interjections.hpp"
 #include "backseat/pronunciation_ratios.hpp"
 #include "backseat/pronunciation_phones.hpp"
+#include "backseat/pronunciation_uk_roads.hpp"
 #include "backseat/pronunciation_states.hpp"
 #include "backseat/pronunciation_spelling.hpp"
 
@@ -2103,6 +2104,10 @@ std::string ForSpeech(std::string const & text)
     s = ErrorCodes(s);
   if (HasDigit(s))
     s = Roads(s);
+  // British roads glued to their number: "the M25" is "the M twenty five", "the A303" "the A three oh
+  // three", "B4009" "B four oh oh nine", "J10" "junction ten" next to a motorway (loop B170).
+  if (HasDigit(s))
+    s = UkRoads(s);
   // House numbers in pairs: "1600 Pennsylvania Avenue" is "sixteen hundred ...".
   if (HasDigit(s))
     s = HouseNumbers(s);
