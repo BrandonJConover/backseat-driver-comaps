@@ -72,6 +72,10 @@ std::string MetricWording(std::string const & text);
 /// nothing fits. Lines that don't fit the driver's housing are left out too, unless that would leave
 /// none. Throws std::out_of_range for an unknown key.
 std::vector<std::string> const & LinesFor(std::string const & key, int tier);
+/// False when nothing in `key` fits the current travel mode, so LinesFor() would only have mode.generic
+/// ("Noted.") for it. A bit nobody asked for is better left unsaid then; a reply to the driver
+/// (cmd.*) still gets its "Noted.".
+bool LinesFitTravelMode(std::string const & key, int tier);
 
 /// Fills {placeholders} from vars. {NAME} in capitals inserts the value in capitals.
 /// Unknown placeholders are left as they are.

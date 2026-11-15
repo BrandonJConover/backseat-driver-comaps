@@ -750,8 +750,14 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
       stage = "now";
     p.stage = 3;
     p.atTurnSince = t;
+    // The last 5 m take a car well under a second; on foot they take seconds, and "you are still
+    // turning" came before the walker was even at the corner. In the app (speechAware) it waits
+    // until 3 s past the corner; the bare engine keeps the TS timing.
+    double const mps = m_lastSample ? m_lastSample->speedMps : 0;
+    if (m_config.speechAware && mps > 0.5 && mps < 5)
+      p.stillAfterMs = 3000 + std::max(0.0, distanceM) / mps * 1000;
   }
-  else if (p.stage == 3 && !p.turned && p.atTurnSince && t - *p.atTurnSince >= 3000)
+  else if (p.stage == 3 && !p.turned && p.atTurnSince && t - *p.atTurnSince >= p.stillAfterMs)
   {
     stage = "still";
     p.stage = 4;
@@ -1072,6 +1078,11 @@ bool CritiqueEngine::Roast(std::vector<Commentary> & out, double t, Category cat
     return false;
   }
 
+  if (!LinesFitTravelMode(key, Tier()))
+  {
+    TraceThrottled("roast.held", key + "/mode", {{"key", key}, {"why", "mode"}});
+    return false;
+  }
   if (category != Category::TurnCompleted)
     Bump(category);
   std::string const text = Fill(Pick(key, Tier()), vars);

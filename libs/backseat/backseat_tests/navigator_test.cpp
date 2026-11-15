@@ -2095,6 +2095,36 @@ TEST(TurnCallsComeCloserOnFoot)
   SetLineTravelMode(TravelMode::Drive);
 }
 
+// "You are still turning left... Please stop turning left." is for a driver who's slow off the
+// corner. On foot the last 5 m take seconds, so it used to come on nearly every turn of a walk,
+// before the walker had even got to the corner.
+TEST(WalkersArentToldTheyreStillTurning)
+{
+  Navigator nav(Config());
+  nav.SetTravelMode(TravelMode::Walk);
+  int still = 0;
+  double t = 0;
+  auto const step = [&](double bearing, RouteSnapshot const & r)
+  {
+    t += 1000;
+    nav.OnFix(Heading(t, 1.4, bearing), r);
+    for (auto const & l : nav.TakeLines())
+      still += l.key.rfind("countdown.still", 0) == 0 || l.key.rfind("countdown.done", 0) == 0;
+  };
+  for (double d = 200; d > 0; d -= 1.4)
+    step(90, Walkway(d));
+  // Around the corner, and a couple of steps on before the router moves on to the next maneuver.
+  step(45, Walkway(0));
+  step(0, Walkway(0));
+  step(0, Walkway(0));
+  RouteSnapshot next = OnRoute(2, TurnKind::Right, 400);
+  next.destinationPoint = {39.8, -105};
+  for (int i = 0; i < 20; ++i)
+    step(0, next);
+  CHECK_EQUAL(still, 0);
+  SetLineTravelMode(TravelMode::Drive);
+}
+
 TEST(OnFootTheGpsNoticesHillsAndEffort)
 {
   Navigator nav(Config());
