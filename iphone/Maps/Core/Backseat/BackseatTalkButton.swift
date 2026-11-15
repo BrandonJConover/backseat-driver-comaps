@@ -32,6 +32,7 @@ import UIKit
   /// Puts the mic on the leading edge of the map, halfway down, out of the way of the other controls.
   @objc static func install(in view: UIView) {
     BackseatListener.prepare()
+    BackseatCarTrip.install()
     BackseatHooks.install()
     BackseatReturnTrip.install()
     BackseatDriveOverlay.install(in: view)

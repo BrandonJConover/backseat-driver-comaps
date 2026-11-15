@@ -87,7 +87,8 @@ public final class ThemeUtils
   @NonNull
   public static ThemeMode getThemeMode(@NonNull CarContext context)
   {
-    final String themeMode = getSharedPreferences(context).getString(THEME_KEY, ThemeMode.AUTO.getConfig());
+    // Backseat Driver: the night map by default (the yellow route is drawn on it), like the phone.
+    final String themeMode = getSharedPreferences(context).getString(THEME_KEY, ThemeMode.NIGHT.getConfig());
 
     if (themeMode.equals(ThemeMode.AUTO.getConfig()))
       return ThemeMode.AUTO;

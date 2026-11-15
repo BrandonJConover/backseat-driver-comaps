@@ -1,4 +1,5 @@
 #import "MWMBackseatRewriter.h"
+#import "MWMBackseatLog.h"
 #import "MWMRoutePoint+CPP.h"
 #import "MWMRouter.h"
 #import "MWMRoutingOptions.h"
@@ -344,6 +345,13 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
                                                    subtitle:@""
                                                        type:MWMRoutePointTypeFinish
                                           intermediateIndex:0];
+  // On the CarPlay screen, CarPlay's own router drives (the phone's MWMRouter isn't listening).
+  MWMCarPlayService * carPlay = MWMCarPlayService.shared;
+  if (carPlay.isCarplayActivated && [carPlay navigateDirectlyTo:to])
+  {
+    [MWMBackseatLog event:@"carplay.route" fields:@{@"to": title ?: @""}];
+    return;
+  }
   if (![MWMRouter isRoutingActive])
   {
     [MWMRouter removePoints];
