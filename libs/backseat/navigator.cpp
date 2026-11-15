@@ -310,6 +310,12 @@ double constexpr kUTurnEveryMs = 120000;
 int constexpr kUTurnMaxPerTrip = 2;
 // Still sitting this long after the trip starts gets the brake-or-gas line.
 double constexpr kSlowStartMs = 45000;
+/// Farther than this from where the trip started is rolling, whatever the GPS says the speed is: fixes
+/// from Wi-Fi or a weak GPS have no speed at all, and "Still parked" while pulling onto the highway is wrong.
+double constexpr kRolledAwayM = 120;
+/// A route that hasn't matched the car yet has no first turn: the trip waits this long for it so the
+/// first direction isn't queued behind the greeting and the rundown.
+double constexpr kStartMatchWaitMs = 5000;
 /// Asking for music: once a trip, at least this far in, on a quiet stretch, if nothing is playing.
 double constexpr kMusicAfterMs = 15 * 60000;
 double constexpr kMusicCheckEveryMs = 15000;
@@ -826,6 +832,7 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & rawRoute)
   bool const speedBack = fix.speedMps >= 0 && m_knownSpeedMps.has_value();
   // With no GPS speed, the car's progress since the last fix says whether it's moving (B147).
   std::optional<double> const progressMps = fix.speedMps < 0 ? ProgressSpeed(fix, route) : std::nullopt;
+  m_progressMps = progressMps;
   m_progress = Progress{fix.tMs, {fix.lat, fix.lon}, fix.accuracyM, route.turnId, route.distToTurnM,
                         route.state == RouteState::OnRoute};
   // Recorded before Update so the turn-timing holds below already see this fix's speed (loop B82).
@@ -1476,7 +1483,12 @@ double Navigator::TimingMps(double speedMps) const
     return speedMps;
   // Unknown (tunnel, garage): assume the car still goes the last speed it was seen going. Read as 0 or -1,
   // every "not this close to the exit" hold shrank to its floor right where exits come up fast.
-  return m_knownSpeedMps ? *m_knownSpeedMps : 0;
+  double const known = m_knownSpeedMps ? *m_knownSpeedMps : 0;
+  // A car last seen parked (Wi-Fi fixes at the start of a trip have no speed) had its first "Now, turn"
+  // timed for a standstill: progress showing it moving wins then. A known moving speed stays put.
+  if (known < kStoppedMps && m_progressMps && *m_progressMps > known)
+    return *m_progressMps;
+  return known;
 }
 
 double Navigator::LastTimingMps() const { return TimingMps(m_lastFix ? m_lastFix->speedMps : 0); }
@@ -1513,6 +1525,7 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     }
     m_engine.reset();
     ResetTrip();
+    m_startHeldSince.reset();
     m_avoidTollsSaid = false;
     // An off-road trip or a hike was this trip's; the next one starts from the route type again.
     if (m_modeFound)
@@ -1524,7 +1537,23 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   }
 
   if (!m_engine)
+  {
+    // The route hasn't found the car on it yet, so it has no first turn. Starting now put the greeting
+    // and the rundown ahead of the first direction, which came a fix later and waited behind them.
+    // Give it a few seconds; a route that never matches starts the trip anyway.
+    if (route.state == RouteState::NotStarted && !route.turnId)
+    {
+      if (!m_startHeldSince)
+      {
+        m_startHeldSince = t;
+        Trace("trip.waitMatch", {});
+      }
+      if (t - *m_startHeldSince < kStartMatchWaitMs)
+        return;
+    }
+    m_startHeldSince.reset();
     StartTrip(t, route);
+  }
   if (m_arrived)
     return;
 
@@ -1588,6 +1617,9 @@ void Navigator::Update(double t, RouteSnapshot const & route)
       bool const nearTurn = m_turnId && m_lastDistToTurnM < kMissedTurnWithinM;
       bool const asked = t - m_lastVoiceCommandT < kNoRerouteRoastAfterCommandMs;
       m_missPending.reset();
+      // A wrong-way swing at the turn, now backed by the route: "That was a left. I said right."
+      if (!asked)
+        Say(m_engine->LeftRoute(t));
       if (nearTurn)
       {
         bool const unseen = FixGapAt(t);
@@ -1761,6 +1793,7 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   EngineConfig config = m_config;
   config.saidLog = &m_said;
   config.speechAware = true;
+  config.confirmWrongTurns = true;
   if (config.speedingRenagMaxMs == 0)
     config.speedingRenagMaxMs = kSpeedingRenagMaxMs;
   if (config.implausibleMps2 == 0)
@@ -1826,6 +1859,9 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   m_plan.expectedMinutes = route.etaSeconds / 60;
   ResetTrip();
   m_tripStartT = t;
+  m_tripStartPos.reset();
+  if (m_hereFix)
+    m_tripStartPos = LatLon{m_hereFix->lat, m_hereFix->lon};
   // Leaving a grocery store: the groceries are in the car. Leaving a bar late: the breathalyzer or the designated driver.
   m_fromNightlife = false;
   m_nightMoved = false;
@@ -2356,7 +2392,12 @@ void Navigator::TrackSlowStart(Fix const & fix)
 {
   if (m_startedRolling)
     return;
-  if (fix.speedMps >= 0.75 * MovingMps())
+  // No GPS speed (Wi-Fi fixes, a weak signal) isn't standing still: progress, or simply being well away
+  // from the start, says the car got going.
+  double const mps = fix.speedMps >= 0 ? fix.speedMps : m_progressMps.value_or(0);
+  bool const awayFromStart = m_tripStartPos && (fix.accuracyM < 0 || fix.accuracyM < kRolledAwayM / 2) &&
+                             DistanceM(*m_tripStartPos, {fix.lat, fix.lon}) > kRolledAwayM;
+  if (mps >= 0.75 * MovingMps() || awayFromStart)
   {
     m_startedRolling = true;
     return;

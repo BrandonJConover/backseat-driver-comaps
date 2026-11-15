@@ -144,4 +144,15 @@ UNIT_TEST(AreCoordsGoodForExtrapolation)
     TEST(!AreCoordsGoodForExtrapolation(loc1, loc2), ("Too rare locations."));
   }
 }
+
+UNIT_TEST(FixAgeLeadMs)
+{
+  double constexpr kNow = 1761750000.0;
+  TEST_EQUAL(FixAgeLeadMs(kNow - 0.4, kNow), 400, ("A 400 ms old fix is drawn 400 ms ahead."));
+  TEST_EQUAL(FixAgeLeadMs(kNow - 1.5, kNow), Extrapolator::kMaxFixAgeLeadMs, ("The lead is capped."));
+  TEST_EQUAL(FixAgeLeadMs(kNow - 5.0, kNow), 0, ("Clocks that disagree are ignored."));
+  TEST_EQUAL(FixAgeLeadMs(kNow + 0.3, kNow), 0, ("A fix from the future is not moved back."));
+  TEST_EQUAL(FixAgeLeadMs(0.0, kNow), 0, ("Test fixes stamped near 1970 get no lead."));
+}
+
 }  // namespace

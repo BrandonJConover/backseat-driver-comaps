@@ -115,6 +115,10 @@ struct EngineConfig
   /// tacked onto a direction for a turn that's seconds away. The Navigator turns it on; off by
   /// default so the TS engine's parity trace still holds.
   bool speechAware = false;
+  /// A heading swing the wrong way near a turn is only a wrong turn once the route agrees: the car left
+  /// it (LeftRoute) or the router called the turn missed. Still on the route and closing in on the turn,
+  /// it was a bend in the road and nothing is said. The Navigator turns it on; off keeps TS parity.
+  bool confirmWrongTurns = false;
   Rng rng;
   LineSource * lineSource = nullptr;
   /// Lines said on earlier trips, so picks avoid them too. Not owned; null keeps it per trip.
@@ -165,6 +169,11 @@ public:
 
   std::vector<Commentary> OnTelemetry(TelemetrySample const & s);
   std::vector<Commentary> OnNav(NavEvent const & e);
+  /// The router took the car off the route: a wrong-way swing waiting for that is said now
+  /// (confirmWrongTurns only; nothing otherwise).
+  std::vector<Commentary> LeftRoute(double t);
+  /// A wrong-way swing is waiting for the route to confirm it (confirmWrongTurns only).
+  bool WrongTurnPending() const { return m_wrongPending.has_value(); }
   /// Hold the parked-mid-route longStop remark until `untilMs` (0 = no hold). The navigator sets this
   /// when a stop starts on a road fast enough to judge traffic on: until its traffic window has seen
   /// the stop, the stop may be a jam about to be called, and "We've been stopped for a while" eight
@@ -349,6 +358,18 @@ private:
   bool m_nascarSaid = false;
   std::vector<Heading> m_headings;
   double m_lastWrongTurnAt;
+  /// A wrong-way heading swing waiting for the route to back it up (confirmWrongTurns).
+  struct WrongPending
+  {
+    double t = 0;
+    TurnDirection expected = TurnDirection::Left;
+    TurnDirection turned = TurnDirection::Right;
+    double distM = 0;
+  };
+  std::optional<WrongPending> m_wrongPending;
+  /// When the router last took the car off the route (LeftRoute); a swing right after is confirmed.
+  std::optional<double> m_leftRouteAt;
+  void SayWrongPending(std::vector<Commentary> & out, double t);
   bool m_hasDestination = false;
   std::optional<double> m_movingWithoutDestinationSince;
   double m_lastNoDestinationAt;
