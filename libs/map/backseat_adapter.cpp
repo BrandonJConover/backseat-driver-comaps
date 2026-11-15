@@ -2243,6 +2243,16 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
   auto const commands = backseat::ParseAppCommands(text);
   if (commands.empty())
   {
+    // "Screw you!": a comeback, unless it's a game answer ("damn, is it a dog?").
+    double const nowMs = std::chrono::duration<double, std::milli>(
+                             std::chrono::steady_clock::now().time_since_epoch()).count();
+    if (!m_navigator.InGame())
+      if (auto const key = m_curseRetorts.KeyFor(text, nowMs))
+      {
+        backseat::Trace("curse", {{"key", *key}, {"text", text}});
+        heard.reply = m_navigator.Reply(*key);
+        return heard;
+      }
     // Chatter, police, plates, thanks: the navigator's business.
     m_navigator.OnDriverSaid(0, text);
     return heard;

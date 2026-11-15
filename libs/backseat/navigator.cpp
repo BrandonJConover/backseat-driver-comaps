@@ -2430,6 +2430,8 @@ std::string Navigator::Reply(std::string const & key, Vars const & vars)
   Vars all = vars;
   auto const add = [&all](char const * k, std::string v) { all.emplace(k, std::move(v)); };
   add("name", m_driverName.empty() ? "you" : m_driverName);
+  // In the third person: "Note to self, Brandon likes technology a little too much."
+  add("driver", m_driverName.empty() ? "this one" : m_driverName);
   switch (m_pronouns)
   {
   case Pronouns::He: add("theycap", "He"); add("theyre", "He's"); add("them", "him"); add("their", "his"); break;
