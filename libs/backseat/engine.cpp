@@ -682,6 +682,7 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     if (e.t - m_lastWrongTurnAt < 20000)
       break;
     m_stats.missedTurns++;
+    NoteDetour(e.t);
     Log(MakeIncident(e.t, IncidentKind::MissedTurn, m_lastInstructionText), e.at);
     Roast(out, e.t, Category::MissedTurn, "missedTurn",
           {{"distance", FormatDistance(m_lastInstructionDistanceM.value_or(500), units)}}, true);
@@ -689,8 +690,13 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
   case NavEvent::Type::Rerouted:
     m_stats.reroutes++;
     Log(MakeIncident(e.t, IncidentKind::Rerouted), e.at);
+    // A silent reroute may be one the driver asked for, or walking off on purpose: the Navigator
+    // calls NoteDetour for the ones that were the driver's doing.
     if (!e.silent)
+    {
+      NoteDetour(e.t);
       Roast(out, e.t, Category::Rerouted, "rerouted", {}, true);
+    }
     break;
   case NavEvent::Type::Traffic:
     if (!e.heavy)
@@ -705,8 +711,13 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
       break;
     }
     m_trafficAlternate = e.alternate.value_or("the other route");
+    // Followed the directions into this jam? Then it's the traffic's fault, not their route's.
+    m_jamBlamesRoute = !m_config.trafficBlameNeedsDetour || DetourBlamesJam(e.t);
+    Trace("traffic.blame", {{"route", m_jamBlamesRoute ? "yes" : "no"},
+                            {"detour_s", m_lastDetourAt ? LogNum((e.t - *m_lastDetourAt) / 1000, 0) : "none"}});
     Log(MakeIncident(e.t, IncidentKind::Traffic, e.alternate), e.at);
-    Roast(out, e.t, Category::Traffic, "traffic.start", {{"alternate", *m_trafficAlternate}}, true);
+    Roast(out, e.t, Category::Traffic, m_jamBlamesRoute ? "traffic.start" : "traffic.start.onRoute",
+          {{"alternate", *m_trafficAlternate}}, true);
     break;
   case NavEvent::Type::Arrived:
   {
@@ -1071,6 +1082,20 @@ void CritiqueEngine::SayWrongPending(std::vector<Commentary> & out, double t)
   WrongTurn(out, t, pending.expected, pending.turned);
 }
 
+void CritiqueEngine::NoteDetour(double t, bool wholeTrip)
+{
+  m_lastDetourAt = t;
+  m_detourWholeTrip = m_detourWholeTrip || wholeTrip;
+  // Left the route to dodge a jam and still stuck: that one's on the driver now.
+  if (m_trafficAlternate)
+    m_jamBlamesRoute = true;
+}
+
+bool CritiqueEngine::DetourBlamesJam(double t) const
+{
+  return m_detourWholeTrip || (m_lastDetourAt && t - *m_lastDetourAt <= kDetourBlamesJamMs);
+}
+
 void CritiqueEngine::WrongTurn(std::vector<Commentary> & out, double t, TurnDirection expected, TurnDirection turned,
                                std::optional<LatLon> at)
 {
@@ -1226,12 +1251,12 @@ void CritiqueEngine::CheckTooSlow(TelemetrySample const & s, std::vector<Comment
   double const speed = JsRound(ToDisplay(s.speedMps, units));
   double const limit = JsRound(ToDisplay(*s.speedLimitMps, units));
   Vars vars{{"speed", Num(speed)}, {"limit", Num(limit)}, {"under", Num(limit - speed)}, {"unit", UnitWord(units)}};
-  // Stuck in traffic isn't dawdling, it's a bad route choice. Blame that instead.
+  // Stuck in traffic isn't dawdling. Blame the route, if the driver picked it (TrafficKey), or the jam.
   bool spoke;
   if (m_trafficAlternate)
   {
     vars["alternate"] = *m_trafficAlternate;
-    spoke = Roast(out, s.t, Category::Traffic, "traffic", vars);
+    spoke = Roast(out, s.t, Category::Traffic, TrafficKey(), vars);
   }
   else
   {
@@ -1261,12 +1286,12 @@ void CritiqueEngine::CheckStopped(TelemetrySample const & s, std::vector<Comment
     m_stopCount++;
     return;
   }
-  // Stuck in a jam keeps blaming the route every 45 s, as before.
+  // Stuck in a jam keeps on about it every 45 s, as before (the route only if the driver picked it).
   if (m_trafficAlternate)
   {
     if (s.t - *m_stoppedSince < m_config.longStopAfterMs)
       return;
-    if (Roast(out, s.t, Category::Traffic, "traffic", {{"alternate", *m_trafficAlternate}}))
+    if (Roast(out, s.t, Category::Traffic, TrafficKey(), {{"alternate", *m_trafficAlternate}}))
     {
       m_stoppedSince = s.t;
       Log(MakeIncident(s.t, IncidentKind::Traffic));

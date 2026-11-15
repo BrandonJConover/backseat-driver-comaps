@@ -50,6 +50,17 @@ bool LineClaimsHighway(std::string const & text)
                      [&lower](char const * w) { return lower.find(" " + std::string(w) + " ") != std::string::npos; });
 }
 
+bool LineBlamesRoute(std::string const & text)
+{
+  static char const * const kBlame[] = {"{alternate}", "told you so", "told you to take", "told you not to take",
+                                        "told you to avoid", "the other road", "listened to me", "ignore me"};
+  std::string lower;
+  for (char const c : text)
+    lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return std::any_of(std::begin(kBlame), std::end(kBlame),
+                     [&lower](char const * w) { return lower.find(w) != std::string::npos; });
+}
+
 void SetLineTravelMode(TravelMode mode)
 {
   g_travelMode = mode;

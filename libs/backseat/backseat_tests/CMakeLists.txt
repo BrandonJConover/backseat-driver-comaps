@@ -6,6 +6,7 @@ add_executable(${PROJECT_NAME}
   check.hpp
   timing.hpp
   engine_test.cpp
+  jam_blame_test.cpp
   jerk_settle_test.cpp
   countdown_distance_test.cpp
   highway_claims_test.cpp
