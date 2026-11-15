@@ -155,6 +155,9 @@ struct RouteSnapshot
   /// How far along the route the next toll stretch starts (BI-113); 0 while driving on one, unset
   /// when the rest of the route is toll-free.
   std::optional<double> tollAheadM;
+  /// The host read the route's toll stretches into tollAheadM. While false, "are there tolls?" gets
+  /// "I can't tell", never a made-up "no tolls" (B165).
+  bool tollsKnown = false;
 };
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
@@ -409,6 +412,12 @@ public:
   /// like any other so it doesn't repeat. Works between trips too. The driver's {name} and
   /// pronouns ({theycap} {theyre} {them} {their}) are filled in unless `vars` has them.
   std::string Reply(std::string const & key, Vars const & vars = {});
+  /// The answer to "are there tolls?" (AppAction::TollsAhead) from the last route update: on one now,
+  /// the next toll stretch's distance, none left, or can't tell. Never a price (no data). Loop B165.
+  std::string TollReply();
+  /// The answer to "is there traffic?" / "why is it so slow?" (AppAction::TrafficAhead): stuck in it, moving
+  /// fine here, or can't tell. Only judges where the car is; there's no live traffic feed. Loop B165.
+  std::string TrafficReply();
   /// Within this far of the next maneuver (or 20 s at the current speed, whichever is more),
   /// "repeat that" only gets lines that say the direction within the first few words.
   static double constexpr kRepeatFirstWithinM = 400;
@@ -741,6 +750,10 @@ private:
   std::optional<double> m_tollWindowT;
   /// The driver said "avoid tolls" this trip: a toll anyway is the route's doing, no joke.
   bool m_avoidTollsSaid = false;
+  /// The last route update's toll data, for TollReply().
+  std::optional<double> m_tollAheadM;
+  bool m_tollsKnown = false;
+  bool m_onRoute = false;
   bool m_policeSaid = false;
   std::optional<double> m_lastLimitMps;
   std::string m_country;

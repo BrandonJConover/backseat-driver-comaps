@@ -329,6 +329,8 @@ std::vector<AppTool> const & AppTools()
       {AppAction::TalkLess, "talk_less", "Make fewer comments; directions stay the same.", nullptr},
       {AppAction::DirectionsOnly, "directions_only", "Only speak directions, lane calls and arrival: no comments, bits or games. What \"shut up\" means.", nullptr},
       {AppAction::TalkMore, "talk_more", "Go back to the full commentary after talking less.", nullptr},
+      {AppAction::TollsAhead, "tolls_ahead", "Say whether the route has tolls: on one now, how far to the next, or none.", nullptr},
+      {AppAction::TrafficAhead, "traffic_ahead", "Say whether the car is stuck in traffic right now.", nullptr},
   };
   return tools;
 }
@@ -571,6 +573,28 @@ bool PastTenseTripQuestion(std::string const & words)
       return true;
   return false;
 }
+/// "Was there traffic last week?", "there were tolls last time", "traffic was bad yesterday": about a drive
+/// that's over. Only the clause holding the cue counts, so "I paid one yesterday, are there tolls now?" still
+/// asks. `words` is CommandWords output, `starts` its ClauseStarts.
+bool PastRoadTalk(std::string const & words, std::vector<size_t> const & starts, size_t at)
+{
+  size_t from = 0;
+  size_t to = words.size();
+  for (size_t const s : starts)
+  {
+    if (s <= at)
+      from = std::max(from, s);
+    else
+      to = std::min(to, s + 1);
+  }
+  std::string const clause = " " + words.substr(from, to - from) + " ";
+  for (char const * past : {" yesterday ", " last week ", " last time ", " last night ", " last month ", " last year ",
+                            " earlier today ", " this morning ", " the other day ", " used to ", " was ", " were ",
+                            " had ", " did ", " paid ", " got stuck "})
+    if (clause.find(past) != std::string::npos)
+      return true;
+  return false;
+}
 }  // namespace
 
 std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
@@ -696,6 +720,19 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       {AppAction::ListCommands, {" what can you do ", " what can i say ", " what commands ", " list commands ",
                                  " list the commands ", " what are your commands ", " how do i use you ",
                                  " how does this work ", " what do you do ", " help me out ", " i need help "}},
+      {AppAction::TollsAhead, {" are there tolls ", " are there any tolls ", " any tolls ", " is this a toll road ",
+                               " is this a toll ", " is that a toll road ", " is it a toll road ", " is this road a toll ",
+                               " are we on a toll road ", " are we on the toll road ", " tolls ahead ", " toll road ahead ",
+                               " do we have tolls ", " do we pay tolls ", " do we have to pay a toll ",
+                               " do i have to pay a toll ", " will we pay tolls ", " will there be tolls ",
+                               " is there a toll road ", " is there a toll ahead ", " any toll roads "}},
+      {AppAction::TrafficAhead, {" is there traffic ", " is there any traffic ", " any traffic ", " how's the traffic ",
+                                 " hows the traffic ", " how is the traffic ", " how's traffic ", " hows traffic ",
+                                 " how is traffic ", " traffic ahead ", " why is it so slow ", " why are we so slow ",
+                                 " why is traffic so slow ", " why are we crawling ", " why aren't we moving ",
+                                 " why arent we moving ", " what's the holdup ", " whats the holdup ",
+                                 " what's the hold up ", " whats the hold up ", " are we in a jam ", " is this a jam ",
+                                 " are we stuck in traffic ", " is it a traffic jam "}},
   };
   std::vector<std::pair<size_t, AppCommand>> found;
   bool const voiceNamed = words.find(" voice ") != std::string::npos;
@@ -880,6 +917,13 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
   // "I'll zoom in on that later", "maybe later we can avoid tolls": put off, not asked for now.
   found.erase(std::remove_if(found.begin(), found.end(), [&](auto const & f)
   { return DeferrableAction(f.second.action) && DeferredAt(words, starts, f.first); }), found.end());
+  // "I paid the toll yesterday, any tolls today?" still asks; "traffic was bad last week" or "there were tolls
+  // last time" is a story, not a question about this road.
+  found.erase(std::remove_if(found.begin(), found.end(), [&](auto const & f)
+  {
+    bool const roadQuestion = f.second.action == AppAction::TollsAhead || f.second.action == AppAction::TrafficAhead;
+    return roadQuestion && PastRoadTalk(words, starts, f.first);
+  }), found.end());
   // "Don't cancel the route", "I don't want to go to work": heard, but not asked for.
   found.erase(std::remove_if(found.begin(), found.end(), [&](auto const & f)
   { return opposite(f.second.action) == AppAction::Count && NegatedAt(words, starts, f.first); }), found.end());
@@ -1118,6 +1162,8 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::TalkLess: return saidAny({"less", "fewer", "down", "chatty", "much"});
   case AppAction::DirectionsOnly: return saidAny({"quiet", "shut", "hush", "stop", "directions", "just"});
   case AppAction::TalkMore: return saidAny({"more", "chatty", "whatever"});
+  case AppAction::TollsAhead: return saidAny({"toll", "tolls"});
+  case AppAction::TrafficAhead: return saidAny({"traffic", "slow", "jam", "crawling", "moving", "holdup", "hold"});
   case AppAction::Count: break;
   }
   return false;

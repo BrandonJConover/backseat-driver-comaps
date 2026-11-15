@@ -84,6 +84,11 @@ enum class AppAction
   DirectionsOnly,
   /// Back to the full commentary.
   TalkMore,
+  /// "Are there tolls?", "is this a toll road?": answered from the route (Navigator::TollReply).
+  TollsAhead,
+  /// "Is there traffic ahead?", "why is it so slow?": answered from the navigator's crawl judgment
+  /// (Navigator::TrafficReply). No live traffic feed, so it never claims what's miles ahead.
+  TrafficAhead,
   Count
 };
 

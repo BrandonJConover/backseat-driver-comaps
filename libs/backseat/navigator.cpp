@@ -93,6 +93,8 @@ double constexpr kFerryAheadMaxM = 1500;
 double constexpr kTollStartM = 200;
 /// ...and only this soon after coming in range; later, it's no longer the start.
 double constexpr kTollWindowMs = 90000;
+/// "Are there tolls?" this close to the toll stretch (or 0, on it) is "we're on one", not a distance (B165).
+double constexpr kTollOnItM = 50;
 /// Two toll stretches with less free road than this between them are one toll road.
 double constexpr kTollFreeGapM = 2000;
 /// A pull-over this soon after serious speeding is probably the police.
@@ -810,6 +812,9 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & rawRoute)
     return;
   RouteSnapshot const route = CleanRoute(rawRoute, m_lastDistToTurnM);
   Fix const & fix = *clean;
+  m_tollAheadM = route.tollAheadM;
+  m_tollsKnown = route.tollsKnown;
+  m_onRoute = route.state == RouteState::OnRoute;
   m_lastFixT = std::max(m_lastFixT, fix.tMs);
   // Clocks can step backwards (GPS vs. system time); the engine ignores those samples.
   m_lastT = std::max(m_lastT, fix.tMs);
@@ -2693,6 +2698,9 @@ void Navigator::ResetTrip()
   m_stopSince.reset();
   m_speeds.clear();
   m_inTraffic = false;
+  m_tollAheadM.reset();
+  m_tollsKnown = false;
+  m_onRoute = false;
   m_heldPlateLines.clear();
   m_twenty.NewTrip();
   m_heldTwentyLines.clear();
@@ -3100,6 +3108,31 @@ void Navigator::PushLine(Commentary c, std::string const & setupVoice)
   }
   // Brandon's lines; the rewording model leaves them alone.
   m_gate.Push(std::move(c), false);
+}
+
+std::string Navigator::TollReply()
+{
+  if (!InTrip() || m_arrived || !m_onRoute)
+    return Reply("cmd.tolls.none");
+  if (!m_tollsKnown)
+    return Reply("cmd.tolls.unknown");
+  if (!m_tollAheadM)
+    return Reply("cmd.tolls.free");
+  // Within a car length or two of the booth, or already on it: "you're on it", not "in 0 feet".
+  if (*m_tollAheadM < kTollOnItM)
+    return Reply("cmd.tolls.on");
+  return Reply("cmd.tolls.ahead", {{"distance", FormatDistance(*m_tollAheadM, m_config.units)}});
+}
+
+std::string Navigator::TrafficReply()
+{
+  if (!InTrip() || m_arrived || !m_onRoute)
+    return Reply("cmd.traffic.none");
+  if (m_inTraffic)
+    return Reply("cmd.traffic.jam");
+  // TrackTraffic judges only once it has most of a window of speeds against known limits.
+  bool const judged = !m_speeds.empty() && m_speeds.back().t - m_speeds.front().t >= kTrafficWindowMs * 0.8;
+  return Reply(judged ? "cmd.traffic.clear" : "cmd.traffic.unknown");
 }
 
 std::string Navigator::Reply(std::string const & key, Vars const & vars)
@@ -4417,7 +4450,9 @@ bool DriveComesFirst(std::string const & spoken, bool aboutIt)
     case AppAction::ReportPolice:
     case AppAction::NavigateTo:
     case AppAction::DifferentRoute:
-    case AppAction::TakeMeBack: return true;
+    case AppAction::TakeMeBack:
+    case AppAction::TollsAhead:
+    case AppAction::TrafficAhead: return true;
     default: break;
     }
   return false;
