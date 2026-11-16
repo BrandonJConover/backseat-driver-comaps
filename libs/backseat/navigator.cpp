@@ -50,6 +50,9 @@ double constexpr kChainWithinS = 10;
 double constexpr kChainMaxM = 500;
 /// After a turn, the next direction waits this long, so the driver is through the turn first...
 double constexpr kInstructionAfterTurnMs = 3000;
+// A new route whose next maneuver is the same kind this close to where the old one's was is the same
+// maneuver (a traffic rebuild, a stop added): no new direction for it.
+double constexpr kSameManeuverM = 60;
 /// ...unless the next maneuver is this close, or this many seconds away at highway speed (an exit
 /// 350 m after a merge at 33 m/s used to wait for 250 m, 7.5 s out; loop B81).
 double constexpr kInstructionNowWithinM = 250;
@@ -310,6 +313,12 @@ double constexpr kUTurnEveryMs = 120000;
 int constexpr kUTurnMaxPerTrip = 2;
 // Still sitting this long after the trip starts gets the brake-or-gas line.
 double constexpr kSlowStartMs = 45000;
+/// Farther than this from where the trip started is rolling, whatever the GPS says the speed is: fixes
+/// from Wi-Fi or a weak GPS have no speed at all, and "Still parked" while pulling onto the highway is wrong.
+double constexpr kRolledAwayM = 120;
+/// A route that hasn't matched the car yet has no first turn: the trip waits this long for it so the
+/// first direction isn't queued behind the greeting and the rundown.
+double constexpr kStartMatchWaitMs = 5000;
 /// Asking for music: once a trip, at least this far in, on a quiet stretch, if nothing is playing.
 double constexpr kMusicAfterMs = 15 * 60000;
 double constexpr kMusicCheckEveryMs = 15000;
@@ -826,7 +835,8 @@ void Navigator::OnFix(Fix const & raw, RouteSnapshot const & rawRoute)
   bool const speedBack = fix.speedMps >= 0 && m_knownSpeedMps.has_value();
   // With no GPS speed, the car's progress since the last fix says whether it's moving (B147).
   std::optional<double> const progressMps = fix.speedMps < 0 ? ProgressSpeed(fix, route) : std::nullopt;
-  m_progress = Progress{fix.tMs, {fix.lat, fix.lon}, fix.accuracyM, route.turnId, route.distToTurnM,
+  m_progressMps = progressMps;
+  m_progress = Progress{fix.tMs, {fix.lat, fix.lon}, fix.accuracyM, route.turnId, route.routeId, route.distToTurnM,
                         route.state == RouteState::OnRoute};
   // Recorded before Update so the turn-timing holds below already see this fix's speed (loop B82).
   if (fix.speedMps >= 0)
@@ -973,7 +983,8 @@ std::optional<double> Navigator::ProgressSpeed(Fix const & fix, RouteSnapshot co
     return std::nullopt;
   std::optional<double> best;
   // The route's distance to the same maneuver shrinking (the router extrapolates through tunnels).
-  if (route.state == RouteState::OnRoute && m_progress->onRoute && route.turnId && route.turnId == m_progress->turnId)
+  if (route.state == RouteState::OnRoute && m_progress->onRoute && route.turnId && route.turnId == m_progress->turnId &&
+      route.routeId == m_progress->routeId)
   {
     double const drop = m_progress->distToTurnM - route.distToTurnM;
     if (drop >= -kProgressSlackM)
@@ -1476,7 +1487,12 @@ double Navigator::TimingMps(double speedMps) const
     return speedMps;
   // Unknown (tunnel, garage): assume the car still goes the last speed it was seen going. Read as 0 or -1,
   // every "not this close to the exit" hold shrank to its floor right where exits come up fast.
-  return m_knownSpeedMps ? *m_knownSpeedMps : 0;
+  double const known = m_knownSpeedMps ? *m_knownSpeedMps : 0;
+  // A car last seen parked (Wi-Fi fixes at the start of a trip have no speed) had its first "Now, turn"
+  // timed for a standstill: progress showing it moving wins then. A known moving speed stays put.
+  if (known < kStoppedMps && m_progressMps && *m_progressMps > known)
+    return *m_progressMps;
+  return known;
 }
 
 double Navigator::LastTimingMps() const { return TimingMps(m_lastFix ? m_lastFix->speedMps : 0); }
@@ -1513,6 +1529,7 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     }
     m_engine.reset();
     ResetTrip();
+    m_startHeldSince.reset();
     m_avoidTollsSaid = false;
     // An off-road trip or a hike was this trip's; the next one starts from the route type again.
     if (m_modeFound)
@@ -1524,7 +1541,23 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   }
 
   if (!m_engine)
+  {
+    // The route hasn't found the car on it yet, so it has no first turn. Starting now put the greeting
+    // and the rundown ahead of the first direction, which came a fix later and waited behind them.
+    // Give it a few seconds; a route that never matches starts the trip anyway.
+    if (route.state == RouteState::NotStarted && !route.turnId)
+    {
+      if (!m_startHeldSince)
+      {
+        m_startHeldSince = t;
+        Trace("trip.waitMatch", {});
+      }
+      if (t - *m_startHeldSince < kStartMatchWaitMs)
+        return;
+    }
+    m_startHeldSince.reset();
     StartTrip(t, route);
+  }
   if (m_arrived)
     return;
 
@@ -1588,6 +1621,9 @@ void Navigator::Update(double t, RouteSnapshot const & route)
       bool const nearTurn = m_turnId && m_lastDistToTurnM < kMissedTurnWithinM;
       bool const asked = t - m_lastVoiceCommandT < kNoRerouteRoastAfterCommandMs;
       m_missPending.reset();
+      // A wrong-way swing at the turn, now backed by the route: "That was a left. I said right."
+      if (!asked)
+        Say(m_engine->LeftRoute(t));
       if (nearTurn)
       {
         bool const unseen = FixGapAt(t);
@@ -1641,30 +1677,58 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     return;
   }
 
+  // A rebuilt route numbers its maneuvers afresh: the same id on another route is another maneuver.
+  bool newRoute = route.turnId && m_turnId && route.routeId != m_routeId;
   // Back on the same maneuver before the miss was sure: a GPS blip. Nothing missed, nothing rerouted.
-  if (m_missPending && route.turnId && route.turnId == m_turnId)
+  if (m_missPending && route.turnId && route.turnId == m_turnId && !newRoute)
   {
     m_missPending.reset();
     m_rerouteRoastDueAt.reset();
     m_rerouting = false;
     Trace("nav.blip", {});
   }
-  // Back on a different route before the miss was confirmed: it was a miss after all.
-  else if (m_missPending)
-    SayMissedTurn(t, std::exchange(m_missPending, std::nullopt)->unseen);
-  // Back before the joke was due. It still counts, quietly.
+  // Back on a different route before the miss was confirmed: it was a miss after all. It's said after
+  // the new route's first direction: the way back first, the joke after. A rebuilt route that hasn't
+  // found the car yet has its direction a moment away, so the miss waits for it (until it's due anyway).
+  std::optional<PendingMiss> missed;
+  if (m_missPending && (route.turnId || route.state != RouteState::NotStarted || t >= m_missPending->confirmAt))
+    missed = std::exchange(m_missPending, std::nullopt);
+  auto const sayMissed = [&]
+  {
+    if (missed)
+      SayMissedTurn(t, std::exchange(missed, std::nullopt)->unseen);
+  };
+  // Back before the joke was due. It still counts, quietly, and so does the detour (jam blame).
   if (std::exchange(m_rerouteRoastDueAt, std::nullopt))
   {
     ++m_reroutes;
+    m_engine->NoteDetour(t);
     Say(m_engine->OnNav(NavEvent::Rerouted(t, true)));
   }
 
   if (!route.turnId)
-    return;
-  if (route.turnId != m_turnId)
   {
-    // Moving on to a new maneuver means the last one was done, unless a reroute got us here.
-    bool const justTurned = m_turnId && !m_rerouting;
+    sayMissed();
+    return;
+  }
+  // A new route while on the old one (a traffic rebuild, a stop added) with the same maneuver next:
+  // nothing new to say, and the lane and side advice already given still holds.
+  if (newRoute && !m_rerouting && route.turn == m_turnKind &&
+      std::fabs(route.distToTurnM - m_lastDistToTurnM) < kSameManeuverM)
+  {
+    for (auto * said : {&m_laneSaidFor, &m_sideSaidFor, &m_exitSkipTurnId})
+      if (*said && *said == m_turnId)
+        *said = route.turnId;
+    m_turnId = route.turnId;
+    m_routeId = route.routeId;
+    newRoute = false;
+    Trace("nav.sameTurn", {{"dist_m", LogNum(route.distToTurnM, 0)}});
+  }
+  if (route.turnId != m_turnId || newRoute)
+  {
+    // Moving on to a new maneuver means the last one was done, unless a reroute (or any new route)
+    // got us here.
+    bool const justTurned = m_turnId && !m_rerouting && !newRoute;
     if (justTurned)
     {
       if (FixGapAt(t))
@@ -1674,8 +1738,18 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     }
     else if (m_rerouting)
       m_leftsInARow = 0;
+    if (newRoute)
+    {
+      // "Once per maneuver" was about the old route's maneuvers.
+      m_laneSaidFor.reset();
+      m_sideSaidFor.reset();
+      m_exitSkipTurnId.reset();
+    }
+    if (m_rerouting || newRoute)
+      Trace("nav.rerouted", {{"dist_m", LogNum(route.distToTurnM, 0)}});
     m_rerouting = false;
     m_turnId = route.turnId;
+    m_routeId = route.routeId;
     m_turnKind = route.turn;
     m_instructionDueAt.reset();
     if (justTurned && route.distToTurnM >= InstructionNowWithinM())
@@ -1695,6 +1769,7 @@ void Navigator::Update(double t, RouteSnapshot const & route)
   {
     Say(m_engine->OnNav(NavEvent::Progress(t, route.distToTurnM)));
   }
+  sayMissed();
   // "I'm going to need you to get over into the left lane. Use your blinkers this time." Once per
   // maneuver, early enough to move over and close enough that it's about this one.
   // A few seconds after the direction itself, so the two don't run together.
@@ -1761,6 +1836,8 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   EngineConfig config = m_config;
   config.saidLog = &m_said;
   config.speechAware = true;
+  config.confirmWrongTurns = true;
+  config.trafficBlameNeedsDetour = true;
   if (config.speedingRenagMaxMs == 0)
     config.speedingRenagMaxMs = kSpeedingRenagMaxMs;
   if (config.implausibleMps2 == 0)
@@ -1826,6 +1903,9 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   m_plan.expectedMinutes = route.etaSeconds / 60;
   ResetTrip();
   m_tripStartT = t;
+  m_tripStartPos.reset();
+  if (m_hereFix)
+    m_tripStartPos = LatLon{m_hereFix->lat, m_hereFix->lon};
   // Leaving a grocery store: the groceries are in the car. Leaving a bar late: the breathalyzer or the designated driver.
   m_fromNightlife = false;
   m_nightMoved = false;
@@ -1888,6 +1968,7 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
   if (turnFirst)
   {
     m_turnId = route.turnId;
+    m_routeId = route.routeId;
     m_turnKind = route.turn;
     SayInstruction(t, route);
   }
@@ -1944,6 +2025,9 @@ void Navigator::StartTrip(double t, RouteSnapshot const & route)
     if (verdict.key == "sketch.slower")
       m_sketchMinutesLost = verdict.minutes;
   }
+  // Their own, slower route over mine: a jam on it is their doing, the whole trip.
+  if (m_sketchMinutesLost > 0)
+    m_engine->NoteDetour(t, true);
   // The first trip's rundown is a speed run: every turn, rattled off, then a request for music.
   // After that, a drawn route gets "We're doing your route" instead of the rundown.
   if (askWalk)
@@ -2402,7 +2486,12 @@ void Navigator::TrackSlowStart(Fix const & fix)
 {
   if (m_startedRolling)
     return;
-  if (fix.speedMps >= 0.75 * MovingMps())
+  // No GPS speed (Wi-Fi fixes, a weak signal) isn't standing still: progress, or simply being well away
+  // from the start, says the car got going.
+  double const mps = fix.speedMps >= 0 ? fix.speedMps : m_progressMps.value_or(0);
+  bool const awayFromStart = m_tripStartPos && (fix.accuracyM < 0 || fix.accuracyM < kRolledAwayM / 2) &&
+                             DistanceM(*m_tripStartPos, {fix.lat, fix.lon}) > kRolledAwayM;
+  if (mps >= 0.75 * MovingMps() || awayFromStart)
   {
     m_startedRolling = true;
     return;
@@ -2736,6 +2825,7 @@ void Navigator::ResetTrip()
   m_turnHeld.clear();
   m_predictionText.clear();
   m_turnId.reset();
+  m_routeId = 0;
   m_turnKind = TurnKind::None;
   m_leftsInARow = 0;
   m_rerouting = false;
@@ -3113,6 +3203,16 @@ bool Navigator::Parked() const
 
 std::vector<std::string> Navigator::RoadFit(std::string const & key, std::vector<std::string> options) const
 {
+  // Followed the directions into this jam: no "I told you so" about the road.
+  if (key == "traffic.standstill" && m_engine && !m_engine->JamBlamesRoute())
+  {
+    std::vector<std::string> fair;
+    for (auto const & l : options)
+      if (!LineBlamesRoute(l))
+        fair.push_back(l);
+    if (!fair.empty())
+      options = std::move(fair);
+  }
   if (key != "straight.later" && key != "traffic.standstill")
     return options;
   std::optional<bool> const motorway = m_road.OnMotorway();

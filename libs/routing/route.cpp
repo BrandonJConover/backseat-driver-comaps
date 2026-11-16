@@ -16,6 +16,7 @@
 #include "routing/turns_tts_text.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace routing
 {
@@ -25,6 +26,10 @@ using namespace std;
 namespace
 {
 double constexpr kOnEndToleranceM = 10.0;
+// Backseat: a match far down the route must run within this of the car's heading, judged only when the
+// GPS heading means something (moving at 18 km/h+).
+double constexpr kMinSpeedForHeadingCheckMps = 5.0;
+double constexpr kMaxFarMatchHeadingDiffDeg = 75.0;
 double constexpr kSteetNameLinkMeters = 400.0;
 }  //  namespace
 
@@ -410,7 +415,27 @@ bool Route::MoveIterator(location::GpsInfo const & info)
   m2::RectD const rect = mercator::MetersToXY(info.m_longitude, info.m_latitude,
                                               max(m_routingSettings.m_matchingThresholdM, info.m_horizontalAccuracy));
 
-  return m_poly.UpdateMatchingProjection(rect);
+  // Backseat: past the next few segments the whole rest of the route is searched (to pick the car up
+  // again after a tunnel). A fix near a later stretch of the route that runs the other way (the route
+  // coming back along a parallel street, the other side of a loop) jumped the position there and every
+  // turn in between was skipped, never called. A car going somewhere has a heading: a far stretch
+  // has to run roughly that way.
+  if (!info.HasBearing() || !info.HasSpeed() || info.m_speed < kMinSpeedForHeadingCheckMps)
+    return m_poly.UpdateMatchingProjection(rect);
+  double const headingDeg = info.m_bearing;
+  auto const & poly = m_poly.GetPolyline();
+  return m_poly.UpdateMatchingProjection(rect, [&](size_t i)
+  {
+    m2::PointD const & a = poly.GetPoint(i);
+    m2::PointD const & b = poly.GetPoint(i + 1);
+    if (AlmostEqualULPs(a, b))
+      return true;
+    // Mercator keeps angles: the screen angle turned into compass degrees.
+    double const segDeg = math::RadToDeg(ang::AngleTo(a, b));
+    double const compassDeg = std::fmod(450.0 - segDeg, 360.0);
+    double const diff = std::fabs(std::fmod(headingDeg - compassDeg + 540.0, 360.0) - 180.0);
+    return diff <= kMaxFarMatchHeadingDiffDeg;
+  });
 }
 
 double Route::GetPolySegAngle(size_t ind) const

@@ -9,6 +9,7 @@
 #include "base/assert.hpp"
 
 #include <cstddef>
+#include <functional>
 #include <limits>
 #include <vector>
 
@@ -81,6 +82,12 @@ public:
 
   /// \brief Updates projection to the closest matched segment if it's possible.
   bool UpdateMatchingProjection(m2::RectD const & posRect);
+  /// Backseat: like UpdateMatchingProjection(), but a match past the next few segments (the search over
+  /// the rest of the route) only takes segments |acceptFar| accepts. A bad fix near a later stretch that
+  /// runs the other way (the route coming back along a parallel street) jumped the position ahead and
+  /// skipped every turn in between.
+  using SegmentFilter = std::function<bool(size_t segmentIndex)>;
+  bool UpdateMatchingProjection(m2::RectD const & posRect, SegmentFilter const & acceptFar);
 
   Iter UpdateProjection(m2::RectD const & posRect);
 
@@ -123,7 +130,8 @@ public:
     return res;
   }
 
-  Iter GetClosestMatchingProjectionInInterval(m2::RectD const & posRect, size_t startIdx, size_t endIdx) const;
+  Iter GetClosestMatchingProjectionInInterval(m2::RectD const & posRect, size_t startIdx, size_t endIdx,
+                                              SegmentFilter const & accept = {}) const;
 
   bool IsFakeSegment(size_t index) const;
 
@@ -138,7 +146,7 @@ private:
   template <typename DistanceFn>
   Iter GetBestProjection(m2::RectD const & posRect, DistanceFn const & distFn) const;
 
-  Iter GetBestMatchingProjection(m2::RectD const & posRect) const;
+  Iter GetBestMatchingProjection(m2::RectD const & posRect, SegmentFilter const & acceptFar = {}) const;
 
   void Update();
 

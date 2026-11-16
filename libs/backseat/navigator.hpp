@@ -93,6 +93,9 @@ struct RouteSnapshot
   RouteState state = RouteState::Inactive;
   /// Identifies the next maneuver; changes when the driver moves on to the next one.
   std::optional<uint32_t> turnId;
+  /// Which route `turnId` is on. A rebuilt route numbers its maneuvers afresh, so turn 3 of the new
+  /// route is not turn 3 of the old one. 0 when the host doesn't say.
+  uint64_t routeId = 0;
   TurnKind turn = TurnKind::None;
   /// Street after the next maneuver, if known.
   std::string nextStreet;
@@ -744,6 +747,8 @@ private:
   std::vector<TurnHeld> m_turnHeld;
   RouteState m_lastState = RouteState::Inactive;
   std::optional<uint32_t> m_turnId;
+  /// The route m_turnId is on (RouteSnapshot::routeId).
+  uint64_t m_routeId = 0;
   double m_lastDistToTurnM = 0;
   bool m_rerouting = false;
   bool m_arrived = false;
@@ -941,10 +946,17 @@ private:
     LatLon pos;
     double accuracyM = -1;
     std::optional<uint32_t> turnId;
+    uint64_t routeId = 0;
     double distToTurnM = 0;
     bool onRoute = false;
   };
   std::optional<Progress> m_progress;
+  /// This fix's speed read from progress, when the GPS gave none (unset when it gave one).
+  std::optional<double> m_progressMps;
+  /// The route had no matched position yet when the trip would have started; when that was.
+  std::optional<double> m_startHeldSince;
+  /// Where the car was when the trip started, so a car that has clearly left counts as rolling.
+  std::optional<LatLon> m_tripStartPos;
   BuildingLookup m_buildingLookup;
   /// This trip started indoors; the "made it out" line is still to come (key, empty if not).
   std::string m_indoorOutKey;

@@ -6,16 +6,20 @@ add_executable(${PROJECT_NAME}
   check.hpp
   timing.hpp
   engine_test.cpp
+  jam_blame_test.cpp
   jerk_settle_test.cpp
   countdown_distance_test.cpp
   highway_claims_test.cpp
   long_approach_test.cpp
+  start_movement_test.cpp
+  wrong_turn_confirm_test.cpp
   final_call_soak_test.cpp
   exit_after_merge_test.cpp
   exit_skip_test.cpp
   destination_side_test.cpp
   hostile_route_test.cpp
   offroute_blip_test.cpp
+  reroute_test.cpp
   then_chaining_test.cpp
   roundabout_exit_test.cpp
   roundabout_exit_countdown_test.cpp

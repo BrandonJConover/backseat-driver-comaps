@@ -7,6 +7,7 @@
 #include "backseat/units.hpp"
 
 #include <algorithm>
+#include <utility>
 #include <cctype>
 #include <cmath>
 #include <limits>
@@ -21,6 +22,10 @@ namespace
 double constexpr kNever = -std::numeric_limits<double>::infinity();
 /// A heading swing counts as taking (or botching) the pending turn only this close to it.
 double constexpr kWrongTurnWithinM = 120;
+/// confirmWrongTurns: still on the route and this much closer to the turn after the swing means the
+/// swing was the road bending, and a swing the route hasn't backed up after this long is dropped.
+double constexpr kWrongBendProgressM = 25;
+double constexpr kWrongConfirmMs = 20000;
 /// Getting this much closer to the maneuver keeps a pending turn alive (loop B146).
 double constexpr kAliveProgressM = 20;
 /// The far countdown call comes at least this many seconds out at the current speed...
@@ -471,6 +476,9 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
   {
   case NavEvent::Type::Instruction:
   {
+    // A new maneuver: a swing still waiting was about the old one, and the route never left.
+    m_wrongPending.reset();
+    m_leftRouteAt.reset();
     m_hasDestination = true;
     m_lastInstructionText = e.text;
     m_lastInstructionDistanceM = e.distanceM;
@@ -544,6 +552,8 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
       SayTurnDone(out, e.t, *m_pendingTurn);
     bool const doneSaid = m_turnDoneSaid;
     m_turnDoneSaid = false;
+    // The router says the turn was done right: the swing was a bend.
+    m_wrongPending.reset();
     m_pendingTurn.reset();
     m_straight.reset();
     m_stats.turnsCompleted++;
@@ -558,6 +568,17 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     break;
   }
   case NavEvent::Type::Progress:
+    if (m_wrongPending)
+    {
+      // Still on the route and well closer to the turn: the swing was the road, not the driver.
+      if (m_pendingTurn && e.distanceM < m_wrongPending->distM - kWrongBendProgressM)
+      {
+        m_pendingTurn->wrongSaid = false;
+        m_wrongPending.reset();
+      }
+      else if (e.t - m_wrongPending->t > kWrongConfirmMs)
+        m_wrongPending.reset();
+    }
     if (m_pendingTurn)
     {
       auto & p = *m_pendingTurn;
@@ -679,11 +700,15 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
   }
   case NavEvent::Type::WrongTurn: WrongTurn(out, e.t, e.expected, e.turned, e.at); break;
   case NavEvent::Type::MissedTurn:
+    // The router agrees the turn went wrong: the swing that saw which way is the line to say.
+    if (m_wrongPending)
+      SayWrongPending(out, e.t);
     m_pendingTurn.reset();
     // Routing usually reports a wrong-way turn as "missed" too. It was already roasted.
     if (e.t - m_lastWrongTurnAt < 20000)
       break;
     m_stats.missedTurns++;
+    NoteDetour(e.t);
     Log(MakeIncident(e.t, IncidentKind::MissedTurn, m_lastInstructionText), e.at);
     Roast(out, e.t, Category::MissedTurn, "missedTurn",
           {{"distance", FormatDistance(m_lastInstructionDistanceM.value_or(500), units)}}, true);
@@ -691,8 +716,13 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
   case NavEvent::Type::Rerouted:
     m_stats.reroutes++;
     Log(MakeIncident(e.t, IncidentKind::Rerouted), e.at);
+    // A silent reroute may be one the driver asked for, or walking off on purpose: the Navigator
+    // calls NoteDetour for the ones that were the driver's doing.
     if (!e.silent)
+    {
+      NoteDetour(e.t);
       Roast(out, e.t, Category::Rerouted, "rerouted", {}, true);
+    }
     break;
   case NavEvent::Type::Traffic:
     if (!e.heavy)
@@ -707,8 +737,13 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
       break;
     }
     m_trafficAlternate = e.alternate.value_or("the other route");
+    // Followed the directions into this jam? Then it's the traffic's fault, not their route's.
+    m_jamBlamesRoute = !m_config.trafficBlameNeedsDetour || DetourBlamesJam(e.t);
+    Trace("traffic.blame", {{"route", m_jamBlamesRoute ? "yes" : "no"},
+                            {"detour_s", m_lastDetourAt ? LogNum((e.t - *m_lastDetourAt) / 1000, 0) : "none"}});
     Log(MakeIncident(e.t, IncidentKind::Traffic, e.alternate), e.at);
-    Roast(out, e.t, Category::Traffic, "traffic.start", {{"alternate", *m_trafficAlternate}}, true);
+    Roast(out, e.t, Category::Traffic, m_jamBlamesRoute ? "traffic.start" : "traffic.start.onRoute",
+          {{"alternate", *m_trafficAlternate}}, true);
     break;
   case NavEvent::Type::Arrived:
   {
@@ -767,6 +802,15 @@ void CritiqueEngine::CheckTurnDirection(TelemetrySample const & s, std::vector<C
     return;
   TurnDirection const turned = delta > 0 ? TurnDirection::Right : TurnDirection::Left;
   m_headings.clear();
+  bool const routeLeft = m_leftRouteAt && s.t - *m_leftRouteAt < kWrongConfirmMs;
+  if (turned != m_pendingTurn->dir && m_config.confirmWrongTurns && !routeLeft)
+  {
+    // A road that bends left just before a right turn swings the heading the same way a wrong turn
+    // does. Wait for the route: off it, or a missed turn, and this is said then.
+    m_pendingTurn->wrongSaid = true;  // no second verdict on this maneuver while it waits
+    m_wrongPending = WrongPending{s.t, m_pendingTurn->dir, turned, m_pendingTurn->distM};
+    return;
+  }
   if (turned == m_pendingTurn->dir)
   {
     if (m_pendingTurn->stage >= 4)
@@ -1018,8 +1062,13 @@ std::optional<std::string> CritiqueEngine::Grievance() const
 {
   if (m_snubbedAt)
     return "not stopping at " + *m_snubbedAt;
-  auto const last = std::find_if(m_incidents.rbegin(), m_incidents.rend(), [](Incident const & i)
-                                 { return i.kind != IncidentKind::Rerouted && i.kind != IncidentKind::LongStop; });
+  // A jam the driver followed my directions into is no grudge: "ignoring my route" would be a lie.
+  bool const jamIsGrudge = !m_config.trafficBlameNeedsDetour || m_jamBlamesRoute;
+  auto const last = std::find_if(m_incidents.rbegin(), m_incidents.rend(), [jamIsGrudge](Incident const & i)
+                                 {
+                                   return i.kind != IncidentKind::Rerouted && i.kind != IncidentKind::LongStop &&
+                                          (jamIsGrudge || i.kind != IncidentKind::Traffic);
+                                 });
   if (last == m_incidents.rend())
     return std::nullopt;
   std::optional<std::string> street;
@@ -1048,6 +1097,37 @@ std::optional<std::string> CritiqueEngine::Grievance() const
   case IncidentKind::Traffic: return std::string("ignoring my route");
   default: return std::nullopt;
   }
+}
+
+std::vector<Commentary> CritiqueEngine::LeftRoute(double t)
+{
+  std::vector<Commentary> out;
+  m_leftRouteAt = t;
+  if (m_wrongPending)
+    SayWrongPending(out, t);
+  return out;
+}
+
+void CritiqueEngine::SayWrongPending(std::vector<Commentary> & out, double t)
+{
+  auto const pending = *std::exchange(m_wrongPending, std::nullopt);
+  if (t - pending.t > kWrongConfirmMs)
+    return;
+  WrongTurn(out, t, pending.expected, pending.turned);
+}
+
+void CritiqueEngine::NoteDetour(double t, bool wholeTrip)
+{
+  m_lastDetourAt = t;
+  m_detourWholeTrip = m_detourWholeTrip || wholeTrip;
+  // Left the route to dodge a jam and still stuck: that one's on the driver now.
+  if (m_trafficAlternate)
+    m_jamBlamesRoute = true;
+}
+
+bool CritiqueEngine::DetourBlamesJam(double t) const
+{
+  return m_detourWholeTrip || (m_lastDetourAt && t - *m_lastDetourAt <= kDetourBlamesJamMs);
 }
 
 void CritiqueEngine::WrongTurn(std::vector<Commentary> & out, double t, TurnDirection expected, TurnDirection turned,
@@ -1205,12 +1285,12 @@ void CritiqueEngine::CheckTooSlow(TelemetrySample const & s, std::vector<Comment
   double const speed = JsRound(ToDisplay(s.speedMps, units));
   double const limit = JsRound(ToDisplay(*s.speedLimitMps, units));
   Vars vars{{"speed", Num(speed)}, {"limit", Num(limit)}, {"under", Num(limit - speed)}, {"unit", UnitWord(units)}};
-  // Stuck in traffic isn't dawdling, it's a bad route choice. Blame that instead.
+  // Stuck in traffic isn't dawdling. Blame the route, if the driver picked it (TrafficKey), or the jam.
   bool spoke;
   if (m_trafficAlternate)
   {
     vars["alternate"] = *m_trafficAlternate;
-    spoke = Roast(out, s.t, Category::Traffic, "traffic", vars);
+    spoke = Roast(out, s.t, Category::Traffic, TrafficKey(), vars);
   }
   else
   {
@@ -1240,12 +1320,12 @@ void CritiqueEngine::CheckStopped(TelemetrySample const & s, std::vector<Comment
     m_stopCount++;
     return;
   }
-  // Stuck in a jam keeps blaming the route every 45 s, as before.
+  // Stuck in a jam keeps on about it every 45 s, as before (the route only if the driver picked it).
   if (m_trafficAlternate)
   {
     if (s.t - *m_stoppedSince < m_config.longStopAfterMs)
       return;
-    if (Roast(out, s.t, Category::Traffic, "traffic", {{"alternate", *m_trafficAlternate}}))
+    if (Roast(out, s.t, Category::Traffic, TrafficKey(), {{"alternate", *m_trafficAlternate}}))
     {
       m_stoppedSince = s.t;
       Log(MakeIncident(s.t, IncidentKind::Traffic));

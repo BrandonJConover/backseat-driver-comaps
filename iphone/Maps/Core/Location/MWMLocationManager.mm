@@ -1,7 +1,6 @@
 #import "MWMLocationManager.h"
 #import "MWMAlertViewController.h"
 #import "MWMLocationObserver.h"
-#import "MWMLocationPredictor.h"
 #import "MWMRouter.h"
 #import "SwiftBridge.h"
 #import "location_util.h"
@@ -115,10 +114,11 @@ std::map<GeoMode, GeoModeSettings> const kGeoSettings{
      {.distanceFilter = 2,
       .accuracy = {.charging = kCLLocationAccuracyBestForNavigation,
                    .battery = kCLLocationAccuracyBest}}},
+    // Backseat: driving gets sensor-fused fixes on battery too. Plain Best lagged behind the car.
     {GeoMode::VehicleRouting,
      {.distanceFilter = kCLDistanceFilterNone,
       .accuracy = {.charging = kCLLocationAccuracyBestForNavigation,
-                   .battery = kCLLocationAccuracyBest}}},
+                   .battery = kCLLocationAccuracyBestForNavigation}}},
     {GeoMode::PedestrianRouting,
      {.distanceFilter = 2,
       .accuracy = {.charging = kCLLocationAccuracyBestForNavigation,
@@ -168,7 +168,6 @@ void setShowLocationAlert(BOOL needShow) {
 @property(nonatomic) CLHeading * lastHeadingInfo;
 @property(nonatomic) CLLocation * lastLocationInfo;
 @property(nonatomic) MWMLocationStatus lastLocationStatus;
-@property(nonatomic) MWMLocationPredictor * predictor;
 @property(nonatomic) Observers * observers;
 @property(nonatomic) location::TLocationSource locationSource;
 
@@ -349,9 +348,10 @@ void setShowLocationAlert(BOOL needShow) {
 {
   if (!locationInfo || self.lastLocationStatus != MWMLocationStatusNoError)
     return;
+  // No MWMLocationPredictor here: its made-up fixes reached the core's Extrapolator as real ones and
+  // broke it (a guess stamped after the next real fix turned extrapolation off), so the arrow sat on
+  // an old fix. The Extrapolator already moves the arrow between fixes.
   [self onLocationUpdate:locationInfo source:self.locationSource];
-  if (![self.lastLocationInfo isEqual:locationInfo])
-    [self.predictor reset:locationInfo];
 }
 
 - (void)onLocationUpdate:(CLLocation *)locationInfo source:(location::TLocationSource)source
@@ -405,7 +405,6 @@ void setShowLocationAlert(BOOL needShow) {
 {
   LOG(LINFO, ("MyPositionMode updated to", DebugPrint(mode)));
   MWMLocationManager * manager = [self manager];
-  [manager.predictor setMyPositionMode:mode];
   [manager processLocationStatus:manager.lastLocationStatus];
   if ([MWMRouter isRoutingActive])
   {
@@ -435,20 +434,6 @@ void setShowLocationAlert(BOOL needShow) {
 {
   setShowLocationAlert(YES);
   [self.manager processLocationStatus:self.manager.lastLocationStatus];
-}
-
-#pragma mark - Prediction
-
-- (MWMLocationPredictor *)predictor
-{
-  if (!_predictor)
-  {
-    __weak MWMLocationManager * weakSelf = self;
-    _predictor = [[MWMLocationPredictor alloc] initWithOnPredictionBlock:^(CLLocation * location) {
-      [weakSelf onLocationUpdate:location source:location::EPredictor];
-    }];
-  }
-  return _predictor;
 }
 
 #pragma mark - Device notifications
