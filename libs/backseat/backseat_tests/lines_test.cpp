@@ -783,3 +783,72 @@ TEST(StreakAndBlameKeysHaveThickUpperTiers)
     for (auto const & line : LinesFor("turnCompleted.streakBig", tier))
       CHECK(line.find("{n}") != std::string::npos || line.find("{N}") != std::string::npos);
 }
+
+TEST(RecurringKeysTopTierStopsRepeatingTierZero)
+{
+  // Loop B173 (BI-128 batch 3, BI-154): on 26 keys heard on most trips, tier 2 was mostly tier 0 word for word, so a
+  // frustrated driver heard the calm joke again instead of an escalation. Tier 2 now keeps at most one tier-0 line,
+  // has at least three lines of its own, and every own line shouts. Placeholders the key needs stay.
+  auto const & data = LineData();
+  for (char const * key :
+       {"rest.ahead",   "rest.passed",    "rest.back",      "rest.quick",  "driveThru.in",  "driveThru.long",
+        "driveThru.leaving", "road.highway", "road.smallTown", "road.nature", "road.farm",    "road.gravel",
+        "night.sunset", "night.dark",     "night.late",     "signal.lost", "signal.back",   "gas.none",
+        "coffee.far",   "clean.1",        "clean.2",        "clean.3",     "arrived.clean", "routine.yesterday",
+        "hardAccel.first", "traffic.cleared"})
+  {
+    auto const it = data.find(key);
+    CHECK(it != data.end());
+    if (it == data.end())
+      continue;
+    std::set<std::string> const calm(it->second[0].begin(), it->second[0].end());
+    int shared = 0;
+    int own = 0;
+    for (auto const & line : it->second[2])
+    {
+      if (calm.count(line))
+      {
+        ++shared;
+        continue;
+      }
+      ++own;
+      bool shouts = false;
+      for (size_t i = 0; i + 2 < line.size(); ++i)
+        shouts = shouts || (std::isupper(static_cast<unsigned char>(line[i])) &&
+                            std::isupper(static_cast<unsigned char>(line[i + 1])) &&
+                            std::isupper(static_cast<unsigned char>(line[i + 2])));
+      if (!shouts)
+        std::printf("    %s tier 2 own line does not shout: %s\n", key, line.c_str());
+      CHECK(shouts);
+    }
+    if (shared > 1 || own < 3)
+      std::printf("    %s tier 2: %d tier-0 copies, %d own lines\n", key, shared, own);
+    CHECK(shared <= 1);
+    CHECK(own >= 3);
+  }
+  auto const has = [](std::string const & line, char const * lower, char const * upper) {
+    return line.find(lower) != std::string::npos || line.find(upper) != std::string::npos;
+  };
+  for (char const * key : {"rest.ahead", "gas.none", "coffee.far"})
+    for (auto const & line : LinesFor(key, 2))
+      CHECK(has(line, "{distance}", "{DISTANCE}"));
+  for (auto const & line : LinesFor("road.farm", 2))
+    CHECK(has(line, "{side}", "{SIDE}"));
+}
+
+TEST(DayOnlyWordsLeftOutOfLinesHeardAtNight)
+{
+  // Loop B173 (BI-155): these keys fire at any hour, so "good morning", "broad daylight" and "Beach day" were false
+  // after dark.
+  for (char const * key : {"bossy", "missedTurn.hike", "venue.beach"})
+    for (int tier = 0; tier < 3; ++tier)
+      for (auto const & line : LinesFor(key, tier))
+      {
+        std::string lower = line;
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        CHECK(lower.find("good morning") == std::string::npos);
+        CHECK(lower.find("broad daylight") == std::string::npos);
+        CHECK(lower.find("beach day") == std::string::npos);
+      }
+}
