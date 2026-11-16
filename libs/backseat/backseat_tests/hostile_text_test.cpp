@@ -2,6 +2,7 @@
 // street name, an imported file) hands us gets garbage, truncated UTF-8, huge numbers and very
 // long input. Nothing may throw, hang, or blow the output up. Loop fallback:security.
 #include "check.hpp"
+#include "timing.hpp"
 
 #include "backseat/lines.hpp"
 #include "backseat/navigator.hpp"
@@ -321,7 +322,7 @@ TEST(HostileTextVeryLongInputFinishes)
   (void)Feed(text);
   auto const secs =
       std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-  CHECK(secs < 20.0);
+  CHECK(secs < 20.0 * backseat_tests::kSanitizerSlack);
 }
 
 TEST(HostileNumbersSpellWithoutOverflow)

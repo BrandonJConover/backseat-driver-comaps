@@ -5,6 +5,7 @@
 // line in a release build. These pin that every screened pass still fires on its own trigger, and that a
 // near miss (a type word inside a longer word, a digit glued on) still comes back as it went in.
 #include "check.hpp"
+#include "timing.hpp"
 
 #include "backseat/lines_data.hpp"
 #include "backseat/pronunciation.hpp"
@@ -67,5 +68,5 @@ TEST(WordScreenLineBankStaysFast)
       }
   double const seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
   CHECK(lines > 5000);
-  CHECK(seconds < 8.0);
+  CHECK(seconds < 8.0 * backseat_tests::kSanitizerSlack);
 }
