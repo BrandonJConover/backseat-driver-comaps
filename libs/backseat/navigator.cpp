@@ -628,29 +628,113 @@ std::string DestinationSide(LatLon const & here, double routeBearingDeg, LatLon 
   return across > 0 ? "right" : "left";
 }
 
-std::string InstructionText(TurnKind turn, std::string const & street, std::string const & destination)
+namespace
+{
+/// "Dallas;Fort Worth;Waco" -> "Dallas and Fort Worth": the first two, trimmed, empties skipped.
+std::string SignList(std::string const & raw)
+{
+  std::vector<std::string> parts;
+  std::string cur;
+  auto const flush = [&]
+  {
+    size_t b = cur.find_first_not_of(' ');
+    size_t e = cur.find_last_not_of(' ');
+    if (b != std::string::npos && parts.size() < 2)
+    {
+      std::string part = cur.substr(b, e - b + 1);
+      if (std::find(parts.begin(), parts.end(), part) == parts.end())
+        parts.push_back(std::move(part));
+    }
+    cur.clear();
+  };
+  for (char const c : raw)
+  {
+    if (c == ';')
+      flush();
+    else
+      cur += c;
+  }
+  flush();
+  if (parts.empty())
+    return {};
+  return parts.size() == 1 ? parts[0] : parts[0] + " and " + parts[1];
+}
+
+/// "42A;42B" -> "42A": the first number; spaces dropped ("42 B" is "42B").
+std::string ExitNumber(std::string const & raw)
+{
+  std::string out;
+  for (char const c : raw)
+  {
+    if (c == ';')
+      break;
+    if (c != ' ')
+      out += c;
+  }
+  return out;
+}
+
+bool StartsWithToward(std::string const & street)
+{
+  return street.rfind("toward ", 0) == 0;
+}
+}  // namespace
+
+SpokenRoad SpeakRoad(RoadSign const & sign)
+{
+  SpokenRoad out;
+  out.exitRef = ExitNumber(sign.junctionRef);
+  bool const exitSign = !sign.destinationRef.empty() || !sign.destination.empty();
+  if (exitSign || sign.isLink)
+  {
+    std::string road = SignList(sign.destinationRef);
+    if (road.empty() && sign.isLink)
+      road = SignList(sign.ref);
+    std::string const towns = SignList(sign.destination);
+    if (!towns.empty())
+      road += (road.empty() ? "" : " ") + std::string("toward ") + towns;
+    if (!road.empty())
+    {
+      out.street = road;
+      return out;
+    }
+  }
+  out.street = sign.name.empty() ? SignList(sign.ref) : sign.name;
+  return out;
+}
+
+std::string InstructionText(TurnKind turn, std::string const & street, std::string const & destination,
+                            std::string const & exitRef)
 {
   std::string text;
+  // An exit number belongs to an exit, or to the keep left/right that takes one.
+  bool const numbered = !exitRef.empty() && (turn == TurnKind::ExitLeft || turn == TurnKind::ExitRight ||
+                                             turn == TurnKind::SlightLeft || turn == TurnKind::SlightRight);
   switch (turn)
   {
   case TurnKind::None:
   case TurnKind::Straight: text = "Continue straight"; break;
   case TurnKind::Left: text = "Turn left"; break;
   case TurnKind::SharpLeft: text = "Make a sharp left"; break;
-  case TurnKind::SlightLeft: text = "Bear left"; break;
+  case TurnKind::SlightLeft: text = numbered ? "Take exit " + exitRef + " on the left" : "Bear left"; break;
   case TurnKind::Right: text = "Turn right"; break;
   case TurnKind::SharpRight: text = "Make a sharp right"; break;
-  case TurnKind::SlightRight: text = "Bear right"; break;
+  case TurnKind::SlightRight: text = numbered ? "Take exit " + exitRef + " on the right" : "Bear right"; break;
   case TurnKind::UTurn: text = "Make a U-turn"; break;
   case TurnKind::Roundabout: text = "Take the roundabout"; break;
-  case TurnKind::ExitLeft: text = "Take the exit on the left"; break;
-  case TurnKind::ExitRight: text = "Take the exit on the right"; break;
+  case TurnKind::ExitLeft: text = numbered ? "Take exit " + exitRef + " on the left" : "Take the exit on the left"; break;
+  case TurnKind::ExitRight:
+    text = numbered ? "Take exit " + exitRef + " on the right" : "Take the exit on the right";
+    break;
   case TurnKind::Destination:
     return destination.empty() ? "Arrive at your destination" : "Arrive at " + destination;
   }
-  if (!street.empty())
-    text += " onto " + street;
-  return text;
+  if (street.empty())
+    return text;
+  if (StartsWithToward(street))
+    return text + " " + street;
+  bool const exit = numbered || turn == TurnKind::ExitLeft || turn == TurnKind::ExitRight;
+  return text + (exit ? " for " : " onto ") + street;
 }
 
 double ChainWithinM(double speedMps)
@@ -691,7 +775,7 @@ std::string RoundaboutText(RouteSnapshot const & route)
   }
   }
   if (route.roundaboutLeg != RoundaboutLeg::Stay && !route.nextStreet.empty())
-    text += " onto " + route.nextStreet;
+    text += (StartsWithToward(route.nextStreet) ? " " : " onto ") + route.nextStreet;
   return text;
 }
 }  // namespace
@@ -700,7 +784,7 @@ std::string InstructionText(RouteSnapshot const & route, double speedMps)
 {
   std::string text = route.turn == TurnKind::Roundabout
                          ? RoundaboutText(route)
-                         : InstructionText(route.turn, route.nextStreet, route.destination);
+                         : InstructionText(route.turn, route.nextStreet, route.destination, route.nextExitRef);
   if (route.thenGapM < 0 || route.thenGapM > ChainWithinM(speedMps))
     return text;
   switch (route.turn)
@@ -730,7 +814,7 @@ std::string InstructionText(RouteSnapshot const & route, double speedMps)
   default: return text;
   }
   if (!route.thenStreet.empty())
-    then += " onto " + route.thenStreet;
+    then += (StartsWithToward(route.thenStreet) ? " " : " onto ") + route.thenStreet;
   return text + ", then " + then;
 }
 

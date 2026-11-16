@@ -22,6 +22,7 @@ add_executable(${PROJECT_NAME}
   offroute_blip_test.cpp
   reroute_test.cpp
   then_chaining_test.cpp
+  street_names_test.cpp
   roundabout_exit_test.cpp
   roundabout_exit_countdown_test.cpp
   countdown_now_leads_test.cpp

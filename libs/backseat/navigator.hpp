@@ -124,8 +124,12 @@ struct RouteSnapshot
   /// route is not turn 3 of the old one. 0 when the host doesn't say.
   uint64_t routeId = 0;
   TurnKind turn = TurnKind::None;
-  /// Street after the next maneuver, if known.
+  /// Street after the next maneuver, if known. At a highway exit, the road and town on the sign:
+  /// "I 35 North toward Dallas" (SpeakRoad()).
   std::string nextStreet;
+  /// The next maneuver's highway exit number from the map (OSM junction:ref, "42B"), empty when
+  /// unknown: "Take exit 42B on the right".
+  std::string nextExitRef;
   double distToTurnM = 0;
   /// What controls the next maneuver's junction, if the host can tell (stop sign, light).
   Control control = Control::None;
@@ -326,8 +330,35 @@ RouteSnapshot CleanRoute(RouteSnapshot route, double lastDistToTurnM);
 /// has turned at least `minDeg` within 80 m. Negative if none starts within `maxM`.
 double CurveAheadM(std::vector<LatLon> const & ahead, double maxM, double minDeg = 50);
 
-/// "Turn left onto Elm Street" for a maneuver and the street after it.
-std::string InstructionText(TurnKind turn, std::string const & street, std::string const & destination);
+/// What the map knows about the road after a maneuver, from the router's road-name info.
+/// Multiple values are ';'-separated, as in OSM ("Dallas;Fort Worth").
+struct RoadSign
+{
+  std::string name;            // "North Colorado Boulevard"
+  std::string ref;             // "US 287"
+  std::string junctionRef;     // Exit number, "42B"
+  std::string destinationRef;  // Road the exit leads to, "I 35 North"
+  std::string destination;     // Towns on the exit sign, "Dallas;Fort Worth"
+  bool isLink = false;         // The road is a ramp.
+};
+
+/// The road as said out loud and the exit number apart. A plain street is its name, or its route
+/// number when it has none ("Elm Street", "US 287"). At an exit or ramp with a sign it's the road and
+/// the towns: "I 35 North toward Dallas and Fort Worth", or "toward Dallas" with no road number. At
+/// most two of each are read. ForSpeech() turns "I 35" and "42B" into words later.
+struct SpokenRoad
+{
+  std::string street;
+  std::string exitRef;
+};
+SpokenRoad SpeakRoad(RoadSign const & sign);
+
+/// "Turn left onto Elm Street" for a maneuver and the street after it. With a highway exit number,
+/// an exit (or a keep-left/right onto one) says it: "Take exit 42B on the right for I 35 North toward
+/// Dallas". A street that is only "toward Dallas" is said without "onto".
+std::string InstructionText(TurnKind turn, std::string const & street, std::string const & destination,
+                            std::string const & exitRef = {});
+
 
 /// The next maneuver's text, with the one after it when that comes right after: "Turn left onto
 /// Winesap Drive, then right onto Cameo Lane". "Right after" is 150 m, or 10 s at `speedMps` up to 500 m

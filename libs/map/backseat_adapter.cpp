@@ -3477,7 +3477,18 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
       snap.routeId = route->GetRouteId();
       snap.turn = ToTurnKind(turn);
       snap.distToTurnM = distanceToTurnM;
-      snap.nextStreet = SpeakableStreetName(info.m_nextStreetName);
+      // From the router's road-name parts, not the screen text, so the exit number survives a
+      // sign that also names towns ("[42B]: [I 35] > Dallas" read as "toward Dallas" lost it).
+      backseat::RoadSign sign;
+      sign.name = info.m_nextName;
+      sign.ref = info.m_nextRef;
+      sign.junctionRef = info.m_nextJunctionRef;
+      sign.destinationRef = info.m_nextDestinationRef;
+      sign.destination = info.m_nextDestination;
+      sign.isLink = info.m_nextIsLink;
+      backseat::SpokenRoad const spoken = backseat::SpeakRoad(sign);
+      snap.nextStreet = spoken.street.empty() ? SpeakableStreetName(info.m_nextStreetName) : spoken.street;
+      snap.nextExitRef = spoken.exitRef;
       snap.control = GuessControl(*route, turn.m_index);
       snap.lanes = WantedLanes(turn.m_lanes);
       snap.laneSide = backseat::LaneAdviceFor(snap.lanes).side;
