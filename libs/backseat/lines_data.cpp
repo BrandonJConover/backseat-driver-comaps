@@ -3789,7 +3789,7 @@ LineTable const & LineData()
         "I looked for a way around. There isn't one. This jam is adding about {minutes} minutes.",
         "Bad news. Every other way is worse. Add {minutes} minutes to the arrival time.",
         "I checked every road. This is still the best one, which tells you how bad the others are. {minutes} minutes late.",
-        "No way around it. We're going to be about {minutes} minutes late. I'll let them know it was you."},
+        "No way around it. We're going to be about {minutes} minutes late. I'll let them know it was the traffic. They won't believe me."},
        {"I could reroute you, but actually I'm having a great time.",
         "No escape. {minutes} extra minutes. I've updated the arrival time and my opinion of this road.",
         "There's nothing better. We're stuck. {minutes} minutes stuck. I did the math.",
