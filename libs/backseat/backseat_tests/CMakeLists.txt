@@ -44,6 +44,7 @@ add_executable(${PROJECT_NAME}
   pop_quiz_test.cpp
   quiz_country_test.cpp
   pronunciation_backup_test.cpp
+  persona_test.cpp
   pronunciation_test.cpp
   ask_moment_test.cpp
   quiet_bits_test.cpp

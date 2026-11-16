@@ -274,6 +274,10 @@ public:
     return m_backseat.SpeakSearchResults(query, std::move(results));
   }
   std::string BackseatReply(std::string const & key, backseat::Vars const & vars = {}) { return m_backseat.ReplyLine(key, vars); }
+  std::string BackseatReplyAsVoice(std::string const & voiceName, std::string const & key, backseat::Vars const & vars = {})
+  {
+    return m_backseat.ReplyLineAsVoice(voiceName, key, vars);
+  }
   BackseatAdapter::SearchPick BackseatPickSearchResult(std::string const & spoken)
   {
     return m_backseat.PickSearchResult(spoken);

@@ -30,6 +30,8 @@ set(
   navigator.hpp
   onboarding.cpp
   onboarding.hpp
+  persona_lines_data.cpp
+  persona_lines_data.hpp
   plate_game.cpp
   plate_game.hpp
   place_search.cpp

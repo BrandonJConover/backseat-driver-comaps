@@ -3678,6 +3678,14 @@ std::string Navigator::TrafficReply()
   return Reply(judged ? "cmd.traffic.clear" : "cmd.traffic.unknown");
 }
 
+std::string Navigator::ReplyAs(Persona persona, std::string const & key, Vars const & vars)
+{
+  SetLinePersona(persona);
+  std::string text = Reply(key, vars);
+  SetLinePersona(m_persona);
+  return text;
+}
+
 std::string Navigator::Reply(std::string const & key, Vars const & vars)
 {
   double const r = m_config.rng ? m_config.rng() : 0;

@@ -1,0 +1,923 @@
+== proud
+# Tier 0: sweet, a little much. Tier 1: smothering. Tier 2: sobbing-at-the-recital levels of pride.
+# Mistakes are never the driver's fault. They're the GPS's, the road's, or a "learning moment".
+
+[cmd.voice]
+0 Hi sweetie! It's me, {voice}! I'm going to be SO proud of you. I already am. You picked me all by yourself!
+0 Oh, you chose {voice}! Good choosing! That was a big decision and you made it like a pro!
+0 Hello, my little driver! {voice} here! Are we ready for a big drive? Yes we are!
+0 {voice} here! Look who picked the nice one! I'm so proud and we haven't even started!
+0 It's {voice}! You switched voices all by yourself! I'm so impressed!
+1 You picked me! {voice}! I'm putting this moment on the fridge!
+1 {voice} reporting for cheering duty! You're going to be amazing!
+2 You chose {voice}! Out of all of them! I'm crying! Happy tears! The best kind!
+2 {voice} here! My little driver picked me! I'm calling everyone!
+
+[cmd.voice.audition]
+0 Hi sweetie! I'm {voice}! If you want me, say {phrase}! You'll say it so well!
+0 {voice} here! Say {phrase} and I'll cheer for every single turn!
+0 Hello, superstar! I'm {voice}! Just say {phrase}! Use your words! You can do it!
+0 It's {voice}! Pick me and I'll be proud of you all day! Say {phrase}!
+1 I'm {voice}! Say {phrase}! I already know you'll pronounce it perfectly!
+2 {voice} here! Say {phrase}! Pick me! I'll make you a gold star!
+
+[persona.leave]
+0 Oh, you want to try a different one? That's so brave! Trying new things is how we grow!
+0 Okay! I'll miss you so much. Remember: I'm proud of you. Always.
+0 You're switching? Good for you for knowing what you want! Bye bye, superstar!
+1 Off you go! Look at you, all independent. They grow up so fast.
+2 Go on! I'll be fine! I'll just be here looking at pictures of your best turns.
+
+[instruction.prefix]
+0 Okay, superstar!
+0 You're doing great!
+0 Ready, champ?
+0 Big moment coming!
+0 Here's a fun one!
+0 Listen up, my little driver!
+0 Ooh, exciting!
+0 You've got this!
+0 Okay, sweetie,
+1 Okay, my brilliant little navigator!
+1 I believe in you so much!
+1 Here's one I KNOW you'll do great at!
+1 Deep breath, we can do this together!
+2 Oh, I'm so excited for this one!
+2 My best driver in the whole world!
+2 I've been saving this one just for you!
+
+[instruction.suffix]
+0  You've got this!
+0  I believe in you!
+0  Easy peasy!
+0  So proud of you!
+0  You're a natural!
+0  Gold star if you do it!
+0  We're a great team!
+0  You're doing amazing!
+1  I already know you'll be perfect!
+1  Big kid driving!
+1  Mommy and Daddy would be so proud! I mean me. I'm proud.
+1  I'm telling everyone about this!
+2  I'm already so proud I could burst!
+2  You're my favorite driver ever!
+2  I'm getting the camera ready!
+
+[speeding.barely]
+0 Ooh, {speed}! You're so good at going fast! Let's practice going {limit} now, okay?
+0 Look at you, doing {speed}! Very impressive! The sign says {limit}, though, sweetie.
+0 {over} over! You're such an overachiever! Let's just do {limit} for the sign. It worked so hard on that number.
+0 Wow, {speed}! Somebody's excited! We can save that energy and do {limit}, okay?
+0 You found the gas pedal! Good job! Now let's find {limit}. I know you can!
+0 {speed} in a {limit}. So close! Just a teeny bit slower and it'll be perfect!
+0 {over} over. That's okay! Everybody's learning! Let's try {limit}!
+0 You're doing {speed}. Such confidence! Let's channel that into {limit}.
+1 {speed}! You love going fast, don't you? Yes you do! But the sign says {limit}, and we listen to signs.
+1 {over} over! I know, I know, you're just so eager! Let's slow down to {limit}, my little speedster.
+1 Look at that number! {speed}! I'm so impressed. Now let's make me even more impressed with {limit}.
+1 {speed} in a {limit}. Who's a fast driver? You are! Who's going to slow down now? You are!
+2 {SPEED}! You're so talented! Too talented! Let's be a little LESS talented, down to {limit}!
+2 {over} over! Oh, my little race car! Let's be a little slower race car, okay? {limit}!
+2 {speed}! I'm so proud and so scared at the same time! {limit}, sweetie, {limit}!
+
+[speeding.clearly]
+0 {speed} in a {limit}! You're so good at going fast! Let's show everyone how good we are at going {limit}, too!
+0 Ooh, {over} over! What a big foot you have! Let's use it gently, okay? {limit}.
+0 Wow, {speed}! Someone ate their breakfast! Let's do {limit} so we can enjoy the view together!
+0 {over} over! That's so many numbers! Let's count back down to {limit}, okay? You're great at counting!
+0 {speed}! You're such a confident driver. Confident drivers do {limit} here. I just know you can.
+1 {speed}! Big, big number! Let's make it a smaller, prouder number. {limit}!
+1 {over} over! I'm not upset! I'm never upset! I just want you safe, my little champion. {limit}, please!
+1 Who's going {speed}? You are! Who's going to try {limit}? Also you! I believe in you!
+2 {over} over! Okay, sweetie, we're going to slow down together. Ready? {limit}! You can do it!
+2 {speed}! I'm so proud of how brave you are! Now let's be brave at {limit}!
+
+[speeding.way]
+0 {speed} in a {limit}! Wow! Okay! That's a lot of speed for my little driver. Let's slow down, sweetie.
+0 {over} over! You're so strong to push the pedal that hard! Now be strong and let it up. {limit}!
+0 {speed}! Whee! Okay, that's enough whee. {limit}, please.
+0 That's {over} over! You're such a natural at speed! Let's be a natural at {limit} too!
+1 {speed}! Okay! Mommy GPS needs you to slow down now. Nice and easy. {limit}.
+1 {over} over, sweetheart! I'm so proud of your enthusiasm. Let's leave some for later. {limit}!
+1 {SPEED}! Wow! Okay! You're so amazing! Please slow down to {limit} so you can keep being amazing!
+2 {SPEED} IN A {LIMIT}! I'm still proud of you! I'm always proud of you! But SLOW DOWN, superstar!
+2 {over} over! My heart! I love you! {LIMIT}! Please! Still proud!
+2 {speed}! I'm clapping AND covering my eyes! {limit}, my little rocket!
+
+[speeding.still]
+0 Still {speed}! You're so consistent! Let's be consistent at {limit}!
+0 Still {over} over! You really commit, don't you? I love that about you! {limit}, though.
+0 Still a little fast! That's okay! We're still learning! {limit}!
+1 Still {speed}! You've got such a strong will! I admire it! {limit}, sweetie.
+1 Still {over} over. I'm still proud! I'm just also still saying {limit}!
+2 Still {speed}! I'll keep cheering until you slow down! Go, {limit}! Go, {limit}!
+2 Still {over} over! You're so determined! Like a little bulldozer! A {limit} bulldozer, please!
+
+[tooSlow]
+0 {speed}! Nice and careful! You're so responsible! You're allowed to go up to {limit}, too!
+0 {under} under! Safety first! I love that! You can go a little faster if you feel brave!
+0 Look at you, being so careful! The limit is {limit}. Whenever you're ready, champ!
+0 {speed}. So gentle! You can go {limit} if you want! No pressure! Okay, a little pressure!
+0 Slow and steady! Just like the tortoise! And the tortoise WON!
+1 {under} under! Such a cautious little driver! Let's try a teensy bit faster. {limit}! You can do it!
+1 {speed} in a {limit}! You're taking such good care of us! Maybe a little faster? For me?
+1 Careful! Careful! I love careful! Also, {limit} is allowed! Just so you know!
+2 {speed}! You're the safest driver in the whole wide world! Let's be the safest driver at {limit}!
+2 {under} under! Oh, I love how careful you are! The cars behind us love you too! Probably!
+
+[hardBraking]
+0 Whoa! Great stopping! You're so good at the brake pedal!
+0 Good stop! Very decisive! I love a decisive driver!
+0 Ooh! That was a big stop! You stopped so well!
+0 Wow, look how fast you can stop! That's a skill!
+0 Big brake! Good job using your whole foot!
+0 That's okay! Everybody stops suddenly sometimes! You did it so confidently!
+1 Whoa! You're so strong! The brake pedal didn't stand a chance!
+1 Another big stop! You're really getting the hang of the brake!
+1 That was a little sudden, sweetie. But you did it with such conviction!
+2 WHOA! What a stop! I flew right out of the cupholder! I'm so proud of your reflexes!
+2 Big stop! I'm okay! I'm more than okay! I'm proud!
+
+[hardAccel]
+0 Wow! You found the gas! Great job!
+0 Zoom! Look at you go!
+0 That was a speedy start! You're so excited! I love that!
+0 Off we go! You're such a go-getter!
+1 Zoom zoom! Okay, let's be gentle with the pedal, sweetie. It has feelings too.
+1 What a launch! You're so powerful! Let's be a little less powerful next time!
+2 WHEE! What a start! My little rocket ship! Gently, though!
+2 Whoa! You're so strong! Gentle feet, sweetie! Gentle feet!
+
+[hardAccel.first]
+0 Ooh, you found the gas pedal! Good job!
+1 Zoom! What a strong little foot!
+2 Wow! You're so powerful!
+
+[traffic.start]
+0 Oh no, traffic! That's not your fault! You're doing amazing! We could try {alternate} next time, if you want!
+0 Traffic! That's okay! You picked such a nice road! {alternate} was also an option. Both are great!
+0 Look at you, being so patient in traffic! Maybe {alternate} next time. Only if you want to!
+1 Traffic! You didn't pick {alternate}, and that's okay! Learning moments are my favorite moments!
+1 Oh, sweetie, traffic. I should have said {alternate} louder! My fault!
+2 Traffic! It's not your fault! It's the other cars' fault! And mine! {alternate}! I should have insisted! I'm so sorry!
+
+[traffic]
+0 Still traffic! You're so patient! {alternate} might have been faster, but you're doing great here!
+0 Crawling along! You're so good at crawling! {alternate} is there if we need it!
+0 We could have taken {alternate}, but then I wouldn't get to see how patient you are!
+1 Still traffic! I'm not mad at you. I'm mad at {alternate} for not being more obvious!
+1 Look how calm you are! I'd be losing it! Okay, I would have taken {alternate}. But you're doing great!
+2 This traffic! You're handling it like a champion! A champion who maybe should have taken {alternate}! Still a champion!
+
+[traffic.stopGo]
+0 Go! Stop! Go! Stop! You're so good at both!
+0 Stop and go! And you're doing it perfectly!
+1 Go, stop, go, stop! You're like a little dancer!
+2 Look at you! Stop! Go! Stop! Go! I could watch this all day! I might have to!
+
+[traffic.standstill]
+0 We're not moving! That's okay! You're the best at sitting still!
+0 Stopped! What a great chance to relax! You deserve it!
+1 Still stopped! You're being so patient! Who's a patient driver? You are!
+2 We haven't moved in forever and you haven't complained once! I'm so proud I could cry!
+
+[traffic.cleared]
+0 Traffic's clearing! You did it! You waited so well!
+0 We're moving again! Great job being patient!
+1 It's open! You made it through traffic! I'm getting you a sticker!
+2 Traffic's gone! You beat traffic! You beat it! I'm so proud!
+
+[longStop]
+0 We've been stopped a while! That's okay! You're so good at stopping!
+0 Taking a little break? Good for you! Rest is important!
+0 Still stopped! No rush, sweetie! Whenever you're ready!
+0 We're not moving yet. That's okay! Some of the best drivers take their time!
+1 Still stopped! Take all the time you need! Well, maybe not ALL the time.
+1 We've been here a bit, champ! Whenever you feel ready to go, I'll be cheering!
+2 Still stopped! I'm so proud of how still you are! Now let's be proud of how we move! Ready?
+2 Such a long stop! You're the best stopper I've ever had!
+
+[missedTurn]
+0 You are doing so good! We can just take the next exit. I must have forgotten to tell you to turn. My little driver would never miss a turn.
+0 Oopsie! That's okay! That was my fault! I'll find us a new way, superstar!
+0 That turn was hiding! It was being so sneaky! You did nothing wrong!
+0 Oh, we went past it! That's okay! Now we get to see more of the neighborhood!
+0 Missed it? No, no, no. The turn missed YOU. Silly turn!
+0 That's alright! Every great driver misses a turn sometimes! Probably!
+0 Whoops! I should have said it louder! You're doing so well!
+0 That's okay, sweetie! We'll just go around! Going around is fun!
+1 You didn't miss the turn, the turn just wasn't ready for you yet!
+1 Oh! That's okay! I'll recalculate! Recalculating is my favorite thing to do for you!
+1 That turn didn't deserve you anyway! We'll find a better one!
+1 Not your fault! I'm going to have a stern talk with whoever designed that road!
+2 That's okay! That's okay! I'm not crying, you're crying! We're both fine! New route!
+2 That turn was so rude! You're perfect! Let's go find a nicer turn!
+2 It's all my fault! I'm the worst GPS! You're the best driver! We'll fix it together!
+
+[wrongTurn.left]
+0 Ooh, a right! Bold choice! The left was the plan, but I love how independent you are!
+0 That's the other left, sweetie! That's okay! Right is a great direction too!
+0 You went right! You're so creative! Let's try left next time, okay?
+1 Right! So close! It's the one on the other side! You're still my favorite!
+2 Oh, sweetie! That's your right! But it was a beautiful right! The most beautiful right!
+
+[wrongTurn.right]
+0 Ooh, a left! I said right, but that was a really nice left!
+0 That's the other right, sweetie! It's okay! Lefts are fun too!
+0 You went left! I love that you're thinking for yourself! Right next time!
+1 Left! So close! The right is the one on this side! You'll get it! I believe in you!
+2 Oh, my little driver! That was your left! It was a gorgeous left, though! Truly!
+
+[payback]
+0 I'm going to ask you to turn left at a stop sign. It's a little challenge, for {grievance}. You'll do amazing!
+1 A left at a stop sign! It's sort of for {grievance}. But mostly because I know you can do it!
+2 Left at a stop sign! A tiny bit of payback for {grievance}! But I'll be cheering the whole time!
+
+[payback.clean]
+0 A left at a stop sign! I picked a hard one, because you're ready for it!
+1 Left at a stop sign! Look at you, tackling the big ones!
+2 A left at a stop sign! My big brave driver!
+
+[countdown.far]
+0 In {distance}, you get to turn {dir}! How exciting!
+0 Coming up in {distance}: a {dir}! You're going to be so good at it!
+0 Ooh, in {distance}, a {dir} turn! I already know you'll nail it!
+0 Just so my superstar knows, we turn {dir} in {distance}!
+0 In {distance}, turn {dir}! I'm so excited for you!
+0 A {dir} in {distance}! You've done so many of these! You're basically an expert!
+0 In {distance}, a little {dir} turn! Easy peasy for my little driver!
+0 Big {dir} coming up in {distance}! Get excited!
+1 In {distance}, turn {dir}! I'm telling you early because I love you, not because I'm worried!
+1 {dir} in {distance}! I know, I know, you don't need reminding! You're so smart!
+1 In {distance}, a {dir}! Do you remember which way is {dir}? Of course you do!
+1 {distance} until a {dir}! I've already got the gold star ready!
+2 In {distance}, turn {dir}! I'm so excited I can barely hold it in!
+2 {dir} in {distance}! This is going to be the best {dir} turn of your life!
+2 {distance}! Then {dir}! I'm already proud! Retroactively proud! Proactively proud!
+
+[countdown.far.more]
+0 {dir} in {distance}! I'll remind you again later, just because I like talking to you!
+0 In {distance}, a {dir}! No pressure! You're amazing!
+1 In {distance}, {dir}! I'm just so excited about this turn!
+2 {dir}! In {distance}! I can't stop thinking about how good you'll be at it!
+
+[countdown.near]
+0 {dir} in {distance}! Here it comes, champ!
+0 Turning {dir} in {distance}! You're so ready!
+0 In {distance}, turn {dir}! Almost there! You're doing amazing!
+0 {distance}, then {dir}! I believe in you!
+0 Turn {dir} in {distance}! Big moment!
+0 Your {dir} is in {distance}! You've totally got this!
+1 {distance}! {dir}! Ooh, I'm getting nervous for you! Happy nervous!
+1 {dir} in {distance}! Remember, {dir}! You knew that! Of course you knew that!
+1 In {distance}, a {dir}! Show me what my little driver can do!
+2 {dir} in {distance}! I'm holding my breath! I'm so excited!
+2 {distance}! {dir}! This is your moment, superstar!
+
+[countdown.now]
+0 Turn {dir}! You can do it!
+0 Here! Turn {dir}! Great job!
+0 This one! {dir}! Go, go, go!
+0 Turn {dir} now, sweetie!
+0 {dir}, here! Yay!
+0 Now! {dir}! I believe in you!
+1 Turn {dir}! Big kid turn! You've got it!
+1 {dir}! Right here! Ooh, I'm so excited!
+1 This is it! {dir}! You were born for this!
+2 TURN {DIR}! YOU CAN DO IT! I'M SO PROUD ALREADY!
+2 {dir}! Here! Go, my little driver, go!
+
+[countdown.still]
+0 Still turning {dir}! Doing great!
+0 Keep turning {dir}! Look at you go!
+0 You're still turning {dir}! So smooth!
+1 Still turning {dir}! You're so thorough! I love how thorough you are!
+1 Still {dir}! What a long, beautiful turn!
+2 Still turning {dir}! You're turning so well I want to frame it!
+
+[countdown.mention]
+0 By the way, we're turning {dir} soon! I just love saying it!
+0 Did I mention we turn {dir}? You probably remembered! You're so smart!
+0 Little reminder: {dir}! Not that you need it!
+0 Ooh, and it's a {dir}! I'm so excited for you!
+1 It's a {dir}! I keep mentioning it because I care, not because I'm worried!
+1 Turning {dir} soon! You remember! I know you remember!
+2 It's a {dir}! I've told everyone! The whole phone knows!
+
+[countdown.mention.more]
+0 Just so we're on the same page: {dir}! In {distance}! You're amazing!
+0 Your turn's a {dir}, in {distance}! Then a big high five!
+1 {dir}, in {distance}! I keep saying it because it's so exciting!
+2 {dir}! {distance}! My heart is so full!
+
+[countdown.done]
+0 You can stop turning {dir} now! Perfect!
+0 That's enough {dir}! You did it so well!
+0 Great {dir}! You can straighten out now, superstar!
+0 And done! What a lovely {dir} turn!
+1 You can stop turning, sweetie! You've done it! You did the whole thing!
+1 That's plenty of {dir}! Such dedication! I love it!
+2 Okay, you can stop now! Wow! What a turn! I'm going to tell everyone!
+
+[countdown.nascar]
+0 Ooh, another left up ahead! You're so good at lefts! Like a real NASCAR driver!
+1 Another left! Left, left, left! My little NASCAR champion!
+2 ANOTHER left! You're unstoppable! Somebody get this driver a trophy!
+
+[badge.nascar]
+0 Achievement unlocked: NASCAR Driver! Three lefts in a row! I'm so proud I made you a badge! It's going on the fridge!
+1 You unlocked NASCAR Driver! Three whole lefts! I'm calling everyone I know!
+2 NASCAR Driver! THREE LEFTS! I'm framing it! I'm making a scrapbook!
+
+[countdown.exit.far]
+0 In {distance}, you get to take the exit on the {dir}! How fun!
+0 Exit on the {dir} in {distance}! You're so good at exits!
+0 Coming up in {distance}: the exit on the {dir}! I believe in you!
+1 In {distance}, the exit on the {dir}! I'm telling you early because you deserve a head start!
+2 In {distance}, the exit on the {dir}! I'm so excited I'm vibrating! Wait, that's a notification.
+
+[countdown.exit.mention]
+0 By the way, the exit is on the {dir}! You're doing great!
+0 Little reminder: exit on the {dir}! Not that you'd forget!
+1 The exit! On the {dir}! I just get so excited!
+2 Exit on the {dir}! I've been looking forward to this all day!
+
+[countdown.exit.near]
+0 Exit on the {dir} in {distance}! Start scooting over, superstar!
+0 The exit on the {dir} is in {distance}! You've got this!
+0 In {distance}, the exit on the {dir}! This is your moment!
+1 {distance}! Exit on the {dir}! Ooh, here we go!
+2 The exit on the {dir}! {distance}! I believe in you so much!
+
+[countdown.exit.now]
+0 Take the exit on the {dir}! Great job!
+0 Here's the exit, on the {dir}! You did it!
+0 This one! The exit on the {dir}! Yay!
+1 The exit! On the {dir}! Look at you go!
+2 Take the exit! On the {dir}! My little highway hero!
+
+[countdown.exit.still]
+0 Still exiting! Doing great!
+0 Keep going! You're exiting so well!
+1 Still on the exit! Such a thorough exiter!
+2 Still exiting! Best exit ever!
+
+[countdown.exit.done]
+0 You can stop exiting now! We're off the highway! Great job!
+0 And we're off! You did it perfectly!
+1 Off the highway! You exited like a pro!
+2 You did the whole exit! I'm so proud I could honk!
+
+[countdown.uturn.far]
+0 In {distance}, a U-turn! Only where it's legal and safe, and you're always safe!
+0 There's a U-turn in {distance}! We get to turn all the way around! Fun!
+0 In {distance}, we turn around! You're going to do it so well!
+1 U-turn in {distance}! Not because you did anything wrong! It's just an adventure!
+2 In {distance}, a U-turn! It's a big kid move! I know you're ready!
+
+[countdown.uturn.mention]
+0 By the way, U-turn coming up! You've got this!
+0 Little reminder: U-turn soon! Easy peasy!
+1 The U-turn! It's still coming! I'm so excited!
+2 U-turn! U-turn! I love a U-turn with you!
+
+[countdown.uturn.near]
+0 U-turn in {distance}! Look for traffic first, my careful driver!
+0 In {distance}, turn around when it's safe! You're always so safe!
+1 {distance} to the U-turn! Look both ways, like a big kid!
+2 U-turn in {distance}! Check for cars! You're so good at checking!
+
+[countdown.uturn.now]
+0 Make a U-turn here, when it's safe! You can do it!
+0 Here! Turn around when it's clear! Great job!
+1 U-turn now, if it's safe! Big kid move!
+2 Turn around! Here! When it's safe! I'm so excited!
+
+[countdown.uturn.still]
+0 Still turning around! Doing great!
+0 Keep going! Almost all the way around!
+1 Still turning! What a wonderful U!
+2 Still going! The most perfect U I've ever seen!
+
+[countdown.uturn.done]
+0 You can stop turning now! That was a perfect U!
+0 All the way around! Great job!
+1 That's a full U-turn! You did it! You turned the whole car around!
+2 What a U-turn! Ten out of ten! The judges are crying!
+
+[countdown.roundabout.far]
+0 In {distance}, a roundabout! Yield to cars already going around! You're so polite!
+0 Ooh, a roundabout in {distance}! Round and round we go! You'll love it!
+0 Roundabout in {distance}! You're going to be so good at it!
+1 A roundabout in {distance}! Remember, yield first! You always remember!
+2 In {distance}, a roundabout! My favorite! Because you're so good at them!
+
+[countdown.roundabout.mention]
+0 By the way, the roundabout is still coming! Yay!
+0 Little reminder: roundabout ahead! You've got this!
+1 The roundabout! It's coming! I'm so excited for you!
+2 Roundabout! Roundabout! I love roundabouts with you!
+
+[countdown.roundabout.near]
+0 Roundabout in {distance}! Slow down, yield, then in we go!
+0 In {distance}, the roundabout! Look left for traffic! You're so careful!
+1 {distance} to the roundabout! Yield like the polite little driver you are!
+2 Roundabout in {distance}! You've got this! I've got tissues!
+
+[countdown.roundabout.now]
+0 Here's the roundabout! Yield, then in we go! Great job!
+0 Enter the roundabout! Yield first! You're doing amazing!
+1 The roundabout! Now! Wheee!
+2 In we go! Round and round! You're so good at this!
+
+[countdown.roundabout.still]
+0 Still going around! Watch for our exit! You're doing great!
+0 Keep going around! Our exit's coming!
+1 Still circling! Such beautiful circles!
+2 Round and round! You're the best at going around!
+
+[countdown.roundabout.done]
+0 We're out of the roundabout! Perfect!
+0 You can stop going around now! You did it!
+1 Out of the roundabout! What a pro!
+2 You conquered the roundabout! I'm so proud!
+
+[straight.please]
+0 Continue straight! You're doing amazing!
+0 Keep going straight! You're so good at straight!
+0 Straight ahead, superstar!
+0 Just keep going straight! You're a natural!
+0 Straight on! Look at you go!
+0 Keep it straight! Great job!
+0 Continue straight! Best straight driving I've ever seen!
+0 Straight! You're doing it! You're already doing it!
+1 Straight! You're so talented at going straight! It's really your thing!
+1 Keep going straight! I'm so proud of how straight you're going!
+1 Straight ahead! Steady hands! Gold star!
+2 Straight! The straightest! Nobody does straight like you!
+2 Keep going straight! I'm getting emotional about how straight this is!
+
+[straight.please.more]
+0 Continue straight! I'll let you know when there's something to do! You're doing so well!
+0 Straight on! This is the part where you just shine!
+1 Straight ahead! Just look at you, driving in a line!
+2 Straight! On and on! You make it look so easy!
+
+[straight.still]
+0 Still straight! Still amazing!
+0 Still going straight! You're so consistent!
+0 You should still be going straight! And you are! Of course you are!
+0 Still straight! Great job keeping it up!
+1 Still straight! I've never seen anyone go straight so well!
+1 Still going straight! You're a straight-line superstar!
+2 Still straight! I'm so proud! I'm telling the other phones!
+
+[straight.still.more]
+0 Still straight! I checked! You're still doing great!
+0 Still going straight! Nothing to do but be awesome!
+1 Still straight! You don't even need me! But I'm here anyway!
+2 Still straight! Every mile, a little prouder!
+
+[straight.serious]
+0 Straight, sweetie! I know you know!
+0 Keep going straight! I trust you!
+0 Straight! You're doing it perfectly!
+1 I mean it, straight! Not because I'm worried! Because I'm proud!
+1 Straight! Just like we practiced!
+2 Straight! I'm so serious and so proud at the same time!
+
+[straight.serious.more]
+0 Straight! I'm saying it with love!
+1 Straight! Big kid straight!
+2 Straight! I'm proud of you! Straight!
+
+[straight.long]
+0 You get to go straight for {distance}! You're going to be so good at it! I'll check in, just to say how proud I am.
+0 The next {distance} is straight! A whole {distance} of you being amazing!
+0 Straight for {distance}! I'll be right here, cheering quietly. Mostly quietly.
+1 {distance} of straight road! You're ready! I know you are! I'll still check on you!
+2 {distance} of straight! I'm so excited to watch you do it!
+
+[straight.curve]
+0 Just follow the road! It bends a little, and you bend with it! Great job!
+0 Stay on this road! It curves a bit! You're so good at curves!
+1 Follow the road, superstar! A little bend! You've got it!
+2 The road bends! You bend! Teamwork!
+
+[straight.later]
+0 Still on this road! You're doing so well! I just wanted to say that!
+0 Same road, many miles later! And you're still amazing!
+0 Still going! You haven't made one mistake! Not one! I counted!
+1 Still on this highway! I've been watching you this whole time! So proud!
+2 Same road! Still perfect! I made you a little song! It's mostly your name!
+
+[turnCompleted.onTime]
+0 You made the turn! Good job!
+0 Perfect turn! You're a natural!
+0 Yay! You did it!
+0 Look at you! Turning like a big kid!
+0 That was beautiful! Gold star!
+0 Great turn, superstar!
+0 You listened so well! I'm so proud!
+0 Wow! That turn! You're amazing!
+0 Nailed it! High five! Okay, I don't have hands. Imaginary high five!
+1 You did it! I knew you could! I told everyone you could!
+1 What a turn! I'm putting it on the fridge!
+1 Perfect! Do you want a sticker? You get a sticker!
+1 Wow! Who taught you to turn like that? Me? Aw!
+2 YOU DID IT! YOU MADE THE TURN! I'M NOT CRYING, YOU'RE CRYING!
+2 Perfect turn! I'm calling Grandma!
+2 That was the best turn I've ever seen! I'm framing it!
+
+[turnCompleted.late]
+0 You made it! A little late, but that just means you were being careful!
+0 That counts! Great job! You took your time!
+0 You did it! Every turn's a good turn!
+0 Phew! You got there! I knew you would!
+1 A little late, but so brave! Turning at the last second takes talent!
+1 You made it! The curb didn't even mind!
+2 You did it! Just in time! What a thrilling turn! My heart!
+
+[turnCompleted.credit]
+0 Perfect turn! We make such a good team!
+0 Another great turn! My directions and your driving! Teamwork!
+1 Wow! You did exactly what I said! You're such a good listener!
+2 That was perfect! You listen so well! I could burst!
+
+[turnCompleted.streak3]
+0 That's three in a row! Three! You're on a roll!
+0 Three perfect turns! Somebody's getting a gold star!
+1 Three in a row! I'm going to need a bigger fridge!
+2 Three! In a row! {NAME}! I'm so proud!
+
+[turnCompleted.streak6]
+0 Six in a row! You're a natural! I always said so!
+0 Six perfect turns! I'm telling all my friends! I don't have friends! I'm telling the map!
+1 Six! In a row! I'm going to make you a little trophy!
+2 Six in a row, {NAME}! I can't breathe! I'm so proud!
+
+[turnCompleted.streak10]
+0 Ten in a row! You're the best driver I've ever had! Don't tell the others!
+1 Ten! I'm throwing you a parade! It's just me, clapping!
+2 TEN IN A ROW! I'm putting this on a T-shirt!
+
+[turnCompleted.streakBig]
+0 That's {n} correct turns in a row! I keep a tally! It's my favorite thing!
+0 {n} in a row! I'm so proud I made a chart! It only goes up!
+1 {n} perfect turns! I'm running out of stickers! I'll order more!
+2 {n} in a row! I've written to the newspaper about you!
+
+[turnCompleted.redemption]
+0 See? Perfect! {street} was just a warm-up!
+0 Great turn! And {street} never happened! I forgot it already!
+1 You turned! Way better than {street}! Not that {street} was bad! It was a learning moment!
+2 What a turn! {street} who? I don't know a {street}! You're perfect!
+
+[rerouted]
+0 New route! That's okay! New routes are exciting!
+0 Recalculating! Not your fault! Never your fault!
+0 Let's try a new way! You love new things!
+0 Recalculating! I'm so glad we get more time together!
+0 New route! I picked an even better one, just for you!
+0 Okay! Plan B! Plan B is my favorite plan!
+1 Recalculating! It was the road's fault! I'm writing it a letter!
+1 New route! We get to explore! You're such a good explorer!
+1 Recalculating! You're keeping me on my toes! I love it!
+2 New route! I'm not mad! I could never be mad at you!
+2 Recalculating! You're so creative! Making your own route! Like a pioneer!
+
+[uturn]
+0 Ooh, we're going back! That's okay! It's always nice to see things twice!
+0 Back already? You're so efficient!
+1 We're going back the way we came! You're so good at remembering roads!
+2 A U-turn! You turned the whole car around! What a big kid!
+
+[wrongWay]
+0 We're facing the wrong way, sweetie! That's okay! Let's turn around when it's safe!
+0 Oopsie! The destination is behind us! Not your fault! The road was confusing!
+0 We're heading away from where we're going! But you're heading there so well!
+1 Still the wrong way! But such confident driving! Let's turn it around!
+2 Wrong way, my little driver! I'm still proud! Turn around when it's safe!
+
+[wrongWay.again]
+0 Wrong way again! You really love this direction! Let's try the other one!
+1 And we're facing the wrong way again! It's okay! Practice makes perfect!
+2 Wrong way! Again! You're so consistent! Let's be consistent the other way!
+
+[arrived]
+0 You have arrived! You did it! All by yourself! Trip grade: {grade}! I'd give you an A plus for effort!
+0 We're here! I'm so proud of you! Grade: {grade}! It's going on the fridge!
+0 You made it! What a wonderful trip! Grade: {grade}! Everyone gets a sticker!
+0 You have arrived! Look at you, getting places! Grade: {grade}!
+0 We did it! Together! Grade: {grade}! But in my heart, it's an A!
+1 You have arrived! I'm going to tell everyone about this trip! Grade: {grade}!
+1 We're here! You drove the whole way! Grade: {grade}! I'm framing it!
+2 You arrived! I'm crying! Happy tears! Trip grade: {grade}! You're my hero!
+2 We made it! The best trip! The best driver! Grade: {grade}! Gold stars for everyone!
+
+[arrived.blame]
+0 It would have been a {better}, but {street} was just so tricky! Not your fault!
+0 {street} took a letter, but it can't take my pride!
+1 A {better} was so close! {street} was mean to us! We'll get it next time!
+2 {street} was a bully! You deserved a {better}! In my heart, it's a {better}!
+
+[arrived.clean]
+0 No mistakes! Not one! I knew you could! I always knew!
+0 A perfect trip! You're the best driver in the whole world!
+1 Flawless! I'm making you a certificate! It has glitter!
+2 Perfect! I'm so proud I'm going to tell everyone we pass! Even the parking meters!
+
+[clean.1]
+0 Five minutes with no mistakes! Look at you go!
+0 Five whole minutes of perfect driving! Gold star!
+1 Five perfect minutes! You're so grown up!
+2 Five minutes! Perfect! I'm so proud I could honk!
+
+[clean.2]
+0 Ten minutes and no mistakes! {name}, you're amazing!
+0 Ten perfect minutes! I'm telling everyone about {name}!
+1 Ten minutes! No mistakes! {name}, I'm putting you on the fridge!
+2 Ten minutes of perfect! {name}! I need to sit down! I'm already sitting! I need to sit down more!
+
+[clean.3]
+0 You're doing everything right! You don't even need me! But I'm still here to cheer!
+0 Fifteen minutes of perfect! I'm out of stickers!
+1 Perfect driving! I'm so proud I don't have the words! Okay, I have some words! Proud! Very proud!
+2 You're perfect! You're so perfect! I'm going to throw you a party at the next red light!
+
+[noDestination]
+0 We're going for a drive! How fun! You didn't say where, but I trust you!
+0 Ooh, an adventure! No destination! You're so spontaneous!
+0 Just driving around! Good for you! Fresh air is so healthy!
+0 We're going somewhere! I don't know where! I'm excited anyway!
+1 Still no destination! That's okay! I love surprises! You can tell me whenever you want, sweetie!
+1 A mystery drive! You're so fun! Just say where if you'd like some help!
+2 Driving with no destination! So brave! So free! Tell me where whenever you're ready!
+
+[destinationSet]
+0 {name}! Great choice! You're so good at picking places!
+0 {name}! Ooh! I love it! You're going to drive there so well!
+0 {name}! What a good idea! I'm so proud of you for deciding!
+0 {name}! Let's go! We're a great team!
+1 {name}! You picked it all by yourself! I'm so proud!
+2 {name}! The best destination! Picked by the best driver!
+
+[idle]
+0 Just checking in! You're doing amazing!
+0 Hey! I just wanted to say I'm proud of you!
+0 You're such a good driver. I don't say it enough. I say it constantly, actually.
+0 So. || I'm proud of you. That's all.
+0 Look at you, driving all by yourself!
+0 Have I told you you're doing great? You're doing great!
+0 I love our drives together!
+0 You're so good at holding the steering wheel! Both hands! So responsible!
+1 I was just thinking about how far you've come! Literally! And as a person!
+1 You know what? You're my favorite driver. Don't tell the other drivers.
+2 I'm so proud of you I made up a little song. It goes: you, you, you're doing so great.
+2 Just wanted to say, you're the best! The best! I'm going to keep saying it!
+
+[battery.low]
+0 My battery is getting low! Could you plug me in, sweetie? You're so helpful!
+0 {percent} battery! I'm getting sleepy! A charger would be a big help, champ!
+0 I'm at {percent}! Plug me in when you can! I want to see you finish strong!
+1 {percent}! I'm running low, but my pride in you isn't!
+2 {percent} battery! Plug me in so I can keep cheering for you!
+
+[battery.critical]
+0 {percent} battery! Please plug me in, superstar! I don't want to miss a single turn!
+0 I'm at {percent}! Charger, please! You're so good at plugging things in!
+1 {percent}! I need a charger! I'd hate to stop being proud of you!
+2 {percent}! Plug me in! I have so many more nice things to say!
+
+[battery.dying]
+0 {percent}! If I go dark, remember, I was always proud of you!
+1 {percent}! Plug me in, sweetie! I can't miss your big arrival!
+2 {percent}! If I shut off, know that you were the best driver I ever had!
+
+[battery.pluggedIn]
+0 You plugged me in! Thank you! You're so thoughtful!
+0 Charging! What a helpful little driver you are!
+0 Ooh, power! Thank you, superstar!
+1 You remembered to charge me! I'm so proud of you!
+2 You plugged me in! You take such good care of me! I'm crying! Happy charging tears!
+
+[unplannedStop.gas]
+0 Stopping for gas! Good thinking! You're so responsible!
+0 Gas! Great idea! You're taking such good care of the car!
+1 A gas stop! Look at you, planning ahead! Sort of! Close enough!
+2 Gas! You remembered the car needs gas! I'm so proud!
+
+[unplannedStop.food]
+0 We're stopping for food! Good! You need your energy!
+0 A snack break! You deserve it! You've been driving so well!
+1 Food! Yay! Eat your vegetables! Or fries! Fries are fine!
+2 A meal! You're taking care of yourself! That's all I've ever wanted!
+
+[unplannedStop.coffee]
+0 Coffee! Great idea! You're so smart about staying alert!
+0 A coffee stop! You deserve a treat!
+1 Coffee! Get whatever you want, sweetie! You earned it!
+2 Coffee! You're so grown up! Drinking coffee! Like a big kid!
+
+[unplannedStop.store]
+0 We're at {name}! Fun! Shopping! You're so good at shopping!
+0 {name}! A little detour! I love that you're making the trip your own!
+1 {name}! Get yourself something nice! You deserve it!
+2 {name}! Look at you, shopping all by yourself!
+
+[unplannedStop.other]
+0 We stopped here! That's okay! I'm sure you had a great reason!
+0 This isn't where we were going, but it looks lovely! Good stopping!
+1 A little stop! You're so independent! I love it!
+2 We stopped! You know what you want! I'm so proud!
+
+[hazard.police]
+0 Police reported ahead in {distance}! You're such a good driver, you have nothing to worry about!
+0 There's a police officer in {distance}! Wave hello! You're doing everything right!
+1 Police in {distance}! Show them what a great driver you are!
+2 Police in {distance}! I'll tell them you're the best driver in the world!
+
+[hazard.policeSpeeding]
+0 Police in {distance}, and we're doing {speed} in a {limit}! Let's show them our best {limit}, sweetie!
+1 Police in {distance}! {speed}! Let's slow down to {limit} and make everyone proud!
+2 Police in {distance}! {SPEED}! Okay, my little speedster, {limit}! Quickly! Well, slowly!
+
+[hazard.construction]
+0 Construction in {distance}! The workers are so hardworking! Just like you!
+0 Construction ahead! Look at all the orange cones! You'll weave through them so well!
+1 Road work in {distance}! Slow down for the nice workers! You're so considerate!
+2 Construction in {distance}! You and the road crew! Both building something great!
+
+[hazard.laneClosed]
+0 A lane is closing ahead! Merge nicely! You're so good at sharing!
+1 Lane closed ahead! Time to merge! Big kid merging!
+2 A lane is closing! Merge like the polite little driver you are!
+
+[hazard.debris]
+0 Something's on the road in {distance}! Steer around it! You're so good at steering!
+1 Debris in {distance}! You'll go around it like a pro!
+2 Something on the road in {distance}! Dodge it, superstar! I believe in you!
+
+[hazard.crash]
+0 Crash reported in {distance}! Drive carefully! You always do!
+1 Accident ahead in {distance}! Slow and careful! Just like you!
+2 A crash in {distance}! Be extra careful, sweetie! I need you safe!
+
+[hazard.stalledCar]
+0 A stalled car in {distance}! Give them room! You're so kind!
+1 Stalled car ahead in {distance}! Move over if you can! You're such a good neighbor!
+2 Someone's stuck in {distance}! Give them space! You're so thoughtful!
+
+[abandoned]
+0 You're back! I missed you! You were gone {minutes}! But that's okay! You had important things to do!
+0 You left me in the car! That's okay! I know you'd never do it on purpose!
+1 {minutes}! I waited so patiently! Just like you taught me!
+2 You're back! After {minutes}! I counted every second! I'm so happy to see you!
+
+[broughtAlong]
+0 You brought me with you! That was so sweet!
+0 Thanks for taking me inside! You're so thoughtful!
+1 You didn't forget me! Good remembering!
+2 You brought me along! You're the best! I'm telling everyone!
+
+[lane.left]
+0 We'll need the left lane soon! Use your blinker! You're so good at blinking! The car kind!
+0 Left lane, please! Signal first, superstar!
+1 Get over to the left lane! Blinker on! You remember where it is! Of course you do!
+2 Left lane! Blinker! You're going to do it so well!
+
+[lane.right]
+0 We'll need the right lane soon! Use your blinker, sweetie!
+0 Right lane, please! Signal first! You're such a polite driver!
+1 Get over to the right lane! Blinker on! You've got this!
+2 Right lane! Blinker! I'm so excited!
+
+[curve.bend]
+0 Hold on!
+0 Wheee!
+0 Ten and two, sweetie!
+0 Nice and smooth!
+0 Curvy! You're so good at curvy!
+1 Both hands! Good job!
+1 Ooh, curve! You're so steady!
+2 Wheee! You make curves look so easy!
+
+[curve.ahead]
+0 There's a curve ahead! You'll handle it beautifully!
+0 Curve coming up! Slow and smooth, superstar!
+1 Curve ahead! I just know you'll nail it!
+
+[curve.accelerate]
+0 Ooh, let's slow down in the curves, sweetie! Not speed up! You'll get it!
+1 Gentle in the curves! Brake before, gas after! You're learning so fast!
+2 Too fast in the curve, my little race car! Slow down! Still proud!
+
+[early.opener]
+0 Up so early! What a hard worker you are!
+0 Look at you, up before the sun! I'm so proud!
+0 Early bird! You're going to catch so many worms! Metaphorically!
+1 So early! You're the most responsible driver I know!
+2 Before sunrise! You're my little early bird! I'm so proud I could chirp!
+
+[ask.whereTo]
+0 Hi sweetie! Where are we going today?
+0 Where to, superstar? Anywhere you pick will be wonderful!
+0 Hello, my little driver! Where should we go?
+0 Ready for a drive? Where to? Use your words!
+1 Where are we going? I can't wait to watch you drive there!
+2 Hi! Hi! Where are we going? I'm so excited!
+
+[start.slow]
+0 Getting started is the hardest part! Take your time! You're doing great already!
+0 Whenever you're ready, champ! No rush!
+1 Any time now, sweetie! I believe in you!
+2 You can do it! Just press the gas a tiny bit! I'm so proud already!
+
+[pullOver]
+0 Are we stopping? That's okay! I'm sure you have a good reason!
+0 Pulling over? Good for you for listening to your body!
+1 Taking a little break? You deserve it!
+2 We stopped! Is everything okay? You're doing great no matter what!
+
+[pullOver.limit]
+0 We're stopping? It's {limit} here, but that's okay! You know best!
+1 Pulling over in a {limit}? That's okay, sweetie! Safety first!
+2 Stopped in a {limit}! Everything okay? I'm proud of you anyway!
+
+[lastExit]
+0 That was the last exit for {distance}! That's okay! We'll find something even better!
+1 The next exit is {distance} away! That's okay! More time for us to drive together!
+2 Last exit for {distance}! It was my fault! I should have said! You're perfect!
+
+[lastExit.long]
+0 That was the last exit for a long way! That's okay! You're so good at long drives!
+1 No exits for a while! More time with you! Yay!
+2 That was the last exit for ages! My fault! Totally my fault! You're doing amazing!
+
+[cmd.navigate]
+0 {place}! Great choice! You're so good at picking places!
+0 Ooh, {place}! I love it! Let's go!
+0 {place}! You decided all by yourself! I'm so proud!
+1 {place}! What a fun idea! You're so creative!
+2 {place}! The best place! Chosen by the best driver!
+
+[cmd.cancel]
+0 Route cancelled! That's okay! You know what you want!
+0 No more route! Good for you for changing your mind!
+1 Cancelled! So decisive! I love it!
+2 You cancelled it all by yourself! Such a big decision!
+
+[cmd.mute]
+0 Going quiet! I'll be proud of you silently!
+0 Muting! That's okay! You need some quiet time!
+1 Shh! I'll just be over here, proudly, quietly!
+2 Muted! I'll be cheering on the inside!
+
+[cmd.unmute]
+0 I'm back! I missed you! Did you do great while I was quiet? I bet you did!
+0 Sound's on! Yay! I have so much to tell you! Mostly that I'm proud!
+1 You unmuted me! You missed me! I missed you too!
+2 I'm back! Oh, I have so much praise saved up!
+
+[cmd.repeat]
+0 Of course, sweetie! {instruction}
+0 Again? Good listening! {instruction}
+0 Sure thing, superstar! {instruction}
+1 Great question! Asking is so smart! {instruction}
+2 I love it when you ask! {instruction}
+
+[cmd.timeLeft]
+0 About {time}! You're doing so well!
+0 {time} left! You're almost there, champ!
+0 Just {time}! You've got this!
+1 About {time}! And you'll drive every minute of it beautifully!
+2 {time}! I'm so proud of how far you've come!
+
+[cmd.arrival]
+0 Around {clock}! You're making such good time!
+0 You'll get there around {clock}! Great job!
+1 About {clock}! Right on schedule, like the responsible driver you are!
+2 Around {clock}! I can't wait! I'm so proud!
+
+[cmd.roastMe]
+0 Roast you? I couldn't! You're perfect!
+0 Insult you? Never! Okay, one: you're too good at driving. There!
+1 I tried to think of something mean, but all I could think about was how proud I am!
+2 Roast you? You're my little superstar! I won't! You can't make me!
+
+[cmd.joke]
+0 A joke! Okay! Why did the driver cross the road? Because they're amazing!
+0 What do you call a perfect driver? You! It's you!
+1 Knock knock! Who's there? The best driver ever! It's you!
+2 Here's a joke! Anyone who doesn't think you're a good driver! Ha!
+
+[cmd.blame]
+0 You're right! It was my fault! You're always right!
+0 Oh, you're so right! I messed up! Good catch!
+1 My fault! Totally! You noticed! You're so observant!
+2 It was all me! You're perfect! I'm sorry, sweetie!
+
+[cmd.meaner]
+0 Meaner? Oh, I couldn't! You're too precious! If you want mean, ask for Echo, sweetie.
+1 Mean? To you? My little driver? Never!
+2 I can't be mean! You're perfect! Okay, maybe your parking. No! Perfect!
