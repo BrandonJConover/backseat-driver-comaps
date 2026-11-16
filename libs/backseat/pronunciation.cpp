@@ -1432,6 +1432,25 @@ std::string Roads(std::string const & text)
     }
     return out;
   });
+  // West Coast freeways go by number with "the": "the 405 North", "take the 101", "the 10 Freeway" are
+  // "the four oh five", "the one oh one" (loop B171). Only when the number is a road: a direction or
+  // freeway word comes next, or a driving verb comes before and nothing noun-like after ("take the 405
+  // to Sunset", not "take the 150 bucks"). "The 405 people waited" and "the 100 meters" stay numbers.
+  if (HasDigit(s))
+  {
+    static std::regex const theRoad(
+        "\\b([Tt]he) (\\d{1,3})(?= (?:North|South|East|West)(?:bound)?\\b| (?:Freeway|Fwy|Expressway|Expwy)\\b)");
+    static std::regex const verbRoad(
+        "\\b((?:[Tt]ake|[Mm]erge onto|[Gg]et on|[Gg]et off|[Ee]xit|[Ss]tay on|[Hh]op on|[Jj]ump on|onto|off) "
+        "[Tt]he) (\\d{1,3})(?=[.,;:!?)]|$| (?:to|at|toward|towards|for|until|past|through|instead|and|or|is|was|"
+        "exit|north|south|east|west)\\b| [A-Z])");
+    auto const say = [](std::smatch const & m, size_t) -> std::optional<std::string> {
+      if (m.str(2).size() > 1 && m.str(2).front() == '0')
+        return std::nullopt;
+      return m.str(1) + " " + RouteNumber(m.str(2));
+    };
+    s = Replace(Replace(s, theRoad, say), verbRoad, say);
+  }
   // "the 101 Freeway", "the 405 Expressway".
   static std::regex const after("\\b(\\d{3,4}) (Freeway|Highway|Expressway|Parkway)\\b");
   return Replace(s, after, [](std::smatch const & m, size_t) -> std::optional<std::string> {

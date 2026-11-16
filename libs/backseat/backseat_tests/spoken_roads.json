@@ -545,6 +545,81 @@
    "input": "The I-35 bus stop",
    "language": "en",
    "expected": "The I thirty five bus stop"
+  },
+  {
+   "input": "Take the 405 North.",
+   "language": "en",
+   "expected": "Take the four oh five North."
+  },
+  {
+   "input": "Merge onto the 101 South.",
+   "language": "en",
+   "expected": "Merge onto the one oh one South."
+  },
+  {
+   "input": "Get on the 10 Freeway.",
+   "language": "en",
+   "expected": "Get on the ten Freeway."
+  },
+  {
+   "input": "Take the 110 to downtown.",
+   "language": "en",
+   "expected": "Take the one ten to downtown."
+  },
+  {
+   "input": "Exit the 405 at Sunset.",
+   "language": "en",
+   "expected": "Exit the four oh five at Sunset."
+  },
+  {
+   "input": "Get off the 210 at Lake.",
+   "language": "en",
+   "expected": "Get off the two ten at Lake."
+  },
+  {
+   "input": "Take the 405",
+   "language": "en",
+   "expected": "Take the four oh five"
+  },
+  {
+   "input": "Take the 405 Northbound",
+   "language": "en",
+   "expected": "Take the four oh five Northbound"
+  },
+  {
+   "input": "Take the 405 North, then the 10 East.",
+   "language": "en",
+   "expected": "Take the four oh five North, then the ten East."
+  },
+  {
+   "input": "Traffic on the 210 East is stopped.",
+   "language": "en",
+   "expected": "Traffic on the two ten East is stopped."
+  },
+  {
+   "input": "The 405 people waited.",
+   "language": "en",
+   "expected": "The four hundred five people waited."
+  },
+  {
+   "input": "Walk the 100 meters.",
+   "language": "en",
+   "expected": "Walk the one hundred meters."
+  },
+  {
+   "input": "Take the 150 bucks.",
+   "language": "en",
+   "expected": "Take the one hundred fifty bucks."
+  },
+  {
+   "input": "Take the 100 steps.",
+   "language": "en",
+   "expected": "Take the one hundred steps."
+  },
+  {
+   "input": "the 5 minutes",
+   "language": "en",
+   "expected": "the five minutes"
   }
  ]
 }
