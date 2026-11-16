@@ -16,6 +16,8 @@ on:
   pull_request:
     branches:
       - 'backseat/**'
+      # What's about to ship: a pull request into stage builds before the merge sends it to TestFlight.
+      - stage
     paths:
       - 3party/**
       - iphone/**
