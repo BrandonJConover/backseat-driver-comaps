@@ -2,6 +2,7 @@
 // JsNumber strings, and ToFixed (RoundTo) screens out non-ties before its 1,100-digit exact print. Both
 // must give exactly what the old code gave: same cells, order and weights; same ToFixed strings.
 #include "check.hpp"
+#include "timing.hpp"
 
 #include "backseat/report.hpp"
 #include "backseat/units.hpp"
@@ -191,7 +192,7 @@ TEST(HeatmapOfALongTripIsFast)
   auto const cells = BuildHeatmap(drive, 75);
   double const seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
   CHECK(!cells.empty());
-  CHECK(seconds < 0.25);
+  CHECK(seconds < 0.25 * backseat_tests::kSanitizerSlack);
 }
 
 TEST(ToFixedScreenMatchesTheExactPrint)
@@ -236,5 +237,5 @@ TEST(RoundingAThousandHeatCellsIsFast)
     sum += RoundTo(x, 6);
   double const seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
   CHECK(sum > 0);
-  CHECK(seconds < 0.05);
+  CHECK(seconds < 0.05 * backseat_tests::kSanitizerSlack);
 }

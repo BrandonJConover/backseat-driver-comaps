@@ -3,6 +3,7 @@
 // the 20 ms cap is loose enough that an unoptimised or sanitized build never flakes, but it catches a
 // regex (or a big table) rebuilt on every call, which costs tens of milliseconds per utterance.
 #include "check.hpp"
+#include "timing.hpp"
 
 #include "backseat/navigator.hpp"
 #include "backseat/plate_game.hpp"
@@ -98,7 +99,7 @@ TEST(ListeningEveryUtteranceIsFast)
     }
   }
   std::printf("    listen speed: worst %.3f ms (\"%s\")\n", worstMs, worst.c_str());
-  if (worstMs >= 20.0)
+  if (worstMs >= 20.0 * ::backseat_tests::kSanitizerSlack)
     throw ::backseat_tests::Failure{"listening took " + std::to_string(worstMs) + " ms for \"" + worst + "\""};
   (void)sink;
 }

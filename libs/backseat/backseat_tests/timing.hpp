@@ -11,9 +11,9 @@
 namespace backseat_tests
 {
 // Wall-clock ceilings in tests are there to catch a pass gone quadratic, not to time a sanitizer. CI's
-// engine job is a Debug build with ASan and UBSan, where the text passes run ~20x slower than release
-// and the whole-bank and page-long-input tests sit right at their ceilings (they moved past them as the
-// pronunciation passes grew). Those builds get twice the room; plain builds keep the tight bound.
+// engine job is a Debug build with ASan and UBSan, where the text and listening passes run far slower than release
+// and the speed tests sit right at their ceilings (they moved past them as the
+// pronunciation and command passes grew). Those builds get twice the room; plain builds keep the tight bound.
 #if defined(__SANITIZE_ADDRESS__)
 inline constexpr double kSanitizerSlack = 2.0;
 #elif defined(__has_feature)

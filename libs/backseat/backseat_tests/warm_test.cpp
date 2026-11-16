@@ -4,6 +4,7 @@
 // LinesFor ~2.5 ms, first metric + left-hand LinesFor ~6 ms more; worst first line over the 515
 // golden inputs 1.9 ms cold vs 0.1 ms after Warm. Warm itself ~11 ms, meant for a background thread.
 #include "check.hpp"
+#include "timing.hpp"
 
 #include "backseat/lines.hpp"
 #include "backseat/pronunciation.hpp"
@@ -92,6 +93,6 @@ TEST(WarmPaysTheColdFirstLine)
   std::cout << "  warm " << warmMs << " ms; then " << kFirstLines.size() << " first lines " << totalMs
             << " ms (worst " << worstMs << " ms), metric+left LinesFor " << linesMs << " ms\n";
   // Generous so debug and sanitizer builds pass; release is ~0.1 ms a line and ~0 for LinesFor.
-  CHECK(worstMs < 50);
-  CHECK(linesMs < 50);
+  CHECK(worstMs < 50 * backseat_tests::kSanitizerSlack);
+  CHECK(linesMs < 50 * backseat_tests::kSanitizerSlack);
 }
