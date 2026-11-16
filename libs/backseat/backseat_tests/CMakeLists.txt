@@ -17,6 +17,7 @@ add_executable(${PROJECT_NAME}
   exit_after_merge_test.cpp
   exit_skip_test.cpp
   destination_side_test.cpp
+  lane_guidance_test.cpp
   hostile_route_test.cpp
   offroute_blip_test.cpp
   reroute_test.cpp
