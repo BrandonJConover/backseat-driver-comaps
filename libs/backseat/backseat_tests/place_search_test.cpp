@@ -182,3 +182,12 @@ TEST(PastPlacesAnswerWhenTheMapSearchCant)
   unnamed.trips = 9;
   CHECK(!PastPlaceNamed("anything", {unnamed}));
 }
+
+TEST(SearchKeepsLettersOutsideAscii)
+{
+  // A destination from the voice model can be accented or in another script; its letters must reach the
+  // map search, not turn into spaces ("São Paulo" was "so paulo", "東京駅 cafe" just "cafe").
+  CHECK_EQUAL(SearchableQuery("São Paulo"), std::string("s\xC3\xA3o paulo"));
+  CHECK_EQUAL(SearchableQuery("東京駅 cafe"), std::string("\xE6\x9D\xB1\xE4\xBA\xAC\xE9\xA7\x85 cafe"));
+  CHECK_EQUAL(SearchableQuery("the Café Tacuba nearby"), std::string("caf\xC3\xA9 tacuba"));
+}

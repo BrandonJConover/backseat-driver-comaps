@@ -116,6 +116,13 @@ import UIKit
   /// Swaps the car screen's arrival alert for the trip's grade and quip once the report is in.
   static func awaitGrade(on mapTemplate: CPMapTemplate, done: CPAlertAction) {
     if let gradeObserver { NotificationCenter.default.removeObserver(gradeObserver) }
+    // routeDidFinish ends the trip before it shows the arrival alert, and a report that was already in is
+    // posted right then, before this listens: take that one.
+    if let ready = BackseatArrivalCard.lastReady, Date().timeIntervalSince(ready.at) < 2 {
+      stopAwaitingGrade()
+      showGrade(ready.report, on: mapTemplate, done: done)
+      return
+    }
     let deadline = Date().addingTimeInterval(gradeWait)
     gradeObserver = NotificationCenter.default.addObserver(forName: BackseatArrivalCard.reportReady, object: nil,
                                                            queue: .main) { [weak mapTemplate] note in

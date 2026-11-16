@@ -30,13 +30,16 @@ std::string Join(std::vector<std::string> const & words, size_t from = 0, size_t
 }
 
 /// Lowercase words with the punctuation gone, apostrophes kept and straightened ("Joe’s" -> "joe's").
-/// A "#" before a number is dropped, and so is a period inside letters ("c.v.s.").
+/// A "#" before a number is dropped, and so is a period inside letters ("c.v.s."). Letters outside ASCII
+/// ("São Paulo", "東京駅") are kept as they are: their UTF-8 bytes are never punctuation.
 std::string PlaceWords(std::string const & text)
 {
   std::string out;
   for (unsigned char const ch : StraightApostrophes(text))
   {
-    char const c = std::isalnum(ch) || ch == '\'' ? static_cast<char>(std::tolower(ch)) : ' ';
+    char const c = ch >= 0x80 ? static_cast<char>(ch)
+                   : std::isalnum(ch) || ch == '\'' ? static_cast<char>(std::tolower(ch))
+                                                     : ' ';
     if (c != ' ' || (!out.empty() && out.back() != ' '))
       out += c;
   }
