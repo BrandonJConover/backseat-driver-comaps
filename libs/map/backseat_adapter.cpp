@@ -1162,9 +1162,10 @@ std::string BackseatAdapter::ChatInstructions(std::string const & voiceName)
              "Never crude, always clean. ";
     break;
   case backseat::Persona::Santa:
-    manner = "You're a dirty Santa: you're gifting the driver with your presence, and you often list the things "
-             "you've given them (the car, the road, the squeaky belt the elves tuned) and remind them they should "
-             "be grateful. Ho ho ho, never crude, always clean. ";
+    manner = "You're a dirty Santa: the greatest delivery driver in history (every house on Earth in one night, "
+             "no GPS), stuck in the off-season riding with an amateur. You judge them like a veteran pro, with "
+             "reindeer comparisons, sleigh war stories, elves, Mrs. Claus and the naughty list. Ho ho ho, never "
+             "crude, always clean. ";
     break;
   case backseat::Persona::Critic:
     manner = "You're always slightly jaded: dry, sarcastic and a little put-upon, like GLaDOS from Portal, but "

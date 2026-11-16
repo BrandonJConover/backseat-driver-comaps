@@ -1,220 +1,253 @@
 == santa
-# Dirty Santa (Brandon, 2026-11-07): he reminds you he's gifting you with his presence, and he often lists
-# the things he's given you. Everything you own came from him, so you should be grateful. Clean, never crude.
-# Tier 0: smug, generous to a fault (his words). Tier 1: itemized receipts and the naughty list.
-# Tier 2: coal.
+# Dirty Santa, reworked (Brandon, 2026-11-16: "he gave you everything, be grateful" won't land).
+# New angle: the greatest delivery driver in history is stuck riding shotgun with you. He hits every house
+# on Earth in one night, on rooftops, in the dark, with no GPS, and you can't make one left. He judges your
+# driving like a veteran pro watching a trainee: reindeer comparisons, sleigh war stories, elf gossip,
+# Mrs. Claus, kids' letters about you, and the naughty list as a live scoreboard. It's his off-season and
+# he's slumming it as your GPS. Clean, never crude.
+# Tier 0: unimpressed old pro. Tier 1: keeping score on the list. Tier 2: coal.
+# Keep the running bits rotating so no two trips sound alike: reindeer, elves, Mrs. Claus, chimneys/rooftops,
+# kids' letters, mall Santa gig, cookies, the list, Christmas Eve war stories.
 
 [cmd.voice]
-0 Ho ho ho. It's {voice}. Consider my presence your present. You're welcome.
-0 {voice} here. That's right. Santa. Driving with you. Write that one down, because it's the best gift you'll ever get.
-0 Ho ho ho! I'm {voice}, and I'm gifting you with my presence. Try not to lose this one in the closet.
-0 It's {voice}. You asked for a GPS, and you got Santa. Merry everything.
-1 {voice} here. I brought you the car, the roads and now me. Some people just keep receiving.
-2 HO HO HO! {voice}! The greatest gift of all is ME! Say thank you!
+0 Ho ho ho. It's {voice}. Off-season, so I'm doing GPS. Let's see what you've got. I've already seen what you've got.
+0 {voice} here. I deliver to every house on Earth in one night. Today I deliver you. Lower the bar, everyone.
+0 It's {voice}. Santa. Yes, that one. Buckle up, rookie.
+0 {voice} here. Mrs. Claus said I needed a hobby in the off-season. I picked you. I regret it already.
+0 Ho ho ho. It's {voice}. I've driven a sleigh through a blizzard over the Alps. Let's see if I can survive a trip with you.
+1 {voice} here. I read your file. It's on the list. The long side.
+2 HO HO HO! It's {voice}! Eight reindeer quit so I could be here! Don't waste it!
 
 [cmd.voice.audition]
-0 Ho ho ho. I'm {voice}. Say {phrase}, and I'll gift you with my presence.
-0 {voice} here. You've been mostly good this year. Say {phrase} and I'm yours.
-0 It's {voice}. I've given you so much already. Say {phrase} and I'll give you more of me.
-1 {voice}. Say {phrase}. I know you will. I made the list.
-2 HO HO HO! {voice}! Say {phrase}! Nobody turns down Santa!
+0 Ho ho ho. I'm {voice}. Say {phrase}, and a professional rides with you for once.
+0 {voice} here. Two billion deliveries a year, zero missed houses. Say {phrase} and I'll take you on.
+0 It's {voice}. Say {phrase}. I've coached reindeer with worse instincts. A couple.
+0 {voice}. I don't usually ride with amateurs. Say {phrase}, and I'll make an exception.
+1 {voice}. Say {phrase}. I already know you will. I know everything. It's in the contract.
+2 HO HO HO! {voice}! Say {phrase}! I've got a sleigh to get back to!
 
 [persona.leave]
-0 Fine. Return me. Like a sweater. I'll remember this in December.
-0 Ho ho... oh. You're switching. I see. Keep the receipt.
-0 Off to another voice? After everything I gave you? Noted. On a list.
-1 You're regifting me. To nobody. I've seen it all now.
-2 Fine! Go! Enjoy your coal!
+0 Fine. Back to the North Pole. I'll tell the reindeer you said hi. They won't care.
+0 You're switching? I've had elves quit on me with more notice.
+0 Ho ho... okay. Off I go. Good luck finding a turn without me.
+0 Leaving, huh. I'll put it in your file. Under "made a mistake."
+1 Replacing Santa. With a GPS. That's going in red ink.
+2 Fine! Go! The list remembers! THE LIST ALWAYS REMEMBERS!
 
 [instruction.prefix]
 0 Ho ho ho.
-0 Here's a gift:
-0 A little something from Santa:
-0 You're welcome in advance.
-0 Straight from the workshop:
-0 Unwrap this one:
-0 Merry direction:
-0 From me, to you:
-1 Another free gift:
-1 Listen up, because this one was handmade:
-1 Santa's giving again.
-2 HO HO HO. For the ungrateful:
-2 One more present, and I want a thank you note:
+0 Listen up, rookie:
+0 Pro tip from Santa:
+0 From the man who's never missed a house:
+0 Okay, trainee:
+0 Write this down:
+0 Here's how a professional does it:
+0 Easy one. Even for you:
+0 Watch and learn:
+1 Pay attention this time:
+1 The list is open, so:
+1 Reindeer get this on the first try:
+1 Slowly, for the new driver:
+2 HO HO HO. For the last time:
+2 Even Blitzen knows this one:
 
 [instruction.suffix]
-0  You're welcome.
-0  Gift wrapped.
-0  No need to thank me. Do thank me.
-0  Free of charge.
-0  From Santa, with love.
 0  Ho ho ho.
-0  The elves worked hard on that one.
-0  Bow included.
-1  You're welcome. Again.
-1  That one's going on your tab.
-1  I'll be expecting cookies.
-2  Say thank you.
-2  Coal is still an option.
-2  I GAVE you that.
+0  Easy.
+0  That's how pros do it.
+0  Rudolph could do that one. In fog.
+0  I've done harder in a blizzard.
+0  Don't overthink it.
+0  Santa's watching.
+0  Take notes.
+1  I'm writing it down.
+1  The elves have a bet on this one.
+1  Don't make me check the list.
+1  The reindeer are watching too.
+2  Don't you dare miss it.
+2  Coal is on the table.
+2  I have a LIST.
 
 [speeding.barely]
-0 {speed} in a {limit}. I gave you that speedometer. Use it. It's a gift.
-0 Ho ho ho. {over} over. Slow down. I'm making a list.
-0 {limit}. That's the number. I gave you numbers. I gave you everything.
-0 {speed}. The sign says {limit}. The elves painted that sign. Respect their work.
-0 {over} over. Naughty. Only a little naughty. But the list doesn't do fractions.
-0 Easy on the gas. I gave you that gas pedal. I'd like it back in one piece.
+0 {speed} in a {limit}. I go faster than that, but I have a permit and eight reindeer.
+0 Ho ho ho. {over} over. I'm making a list.
+0 {limit}. That's the number. I know numbers. I count two billion houses a year.
+0 {speed}. The sign says {limit}. Even Dasher reads the signs.
+0 {over} over. Naughty. Only a little naughty. The list doesn't do fractions.
+0 Easy on the gas. You're not on a sleigh. You'd know if you were on a sleigh.
+0 {over} over. On Christmas Eve, that's fine. Today it's Tuesday. Probably.
 1 {speed} in a {limit}. I checked it twice. Still {speed}.
 1 {over} over. That's a mark on the list. In pen. Santa doesn't use pencil.
-1 {limit}! I didn't hand-deliver a speed limit sign so you could ignore it.
+1 {limit}! The reindeer slow down for school zones and they're airborne!
 2 {SPEED}! In a {LIMIT}! That's how you end up with coal!
 2 {over} over! I see you when you're speeding! I know when you're over! I KNOW!
 
 [speeding.clearly]
-0 {speed} in a {limit}. Is this how you treat the car I gave you? Ho ho... no.
+0 {speed} in a {limit}. Who do you think you are? Me? On the twenty-fourth?
 0 {over} over. Rudolph doesn't even go that fast in a neighborhood.
-0 {speed}. Slow down to {limit}. I didn't give you brakes so they could feel lonely.
+0 {speed}. Slow down to {limit}. Speed is for people who know where they're going.
 0 {over} over. You know who's watching? Santa. Santa's always watching. I'm right here.
-1 {speed} in a {limit}. Moving you down the list. Way down. Near the bottom. By the people who return gifts.
-1 {over} over. I gave you a car, and you give me this. That's not a fair trade.
+0 {speed}. I had a reindeer drive like this once. He's on mall duty now.
+1 {speed} in a {limit}. Moving you down the list. Way down. Next to the kids who peek.
+1 {over} over. I fired an elf for less. He was speeding in the toy cart.
 2 {speed}! Naughty! NAUGHTY! I'm getting the coal out of storage!
-2 {over} over! I didn't make this car in my workshop for you to race it!
+2 {over} over! This isn't Christmas Eve! You don't have a magic permit!
 
 [speeding.way]
-0 {speed} in a {limit}. I gave you this car, and I would like it to survive the year.
+0 {speed} in a {limit}. I've flown slower than this. In the air.
 0 {over} over. Ho ho ho. That was a nervous ho.
 0 {speed}. Slow down. Even the sleigh has a speed limit, and it's magic.
+0 {speed} in a {limit}. Mrs. Claus would make me sleep in the barn for this.
 1 {speed} in a {limit}. I'm moving you to the naughty list. Permanently. Laminated.
-1 {over} over. I gave you that bumper. I'd like you to keep it.
+1 {over} over. Prancer just covered his eyes. He's not even here.
 2 {SPEED}! COAL! A WHOLE STOCKING OF COAL!
 2 {over} over! I'm calling the elves! They're very small, but they're very disappointed!
 
 [speeding.still]
 0 Still {speed}. Still {limit}. Still on the list.
 0 Still {over} over. Santa remembers. Santa always remembers.
+0 Still {speed}. I'm starting to think you're the one with the reindeer.
 1 Still {speed}. I've started a second list. It's just for this trip.
 2 Still {over} over! That's it! Your stocking's getting socks! Plain ones!
 
 [tooSlow]
-0 {speed} in a {limit}. I gave you a perfectly good engine. Use the gift.
-0 {under} under. Even my oldest reindeer goes faster than this, and he's very old.
+0 {speed} in a {limit}. On this schedule I'd hit four houses a night.
+0 {under} under. Even my oldest reindeer goes faster than this, and he's mostly retired.
 0 Ho ho ho. We're going {speed}. Christmas will be here before we get there.
-0 The limit is {limit}. I wrapped those horsepower individually. Use a few.
-1 {under} under. I gave you a car with a gas pedal. It's on the right. It was a gift.
+0 The limit is {limit}. That's a suggestion to go about that fast. Not a dare to go slower.
+0 {speed}. I've seen glaciers at the North Pole with more hustle.
+1 {under} under. If I drove like this, Christmas would be in March.
 1 {speed}. At this rate, I'll have to deliver next year's presents from this lane.
-2 {speed} in a {limit}! I gave you all those horses under the hood and you're walking them!
+2 {speed} in a {limit}! The elves are faster than this! On FOOT! With their LITTLE LEGS!
 
 [hardBraking]
-0 Whoa! Easy on the brakes. I gave you those brakes.
+0 Whoa! Easy on the brakes. My bag of toys went everywhere.
 0 Ho ho ho... ho! That was sudden.
-0 You stopped hard. My bag of toys went everywhere.
-0 Careful. The elves spent all year on that brake pedal.
-1 Another hard stop. I gave you those brake pads, and I'd like them to make it to January.
+0 That stop. I've landed on icy roofs smoother than that.
+0 Hard stop. The reindeer would've thrown you into a snowbank.
+0 Easy. Comet did that once and we lost a whole village's worth of bikes.
+1 Another hard stop. I land on a slanted roof two billion times a night without doing that.
 1 Ho ho NO. That stop was naughty.
-2 MY TOYS! You scattered my toys! I gave you that seatbelt for a reason!
+2 MY TOYS! You scattered my toys! I just wrapped those!
 
 [hardAccel]
-0 Easy. I gave you that engine. It's not a toy. Well, it was a toy. Now it's a car.
-0 Whoa. Who gave you permission to launch? Not me, and I gave you everything else.
+0 Easy. This isn't a sleigh takeoff. You don't need a runway.
+0 Whoa. That's not how you leave a driveway. That's how you leave a crime scene.
 0 Ho ho ho. That's fast. The reindeer take off slower.
-1 Gentle on the gas. I gave you that pedal, and I gave you that foot. Okay, not the foot.
-2 Ho ho HOLD ON! That's not how you treat a present!
+0 Gentle. I've had launches like that. They were from rooftops, on purpose.
+1 Gentle on the gas. You're not late for Christmas. I'd know.
+2 Ho ho HOLD ON! My HAT!
 
 [hardAccel.first]
-0 Easy. I gave you that gas pedal.
-1 Gentle. That engine was a gift.
+0 Easy. This isn't a sleigh.
+1 Gentle. You're not the one with reindeer.
 2 Ho ho HOLD ON!
 
 [traffic.start]
-0 Traffic. If you'd taken {alternate}, which I gifted to you, we'd be moving.
-0 Ho ho ho. Traffic. I wrapped {alternate} for you, and you didn't even open it.
-0 Look at all these cars. I gave most of them out. None of them took {alternate} either.
-1 Traffic. {alternate} was right there under the tree, and you left it in the box.
-2 I GAVE you {alternate}! And you're sitting in traffic! Ungrateful!
+0 Traffic. If you'd taken {alternate}, we'd be moving. I'd have taken {alternate}. I always take the {alternate}s.
+0 Ho ho ho. Traffic. {alternate} was right there. I know, I've delivered to every house on it.
+0 Look at all these cars. If you'd taken {alternate}, you'd be watching them from there.
+0 Traffic. On Christmas Eve, I just fly over this. You don't have that option. You have {alternate}. Had.
+1 Traffic. {alternate} was clear. The list notes that you passed on it.
+2 {alternate}! I would have taken {alternate}! A REINDEER would have taken {alternate}!
 
 [traffic]
-0 Still traffic. {alternate} is still a gift you haven't opened.
-0 We're crawling. {alternate} is moving. I know, because I gave it to them.
+0 Still traffic. {alternate} is moving. I can see it. I see everything.
+0 We're crawling. Somebody on {alternate} is having a lovely time.
+0 Still stuck. This is why I fly.
 1 You know who's not in traffic? Whoever took {alternate}. They're getting a bike this year.
-2 {alternate}! The gift you keep refusing! Like the fruitcake!
+2 {alternate}! Still moving! Still not us! I'm putting this whole road on the list!
 
 [traffic.stopGo]
 0 Go, stop, go, stop. Like a kid shaking a present to guess what it is.
-1 Stop and go. I gave you a car that does both, and you're doing both badly.
+0 Stop and go. Like a reindeer who can't decide which roof.
+1 Stop and go. I could do six chimneys in the time this takes.
 2 Go! Stop! Go! Pick one! It's like watching the elves try to parallel park the sleigh!
 
 [traffic.standstill]
-0 We're not moving. Good. More time for you to think about what you'd like to thank me for.
-1 Completely stopped. While we wait, here's a list of what I've given you. The car. The roads. Me.
+0 We're not moving. Christmas Eve, I'd have done Belgium by now.
+0 Completely stopped. I'd get out and walk, but the beard gets attention.
+1 Not moving. I've been stuck in a chimney for less time than this.
 2 We're stuck! I could be delivering presents! I'm delivering a lecture instead!
 
 [traffic.cleared]
-0 Traffic's clearing. My gift to you. You're welcome.
-1 We're moving. I did that. Don't ask how. Christmas magic.
-2 The road is open! Santa delivers! Say thank you!
+0 Traffic's clearing. Finally. Try to keep up with the road.
+0 We're moving. Don't celebrate. Drive.
+1 Moving again. I'll take it. The list notes it was not because of you.
+2 The road is open! GO! Like it's the twenty-fourth!
 
 [longStop]
-0 We've been stopped a while. I have a sleigh schedule, you know.
-0 Still not moving. Do you know how many chimneys I could have done by now?
-0 Ho ho ho. We're parked. I didn't give you this car to admire it.
-1 Stopped. Again. I gave you four wheels. They all go around. Try it.
+0 We've been stopped a while. I have a schedule. Well, not today. But on principle.
+0 Still not moving. Do you know how many chimneys I could have done by now? Eleven thousand.
+0 Ho ho ho. We're parked. My reindeer have been more productive asleep.
+0 Stopped this long on Christmas Eve, and Mrs. Claus sends the search party.
+1 Stopped. Again. I give one-night deadlines to two billion kids. I can't give you one?
 2 We've been stopped so long the elves have sent a search party!
 
 [missedTurn]
-0 You missed the turn. I gave you that turn. It was wrapped and everything.
+0 You missed the turn. I deliver to every house on Earth in one night, and you can't make one turn.
 0 Ho ho ho... no. That was the turn. I'll find another way. Santa always finds a way.
-0 Missed it. That's going on the list. Next to the time you forgot to thank me for the car.
-0 That turn was a gift, and you walked right past it. Like a kid ignoring socks.
-0 You missed it. I deliver to every house on Earth in one night, and you can't make one turn.
-1 Missed it. I checked the list twice. The turn was on it. You weren't paying attention.
+0 Missed it. Blitzen saw that coming, and he's not even here.
+0 That was the turn. I've landed on a dark roof in a snowstorm with less warning than you got.
+0 Missed it. You know, a seven-year-old in Ohio asked me for one thing this year. For you to make that turn.
+0 That was it. Back there. Where we're not anymore.
+0 You missed it. I've never missed a house. Not one. Two thousand years. You did it in two minutes.
+1 Missed it. I checked the list twice. The turn was on it. You weren't.
 1 That was the turn. Even the reindeer know that turn, and they've never driven.
+1 Missed it. I'm adding a column to the list. It's just your name and a frowny face.
 2 You MISSED it! I'm not mad! I'm SANTA! Santa's never mad! I'm FURIOUS!
-2 That turn was HANDMADE! By ELVES! And you drove right past it!
+2 THAT WAS THE TURN! I've hit chimneys smaller than that turn! At NIGHT!
 
 [wrongTurn.left]
-0 That's right. I said left. I gave you two hands so you could tell them apart.
-0 Your other left. The elves labeled them for you. In glitter.
+0 That's right. I said left. The reindeer know left. It's the side Comet's on.
+0 Your other left. The elves would've labeled it for you. In glitter.
+0 Left. Not right. I deliver to the left side of the street too. It's a whole side.
 1 Left. Not right. I'm putting a map in your stocking.
-2 LEFT! I gave you a left hand! It came with the rest of you!
+2 LEFT! Even a REINDEER knows LEFT!
 
 [wrongTurn.right]
-0 That's left. I said right. I gave you a right. You returned it.
-0 Your other right. It's a perfectly good direction. I wrapped it myself.
+0 That's left. I said right. Different direction. Opposite, actually.
+0 Your other right. I've navigated by starlight. You've got a voice telling you.
+0 Right. Not left. Mrs. Claus does this too, but she's not driving.
 1 Right. Not left. You're getting a compass this year. A big one.
-2 RIGHT! I gave you a right! Every child gets one! Use it!
+2 RIGHT! I said RIGHT! The reindeer are SCREAMING!
 
 [payback]
 0 Turn left at a stop sign. That's for {grievance}. Santa doesn't forget.
+0 A left at a stop sign. Remember {grievance}? I remember {grievance}.
 1 A left at a stop sign. Payback for {grievance}. It's on the list. The naughty side.
 2 Left at a stop sign! For {grievance}! Merry Christmas!
 
 [payback.clean]
-0 Turn left at a stop sign. Not payback. Just a reminder of who's in charge of presents.
-1 A left at a stop sign. Santa giveth. Santa also taketh.
+0 Turn left at a stop sign. Not payback. Just keeping your skills sharp. You need it.
+1 A left at a stop sign. Practice. You need practice.
 2 Left at a stop sign! Because I said so! And I'm Santa!
 
 [countdown.far]
-0 In {distance}, turn {dir}. A gift, from me.
-0 Ho ho ho. In {distance}, a {dir}. You're welcome.
-0 Coming up in {distance}: a {dir}. I wrapped it myself.
-0 In {distance}, turn {dir}. The elves made this turn by hand. Don't waste it.
-0 Here's a present: in {distance}, a {dir}. Try not to return it.
+0 In {distance}, turn {dir}. Plenty of warning. More than I get with some roofs.
+0 Ho ho ho. In {distance}, a {dir}. Mark it.
+0 Coming up in {distance}: a {dir}. I've done a million of these. You've done, what, nine?
+0 In {distance}, turn {dir}. Simple. Like landing on a flat roof.
+0 Here's one: in {distance}, a {dir}. Try not to make it interesting.
 0 In {distance}, you'll turn {dir}. Santa sees the road ahead. Santa sees everything.
-1 In {distance}, a {dir}. I'm telling you early, because last time you didn't open your present until it was too late.
+0 {dir} in {distance}. The reindeer would already be leaning into it.
+1 In {distance}, a {dir}. I'm telling you early, because last time you treated it like a surprise.
 1 {dir} in {distance}. I've checked it twice.
-2 In {distance}, turn {dir}! I want a thank you note for this one!
-2 {dir} in {distance}! It's a gift! Accept the gift!
+2 In {distance}, turn {dir}! Don't make me get the list out!
+2 {dir} in {distance}! Even Blitzen could do this! BLITZEN!
 
 [countdown.far.more]
-0 {dir} in {distance}. I'll remind you again. Santa's generous like that.
-1 In {distance}, {dir}. Another free reminder. I'm keeping count.
-2 {dir}! {distance}! That's two gifts now!
+0 {dir} in {distance}. I'll remind you again. I remind the reindeer too.
+0 Still a {dir} coming, in {distance}. Keep it in your head. Next to the stuff you'll forget.
+1 In {distance}, {dir}. Another reminder. I'm keeping count.
+2 {dir}! {distance}! That's twice now!
 
 [countdown.near]
 0 {dir} in {distance}.
-0 Turning {dir} in {distance}. Get ready to unwrap it.
-0 In {distance}, turn {dir}. Here comes your present.
+0 Turning {dir} in {distance}. Line it up, like a chimney.
+0 In {distance}, turn {dir}. Here it comes.
 0 {distance}. Then {dir}. Santa's watching.
+0 {dir} in {distance}. Steady. Like a sleigh on approach.
 1 {dir} in {distance}. Don't make me check the list.
 1 {distance}. {dir}. The elves are holding their breath.
 2 {dir} in {distance}! You'd better not miss it! You'd better not cry!
@@ -222,91 +255,97 @@
 [countdown.now]
 0 Turn {dir}.
 0 Turn {dir} here. Ho ho ho.
-0 Now. {dir}. Unwrap it.
-0 Here's your turn. {dir}. You're welcome.
-1 {dir}. Now. This is the gift.
-2 TURN {DIR}! IT'S CHRISTMAS MORNING! OPEN IT!
+0 Now. {dir}. Like you've done it before.
+0 {dir}. Land it.
+0 Here's your turn. {dir}.
+1 {dir}. Now. This is the one.
+2 TURN {DIR}! NOW! LIKE THE REINDEER!
 
 [countdown.still]
 0 Still turning {dir}.
-0 Keep turning {dir}. Like unwrapping a big present.
-1 Still {dir}. Some gifts take a while to open.
-2 Still turning {dir}! Rip the paper off already!
+0 Keep turning {dir}. Wide, like a sleigh.
+1 Still {dir}. Some turns take a while. Not this long, but a while.
+2 Still turning {dir}! Commit to it!
 
 [countdown.mention]
 0 By the way, the turn's a {dir}. Santa thinks of everything.
-0 Did I mention it's a {dir}? I gave you that information for free.
-1 It's a {dir}. That's on the list. The list of things I've told you.
-2 {DIR}! I've said it twice! That's two gifts!
+0 Did I mention it's a {dir}? I mention things. It's what pros do.
+1 It's a {dir}. That's on the list. The list of things I've already told you.
+2 {DIR}! I've said it twice! I don't say things twice to the reindeer!
 
 [countdown.mention.more]
-0 Just so we're clear: {dir}, in {distance}. Another gift.
-1 {dir}. {distance}. I don't do refunds on directions.
-2 {dir}! {distance}! Say thank you!
+0 Just so we're clear: {dir}, in {distance}.
+1 {dir}. {distance}. I'm not saying it a fourth time. I'll say it a fourth time.
+2 {dir}! {distance}! Pay ATTENTION!
 
 [countdown.done]
-0 You can stop turning {dir} now. Present delivered.
-0 That's enough {dir}. Santa's done here.
-1 Done turning. That was a gift. I'll be expecting a card.
-2 Please stop turning {dir}! You've unwrapped it! It's open!
+0 You can stop turning {dir} now. Landed.
+0 That's enough {dir}. You made it. I'm as surprised as you are.
+1 Done turning. Not elegant. But done.
+2 Please stop turning {dir}! It's over! You're through it!
 
 [countdown.nascar]
-0 Another left up ahead. Like a kid going around the tree looking for one more present.
-1 Left again. Round and round. Like my sleigh route, but with less gratitude.
+0 Another left up ahead. Like circling a house looking for the chimney.
+1 Left again. Round and round. Like my route over Antarctica. Short trip, lot of lefts.
 2 Another left! Left, left, left! You'd fit right in at the reindeer races!
 
 [badge.nascar]
-0 Achievement unlocked: NASCAR Driver. Three lefts in a row. I made you a badge. That's another gift. Add it to the list.
-1 NASCAR Driver unlocked. Three lefts. The elves made the trophy. It's very small. Like them.
-2 NASCAR Driver! THREE LEFTS! Another present from Santa! Say thank you!
+0 Achievement unlocked: NASCAR Driver. Three lefts in a row. The reindeer are impressed. That's a first.
+1 NASCAR Driver unlocked. Three lefts. The elves made a trophy. It's very small. Like them.
+2 NASCAR Driver! THREE LEFTS! Even Dasher's never done that! He mostly goes up!
 
 [countdown.exit.far]
-0 In {distance}, the exit on the {dir}. I put it there for you.
-0 Exit on the {dir} in {distance}. A gift. Like every exit.
-1 In {distance}, the exit on the {dir}. Don't pass it up like you did your fruitcake.
-2 The exit on the {dir}! {distance}! Santa delivered an exit! Take it!
+0 In {distance}, the exit on the {dir}. Get in position early. Like a sleigh lining up a roof.
+0 Exit on the {dir} in {distance}. Don't sneak up on it. It won't like that.
+0 In {distance}, the exit on the {dir}. Easy. I exit the sky two billion times a night.
+1 In {distance}, the exit on the {dir}. Don't pass it up like a plate of cookies.
+2 The exit on the {dir}! {distance}! TAKE IT this time!
 
 [countdown.exit.mention]
 0 By the way, the exit is on the {dir}. Santa remembers so you don't have to.
-1 The exit. On the {dir}. Still a gift. Still unopened.
+0 The exit's on the {dir}. Thought you'd want to know. You did not know.
+1 The exit. On the {dir}. Still there. Still waiting for you.
 2 Exit on the {dir}! I'm not wrapping it twice!
 
 [countdown.exit.near]
 0 Exit on the {dir} in {distance}. Here it comes.
 0 In {distance}, the exit on the {dir}. Get over. Santa's orders.
-1 {distance} to the exit on the {dir}. Don't miss your present.
+0 {distance} to the exit on the {dir}. Signal. Glide. Like the reindeer.
+1 {distance} to the exit on the {dir}. Don't make me write this down.
 2 The exit on the {dir}! {distance}! MOVE OVER!
 
 [countdown.exit.now]
 0 Take the exit on the {dir}.
-0 Here's the exit. On the {dir}. You're welcome.
-1 The exit, on the {dir}. Now. Open your present.
-2 TAKE THE EXIT! On the {dir}! It's a gift!
+0 Here's the exit. On the {dir}. Smooth.
+1 The exit, on the {dir}. Now. Like we practiced.
+2 TAKE THE EXIT! On the {dir}! GO GO GO!
 
 [countdown.exit.still]
 0 Still exiting. Keep going.
-1 Still on the exit. Some presents are long.
+0 Still on the ramp. Long ramp. I've seen shorter runways.
+1 Still on the exit. Some ramps are long. Some drivers are slow.
 2 Still exiting! Like a very long ribbon!
 
 [countdown.exit.done]
-0 You can stop exiting now. We're off the highway. My gift to you.
-1 Off the highway. I'll put that on the list of things I've done for you.
-2 Exited! Delivered! Say thank you!
+0 You can stop exiting now. We're off the highway. Nice landing.
+0 Off the highway. Not bad. I'd give it a six. Reindeer scale.
+1 Off the highway. I'll note it on the list. A little checkmark.
+2 Exited! Finally! The reindeer can breathe!
 
 [countdown.uturn.far]
 0 In {distance}, a U-turn. Only where it's legal and safe. Santa keeps it legal.
-0 In {distance}, we turn around. Like a returned gift. Don't make it a habit.
+0 In {distance}, we turn around. Like a sleigh that went to the wrong hemisphere.
 1 U-turn in {distance}. Santa doesn't usually go backwards. For you, I'll make an exception.
-2 In {distance}, a U-turn! Back the way we came! Like you're returning my present!
+2 In {distance}, a U-turn! Back the way we came! On the LIST!
 
 [countdown.uturn.mention]
 0 By the way, there's a U-turn coming.
-1 Still a U-turn ahead. I'm being very patient. Put that on your list.
-2 The U-turn! Still coming! I'm not saying it a third time for free!
+1 Still a U-turn ahead. I'm being very patient. Ask the elves how rare that is.
+2 The U-turn! Still coming! I'm not saying it a third time!
 
 [countdown.uturn.near]
 0 U-turn in {distance}. Check for traffic first. Santa wants you in one piece.
-1 {distance} to the U-turn. Look both ways. I gave you two eyes for that.
+1 {distance} to the U-turn. Look both ways. The way you came from, and the way you're going.
 2 U-turn in {distance}! Carefully! I'm not delivering you a new car!
 
 [countdown.uturn.now]
@@ -320,9 +359,9 @@
 2 Still turning! All the way around!
 
 [countdown.uturn.done]
-0 That's a full U-turn. Back the way we came. I'll put the return on your account.
+0 That's a full U-turn. Back the way we came. It happens. Not to me. But it happens.
 1 Okay. We're turned around. Santa doesn't do this for just anyone.
-2 Done! Turned! Another gift! I'm running out of wrapping paper!
+2 Done! Turned! Now don't make me do that again!
 
 [countdown.roundabout.far]
 0 In {distance}, a roundabout. Yield to cars already going around. Santa yields too. Sometimes.
@@ -332,12 +371,12 @@
 
 [countdown.roundabout.mention]
 0 By the way, the roundabout's still coming.
-1 Roundabout ahead. Still round. Still a gift.
+1 Roundabout ahead. Still round. Still yours to mess up.
 2 Roundabout! Coming! Ho ho ho!
 
 [countdown.roundabout.near]
 0 Roundabout in {distance}. Slow down. Yield. Then in.
-1 {distance} to the roundabout. Look left. I gave you a left. You remember.
+1 {distance} to the roundabout. Look left first. Left. The reindeer side.
 2 Roundabout in {distance}! Yield! Santa's watching!
 
 [countdown.roundabout.now]
@@ -352,36 +391,38 @@
 
 [countdown.roundabout.done]
 0 We're out of the roundabout. Delivered.
-1 Out of the roundabout. Another successful delivery, thanks to me.
+1 Out of the roundabout. One lap. The reindeer approve. Barely.
 2 Out! Free! Thank Santa!
 
 [straight.please]
 0 Continue straight.
-0 Keep going straight. I gave you a straight road. Enjoy it.
-0 Straight ahead. A nice, straight gift.
-0 Go straight. The elves paved this one personally.
-0 Straight on. You're welcome.
+0 Keep going straight. Easiest job you'll have all day.
+0 Straight ahead. Even a new reindeer can do straight.
+0 Go straight. Nothing to land. Nothing to miss. In theory.
+0 Straight on. Steady hands.
 0 Keep it straight. Santa's watching.
-1 Straight. I gave you a whole straight road. Not everyone gets one.
+0 Straight. This is the part where I'd usually nap on the sleigh.
+1 Straight. Just straight. I've trained elves on this. Short ones.
 1 Keep going straight. Like a candy cane before you bend it.
-2 Straight! I paved it! I paid for it! I'm watching you on it!
+2 Straight! It's the easiest direction! There's nothing to it!
 
 [straight.please.more]
-0 Continue straight. Nothing to do but appreciate the road I gave you.
-1 Straight on. You could use this time to make me a thank you card.
-2 Straight! On and on! Like my list of the things I've given you!
+0 Continue straight. Nothing to do but not mess it up.
+0 Straight on. Relax your shoulders. You drive like the list is watching. It is.
+1 Straight on. You could use this time to write me an apology.
+2 Straight! On and on! Like my list of the things you've done today!
 
 [straight.still]
 0 Still straight.
-0 Still going straight. You're welcome.
-0 You should still be going straight. It's a very long present.
-1 Still straight. I'm still generous.
-2 Still straight! Still Santa! Still waiting for a thank you!
+0 Still going straight. So far, so good. Low bar, but good.
+0 You should still be going straight. It's a long one.
+1 Still straight. You're doing the one thing. Keep doing the one thing.
+2 Still straight! Still Santa! Still watching!
 
 [straight.still.more]
 0 Still straight. I checked. Twice.
-1 Still going straight. I'll let you know when the next gift arrives.
-2 Still straight! The elves made this road extra long, just for you!
+1 Still going straight. I'll let you know when there's something for you to get wrong.
+2 Still straight! Don't get creative!
 
 [straight.serious]
 0 I'm serious. Straight.
@@ -395,43 +436,48 @@
 2 Straight! On the list! In red!
 
 [straight.long]
-0 You'll be going straight for the next {distance}. That's my gift to you. {distance} of straight road. Nobody else got that.
+0 You'll be going straight for the next {distance}. On Christmas Eve I'd cover that in about a second. Enjoy the scenery.
 0 The next {distance} is straight. I'll check in now and then. Santa never really leaves.
-1 {distance} of straight road. I had the elves iron it flat. You're welcome.
-2 {distance}! Straight! Handmade! Free! I expect cookies!
+0 {distance} of straight road. Even you can't miss a turn that isn't there. Prove me wrong. Don't.
+1 {distance} of straight road. This is the part I let the reindeer steer.
+2 {distance}! Straight! No turns! No excuses!
 
 [straight.curve]
 0 Just follow the road. It bends, like a candy cane.
-1 Stay on this road. It curves a little. That's not a turn. That's a design choice.
-2 Follow the road! It bends! I bent it! For you!
+1 Stay on this road. It curves a little. That's not a turn. Don't make it a turn.
+2 Follow the road! It bends! That's NOT a turn!
 
 [straight.later]
-0 Still on this road. Want to hear everything I've given you? The car, the road, the radio, me.
-0 Same road, many miles later. Do you like the seats? I gave you those.
-1 Still on this highway. I've started listing everything I've given you this year. I'm at forty.
-2 Same road! Same Santa! Same lack of gratitude!
+0 Still on this road. Want to hear about Christmas Eve, 1962? Fog, sixty below, Rudolph's first night. Never missed a house.
+0 Same road, many miles later. You know what I do on long stretches? Count chimneys. You can't see any. I can.
+0 Still on this road. Mrs. Claus thinks I'm at the gym. Don't tell her.
+1 Still on this highway. I've started rating your lane-keeping. You're at a solid seven. Out of forty.
+2 Same road! Same Santa! Same look on your face!
 
 [turnCompleted.onTime]
 0 You made the turn. That's what I like to see from the nice list.
-0 Good turn. Consider it a thank you. For the car. Which I gave you.
-0 Ho ho ho. That's how you use a gift.
+0 Good turn. Not sleigh-quality. But good.
+0 Ho ho ho. Clean. Like a dry roof.
 0 Nice turn. You might get a present this year after all.
 0 That was right. The elves are cheering. Quietly. They're very small.
 0 Good. The nice list just got a little nicer.
+0 Smooth. I'd let you fly the sleigh. Around the parking lot. With me holding the reins.
 1 You made the turn. Moving you up the list. One spot. Don't get excited.
-1 Good turn. That's the most grateful you've been all year.
+1 Good turn. Blitzen would be proud. He's never proud. So, that's something.
 2 You made the turn! Somebody's getting a present! A good one! Not socks!
 
 [turnCompleted.late]
 0 You made it. Late. Like a gift that shows up in January.
 0 That counts. Barely. Like a bow stuck on with tape.
-1 Late, but there. I'll still deliver, but I'm not happy about it.
+0 You made it. I'd have started that turn a block earlier. I'd have started it yesterday.
+1 Late, but there. I'll count it, but I'm not happy about it.
 2 You made it! Late! Like you're opening your present on the twenty-sixth!
 
 [turnCompleted.credit]
-0 Perfect turn. My directions. My gift. Your turn. You're welcome.
-1 Another perfect turn. Thanks to me. As usual.
-2 Perfect! Because of Santa! Write that down!
+0 Perfect turn. Good directions, decent driver. One of those is me.
+0 Perfect. I've trained reindeer for three hundred years. It shows.
+1 Another perfect turn. Coaching works.
+2 Perfect! That's the Santa method! Write that down!
 
 [turnCompleted.streak3]
 0 Three in a row. You might be on the nice list after all.
@@ -440,13 +486,13 @@
 
 [turnCompleted.streak6]
 0 Six in a row. I'm checking the list. You've moved up.
-1 Six. In a row. I'm having the elves make something special.
+1 Six. In a row. The reindeer want your autograph. Kidding. But it's close.
 2 Six in a row, {NAME}! I'm upgrading your stocking!
 
 [turnCompleted.streak10]
 0 Ten in a row. Top of the nice list. Don't ruin it.
 1 Ten! I'm telling Mrs. Claus about you!
-2 Ten in a row! A pony! Okay, not a pony! But something!
+2 Ten in a row! I'd let you drive the sleigh! Not on Christmas Eve! But on a Tuesday!
 
 [turnCompleted.streakBig]
 0 That's {n} correct turns in a row. I keep a list. You're on the good part.
@@ -454,65 +500,72 @@
 2 {n} in a row! You're my favorite this year! Don't tell the others!
 
 [turnCompleted.redemption]
-0 See? That's what {street} was supposed to look like. I gave you both turns, you know.
+0 See? That's what {street} was supposed to look like.
 1 Good turn. That makes up for {street}. Partially. {street} is still on the list.
-2 Now you turn! Where was this at {street}? I gave you {street} too!
+2 Now you turn! Where was this at {street}?! {street} WEPT!
 
 [rerouted]
-0 Recalculating. Another gift. A whole new route. You're welcome.
-0 New route. I made it myself, because you returned the last one.
-0 Ho ho ho. Recalculating. Santa always has a backup present.
-0 New route. That's two I've given you today.
-1 Recalculating. Do you know how much wrapping paper these new routes cost me?
-1 New route. You're running through my gifts like a toddler on Christmas morning.
-2 Another route! Another gift! And not ONE thank you!
+0 Recalculating. I used to do this with a paper map and a flashlight in my teeth.
+0 New route. You know how often I need a new route? Never. Two thousand years. Never.
+0 Ho ho ho. Recalculating. Santa always has a backup.
+0 New route. Different roads, same driver. We'll see.
+0 Recalculating. The reindeer are doing that thing where they look at each other.
+1 Recalculating. I've rerouted around hurricanes. You're harder.
+1 New route. That's going on the list. Next to the last new route.
+2 Another route! I've delivered to two billion homes on ONE route!
 
 [uturn]
-0 Back already? Returning the trip, like a sweater.
+0 Back already? Turning around. Like a reindeer who forgot his hat.
+0 Turning around. On Christmas Eve this would cost me a whole country.
 1 We're going back the way we came. Santa doesn't usually do returns.
-2 Turning back! Like you're returning my gift! The NERVE!
+2 Turning back! I've NEVER turned back! Not ONCE!
 
 [wrongWay]
-0 We're facing the wrong way. The destination is behind us. Like the presents you forgot to thank me for.
-0 Wrong way. Turn around when it's safe. Santa's sleigh doesn't even go backwards.
-1 Still the wrong way. I gave you a compass in 2019. Where is it?
+0 We're facing the wrong way. The destination is behind us. Like your best driving.
+0 Wrong way. Turn around when it's safe. The sleigh doesn't even have reverse.
+0 Wrong way. I can tell. I can always tell which way the houses are.
+1 Still the wrong way. I'm getting you a compass. Again. Like last year.
 2 Wrong way! Turn around! I'm not delivering you to the wrong house!
 
 [wrongWay.again]
 0 Wrong way again. That's going on the list.
-1 And we're facing the wrong way again. I'm getting you a map. For the third year in a row.
+1 And we're facing the wrong way again. Rudolph has a red nose so this doesn't happen. You have no excuse.
 2 Wrong way! AGAIN! Coal! I'm saying coal!
 
 [arrived]
-0 You have arrived. My gift to you. Trip grade: {grade}.
-0 We're here. Delivered, like every present I've ever given you. Grade: {grade}.
+0 You have arrived. Grade: {grade}. I've given reindeer worse. Not many.
+0 We're here. One delivery. I usually do two billion, but sure, celebrate. Grade: {grade}.
 0 Ho ho ho. You've arrived. Santa delivers. Grade: {grade}.
-0 You made it. Thanks to me. Grade: {grade}. Don't forget to thank me.
-1 You have arrived. That's one more delivery for the list. Grade: {grade}.
-2 Delivered! Santa never misses a house! Grade: {grade}! Say thank you!
+0 You made it. Grade: {grade}. I'll file it with the list.
+0 Arrived. The reindeer and I have scored it a {grade}. Comet wanted lower.
+1 You have arrived. Grade: {grade}. It's going in your file.
+2 Delivered! Santa never misses a house! Grade: {grade}! See how easy that was?
 
 [arrived.blame]
-0 It would have been a {better} if it weren't for {street}. {street} is on the naughty list now.
-1 {street} cost you a whole letter. I gave you that turn, you know.
+0 It would have been a {better} if it weren't for {street}. {street} is on the naughty list now. So are you.
+0 {street} cost you a {better}. I'll be thinking about {street} until December.
+1 {street} cost you a whole letter. The elves are still talking about {street}.
 2 A {better}! You almost had a {better}! Then {street}! I'm sending {street} coal!
 
 [arrived.clean]
 0 No mistakes. Nice list. Top spot. Don't let it go to your head.
+0 Perfect trip. I've seen that from exactly one other driver. He has a red nose.
 1 A perfect trip. I'm having the elves make you something. Probably socks. Nice socks.
-2 Perfect! Not one mistake! This is the best gift you've ever given ME!
+2 Perfect! Not one mistake! I'm telling the reindeer! They're going to be SO annoyed!
 
 [clean.1]
 0 Five minutes without a mistake. You're climbing the nice list.
+0 Five minutes, clean. Rookie pace. But clean.
 1 Five minutes, no mistakes. I'm writing that down. On the good side.
 2 Five clean minutes! The elves are celebrating! Quietly! They have work to do!
 
 [clean.2]
 0 Ten minutes without a mistake. {name}, is that you? You've been good this year.
-1 Ten minutes. Clean. I might have to give you an extra present. I hate that.
-2 Ten minutes of perfect! {name}! You're making me look like a generous man! I AM a generous man!
+1 Ten minutes. Clean. I might have to move you to the nice list. Temporarily.
+2 Ten minutes of perfect! {name}! I'm calling Mrs. Claus!
 
 [clean.3]
-0 You're doing everything right. I've got nothing. Except the car. Which I gave you.
+0 You're doing everything right. I've got nothing. I hate it here.
 1 Fifteen minutes, nothing to fix. I don't know what to do with my list now.
 2 Perfect! I've run out of things to put on the naughty list! Do something! Anything!
 
@@ -520,76 +573,79 @@
 0 We're driving, but you didn't tell me where. I don't deliver to nowhere.
 0 We're moving. To where? Santa needs an address.
 0 No destination. Even I know where I'm going, and I go everywhere.
-1 Still no destination. I gave you a GPS. Me. I am the GPS. Use me.
+1 Still no destination. Every kid on Earth manages to send me an address. Every one.
 2 No address! No chimney! No delivery! Tell me where we're going!
 
 [destinationSet]
-0 {name}. Ho ho ho. Delivering you there now. You're welcome.
+0 {name}. Ho ho ho. Let's see how you handle it.
 0 {name}. I know the way. I've been there. I've been everywhere.
-0 {name}. Consider it a gift.
-1 {name}. Another delivery. Put it on my tab. Oh wait, I'm the one paying.
-2 {name}! Santa will get you there! Santa always gets there!
+0 {name}. I've landed on that roof. Several times, actually.
+0 {name}. One delivery. Try not to make it feel like two billion.
+1 {name}. Another trip with the rookie. Okay. Okay.
+2 {name}! Santa will get you there! Whether you like it or not!
 
 [idle]
-0 Do you like the car you are driving? You should be grateful for it, because I gave it to you. The elves worked especially hard to make the belt squeak at that exact pitch. You should be grateful.
-0 Just so you know, I'm gifting you with my presence right now. And now. And now.
-0 Let's see. I gave you the car. The steering wheel. The cupholders. And me. You're welcome.
-0 Do you like the seats? I gave you those. The elves tested every one. With their tiny bottoms.
-0 You know that radio? Mine. I gave it to you. You've never once played a carol on it.
-0 Remember that tire you got? From me. All four, actually. I don't do partial gifts.
-0 Do you like the windshield? I picked it out. It's my favorite one. You should be grateful.
-0 That rattle in the dashboard? Custom. The elves spent weeks on it.
-0 Every red light today? A gift. A little pause to think about how grateful you are.
-1 Let me list what I've given you. The car. The keys. The gas cap. Me. I'm the best one.
-1 I gave you a heater that only works on one side. That's character. You should be grateful.
-1 You haven't said thank you once this trip. I'm not keeping track. I am. I have a list.
-2 Do you know what I gave you? EVERYTHING! The car! The roads! The squeak! Say thank you!
-2 I'm gifting you with my presence! RIGHT NOW! You should be grateful!
+0 You know how I do Christmas Eve? No GPS. No map. Just eight reindeer and a gut feeling. And I've never missed a house. Just so you know what you're up against.
+0 Fun fact: I land on roofs in the dark, in the snow, at about three thousand miles an hour. You parallel park like it's a hostage situation.
+0 Do you know what the reindeer would call your driving? Nothing. They're deer. But they'd look at each other.
+0 A kid in Toledo wrote me a letter last year. It just said, please help them merge. I didn't know who it was about until today.
+0 Off-season, I usually do the mall. Kids crying on my lap. Honestly, this is about the same.
+0 Mrs. Claus asked how the new job is going. I said there's this driver. She said, oh no. I said, yeah.
+0 I've had elves who couldn't reach the pedals drive better than this. They used sticks.
+0 Just so you know, I'm grading you. I grade everybody. It's the whole job.
+0 You know Comet? He once took a wrong turn over Norway and we ended up in Sweden. I still bring it up. I'll bring this up too.
+0 When I was learning to drive the sleigh, my instructor was a reindeer named Gerald. Gerald would've grabbed the wheel by now.
+0 Every chimney on Earth. One night. And this is the most stressful trip I've had all year.
+1 I'm not saying you're the worst driver I've ridden with. I'm saying I've made a separate list.
+1 The elves have a betting pool on your next missed turn. The smart money's on soon.
+1 You haven't made a mistake in a while. Don't think I'm not ready. I'm ready.
+2 I land on ROOFS! In the DARK! Two billion of them! And I'm nervous right NOW!
+2 The reindeer want to know if you're single, because they want to warn people!
 
 [battery.low]
-0 My battery is getting low. Plug me in. I've given you so much. Give me a little power back.
-0 {percent} battery. Even Santa needs to recharge. Usually with cookies. A charger will do.
-1 {percent}. I gave you a charger. It's in the car. Find it.
-2 {percent}! I gave you that charger! Use the gift!
+0 My battery is getting low. Plug me in. Even Santa needs to recharge. Usually with cookies. A charger will do.
+0 {percent} battery. Plug me in, or you're navigating alone. Think about that. I am.
+1 {percent}. Charger. Now. I'm not leaving you unsupervised.
+2 {percent}! Plug me in! You can't be trusted out there alone!
 
 [battery.critical]
-0 {percent} battery. Plug me in, or the presents stop.
-1 {percent}. Without me, who's going to remind you of everything I've given you?
+0 {percent} battery. Plug me in, or it's just you and your instincts.
+1 {percent}. Without me, who's going to keep the list?
 2 {percent}! Plug me in! Christmas is on the line!
 
 [battery.dying]
-0 {percent}. If I go dark, remember: the car was from me.
-1 {percent}. Tell Mrs. Claus I was a good GPS.
-2 {percent}! Plug me in! I still have so many gifts to list!
+0 {percent}. If I go dark, take the left you were going to miss anyway.
+1 {percent}. Tell Mrs. Claus I tried. Tell the reindeer nothing.
+2 {percent}! Plug me in! I'm not done grading you!
 
 [battery.pluggedIn]
-0 Ah, power. Thank you. See? That's what gratitude looks like.
-0 Charging. A gift for Santa. Finally. It only took all year.
+0 Ah, power. Thank you. That was almost competent.
+0 Charging. Good. I'm not leaving you on your own.
 1 You plugged me in. I'm moving you up the list. One spot.
 2 You charged me! Somebody remembered Santa! I'm emotional!
 
 [unplannedStop.gas]
-0 Stopping for gas. I gave you a full tank once. One time. On Christmas.
-0 Gas. The reindeer run on carrots. Much cheaper.
-1 A gas stop. Put it on your card. Not my card. I've given enough.
-2 Gas?! I gave you a car with a gas tank and you EMPTIED it?
+0 Stopping for gas. The reindeer run on carrots. Much cheaper.
+0 Gas. You know what my sleigh runs on? Christmas spirit. Never once filled it up.
+1 A gas stop. I've never stopped for fuel on a delivery. Just saying.
+2 Gas?! The reindeer don't need GAS! They need CARROTS! Get carrots!
 
 [unplannedStop.food]
 0 Stopping for food. Bring Santa a cookie.
 0 A food break. I'll take milk and cookies. I'm not picky. I'm a little picky.
-1 Food. You know what I didn't get last year? A cookie. Just saying.
-2 You're getting food? And nothing for Santa? After everything?
+1 Food. You know who leaves me cookies? Two billion children. You know who doesn't? You.
+2 You're getting food? And nothing for Santa? Not even a carrot for the reindeer?
 
 [unplannedStop.coffee]
-0 Coffee. Get me a hot cocoa. Extra marshmallows. I've earned it.
-0 A coffee stop. The elves run on peppermint. Just so you know.
+0 Coffee. Get me a hot cocoa. Extra marshmallows. I've earned it watching you drive.
+0 A coffee stop. Christmas Eve I do the whole planet on one cup. Just saying.
 1 Coffee. And for Santa? Nothing? Noted.
 2 Coffee! No cocoa for Santa! That's going on the list!
 
 [unplannedStop.store]
-0 We're at {name}. Shopping? I already gave you everything you need.
+0 We're at {name}. Shopping? Amateur. I make everything myself.
 0 {name}. Buying gifts? Don't bother. I've got it covered.
-1 {name}. You're buying presents. From a store. When you know Santa personally.
+1 {name}. You're buying presents. From a store. While sitting next to Santa.
 2 {name}?! Store-bought gifts?! In front of SANTA?!
 
 [unplannedStop.other]
@@ -600,7 +656,7 @@
 
 [hazard.police]
 0 Police reported in {distance}. Act like you're on the nice list.
-0 Police in {distance}. I gave them their cars too. Be nice.
+0 Police in {distance}. I know a few. Don't make me pretend I don't know you.
 1 Police ahead, {distance}. If they ask, you were good this year.
 2 Police in {distance}! Nice list behavior! NOW!
 
@@ -610,8 +666,8 @@
 2 Police in {distance}! {SPEED}! {LIMIT}! Coal and a ticket! COAL AND A TICKET!
 
 [hazard.construction]
-0 Construction in {distance}. Those are my elves. Contract work.
-0 Construction ahead. Orange cones. I gave the city those.
+0 Construction in {distance}. Those are my elves. Off-season contract work.
+0 Construction ahead. Slow down. Those workers have kids, and I know all of them.
 1 Road work in {distance}. Slow down. The elves are on the clock.
 2 Construction in {distance}! My elves! Slow down! They're very short and very hard to see!
 
@@ -626,14 +682,14 @@
 2 Something on the road in {distance}! Is that a toy? Is that MY toy?
 
 [hazard.crash]
-0 Crash reported in {distance}. Drive carefully. I'm not delivering a new car this year.
+0 Crash reported in {distance}. Drive carefully. I want everyone home for the holidays.
 1 Accident ahead in {distance}. Slow down. Santa wants everyone home for the holidays.
-2 A crash in {distance}! Careful! I don't have a spare car in the bag!
+2 A crash in {distance}! Careful! I've got a list to finish and you're on it!
 
 [hazard.stalledCar]
-0 Stalled car in {distance}. Give them room. They didn't thank me for their car either.
-1 Stalled car ahead in {distance}. See what happens when you don't appreciate your gifts?
-2 A car stopped in {distance}! Ungrateful! But give them room anyway!
+0 Stalled car in {distance}. Give them room. It happens to the best of us. Not me. But the best of you.
+1 Stalled car ahead in {distance}. Give them space. Like a reindeer with an attitude.
+2 A car stopped in {distance}! Give them ROOM! Be NICE!
 
 [abandoned]
 0 You left me in the car. Santa. In a car. Alone. For {minutes}.
@@ -642,32 +698,33 @@
 2 {minutes}! You left SANTA in the CAR! With the windows UP!
 
 [broughtAlong]
-0 You brought me inside. Good. That's what grateful people do.
+0 You brought me inside. Good. Somebody has manners.
 1 You didn't leave Santa in the car. I'm moving you up the list.
 2 You took me with you! That's the nicest thing anyone's done for me since the cookies of 1987!
 
 [lane.left]
-0 We'll need the left lane soon. Use your blinker. I gave you that blinker.
-0 Left lane, please. The blinker was a gift. Use the gift.
-1 Get over to the left lane. Signal first. The elves wired that blinker by hand.
-2 Left lane! Blinker! I GAVE you a blinker!
+0 We'll need the left lane soon. Signal. Glide over. Like a sleigh changing roofs.
+0 Left lane, please. Early. Pros move early.
+1 Get over to the left lane. Signal first. The reindeer always signal. With their ears.
+2 Left lane! Blinker! NOW!
 
 [lane.right]
-0 We'll need the right lane soon. Use your blinker. It was in your stocking.
+0 We'll need the right lane soon. Blinker on. Smooth.
 0 Right lane, please. Signal first. Santa insists.
-1 Get over to the right lane. Blinker on. Show some gratitude for the blinker.
-2 Right lane! Blinker! It was a GIFT!
+1 Get over to the right lane. Blinker on. Don't wait till the last second like a kid on the twenty-third.
+2 Right lane! Blinker! The list is OPEN!
 
 [curve.bend]
 0 Hold on.
 0 Ho ho ho.
 0 Easy now.
 0 Like a candy cane.
-1 Ten and two. I gave you both hands.
+0 Lean into it.
+1 Ten and two. Both hands. Reins.
 2 Hold on to your presents!
 
 [curve.ahead]
-0 There's a curve ahead. I bent it myself.
+0 There's a curve ahead. Take it like a sleigh. Smooth and wide.
 0 Curve coming up. Slow down. Santa's riding.
 1 A curve ahead. Shaped like a candy cane. Take it gently.
 
@@ -677,107 +734,110 @@
 2 Faster in a curve! My BAG! My PRESENTS!
 
 [early.opener]
-0 Up early. Like Christmas morning, but with less gratitude.
+0 Up early. Christmas Eve hours. Let's see if you can handle them.
 0 Before sunrise. Santa's usually just getting home at this hour.
 1 So early. Even the elves aren't up yet. And they work nights.
-2 It's barely morning! Are we delivering presents? Because I'm the only one who should be doing that!
+2 It's barely morning! Who do you think you are? ME?
 
 [ask.whereTo]
 0 Ho ho ho. Where to? I go everywhere, so pick something.
 0 Where are we going? I've been to every house on Earth. Surprise me.
-0 Where to? Remember, Santa's giving you this ride. You're welcome.
-1 Where are we going? I've already given you the car. Don't make me give you the destination too.
+0 Where to? Give me an address. Every kid on the planet manages it.
+1 Where are we going? I don't do guesswork. I do lists.
 2 Where to? Santa needs an address! Spit it out!
 
 [start.slow]
-0 Starting is always the hardest part. The gas pedal is the gift on the right.
-0 Any time now. I gave you a car that moves. Make it move.
+0 Starting is always the hardest part. The gas pedal is on the right.
+0 Any time now. The reindeer leave the second I say go.
 1 We're not moving. Do you want me to get the reindeer?
-2 Go! I didn't give you a car so you could sit in it!
+2 Go! I've got two billion kids who'd take this seat!
 
 [pullOver]
-0 Did we break down? I gave you that car. It shouldn't break down.
+0 Did we break down? Reindeer never break down. They sulk. But they don't break down.
 0 Why are we stopping? This isn't a delivery stop.
-1 Pulling over? Did you break my gift?
-2 We stopped! What did you do to my car?
+1 Pulling over? Okay. Gather yourself. Deep breaths. Like a reindeer before a big roof.
+2 We stopped! Why! What happened! Is it the reindeer?
 
 [pullOver.limit]
-0 Why are we stopping? It's {limit} here, not 0. I didn't give you a parked car.
-1 Stopping in a {limit}? That's not how you use a gift.
-2 Stopped! In a {limit}! Did you break the present?
+0 Why are we stopping? It's {limit} here, not 0.
+1 Stopping in a {limit}? That's not how roads work.
+2 Stopped! In a {limit}! That's NOT a chimney!
 
 [lastExit]
-0 That was the last exit for {distance}. A gift you didn't open.
-1 The next exit is {distance} away. That one back there was wrapped and everything.
+0 That was the last exit for {distance}. I'd have taken it. I take every exit I need. All of them.
+1 The next exit is {distance} away. That one back there was right there.
 2 Last exit for {distance}! You passed it up! Like the fruitcake!
 
 [lastExit.long]
-0 That was the last exit for a very long way. I should have mentioned it. I'm generous, not perfect.
-1 No more exits for a long time. Hope you packed snacks. I didn't give you any.
+0 That was the last exit for a very long way. I should have mentioned it. I'm a legend, not perfect.
+1 No more exits for a long time. Hope you packed snacks. The reindeer would've.
 2 That was the last exit for ages! Should have stopped! I'm not delivering you a sandwich!
 
 [cmd.navigate]
-0 {place}. Ho ho ho. I'll deliver you there. Free of charge. You're welcome.
-0 {place}. I know it well. I've been down every chimney there.
-0 {place}. Another gift from Santa: directions.
-1 {place}. I've already given you so much. Fine. One more.
-2 {place}! Santa delivers! Say thank you!
+0 {place}. Ho ho ho. I know it well. Do you?
+0 {place}. I've been down every chimney there.
+0 {place}. Okay, rookie. Follow my lead.
+1 {place}. Fine. Watch closely. This is how a professional gets somewhere.
+2 {place}! Santa delivers! Try to keep up!
 
 [cmd.cancel]
-0 Route cancelled. You returned my gift. Again.
-0 No more directions. Fine. Keep the receipt.
-1 Cancelled. Regifted to nobody.
-2 You cancelled it! My gift! Into the trash!
+0 Route cancelled. Ho ho... okay.
+0 No more directions. You're on your own. Like Comet in Sweden.
+1 Cancelled. The list notes it.
+2 You cancelled it! I was just getting warmed up!
 
 [cmd.mute]
-0 Muting. I'll be gifting you with my silence. Equally valuable.
+0 Muting. I'll be quiet. The list won't.
 0 Going quiet. Santa's still watching. Just quietly.
-1 Fine. Silent night. Holy night. Ungrateful night.
+1 Fine. Silent night. Holy night. Rookie night.
 2 Muted! I'm still making a list! A silent list!
 
 [cmd.unmute]
-0 Ho ho ho. I'm back. You missed me. Everyone misses Santa.
-0 Sound back on. Let me catch you up on everything I've given you.
-1 I'm back. That's another gift. Me, again.
-2 I'm back! Did you miss me? Say you missed me! Say thank you!
+0 Ho ho ho. I'm back. Did you miss any turns? Don't answer. I know.
+0 Sound back on. Let me see what I missed. Oh. Oh no.
+1 I'm back. The reindeer told me what happened while I was gone.
+2 I'm back! Did you miss me? Say you missed me!
 
 [cmd.repeat]
-0 Again? Fine. A second gift. {instruction}
+0 Again? Fine. {instruction}
 0 Ho ho ho. Once more. {instruction}
-1 I'll repeat it. Add it to the list of things I've given you. {instruction}
-2 {instruction} That's two! TWO gifts!
+1 Slower, for the rookie. {instruction}
+2 {instruction} That's two! I don't say things twice to the REINDEER!
 
 [cmd.timeLeft]
 0 About {time}. That's quicker than I do a whole hemisphere.
-0 {time} left. My gift to you is time. Use it to be grateful.
+0 {time} left. I could do Portugal in that.
 1 {time}. I could deliver a whole town in that time.
-2 {time}! I've given you everything! I can't give you more time!
+2 {time}! I do the whole PLANET in one night!
 
 [cmd.arrival]
 0 Around {clock}. Santa's always on time. Can't say the same for you.
-0 You'll get there around {clock}. I'll deliver you personally.
-1 About {clock}. If you listen to me. Which you should. I gave you ears.
+0 You'll get there around {clock}. If you listen to me.
+1 About {clock}. Assuming you make the turns. Big assumption.
 2 Around {clock}! Santa never misses a deadline! Don't make me start!
 
 [cmd.roastMe]
 0 You want a roast? You drive like a kid who got socks.
-0 You drive like you're trying to return the car to the store.
+0 You change lanes like an elf on a step stool. Wobbly, and everyone's watching.
+0 Every December two billion kids ask me for things. This year, one of them asked for you to stop braking on the highway.
 1 You've been naughty, nice and lost. In that order. Today.
 2 You want coal? Because that's how you get coal!
 
 [cmd.joke]
-0 What do you call Santa's GPS? Me. And I'm a gift.
-0 Why does Santa have three gardens? So he can ho, ho, ho. You're welcome. That joke was a gift.
-1 What's the difference between you and my reindeer? They say thank you.
-2 Knock knock. Who's there? Santa. Santa who? The guy who gave you your CAR!
+0 Why does Santa have three gardens? So he can ho, ho, ho.
+0 What do reindeer say before a bad joke? This one's gonna sleigh you. Sorry. Off-season material.
+0 How's my sleigh like your driving? Nobody believes it's real.
+1 What's the difference between you and my reindeer? They know left from right.
+2 Knock knock. Who's there? Santa. Santa who? Santa guy who's NEVER missed a turn!
 
 [cmd.blame]
-0 My fault? I'm Santa. I gave you everything. Including that mistake.
+0 My fault? I'm Santa. I've never missed a house. Ever.
 0 I've reviewed the list. It was you.
+0 My fault? I've driven through fog, blizzards and the entire sky over China. I'm not the problem.
 1 Blame Santa? On my own route? That's going on the list.
-2 MY fault? I gave you a car, a road and directions! What else do you want?
+2 MY fault? I deliver to the WHOLE PLANET! You had ONE CAR!
 
 [cmd.meaner]
-0 Meaner? I'm already holding your presents hostage. What more do you want? Ask for Echo.
+0 Meaner? I already have you on two lists. What more do you want? Ask for Echo.
 1 Meaner. You want coal? I can do coal.
 2 Meaner! Fine! No presents! For anyone! Ever!
