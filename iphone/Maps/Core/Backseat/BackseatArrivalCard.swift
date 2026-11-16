@@ -13,7 +13,9 @@ import UIKit
     NotificationCenter.default.addObserver(forName: BackseatTalkButton.navigationVisibilityChanged, object: nil,
                                            queue: .main) { note in
       if (note.object as? Bool) ?? false {
-        tripStartedAt = Date()
+        // The phone and the car screen can both say a trip is on (handing the trip between them);
+        // the trip started at the first one.
+        if tripStartedAt == nil { tripStartedAt = Date() }
       } else if let started = tripStartedAt {
         tripStartedAt = nil
         waitForReport(newerThan: started, until: Date().addingTimeInterval(reportWait))
@@ -21,9 +23,14 @@ import UIKit
     }
   }
 
+  /// Posted on the main thread when a finished trip's report is in; the object is the `TripReport`.
+  /// CarPlay shows the grade on the car screen from it.
+  static let reportReady = Notification.Name("BackseatTripReportReady")
+
   /// A cancelled trip has no report, so nothing shows.
   private static func waitForReport(newerThan started: Date, until deadline: Date) {
     if let report = TripReport(MWMBackseatRewriter.lastTripReport), report.at >= started {
+      NotificationCenter.default.post(name: reportReady, object: report)
       show(report)
       return
     }

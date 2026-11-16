@@ -19,7 +19,8 @@ final class MapTemplateBuilder {
   }
   
   private enum Constants {
-    static let carPlayGuidanceBackgroundColor = UIColor(46, 100, 51, 1.0)
+    // Backseat Driver: the night-drive card colour, not CoMaps green, behind the turn instructions.
+    static let carPlayGuidanceBackgroundColor = BackseatTheme.card
   }
   private static weak var myPositionModeButton: CPMapButton?
   
@@ -79,7 +80,8 @@ final class MapTemplateBuilder {
       let gridTemplate = SettingsTemplateBuilder.buildGridTemplate()
       CarPlayService.shared.pushTemplate(gridTemplate, animated: true)
     }
-    mapTemplate.trailingNavigationBarButtons = [settingsButton]
+    // Backseat Driver: the mic, to say where to go ("take me home").
+    mapTemplate.trailingNavigationBarButtons = [settingsButton, BackseatCarPlay.micBarButton()]
   }
   
   class func configurePanUI(mapTemplate: CPMapTemplate) {
@@ -103,7 +105,8 @@ final class MapTemplateBuilder {
       mapTemplate.showPanningInterface(animated: true)
     }
     let myPositionModeButton = buildMyPositionModeButton()
-    mapTemplate.mapButtons = [myPositionModeButton, panningButton]
+    // Backseat Driver: the mic, to talk back mid-trip.
+    mapTemplate.mapButtons = [myPositionModeButton, panningButton, BackseatCarPlay.micMapButton()]
     setupSoundAndRedirectButtons(template: mapTemplate)
     let endButton = buildBarButton(type: .endRoute) { _ in
       CarPlayService.shared.cancelCurrentTrip()
