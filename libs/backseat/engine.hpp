@@ -151,6 +151,11 @@ std::string RoundaboutExitOf(std::string const & instruction);
 /// tier 2 shouts it ("THIRD EXIT!"). Empty when the var is missing or empty (loop B99).
 std::string ExitCallFor(Vars const & vars, int tier);
 
+/// The final roundabout call with its exit sentence right after the first sentence that names the
+/// maneuver: ("Roundabout. Now. Smoothly.", "Third exit.") -> "Roundabout. Third exit. Now. Smoothly.".
+/// No such sentence: the call goes at the end. Empty call: the text unchanged (loop B172).
+std::string WithExitCallAfterManeuver(std::string const & text, std::string const & call);
+
 /// The spoken direction: "In 500 feet, turn left onto Elm Street.", "In a quarter mile, at the light,
 /// turn right onto Oak Lane.", "Your destination, Sundance Lane, is 400 feet ahead."
 std::string DirectionText(std::string const & text, double distanceM, Units units, Control control = Control::None);

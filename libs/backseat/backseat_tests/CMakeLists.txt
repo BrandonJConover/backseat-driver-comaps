@@ -19,6 +19,7 @@ add_executable(${PROJECT_NAME}
   then_chaining_test.cpp
   roundabout_exit_test.cpp
   roundabout_exit_countdown_test.cpp
+  countdown_now_leads_test.cpp
   delivery_test.cpp
   history_test.cpp
   trip_log_test.cpp

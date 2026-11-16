@@ -72,7 +72,7 @@ TEST(RoundaboutCountdownEndsWithTheExit)
   std::vector<std::string> const want = {
       "In 500 feet you are going to take the roundabout. Third exit.",
       "By the way, did I mention you should take the roundabout. Third exit.",
-      "Hey, you should be taking the roundabout. Third exit.",
+      "Roundabout. Third exit. You should be taking it now.",
       "You should still be going around the roundabout.",
       "Please stop going around. You're out of the roundabout."};
   CHECK(said == want);
@@ -82,7 +82,7 @@ TEST(RoundaboutCountdownWithoutAnExitIsUnchanged)
 {
   std::vector<std::string> const want = {
       "In 500 feet you are going to take the roundabout.",
-      "By the way, did I mention you should take the roundabout.", "Hey, you should be taking the roundabout.",
+      "By the way, did I mention you should take the roundabout.", "Roundabout. You should be taking it now.",
       "You should still be going around the roundabout.", "Please stop going around. You're out of the roundabout."};
   CHECK(Countdown("Take the roundabout onto Oak Street") == want);
   CHECK(Countdown("Exit the roundabout onto Oak Street").front().find("exit.") == std::string::npos);

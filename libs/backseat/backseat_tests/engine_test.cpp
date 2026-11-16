@@ -270,7 +270,7 @@ TEST(ExitsUseExitWordingNotTurnRight)
   std::vector<std::string> const want = {
       "In 500 feet you are going to take the exit on the right.",
       "By the way, did I mention you should take the exit on the right.",
-      "Hey, you should be taking the exit on the right.",
+      "Exit on the right. Now. You should be on the ramp already.",
       "You should still be taking the exit.", "Please stop exiting. You've exited."};
   CHECK(CountdownFor("Take the exit on the right onto I-25") == want);
   CHECK(TurnShapeOf("Take the exit on the left") == TurnShape::Exit);
@@ -280,12 +280,12 @@ TEST(UTurnsAndRoundaboutsGetCountdowns)
 {
   std::vector<std::string> const uturn = {
       "In 500 feet you are going to make a U-turn.", "By the way, did I mention you should make a U-turn.",
-      "Hey, you should be making a U-turn.", "You should still be making a U-turn.",
+      "U-turn. Now, when it's clear. You should be turning around.", "You should still be making a U-turn.",
       "Please stop making a U-turn. If you keep going, we'll be headed the wrong way again."};
   CHECK(CountdownFor("Make a U-turn") == uturn);
   std::vector<std::string> const roundabout = {
       "In 500 feet you are going to take the roundabout.",
-      "By the way, did I mention you should take the roundabout.", "Hey, you should be taking the roundabout.",
+      "By the way, did I mention you should take the roundabout.", "Roundabout. You should be taking it now.",
       "You should still be going around the roundabout.", "Please stop going around. You're out of the roundabout."};
   CHECK(CountdownFor("Take the roundabout onto Elm Street") == roundabout);
 }

@@ -293,6 +293,31 @@ std::string ExitCallFor(Vars const & vars, int tier)
   return text + ".";
 }
 
+std::string WithExitCallAfterManeuver(std::string const & text, std::string const & call)
+{
+  if (call.empty())
+    return text;
+  static std::regex const maneuver(R"(\b(roundabout|around)\b)", std::regex::icase);
+  size_t start = 0;
+  while (start < text.size())
+  {
+    size_t end = text.find_first_of(".!?", start);
+    if (end == std::string::npos)
+      break;
+    while (end + 1 < text.size() && std::string(".!?").find(text[end + 1]) != std::string::npos)
+      ++end;
+    if (std::regex_search(text.begin() + static_cast<std::ptrdiff_t>(start),
+                          text.begin() + static_cast<std::ptrdiff_t>(end), maneuver))
+    {
+      if (end + 1 >= text.size())
+        return text + " " + call;
+      return text.substr(0, end + 1) + " " + call + text.substr(end + 1);
+    }
+    start = end + 1;
+  }
+  return text + " " + call;
+}
+
 TurnShape TurnShapeOf(std::string const & text)
 {
   static std::regex const uturn(R"(\bu-?turn\b)", std::regex::icase);
@@ -888,15 +913,18 @@ void CritiqueEngine::Countdown(std::vector<Commentary> & out, double t, double d
     return;
   }
   Vars vars{{"dir", DirName(p.dir)}, {"distance", distance}};
-  // A roundabout with a known exit: the joke, then the exit on its own, so it isn't lost (loop B99).
+  // A roundabout with a known exit: the joke, then the exit on its own, so it isn't lost (loop B99);
+  // on the "now" call the exit follows the maneuver instead (loop B172).
   // "still" is past the entry; the exit there would read as a new instruction.
   if (p.shape == TurnShape::Roundabout && std::string_view(stage) != "still")
     if (std::string const exit = RoundaboutExitOf(p.text); !exit.empty())
       vars["exit"] = exit;
   int const tier = Tier();
   std::string text = Capitalize(Fill(Pick(key, tier), vars));
+  // The final call says the exit right after the maneuver, before any joke, so the driver has it in
+  // time (loop B172); the earlier nags keep the joke first and the exit last (loop B99).
   if (std::string const call = ExitCallFor(vars, tier); !call.empty())
-    text += " " + call;
+    text = std::string_view(stage) == "now" ? WithExitCallAfterManeuver(text, call) : text + " " + call;
   out.push_back(Make(t, Category::Instruction, text, Priority::Nav));
   out.back().key = key;
   out.back().vars = vars;
