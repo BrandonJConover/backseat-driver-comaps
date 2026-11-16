@@ -63,6 +63,14 @@ struct JamDrive
       n += l.key == key;
     return n;
   }
+  /// Lines whose key starts with `prefix`: the jam call has route-blame variants ("traffic.start.onRoute").
+  int CountPrefix(std::string const & prefix) const
+  {
+    int n = 0;
+    for (auto const & l : said)
+      n += l.key.rfind(prefix, 0) == 0;
+    return n;
+  }
   int Reports() const
   {
     int n = 0;
@@ -87,7 +95,7 @@ TEST(JamIsReportedForRouting)
   JamDrive d;
   d.Feed(0, 90, d.limit);
   d.Feed(90, 200, 2);
-  CHECK(d.Count("traffic.start") + d.Count("traffic.stopGo") + d.Count("traffic.standstill") >= 1);
+  CHECK(d.CountPrefix("traffic.start") + d.CountPrefix("traffic.stopGo") + d.CountPrefix("traffic.standstill") >= 1);
   CHECK_EQUAL(d.Reports(), 1);
   auto const & r = *d.reports.front();
   CHECK(r.behindM >= 200 && r.behindM <= 3000);

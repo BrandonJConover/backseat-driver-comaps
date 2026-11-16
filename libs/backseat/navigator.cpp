@@ -2009,7 +2009,9 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     m_rerouting = false;
   // A new route while on the old one (a traffic rebuild, a stop added) with the same maneuver next:
   // nothing new to say, and the lane and side advice already given still holds.
-  if (newRoute && (!m_rerouting || trafficSame) && route.turn == m_turnKind &&
+  // The router may keep the route's id and only renumber the maneuver, so a traffic rebuild doesn't need a new id.
+  if ((newRoute || (trafficSame && route.turnId != m_turnId)) && (!m_rerouting || trafficSame) &&
+      route.turn == m_turnKind &&
       (trafficSame || std::fabs(route.distToTurnM - m_lastDistToTurnM) < kSameManeuverM))
   {
     if (trafficSame)
