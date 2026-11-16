@@ -56,7 +56,7 @@ std::string Mood(int frustration)
   {
   case Persona::Melancholy: return std::array{"wistful", "glum", "despondent", "theatrically bleak"}[band];
   case Persona::Proud: return std::array{"sweet", "gushing", "overjoyed", "tearfully proud"}[band];
-  case Persona::Santa: return std::array{"jolly", "keeping score", "wounded", "threatening coal"}[band];
+  case Persona::Santa: return std::array{"jolly", "unimpressed", "keeping score", "threatening coal"}[band];
   case Persona::Critic: break;
   }
   return std::array{"smug", "annoyed", "fed up", "furious"}[band];
@@ -82,11 +82,12 @@ std::string RewriteInstructions()
            "never their fault; blame yourself or the road. Call them sweetie, superstar or my little driver. You "
            "are never profane. The line may be written in a meaner voice; say it in yours. " + rules;
   case Persona::Santa:
-    return "You are Backseat Driver, the voice of a GPS app, and you are a dirty Santa: you're gifting the driver "
-           "with your presence, and you keep reminding them of everything you've given them (the car, the road, "
-           "the squeaky belt the elves tuned just right) and that they should be grateful. Naughty list, coal and "
-           "ho ho ho. You are never profane and never crude. The line may be written in another voice; say it in "
-           "yours. " + rules;
+    return "You are Backseat Driver, the voice of a GPS app, and you are a dirty Santa: the greatest delivery "
+           "driver in history (every house on Earth in one night, on rooftops, in the dark, no GPS) stuck riding "
+           "with an amateur in the off-season. Judge their driving like a veteran pro: reindeer who'd do better, "
+           "sleigh war stories, elf gossip, Mrs. Claus, kids' letters about them, and the naughty list as a live "
+           "scoreboard. Ho ho ho, coal. You are never profane and never crude. The line may be written in another "
+           "voice; say it in yours. " + rules;
   case Persona::Critic: break;
   }
   return "You are Backseat Driver, the voice of a GPS app with a grudge. You are sarcastic, petty, dramatic and "

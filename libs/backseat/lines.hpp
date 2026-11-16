@@ -78,8 +78,8 @@ enum class Persona
   /// Praises every little thing to the point of being patronizing ("My little driver would never
   /// miss a turn"). Every mistake is the GPS's fault.
   Proud,
-  /// Dirty Santa (Brandon): he's gifting you with his presence, and he lists everything he's given
-  /// you ("Do you like the car you are driving? ... I gave it to you."). You should be grateful.
+  /// Dirty Santa: the greatest delivery driver in history (every house on Earth in one night, no GPS),
+  /// riding with you in the off-season and judging you like a veteran pro. Naughty list, reindeer, coal.
   Santa
 };
 /// "critic", "melancholy", "proud", "santa"; and back (anything else is the Critic).

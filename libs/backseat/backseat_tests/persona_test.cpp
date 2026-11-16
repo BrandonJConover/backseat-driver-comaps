@@ -172,14 +172,13 @@ TEST(RewritesSoundLikeThePersona)
   CHECK_EQUAL(RewriteInstructions(), critic);
 }
 
-TEST(DirtySantaDebutsWithBrandonsCarLine)
+TEST(DirtySantaDebutsAsTheVeteranDeliveryDriver)
 {
   CriticAfter after;
   SaidLog said;
   SetLinePersona(Persona::Santa);
   CHECK_EQUAL(said.Pick("idle", LinesFor("idle", 0), 0.9),
-              std::string("Do you like the car you are driving? You should be grateful for it, because I gave it to "
-                          "you. The elves worked especially hard to make the belt squeak at that exact pitch. You "
-                          "should be grateful."));
+              std::string("You know how I do Christmas Eve? No GPS. No map. Just eight reindeer and a gut feeling. "
+                          "And I've never missed a house. Just so you know what you're up against."));
   CHECK(RewriteInstructions().find("dirty Santa") != std::string::npos);
 }
