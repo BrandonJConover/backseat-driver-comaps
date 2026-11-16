@@ -460,6 +460,7 @@ void RoutingManager::OnBuildRouteReady(Route const & route, RouterResultCode cod
 void RoutingManager::OnRebuildRouteReady(Route const & route, RouterResultCode code)
 {
   HidePreviewSegments();
+  m_backseat.OnRouteRebuilt(route, code == RouterResultCode::NoError);
 
   if (code != RouterResultCode::NoError)
     return;
@@ -527,6 +528,8 @@ void RoutingManager::OnLocationUpdate(location::GpsInfo const & info)
     CheckLocationForRouting(info);
   // Only real fixes go to Backseat Driver: extrapolated ones would fake hard braking.
   m_backseat.OnLocationUpdate(info, m_routingSession, GetBackseatDestinationName());
+  // A jam the navigator measured goes on the router's traffic map (and the route around it).
+  m_backseat.ApplyTraffic(m_routingSession);
 }
 
 std::string RoutingManager::GetBackseatDestinationName() const

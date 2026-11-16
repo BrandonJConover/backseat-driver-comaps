@@ -174,6 +174,34 @@ using LevelCrossingLookup = std::function<bool(LatLon const &)>;
 /// (e.g. "I-25"). Empty when there's no real alternative.
 using AlternateLookup = std::function<std::optional<std::string>(LatLon const &)>;
 
+/// A jam the car is sitting in, measured from its own GPS (there's no free live traffic feed). The
+/// host marks this stretch of the route as slow on the router's traffic map and rebuilds the route,
+/// so the ETA counts the jam and a faster way around it is taken if there is one.
+struct JamReport
+{
+  /// The jammed stretch along the route, relative to the car: from `behindM` back to `aheadM` ahead.
+  /// What's behind is measured; what's ahead is a guess that grows the longer the jam lasts.
+  double behindM = 0;
+  double aheadM = 0;
+  /// The car's average speed in the jam as a share of the posted limit (0..1).
+  double speedShare = 0;
+};
+/// Gets a JamReport while the car is stuck (at most every few minutes), and nothing when the jam is
+/// over: the host then drops the jam from its traffic map, without rerouting.
+using JamReporter = std::function<void(std::optional<JamReport> const &)>;
+/// What the router made of a JamReport, once the rebuilt route is in.
+struct TrafficReroute
+{
+  /// The new route leaves the jammed road sooner than the old one did.
+  bool newRoute = false;
+  /// Seconds the new route saves over staying in the jam (0 when it saves nothing).
+  double savedS = 0;
+  /// Seconds the jam adds to the trip on the route the car is now on.
+  double delayS = 0;
+  /// The road the new route takes around the jam ("I-25"), if it has a name.
+  std::string via;
+};
+
 enum class Bridge
 {
   None,
@@ -349,6 +377,12 @@ public:
   void SetLevelCrossingLookup(LevelCrossingLookup lookup) { m_crossingLookup = std::move(lookup); }
   /// Names the road to blame a jam on ("I told you to take I-25").
   void SetAlternateLookup(AlternateLookup lookup) { m_alternateLookup = std::move(lookup); }
+  /// Hands jams to the host for traffic-aware routing (JamReport). Nothing set: jams only get jokes.
+  void SetJamReporter(JamReporter reporter) { m_jamReporter = std::move(reporter); }
+  /// The host rebuilt the route around a reported jam. Call before the next OnFix with the new route,
+  /// so its new maneuver isn't taken for a turn the driver made. Says how it went: a way around, or
+  /// no way around and how late that makes us.
+  void OnTrafficReroute(double tMs, TrafficReroute const & result);
   void SetDriverPronouns(Pronouns p) { m_pronouns = p; }
   /// What to call the driver, from first-run setup. Empty when they never said.
   void SetDriverName(std::string name) { m_driverName = std::move(name); }
@@ -927,6 +961,22 @@ private:
   bool m_inTraffic = false;
   StopGo m_stopGo;
   AlternateLookup m_alternateLookup;
+  // Traffic-aware routing: when this jam started, how far the car has crept since, and the asks
+  // made to the host (JamReporter) this trip.
+  JamReporter m_jamReporter;
+  double m_jamStartT = -1;
+  double m_jamMovedM = 0;
+  double m_jamLastFixT = -1;
+  double m_lastJamAskT = -1e18;
+  int m_jamAsks = 0;
+  /// A JamReport is out and the host hasn't dropped it yet.
+  bool m_jamReported = false;
+  /// The last traffic rebuild kept the same roads: its first maneuver is the one already called.
+  bool m_trafficSameRoute = false;
+  /// How much delay the last "no way around this" line owned up to (0: none said since the last way around).
+  double m_noWayAroundSaidS = 0;
+  /// Ask the host about the jam once it's lasted a while, then again if it keeps going.
+  void TrackJamForRouting(Fix const & fix);
 
   // License plate game.
   PlateGame m_plates;

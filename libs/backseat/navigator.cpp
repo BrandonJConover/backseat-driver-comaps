@@ -487,6 +487,24 @@ double constexpr kClearShare = 0.6;
 /// Only roads at least this fast count; crawling down a 25 mph street is just driving.
 double constexpr kTrafficMinLimitMps = 15;  // ~34 mph
 double constexpr kTrafficClearedChance = 0.5;
+/// Traffic-aware routing (JamReport): the host hears about a jam once it's lasted this long past the
+/// call, then again every kJamAskEveryMs while it lasts, at most kJamAsksPerTrip times a trip.
+double constexpr kJamAskAfterMs = 30000;
+double constexpr kJamAskEveryMs = 5 * 60000;
+int constexpr kJamAsksPerTrip = 3;
+/// The jam's guessed reach ahead of the car: twice what's been crawled, within these bounds, plus
+/// another kJamAheadGrowM for each ask after the first (a jam that keeps going is a long one).
+double constexpr kJamAheadMinM = 1500;
+double constexpr kJamAheadMaxM = 5000;
+double constexpr kJamAheadGrowM = 1000;
+double constexpr kJamBehindMinM = 200;
+double constexpr kJamBehindMaxM = 3000;
+/// A way around that saves at least this much says how much; less, and it just says which road.
+double constexpr kRerouteSaysMinutesS = 120;
+/// No way around: said when the jam costs at least this much, and again only if it's grown by
+/// kNoWayAroundGrowS since.
+double constexpr kNoWayAroundMinS = 180;
+double constexpr kNoWayAroundGrowS = 300;
 
 double DistanceM(LatLon const & a, LatLon const & b)
 {
@@ -1225,6 +1243,13 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
   {
     m_inTraffic = false;
     m_stopGo.Reset();
+    m_jamStartT = -1;
+    // Moving again: the jam comes off the router's map, and the route stays as it is.
+    if (std::exchange(m_jamReported, false) && m_jamReporter)
+    {
+      Trace("traffic.jamClear", {});
+      m_jamReporter(std::nullopt);
+    }
     Say(m_engine->OnNav(NavEvent::Traffic(fix.tMs, false)));
     // "Traffic's clearing up. Try to act like you've done this before." Half the time.
     if ((m_config.rng ? m_config.rng() : 0) < kTrafficClearedChance)
@@ -1232,12 +1257,88 @@ void Navigator::TrackTraffic(Fix const & fix, RouteSnapshot const & route)
   }
   if (!m_inTraffic)
     return;
+  TrackJamForRouting(fix);
   switch (m_stopGo.Update(fix.tMs, std::max(0.0, fix.speedMps)))
   {
   case StopGo::Quip::StopGo: SayLine(fix.tMs, Category::Traffic, "traffic.stopGo"); break;
   case StopGo::Quip::Standstill: SayLine(fix.tMs, Category::Traffic, "traffic.standstill"); break;
   case StopGo::Quip::None: break;
   }
+}
+
+void Navigator::TrackJamForRouting(Fix const & fix)
+{
+  if (m_jamStartT < 0)
+  {
+    m_jamStartT = fix.tMs;
+    m_jamMovedM = 0;
+  }
+  else if (m_jamLastFixT >= 0 && fix.tMs > m_jamLastFixT)
+  {
+    m_jamMovedM += std::max(0.0, fix.speedMps) * (fix.tMs - m_jamLastFixT) / 1000;
+  }
+  m_jamLastFixT = fix.tMs;
+  if (!m_jamReporter || m_travelMode != TravelMode::Drive || m_jamAsks >= kJamAsksPerTrip ||
+      fix.tMs - m_jamStartT < kJamAskAfterMs || fix.tMs - m_lastJamAskT < kJamAskEveryMs || m_speeds.empty())
+    return;
+  double speed = 0;
+  double limit = 0;
+  for (auto const & s : m_speeds)
+  {
+    speed += s.mps;
+    limit += s.limitMps;
+  }
+  JamReport report;
+  report.speedShare = limit > 0 ? std::clamp(speed / limit, 0.0, 1.0) : 0;
+  // Crept since the call, plus the window that made the call.
+  double const windowM = speed / m_speeds.size() * (m_speeds.back().t - m_speeds.front().t) / 1000;
+  report.behindM = std::clamp(m_jamMovedM + windowM, kJamBehindMinM, kJamBehindMaxM);
+  report.aheadM = std::clamp(2 * report.behindM + m_jamAsks * kJamAheadGrowM, kJamAheadMinM, kJamAheadMaxM);
+  ++m_jamAsks;
+  m_lastJamAskT = fix.tMs;
+  m_jamReported = true;
+  Trace("traffic.jamReport", {{"behind_m", LogNum(report.behindM, 0)},
+                              {"ahead_m", LogNum(report.aheadM, 0)},
+                              {"share", LogNum(report.speedShare, 2)},
+                              {"ask", std::to_string(m_jamAsks)}});
+  m_jamReporter(report);
+}
+
+void Navigator::OnTrafficReroute(double tMs, TrafficReroute const & result)
+{
+  if (!m_engine || m_arrived)
+    return;
+  Trace("traffic.reroute", {{"new", result.newRoute ? "yes" : "no"},
+                            {"saved_s", LogNum(result.savedS, 0)},
+                            {"delay_s", LogNum(result.delayS, 0)},
+                            {"via", result.via}});
+  // The route was swapped under the car. Its next maneuver is new to the router, not a turn the
+  // driver made, and the driver didn't get lost: no turn credit, no reroute roast, no grade hit.
+  m_rerouting = true;
+  m_trafficSameRoute = !result.newRoute;
+  if (!InCar(m_travelMode))
+    return;
+  if (result.newRoute)
+  {
+    Vars vars{{"road", result.via.empty() ? "another way" : result.via}};
+    if (result.savedS >= kRerouteSaysMinutesS)
+    {
+      vars["minutes"] = std::to_string(static_cast<int>(std::lround(result.savedS / 60)));
+      SayLine(tMs, Category::Traffic, "traffic.reroute", vars);
+    }
+    else
+    {
+      SayLine(tMs, Category::Traffic, "traffic.rerouteEven", vars);
+    }
+    m_noWayAroundSaidS = 0;
+    return;
+  }
+  if (result.delayS < kNoWayAroundMinS ||
+      (m_noWayAroundSaidS > 0 && result.delayS < m_noWayAroundSaidS + kNoWayAroundGrowS))
+    return;
+  m_noWayAroundSaidS = result.delayS;
+  SayLine(tMs, Category::Traffic, "traffic.noWayAround",
+          {{"minutes", std::to_string(static_cast<int>(std::lround(result.delayS / 60)))}});
 }
 
 namespace
@@ -1711,11 +1812,18 @@ void Navigator::Update(double t, RouteSnapshot const & route)
     sayMissed();
     return;
   }
+  // Rebuilt around a jam on the same roads (OnTrafficReroute): the maneuver already called may come back
+  // under a new number. It isn't a reroute against the driver, so keep quiet rather than say it twice.
+  bool const trafficSame = std::exchange(m_trafficSameRoute, false);
+  if (trafficSame && !newRoute && route.turnId == m_turnId)
+    m_rerouting = false;
   // A new route while on the old one (a traffic rebuild, a stop added) with the same maneuver next:
   // nothing new to say, and the lane and side advice already given still holds.
-  if (newRoute && !m_rerouting && route.turn == m_turnKind &&
-      std::fabs(route.distToTurnM - m_lastDistToTurnM) < kSameManeuverM)
+  if (newRoute && (!m_rerouting || trafficSame) && route.turn == m_turnKind &&
+      (trafficSame || std::fabs(route.distToTurnM - m_lastDistToTurnM) < kSameManeuverM))
   {
+    if (trafficSame)
+      m_rerouting = false;
     for (auto * said : {&m_laneSaidFor, &m_sideSaidFor, &m_exitSkipTurnId})
       if (*said && *said == m_turnId)
         *said = route.turnId;
@@ -2838,6 +2946,15 @@ void Navigator::ResetTrip()
   m_tollAheadM.reset();
   m_tollsKnown = false;
   m_onRoute = false;
+  m_jamStartT = -1;
+  m_jamMovedM = 0;
+  m_jamLastFixT = -1;
+  m_lastJamAskT = -1e18;
+  m_jamAsks = 0;
+  m_trafficSameRoute = false;
+  m_noWayAroundSaidS = 0;
+  if (std::exchange(m_jamReported, false) && m_jamReporter)
+    m_jamReporter(std::nullopt);
   m_heldPlateLines.clear();
   m_twenty.NewTrip();
   m_heldTwentyLines.clear();

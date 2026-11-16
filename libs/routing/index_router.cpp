@@ -147,10 +147,12 @@ unique_ptr<DirectionsEngine> CreateDirectionsEngine(VehicleType vehicleType, sha
   UNREACHABLE();
 }
 
-shared_ptr<TrafficStash> CreateTrafficStash(VehicleType, shared_ptr<NumMwmIds>, traffic::TrafficCache const &)
+shared_ptr<TrafficStash> CreateTrafficStash(VehicleType vehicleType, shared_ptr<NumMwmIds> numMwmIds,
+                                            traffic::TrafficCache const & trafficCache)
 {
-  return nullptr;
-  // return (vehicleType == VehicleType::Car ? make_shared<TrafficStash>(trafficCache, numMwmIds) : nullptr);
+  // Backseat Driver: on for cars again. The only traffic in the cache is the jams the phone measured
+  // itself (RoutingSession::SetObservedTraffic); with none, every segment is Unknown and costs the same.
+  return (vehicleType == VehicleType::Car ? make_shared<TrafficStash>(trafficCache, numMwmIds) : nullptr);
 }
 
 void PushPassedSubroutes(Checkpoints const & checkpoints, vector<Route::SubrouteAttrs> & subroutes)

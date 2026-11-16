@@ -1048,6 +1048,17 @@ void RoutingSession::CopyTraffic(traffic::AllMwmTrafficInfo & trafficColoring) c
   TrafficCache::CopyTraffic(trafficColoring);
 }
 
+void RoutingSession::SetObservedTraffic(traffic::AllMwmTrafficInfo const & coloring, bool rebuild)
+{
+  CHECK_THREAD_CHECKER(m_threadChecker, ());
+  Clear();
+  for (auto const & [mwmId, segments] : coloring)
+    if (segments)
+      Set(mwmId, segments);
+  if (rebuild)
+    RebuildRouteOnTrafficUpdate();
+}
+
 std::vector<routing::RouteStepInfo> RoutingSession::GetRouteTurnsForDisplay(std::string const & locale) const
 {
   return m_route->GetTurnsForDisplay(locale);
