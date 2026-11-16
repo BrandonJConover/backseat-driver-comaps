@@ -724,7 +724,10 @@ import Speech
 }
 
 /// "Take me to Starbucks": searches like the search screen does (and shows it there), then reads
-/// the three nearest results out loud and routes to the one the driver picks by voice.
+/// the three best results out loud and routes to the one the driver picks by voice. Best means the
+/// name asked for, then a place they've driven to before, then the nearest. When the search finds
+/// nothing it tries what the recognizer may have meant ("star bucks" -> "starbucks"), and then a
+/// place driven to before by that name.
 @objc final class BackseatVoiceSearch: NSObject, MWMSearchObserver {
   private static var current: BackseatVoiceSearch?
   /// How long to wait for the search, and for the driver to pick.
@@ -732,49 +735,100 @@ import Speech
   private static let pickWait: TimeInterval = 20
   private static let confirmWait: TimeInterval = 15
 
+  /// Somewhere to go: a search result or a place from past trips.
+  private struct Place {
+    let coordinate: CLLocationCoordinate2D
+    let title: String
+  }
+
+  /// What was asked for, as the lines say it.
   private let query: String
-  private var results: [SearchResult] = []
+  private var results: [Place] = []
   private var finished = false
+  /// Other spellings still to try when a search finds nothing.
+  private var variants: [String]
+  /// Which search the results belong to; a late timer from an earlier one does nothing.
+  private var attempt = 0
 
   private let asStop: Bool
 
   private init(query: String, asStop: Bool) {
     self.query = query
     self.asStop = asStop
+    variants = MWMBackseatRewriter.searchVariants(query)
   }
 
   @objc static func start(_ query: String, asStop: Bool) {
     current?.finish()
-    let search = BackseatVoiceSearch(query: query, asStop: asStop)
+    let search = BackseatVoiceSearch(query: MWMBackseatRewriter.searchableQuery(query), asStop: asStop)
     current = search
     Search.add(search)
-    MapsAppDelegate.theApp().searchText(query)
-    DispatchQueue.main.asyncAfter(deadline: .now() + searchWait) { [weak search] in search?.speakResults() }
+    search.run(search.query)
+  }
+
+  private func run(_ text: String) {
+    attempt += 1
+    let thisAttempt = attempt
+    MapsAppDelegate.theApp().searchText(text)
+    DispatchQueue.main.asyncAfter(deadline: .now() + Self.searchWait) { [weak self] in
+      guard let self, self.attempt == thisAttempt else { return }
+      self.speakResults()
+    }
   }
 
   func onSearchCompleted() {
     speakResults()
   }
 
-  /// The three nearest results, named with their street: "Starbucks Colfax Avenue".
+  /// The three best results, named with their street: "Starbucks Colfax Avenue".
   private func speakResults() {
     guard !finished else { return }
-    finish()
     let here = LocationManager.lastLocation()
-    let found = Search.getResults().filter { $0.itemType == .regular }.map { result -> (SearchResult, Double) in
-      let place = CLLocation(latitude: result.coordinate.latitude, longitude: result.coordinate.longitude)
-      return (result, here.map { $0.distance(from: place) } ?? 0)
-    }.sorted { $0.1 < $1.1 }.prefix(3)
-    results = found.map(\.0)
-    let names = found.map { result, _ -> String in
-      let street = result.addressText.split(separator: ",").first.map { String($0).trimmingCharacters(in: .whitespaces) }
-      guard let street, !street.isEmpty, street != result.titleText else { return result.titleText }
-      return "\(result.titleText) \(street)"
+    let found = Search.getResults().filter { $0.itemType == .regular }
+    // Nothing: try the next way of spelling it before giving up.
+    if found.isEmpty, !variants.isEmpty {
+      run(variants.removeFirst())
+      return
     }
+    finish()
+    var places: [Place] = []
+    var names: [String] = []
+    var distances: [NSNumber] = []
+    if found.isEmpty {
+      // The map doesn't know it, but the trip log does: "Grandma's House".
+      if let past = MWMBackseatRewriter.pastRouteNamed(query),
+         let label = past["label"] as? String,
+         let latitude = (past["lat"] as? NSNumber)?.doubleValue,
+         let longitude = (past["lon"] as? NSNumber)?.doubleValue {
+        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        let place = CLLocation(latitude: latitude, longitude: longitude)
+        places = [Place(coordinate: coordinate, title: label)]
+        names = [label]
+        distances = [NSNumber(value: here.map { $0.distance(from: place) } ?? 0)]
+      }
+    } else {
+      let all = found.map { result -> (Place, String, Double) in
+        let place = CLLocation(latitude: result.coordinate.latitude, longitude: result.coordinate.longitude)
+        let street = result.addressText.split(separator: ",").first.map { String($0).trimmingCharacters(in: .whitespaces) }
+        let name = street.map { !$0.isEmpty && $0 != result.titleText ? "\(result.titleText) \($0)" : result.titleText }
+          ?? result.titleText
+        return (Place(coordinate: result.coordinate, title: result.titleText), name, here.map { $0.distance(from: place) } ?? 0)
+      }
+      let order = MWMBackseatRewriter.rankSearchResults(query,
+                                                        names: all.map { $0.0.title },
+                                                        distances: all.map { NSNumber(value: $0.2) },
+                                                        latitudes: all.map { NSNumber(value: $0.0.coordinate.latitude) },
+                                                        longitudes: all.map { NSNumber(value: $0.0.coordinate.longitude) })
+      let ranked = order.map(\.intValue).filter { all.indices.contains($0) }.prefix(3).map { all[$0] }
+      places = ranked.map { $0.0 }
+      names = ranked.map { $0.1 }
+      distances = ranked.map { NSNumber(value: $0.2) }
+    }
+    results = places
     var pick = -1
     var none = ObjCBool(false)
     var confirm = ObjCBool(false)
-    let line = MWMBackseatRewriter.speakSearchResults(query, names: names, distances: found.map { NSNumber(value: $0.1) },
+    let line = MWMBackseatRewriter.speakSearchResults(query, names: names, distances: distances,
                                                       pick: &pick, none: &none, confirm: &confirm)
     say(line)
     if confirm.boolValue {
@@ -826,9 +880,9 @@ import Speech
     guard results.indices.contains(index) else { return }
     let result = results[index]
     if asStop {
-      MWMBackseatRewriter.addStop(result.coordinate, title: result.titleText)
+      MWMBackseatRewriter.addStop(result.coordinate, title: result.title)
     } else {
-      MWMBackseatRewriter.route(to: result.coordinate, title: result.titleText)
+      MWMBackseatRewriter.route(to: result.coordinate, title: result.title)
     }
   }
 

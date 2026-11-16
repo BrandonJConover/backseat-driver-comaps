@@ -289,6 +289,19 @@ public:
   }
   bool BackseatInGame() const { return m_backseat.InGame(); }
   std::vector<BackseatAdapter::PastRoute> BackseatPastRoutes(size_t max) const { return m_backseat.PastRoutes(max); }
+  std::vector<std::string> BackseatSearchVariants(std::string const & query) const
+  {
+    return m_backseat.SearchVariants(query);
+  }
+  std::vector<size_t> BackseatRankSearchResults(std::string const & query,
+                                                std::vector<backseat::PlaceCandidate> const & candidates) const
+  {
+    return m_backseat.RankSearchResults(query, candidates);
+  }
+  std::optional<BackseatAdapter::PastRoute> BackseatPastRouteNamed(std::string const & query) const
+  {
+    return m_backseat.PastRouteNamed(query);
+  }
   std::string BackseatVoiceRecovered() { return m_backseat.VoiceRecovered(); }
   bool BackseatRemember(std::string const & topic, std::string const & fact) { return m_backseat.Remember(topic, fact); }
   bool BackseatForget(std::string const & topic) { return m_backseat.Forget(topic); }

@@ -626,6 +626,18 @@ std::string Capitalized(std::string s)
   return s;
 }
 
+/// What the map search gets for a spoken place: the filler off and an address in digits. Logged when
+/// that changed anything, so a drive log shows what was actually searched.
+std::string SearchQueryFor(std::string const & spoken)
+{
+  std::string query = backseat::SearchableQuery(spoken);
+  if (query.empty())
+    return spoken;
+  if (query != spoken)
+    backseat::Trace("search.cleaned", {{"heard", spoken}, {"query", query}});
+  return query;
+}
+
 std::string FillRecap(char const * tmpl, std::string const & value)
 {
   std::string s = tmpl;
@@ -2360,7 +2372,7 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     // Somewhere new (or home/work before there's enough history): let the driver pick. No naming it
     // yet: what was heard may not be what's found, and the line for what's found comes with the pick.
     heard.kind = HeardCommand::Kind::Search;
-    heard.query = command.argument;
+    heard.query = SearchQueryFor(command.argument);
     if (replyNamesPlace)
       reply.clear();
     // "Starbucks in Colorado, or Starbucks in Alaska?" Not every time, or it gets old.
@@ -2395,7 +2407,7 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
       return {};
     // With a route it's a stop on the way. Without one, it's just where we're going.
     heard.kind = m_navigator.InTrip() ? HeardCommand::Kind::SearchStop : HeardCommand::Kind::Search;
-    heard.query = command.argument;
+    heard.query = SearchQueryFor(command.argument);
     return m_navigator.Reply("cmd.findStop", {{"place", command.argument}});
   }
   case AppAction::SetTravelMode:
@@ -2658,6 +2670,33 @@ std::vector<BackseatAdapter::PastRoute> BackseatAdapter::PastRoutes(size_t max) 
     out.push_back({name, p.destination, p.to.lat, p.to.lon, p.trips, p.usualMinutes});
   }
   return out;
+}
+
+std::vector<std::string> BackseatAdapter::SearchVariants(std::string const & query) const
+{
+  return backseat::QueryVariants(query);
+}
+
+std::vector<size_t> BackseatAdapter::RankSearchResults(std::string const & query,
+                                                       std::vector<backseat::PlaceCandidate> const & candidates) const
+{
+  size_t constexpr kPastPlaces = 200;
+  auto const order = backseat::RankSearchResults(query, candidates, backseat::PastPlaces(m_navigator.History(), kPastPlaces));
+  if (!order.empty() && order[0] != 0)
+    backseat::Trace("search.ranked", {{"query", query}, {"first", candidates[order[0]].name},
+                                      {"was", candidates[0].name}});
+  return order;
+}
+
+std::optional<BackseatAdapter::PastRoute> BackseatAdapter::PastRouteNamed(std::string const & query) const
+{
+  size_t constexpr kPastPlaces = 200;
+  auto const place = backseat::PastPlaceNamed(query, backseat::PastPlaces(m_navigator.History(), kPastPlaces));
+  if (!place)
+    return {};
+  backseat::Trace("search.past", {{"query", query}, {"place", place->destination}});
+  return PastRoute{place->destination, place->destination, place->to.lat, place->to.lon, place->trips,
+                   place->usualMinutes};
 }
 
 std::string BackseatAdapter::AskWhereTo()
