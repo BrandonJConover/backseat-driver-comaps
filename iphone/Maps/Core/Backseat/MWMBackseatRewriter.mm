@@ -445,6 +445,13 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   return info.IsValid() ? info.m_speedLimitMps : -1;
 }
 
++ (double)speedCameraAheadMeters
+{
+  if (![MWMRouter isOnRoute])
+    return -1;
+  return GetFramework().GetRoutingManager().BackseatCameraAheadM();
+}
+
 + (void)shareVoices
 {
   std::vector<backseat::VoiceOption> voices;

@@ -70,6 +70,7 @@ add_executable(${PROJECT_NAME}
   ferry_test.cpp
   toll_test.cpp
   toll_traffic_question_test.cpp
+  speed_camera_test.cpp
   resume_after_stop_test.cpp
   jam_stop_test.cpp
   debug_log_test.cpp

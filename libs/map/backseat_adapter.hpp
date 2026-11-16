@@ -448,7 +448,13 @@ public:
     return engine ? engine->Frustration() : 0;
   }
 
+  /// Meters along the route to the next speed camera within 2 km, -1 if none (the driving screen's
+  /// camera badge). Set with each location update.
+  double CameraAheadM() const { return m_cameraAheadM; }
+
 private:
+  /// Fills the snapshot's next speed camera from the route's segments (RouteSnapshot::cameraAheadM).
+  void SetCameraAhead(routing::Route const & route, backseat::RouteSnapshot & snap) const;
   std::optional<backseat::Sight> SightAt(backseat::LatLon const & at, double bearingDeg) const;
   backseat::Bridge BridgeAt(backseat::LatLon const & at, double bearingDeg) const;
   /// Meters to the nearest mapped car road, up to kRoadSearchM; that far if none, -1 with no map.
@@ -567,6 +573,7 @@ private:
   mutable std::string m_currentStreet;
   double m_speedMps = 0;
   double m_speedLimitMps = -1;
+  mutable double m_cameraAheadM = -1;
   std::string m_lastCallerVoice;
   std::string m_callerVoiceToWarm;
   mutable std::mutex m_lastTripMutex;

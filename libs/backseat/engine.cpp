@@ -66,6 +66,9 @@ double constexpr kRoastSpeakMs = 5000;
 double constexpr kLinePauseMs = 350;
 /// speechAware: no remark after a direction for a turn that's closer than this many seconds.
 double constexpr kSuffixMinS = 15;
+/// After a speed camera line that caught the driver speeding, the regular speeding lines wait this
+/// long: the camera line already said it, and the car is about to pass the camera.
+double constexpr kCameraHushMs = 45000;
 
 /// How much each offense winds the GPS up. Negative values calm it down.
 double FrustrationDelta(Category c)
@@ -118,6 +121,7 @@ char const * HazardName(HazardKind k)
   case HazardKind::Debris: return "debris";
   case HazardKind::Crash: return "crash";
   case HazardKind::StalledCar: return "stalledCar";
+  case HazardKind::SpeedCamera: return "speedCamera";
   }
   return "police";
 }
@@ -654,6 +658,11 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
   }
   case NavEvent::Type::HazardAhead:
   {
+    if (e.hazard == HazardKind::SpeedCamera)
+    {
+      SpeedCameraAhead(out, e);
+      break;
+    }
     std::string const id = e.id ? *e.id : std::string(HazardName(e.hazard)) + "@" + Num(JsRound(e.t / 60000));
     if (!m_hazardsAnnounced.insert(id).second)
       break;
@@ -1145,19 +1154,52 @@ void CritiqueEngine::WrongTurn(std::vector<Commentary> & out, double t, TurnDire
   Roast(out, t, Category::WrongTurn, std::string("wrongTurn.") + DirName(expected), {}, true);
 }
 
+void CritiqueEngine::SpeedCameraAhead(std::vector<Commentary> & out, NavEvent const & e)
+{
+  // Speed cameras have no feed to refresh: the host sends each one once, by its id.
+  if (e.id && !m_hazardsAnnounced.insert(*e.id).second)
+    return;
+  Units const units = m_config.units;
+  auto const & s = m_lastSample;
+  double const limitMps = e.limitMps ? *e.limitMps : s && s->speedLimitMps ? *s->speedLimitMps : -1;
+  bool const speeding = s && limitMps > 0 && Over(s->speedMps, limitMps);
+  Vars vars{{"distance", FormatDistance(e.distanceM, units)}};
+  if (s && limitMps > 0)
+  {
+    vars["speed"] = Num(JsRound(ToDisplay(s->speedMps, units)));
+    vars["limit"] = Num(JsRound(ToDisplay(limitMps, units)));
+  }
+  // Safety info: skips the roast gap like navigation does.
+  if (!Roast(out, e.t, Category::Hazard, speeding ? "hazard.speedCameraSpeeding" : "hazard.speedCamera", vars, true))
+    return;
+  // The camera line was the speeding line. No "you're speeding" right behind it.
+  if (speeding)
+    HushSpeeding(e.t + kCameraHushMs);
+}
+
+int CritiqueEngine::ToleranceFor(double limitMps) const
+{
+  double constexpr kFastLimitMps = 24.5;  // 55 mph
+  return limitMps >= kFastLimitMps && m_config.speedingToleranceFast >= 0 ? m_config.speedingToleranceFast
+                                                                          : m_config.speedingTolerance;
+}
+
+bool CritiqueEngine::Over(double speedMps, double limitMps) const
+{
+  Units const units = m_config.units;
+  int const over = static_cast<int>(JsRound(ToDisplay(speedMps, units))) - static_cast<int>(JsRound(ToDisplay(limitMps, units)));
+  return limitMps > 0 && over > ToleranceFor(limitMps);
+}
+
 void CritiqueEngine::CheckSpeeding(TelemetrySample const & s, TelemetrySample const * prev, std::vector<Commentary> & out)
 {
   Units const units = m_config.units;
   bool const backoff = m_config.speedingRenagMaxMs > 0;
-  double constexpr kFastLimitMps = 24.5;  // 55 mph
   auto const overOf = [&](double limitMps) {
     return static_cast<int>(JsRound(ToDisplay(s.speedMps, units))) -
            static_cast<int>(JsRound(ToDisplay(limitMps, units)));
   };
-  auto const toleranceOf = [&](double limitMps) {
-    return limitMps >= kFastLimitMps && m_config.speedingToleranceFast >= 0 ? m_config.speedingToleranceFast
-                                                                            : m_config.speedingTolerance;
-  };
+  auto const toleranceOf = [&](double limitMps) { return ToleranceFor(limitMps); };
 
   // A big drop in the posted limit: remember the old one for the grace period.
   if (s.speedLimitMps)
@@ -1236,6 +1278,14 @@ void CritiqueEngine::CheckSpeeding(TelemetrySample const & s, TelemetrySample co
 
   if (!m_speedingSince)
     m_speedingSince = s.t;
+  // A speed camera line just said it: this band counts as said, and nags start from now.
+  if (s.t < m_speedingHushUntil)
+  {
+    if (escalated)
+      m_speedingBand = band;
+    m_lastSpeedingLineAt = s.t;
+    return;
+  }
   if (escalated)
   {
     // Barely over, again, so soon: it's noted, not said.

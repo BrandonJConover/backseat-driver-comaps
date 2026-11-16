@@ -198,6 +198,11 @@ public:
   bool JamBlamesRoute() const { return m_jamBlamesRoute; }
   /// How long after a detour a new jam still counts as the detour's fault.
   static constexpr double kDetourBlamesJamMs = 20 * 60000;
+  /// No speeding lines until `untilMs` (a speed camera line just covered it). Speeding is still
+  /// timed and logged, and the band it reached counts as said.
+  void HushSpeeding(double untilMs) { m_speedingHushUntil = std::max(m_speedingHushUntil, untilMs); }
+  /// `speedMps` is over `limitMps` by more than the speeding tolerance for that limit.
+  bool Over(double speedMps, double limitMps) const;
 
   int Frustration() const;
   TripStats const & Stats() const { return m_stats; }
@@ -280,6 +285,7 @@ private:
   };
 
   void CheckSpeeding(TelemetrySample const & s, TelemetrySample const * prev, std::vector<Commentary> & out);
+  void SpeedCameraAhead(std::vector<Commentary> & out, NavEvent const & e);
   void CheckTooSlow(TelemetrySample const & s, std::vector<Commentary> & out);
   void CheckStopped(TelemetrySample const & s, std::vector<Commentary> & out);
   void CheckTurnDirection(TelemetrySample const & s, std::vector<Commentary> & out);
@@ -326,6 +332,9 @@ private:
   std::optional<SpeedBand> m_speedingBand;
   double m_lastSpeedingLineAt;
   double m_lastBarelyLineAt = -1e18;
+  /// See HushSpeeding.
+  double m_speedingHushUntil = -1e18;
+  int ToleranceFor(double limitMps) const;
   /// "Still speeding" nags since the driver was last under the limit for a while.
   int m_speedingRenags = 0;
   std::optional<double> m_underLimitSince;

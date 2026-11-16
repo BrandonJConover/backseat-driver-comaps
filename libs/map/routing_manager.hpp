@@ -330,6 +330,8 @@ public:
   void BackseatSetBusinessOwner(std::string const & owner) { m_backseat.SetBusinessOwner(owner); }
   void BackseatSketchApplied(bool addedStop, bool trimmed) { m_backseat.SketchApplied(addedStop, trimmed); }
   int BackseatFrustration() const { return m_backseat.Frustration(); }
+  /// Meters to the next speed camera on the route, -1 if none within 2 km.
+  double BackseatCameraAheadM() const { return m_backseat.CameraAheadM(); }
   std::vector<backseat::LatLon> BackseatSnapToRoads(std::vector<backseat::LatLon> const & stroke) const
   {
     return m_backseat.SnapToRoads(stroke);
