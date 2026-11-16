@@ -615,7 +615,6 @@ private:
   std::optional<TrafficAsk> m_trafficAsk;
   /// The traffic rebuild is in, and the car hasn't been matched to it yet: still "on route".
   bool m_trafficSettling = false;
-  double m_lastFixMs = 0;
   /// The route being followed, for the road-trip lookups (set with each location update).
   std::shared_ptr<routing::Route const> m_route;
   /// Rest areas, gas, coffee and viewpoints along m_route, by distance from its start; scanned once

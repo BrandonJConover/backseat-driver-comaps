@@ -31,7 +31,7 @@ std::string Join(std::vector<std::string> const & words, size_t from = 0, size_t
 
 /// Lowercase words with the punctuation gone, apostrophes kept and straightened ("Joe’s" -> "joe's").
 /// A "#" before a number is dropped, and so is a period inside letters ("c.v.s.").
-std::string Words(std::string const & text)
+std::string PlaceWords(std::string const & text)
 {
   std::string out;
   for (unsigned char const ch : StraightApostrophes(text))
@@ -55,8 +55,8 @@ std::string Words(std::string const & text)
   return Join(words);
 }
 
-bool StartsWith(std::string const & s, std::string const & lead) { return s.rfind(lead, 0) == 0; }
-bool EndsWith(std::string const & s, std::string const & tail)
+bool PlaceStartsWith(std::string const & s, std::string const & lead) { return s.rfind(lead, 0) == 0; }
+bool PlaceEndsWith(std::string const & s, std::string const & tail)
 {
   return s.size() >= tail.size() && s.compare(s.size() - tail.size(), tail.size(), tail) == 0;
 }
@@ -284,11 +284,11 @@ int NameTier(std::string const & query, std::string const & name)
   if (!PlaceMatches(query, name))
     return 0;
   static char const * const kSmall[] = {"a", "an", "the", "to", "of", "in", "on", "at", "and", "or", "for", "by", "near"};
-  auto const nameWords = Split(Words(name));
+  auto const nameWords = Split(PlaceWords(name));
   std::string squashed;
   for (auto const & w : nameWords)
     squashed += w;
-  for (auto const & word : Split(Words(query)))
+  for (auto const & word : Split(PlaceWords(query)))
   {
     if (std::find_if(std::begin(kSmall), std::end(kSmall), [&](char const * s) { return word == s; }) != std::end(kSmall))
       continue;
@@ -313,7 +313,7 @@ double MetersBetween(LatLon a, LatLon b)
 
 std::string SearchableQuery(std::string const & spoken)
 {
-  std::string q = " " + Words(spoken) + " ";
+  std::string q = " " + PlaceWords(spoken) + " ";
   for (bool trimmed = true; trimmed;)
   {
     trimmed = false;
@@ -321,7 +321,7 @@ std::string SearchableQuery(std::string const & spoken)
                                    " a place called ", " the place called ", " this place called ",
                                    " that place called ", " somewhere called ", " something called ", " a ", " an ",
                                    " the ", " some ", " back to ", " over to ", " to "})
-      if (StartsWith(q, lead) && q.size() > lead.size())
+      if (PlaceStartsWith(q, lead) && q.size() > lead.size())
       {
         q.erase(0, lead.size() - 1);
         trimmed = true;
@@ -329,7 +329,7 @@ std::string SearchableQuery(std::string const & spoken)
     for (std::string const tail : {" please ", " thanks ", " thank you ", " near me ", " nearby ", " around here ",
                                    " close by ", " near here ", " in town ", " real quick ", " right now ", " now ",
                                    " or something ", " i think ", " for me ", " um ", " uh "})
-      if (EndsWith(q, tail) && q.size() > tail.size())
+      if (PlaceEndsWith(q, tail) && q.size() > tail.size())
       {
         q.erase(q.size() - tail.size() + 1);
         trimmed = true;

@@ -386,7 +386,7 @@ std::string StopKind(std::string target)
         trimmed = true;
       }
   }
-  static std::pair<char const *, char const *> const kKinds[] = {
+  static std::pair<char const *, char const *> const kStopKinds[] = {
       {"gas", "gas station"},         {"gas station", "gas station"}, {"fuel", "gas station"},
       {"petrol", "gas station"},      {"petrol station", "gas station"},
       {"food", "restaurant"},         {"something to eat", "restaurant"}, {"restaurant", "restaurant"},
@@ -400,7 +400,7 @@ std::string StopKind(std::string target)
       {"hospital", "hospital"},       {"er", "emergency room"},           {"e r", "emergency room"},
       {"emergency room", "emergency room"}, {"urgent care", "urgent care"}, {"police station", "police station"},
       {"pharmacy", "pharmacy"},       {"drugstore", "pharmacy"},          {"drug store", "pharmacy"}};
-  for (auto const & kind : kKinds)
+  for (auto const & kind : kStopKinds)
     if (target == kind.first)
       return kind.second;
   return {};

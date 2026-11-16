@@ -1350,8 +1350,11 @@ void Navigator::TrackSpeedCamera(Fix const & fix, RouteSnapshot const & route)
     return;
   if (!m_camera)
   {
-    m_camera.emplace();
-    m_camera->id = *id;
+    // Built and then moved in: clang can't see CameraWatch's default constructor through optional::emplace
+    // (a nested struct with member initializers is checked before Navigator is complete).
+    CameraWatch watch;
+    watch.id = *id;
+    m_camera = std::move(watch);
   }
   m_camera->aheadM = *route.cameraAheadM;
   m_camera->limitMps = route.cameraLimitMps;

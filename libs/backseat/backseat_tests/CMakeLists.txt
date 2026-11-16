@@ -101,6 +101,10 @@ add_executable(${PROJECT_NAME}
   phantom_direction_test.cpp
   traffic_reroute_test.cpp
 )
+
+# Each test file keeps its own small helpers (Drive, Config, Route...) in an anonymous namespace, so the
+# files must not be glued together: a unity build of the app still covers the library itself.
+set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD OFF)
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
 target_compile_definitions(${PROJECT_NAME} PRIVATE
   BACKSEAT_TRACE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/parity_trace.txt"
