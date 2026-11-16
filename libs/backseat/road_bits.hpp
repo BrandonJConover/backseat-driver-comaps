@@ -142,6 +142,8 @@ public:
   void OnConnectivity(double tMs, bool online);
   /// The latest weather where the car is. Cheap to call often; the host refreshes it every 15 minutes.
   void OnWeather(double tMs, Weather const & weather);
+  /// Rain, snow, ice or fog at the last report: personal asks wait it out (loop B174, BI-087).
+  bool BadWeather() const { return m_weather && (m_weather->rain || m_weather->snow || m_weather->ice || m_weather->fog); }
 
   /// Called on every fix during a trip. `said` remembers across trips; `r` is a random number in [0, 1).
   std::vector<RoadRemark> Tick(RoadTick const & k, SaidLog & said, double r);

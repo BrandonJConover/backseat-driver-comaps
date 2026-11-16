@@ -293,6 +293,15 @@ bool QuizAnswerTakes(QuizQuestion const & q, std::string const & spoken);
 /// `aboutIt`: a 20 Questions question about "it", where "go" ("do you go there to get it?") isn't the route.
 bool DriveComesFirst(std::string const & spoken, bool aboutIt = false);
 
+/// Personal asks wait for a calm moment (loop B174, BI-087; TU Berlin: informal, personal-topic chatter
+/// is the most distracting kind). Line keys that ask the driver something personal or invite an answer:
+/// file questions, getting-to-know-you and mileage asks, "rate my directions", game and music offers.
+std::vector<std::string> const & AnswerInvitingKeys();
+bool InvitesAnswer(std::string const & key);
+/// At highway speed (~50 mph and up) with a turn or exit under a minute away, or in rain, snow, ice or
+/// fog, such an ask waits. City speed, or the next maneuver far off in clear weather: no wait.
+bool AskMustWait(double speedMps, double toTurnS, bool badWeather);
+
 class Navigator
 {
 public:
@@ -646,6 +655,9 @@ private:
   /// A quiet-stretch bit is still going (a call, a game of 20 Questions), so nothing else should start one.
 public:
   /// 20 Questions or the plate game is on (or offered), so what's heard goes to the game first.
+  /// Now is a calm moment for a personal ask (AskMustWait on the last fix and route), e.g. before a host
+  /// asks a file question. No trip: always calm.
+  bool CalmForAsk() const;
   bool InGame() const
   {
     return QuizAsking() || m_twenty.Active() || m_plates.GetState() == PlateGame::State::Offered ||
@@ -653,6 +665,8 @@ public:
   }
 
 private:
+  /// AskMustWait for this fix and route.
+  bool AsksWait(double speedMps, RouteSnapshot const & route) const;
   bool QuietBitBusy() const { return m_call.Active() || m_twenty.Active() || QuizAsking(); }
   /// A pop quiz question is waiting for its answer on a trip still going.
   bool QuizAsking() const { return m_quiz.Asking() && m_engine && !m_arrived; }

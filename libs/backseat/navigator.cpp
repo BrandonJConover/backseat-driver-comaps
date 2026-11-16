@@ -2030,6 +2030,52 @@ void Navigator::TrackLeftBuilding(Fix const & fix)
   m_indoorOutKey.clear();
 }
 
+std::vector<std::string> const & AnswerInvitingKeys()
+{
+  // Audited against the line bank (loop B174): every key whose line asks the driver something about
+  // themselves or waits for an answer. In-game turns (quiz.ask, twenty.*) and first-run setup, which
+  // runs parked, keep their own timing.
+  static std::vector<std::string> const kKeys = {
+      "file.bedSide",       "file.color",          "file.iceCream",  "file.music",      "file.snack1",
+      "file.snack2",        "mileage.askBusiness", "mileage.askHome", "mileage.askOwner", "mileage.unknownAsk",
+      "onboard.ask.gender", "onboard.ask.home",    "onboard.ask.married", "survey.ask", "trap.bathroom.ask",
+      "trap.rate.ask",      "music",               "twenty.offer",   "twenty.offerAgain", "plateGame.offer",
+      "game.myIdea",        "quiz.open"};
+  return kKeys;
+}
+
+bool InvitesAnswer(std::string const & key)
+{
+  auto const & keys = AnswerInvitingKeys();
+  return std::find(keys.begin(), keys.end(), key) != keys.end();
+}
+
+/// ~50 mph / 80 km/h: highway speed, where a minute to the exit goes by fast.
+double constexpr kAskHighwayMps = 22;
+/// Under this long to the next turn or exit at highway speed, an ask waits.
+double constexpr kAskManeuverWithinS = 60;
+
+bool AskMustWait(double speedMps, double toTurnS, bool badWeather)
+{
+  return badWeather || (speedMps >= kAskHighwayMps && toTurnS < kAskManeuverWithinS);
+}
+
+bool Navigator::AsksWait(double speedMps, RouteSnapshot const & route) const
+{
+  double const mps = TimingMps(speedMps);
+  double const toTurnS = route.turnId ? SecondsToTurn(route.distToTurnM, mps) : 1e9;
+  return AskMustWait(mps, toTurnS, m_road.BadWeather());
+}
+
+bool Navigator::CalmForAsk() const
+{
+  if (!InTrip() || m_arrived || !m_lastFix)
+    return true;
+  double const mps = LastTimingMps();
+  double const toTurnS = m_turnId ? SecondsToTurn(m_lastDistToTurnM, mps) : 1e9;
+  return !AskMustWait(mps, toTurnS, m_road.BadWeather());
+}
+
 std::string CompassDirection(LatLon const & from, LatLon const & to)
 {
   double constexpr kRad = M_PI / 180;
@@ -2597,7 +2643,7 @@ void Navigator::TrackMusic(double tMs, RouteSnapshot const & route)
     SayLine(tMs, Category::Music, "music.judge");
   }
   // Silence (well, just the GPS) on a long trip: ask for music.
-  if (!playing && !m_musicAsked && tMs - m_tripStartT >= kMusicAfterMs)
+  if (!playing && !m_musicAsked && tMs - m_tripStartT >= kMusicAfterMs && !AsksWait(m_hereFix ? m_hereFix->speedMps : -1, route))
   {
     m_musicAsked = true;
     SayLine(tMs, Category::Music, "music");
@@ -2849,7 +2895,7 @@ void Navigator::TrackPlateGame(double tMs, LatLon const & here, double speedMps,
   }
   bool const nearManeuver = route.turnId && route.distToTurnM < GameHoldM(PlateGame::kHoldNearManeuverM, TimingMps(speedMps));
   // The game the GPS refused a few minutes ago is now its own idea.
-  if (m_gamePitchAt && tMs >= *m_gamePitchAt && !nearManeuver && route.state == RouteState::OnRoute &&
+  if (m_gamePitchAt && tMs >= *m_gamePitchAt && !nearManeuver && !AsksWait(speedMps, route) && route.state == RouteState::OnRoute &&
       m_plates.GetState() != PlateGame::State::Playing)
   {
     m_gamePitchAt.reset();
@@ -2867,6 +2913,9 @@ void Navigator::TrackPlateGame(double tMs, LatLon const & here, double speedMps,
     return;
   // US and Mexican plates name a state; a UK or German plate says nothing about where the car is from.
   if (!PlatesNameAState(m_country))
+    return;
+  // A game offer waits for a calm moment (loop B174).
+  if (AsksWait(speedMps, route))
     return;
   if (PlateGame::ShouldOffer(m_tripsOnRoute, route.distToTurnM, m_engine->Frustration()))
     SayPlate(tMs, m_plates.Offer(Tier()));
@@ -4025,6 +4074,13 @@ void Navigator::TrackQuietBits(Fix const & fix, RouteSnapshot const & route)
           : pick < fact + kAsideWeight       ? Bit::Aside
                                              : Bit::Trap;
   }
+  // Asking the driver something (a game offer, "rate my directions") waits for a calm moment; nothing
+  // is used up, so the same ask comes on the next calm stretch (loop B174, BI-087).
+  if ((bit == Bit::Twenty || bit == Bit::Trap) && AsksWait(fix.speedMps, route))
+  {
+    Trace("quiet.askWaits", {{"bit", bit == Bit::Twenty ? "twenty" : "trap"}});
+    return;
+  }
   ++m_quietBits;
   m_lastQuietBitT = t;
   switch (bit)
@@ -4301,7 +4357,7 @@ void Navigator::TrackPopQuiz(Fix const & fix, RouteSnapshot const & route)
   if (!steady || t - m_tripStartT < kQuizAfterStartMs || t - m_lastQuizT < kQuizEveryMs ||
       t - m_lastQuietBitT < kQuizAfterQuietBitMs || t - std::max(m_lastSpokeT, m_lastRoadT) < kQuizSilenceMs)
     return;
-  if (SecondsToTurn(route.distToTurnM, TimingMps(fix.speedMps)) < kQuizMinToTurnS)
+  if (SecondsToTurn(route.distToTurnM, TimingMps(fix.speedMps)) < kQuizMinToTurnS || AsksWait(fix.speedMps, route))
     return;
   // One roll of the dice per stretch, so it stays a surprise.
   if (m_quizRolledFor == route.turnId)

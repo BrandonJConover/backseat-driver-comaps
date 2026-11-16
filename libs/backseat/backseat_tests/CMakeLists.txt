@@ -38,6 +38,7 @@ add_executable(${PROJECT_NAME}
   quiz_country_test.cpp
   pronunciation_backup_test.cpp
   pronunciation_test.cpp
+  ask_moment_test.cpp
   quiet_bits_test.cpp
   report_test.cpp
   report_speed_test.cpp
