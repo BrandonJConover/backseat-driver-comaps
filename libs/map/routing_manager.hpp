@@ -318,6 +318,10 @@ public:
   std::string BackseatMapBrowsed() { return m_backseat.MapBrowsed(); }
   std::string BackseatTypingDestination() { return m_backseat.TypingDestination(); }
   std::string BackseatRoughRoad() { return m_backseat.RoughRoad(); }
+  std::string BackseatVolumeDown(double before, double after, bool foreground)
+  {
+    return m_backseat.VolumeDown(before, after, foreground);
+  }
   std::string BackseatArrivalSurvey() { return m_backseat.ArrivalSurvey(); }
   std::string BackseatSurveyAnswer(std::string const & spoken) { return m_backseat.SurveyAnswer(spoken); }
   std::string BackseatDriveSample(double lat, double lon, double speedMps, double accuracyM, int activity, double tMs)

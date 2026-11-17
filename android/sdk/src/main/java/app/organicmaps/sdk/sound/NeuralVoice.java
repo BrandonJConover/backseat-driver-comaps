@@ -21,6 +21,12 @@ public interface NeuralVoice
    */
   void speak(@NonNull String text, boolean nav, float speed, float volume, @NonNull Runnable fallback);
 
+  /** True while a line is being synthesized, waiting its turn or playing. */
+  default boolean isSpeaking()
+  {
+    return false;
+  }
+
   /** Stops playback and forgets queued lines. */
   void stop();
 }

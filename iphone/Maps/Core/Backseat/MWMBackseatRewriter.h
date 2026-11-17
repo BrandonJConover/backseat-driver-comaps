@@ -128,6 +128,9 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 + (NSString *)typingDestination;
 /// A rough stretch of road (several hard jolts). A line to say, or empty.
 + (NSString *)roughRoad;
+/// The driver turned the volume down (one burst of presses, 0..1): "I won't be silenced!", or empty
+/// (muted all the way, not navigating and not on screen, or said in the last few minutes).
++ (NSString *)volumeDownFrom:(double)before to:(double)after foreground:(BOOL)foreground;
 /// Spoken once the slider is back at the mean end: "Don't touch my slider."
 + (NSString *)nicenessSlidBack;
 /// After the arrival line, at most once every 20 hours: the one-to-ten rating question, or empty.

@@ -81,6 +81,8 @@ object KokoroVoice : NeuralVoice
   @Volatile private var player: ClipPlayer? = null
   /** The driver changed their own pronunciations: the engine reloads with the new dictionary. */
   @Volatile private var lexiconChanged = false
+  /** A line taken off [jobs] that isn't in the player yet. */
+  @Volatile private var synthesizing = false
 
   /** Plugs the voice into [TtsPlayer] and loads (or first downloads) the model in the background. */
   @JvmStatic
@@ -96,6 +98,8 @@ object KokoroVoice : NeuralVoice
   }
 
   override fun isReady() = tts != null
+
+  override fun isSpeaking() = synthesizing || jobs.isNotEmpty() || player?.busy() == true
 
   override fun speak(text: String, nav: Boolean, speed: Float, volume: Float, fallback: Runnable)
   {
@@ -189,6 +193,7 @@ object KokoroVoice : NeuralVoice
             Logger.e(TAG, "Couldn't reload Kokoro with the new pronunciations", e)
           }
         }
+        synthesizing = true
         try
         {
           synthesize(engine, job)
@@ -203,6 +208,10 @@ object KokoroVoice : NeuralVoice
             mainHandler.removeCallbacks(job.deadline)
             job.fallback.run()
           }
+        }
+        finally
+        {
+          synthesizing = false
         }
       }
     }, "KokoroSynth").start()
@@ -360,6 +369,8 @@ object KokoroVoice : NeuralVoice
         lock.notifyAll()
       }
     }
+
+    fun busy(): Boolean = synchronized(lock) { current != null || navQueue.isNotEmpty() || roastQueue.isNotEmpty() }
 
     fun interruptRoast()
     {

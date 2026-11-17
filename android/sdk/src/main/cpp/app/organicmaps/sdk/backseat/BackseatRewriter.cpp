@@ -130,6 +130,13 @@ JNIEXPORT void JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeEnableMu
   });
 }
 
+JNIEXPORT jstring JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeVolumeDown(JNIEnv * env, jclass,
+                                                                                 jdouble before, jdouble after,
+                                                                                 jboolean foreground)
+{
+  return jni::ToJavaString(env, frm()->GetRoutingManager().BackseatVolumeDown(before, after, foreground));
+}
+
 JNIEXPORT jstring JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeDriverSaid(JNIEnv * env, jclass, jstring text)
 {
   // "" when the navigator took it, "route\tlat\tlon\tname" or "search\tquery" for a destination.
