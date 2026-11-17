@@ -1,5 +1,6 @@
 #include "backseat/rundown.hpp"
 
+#include "backseat/pick_index.hpp"
 #include "backseat/report.hpp"
 
 #include <algorithm>
@@ -65,7 +66,8 @@ std::vector<std::string> const kReturnGreetings = {
 
 std::string const & PickFrom(std::vector<std::string> const & xs, Rng const & rng)
 {
-  return xs[static_cast<size_t>(std::floor(rng() * xs.size()))];
+  // NaN or negative -> first, 1 or more -> last (was out of bounds).
+  return xs[PickIndex(rng ? rng() : 0, xs.size())];
 }
 
 std::string Join(std::vector<std::string> const & parts, std::string const & sep)
@@ -168,7 +170,8 @@ std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripR
     Kind const m = turns[i];
     streak = i > 0 && m == turns[i - 1] ? streak + 1 : 0;
     if (m == Kind::UTurn)
-      phrases.push_back(streak ? "another U-turn, don't ask" : "a U-turn, don't ask");
+      // "going to make a U-turn", not "going to a U-turn"; later ones follow "then".
+      phrases.push_back(streak ? "another U-turn, don't ask" : i == 0 ? "make a U-turn, don't ask" : "a U-turn, don't ask");
     else if (streak == 0)
       phrases.push_back(i == 0 ? "turn " + name(m) : name(m));
     else if (streak == 1)
@@ -182,8 +185,9 @@ std::string RouteRundown(std::vector<RouteStep> const & steps, std::vector<TripR
   {
     // "I've met you" only lands once it actually has.
     std::string const why = before >= 3 ? "because I've met you" : "because something tells me I'll need to";
-    list = "First you're going to " + Join(phrases, ", then ") + ", and then " + std::to_string(turns.size() - kMaxListed) +
-           " more turns that I'll explain as we go, " + why + ".";
+    size_t const rest = turns.size() - kMaxListed;
+    list = "First you're going to " + Join(phrases, ", then ") + ", and then " + std::to_string(rest) + " more " +
+           (rest == 1 ? "turn" : "turns") + " that I'll explain as we go, " + why + ".";
   }
   else if (phrases.size() == 1)
   {

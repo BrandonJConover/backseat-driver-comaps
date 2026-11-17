@@ -172,8 +172,11 @@ TEST(NavigatorRewordsRoastsButNotDirections)
   auto const opening = nav.TakeLines();
   CHECK(!opening.empty());
   CHECK(model->asked.empty());  // greeting, rundown and directions are never reworded
-  f.tMs = 6000;
+  f.tMs = 3000;  // over for one fix: not speeding yet (3 s sustain)
   f.speedMps = FromDisplay(53, Units::Mph);
+  nav.OnFix(f, r);
+  CHECK(model->asked.empty());
+  f.tMs = 6000;
   nav.OnFix(f, r);
   CHECK_EQUAL(model->asked.size(), size_t{1});
   CHECK_EQUAL(model->asked[0].category, std::string("speeding"));
@@ -210,4 +213,26 @@ TEST(RewritesThatAreTheModelTalkingAreThrownOut)
               std::string("Left. The other left."));
   CHECK_EQUAL(AcceptRewrite(r, "Line: Left. The other left.").value_or(""), std::string("Left. The other left."));
   CHECK(AcceptRewrite(r, "Left means left. Wild concept, I know.").has_value());
+}
+
+TEST(GateDropsLinesWithNothingToSay)
+{
+  auto model = std::make_shared<FakeModel>();
+  FakeClock clock;
+  RewriteGate gate(1000ms, clock.Fn());
+  gate.SetRewriter(model);
+  // An empty pool or a template that filled to blanks never reaches the voice or the model.
+  for (char const * blank : {"", " ", " || ", "\n\t", "..."})
+  {
+    gate.Push(Line(blank));
+    gate.Push(Line(blank), false);
+  }
+  CHECK(model->asked.empty());
+  CHECK(gate.Take().empty());
+  // Real lines around them still go out.
+  gate.Push(Line("Ok."), false);
+  gate.Push(Line(""), false);
+  auto const out = gate.Take();
+  CHECK_EQUAL(out.size(), size_t{1});
+  CHECK_EQUAL(out[0].text, std::string("Ok."));
 }

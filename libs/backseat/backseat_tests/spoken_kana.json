@@ -1,0 +1,115 @@
+{
+ "about": "Japanese kana romanised by Hepburn for map street names, POI names and quotes English Kokoro would skip ('ラーメン' ramen, 'ありがとう' arigato, 'さくら通り' sakura 通 ri). Same rules as EpubToM4B text/spoken_foreign_scripts.py kana_word (CROSS X-015): small tsu doubles the next consonant, yoon, katakana loan sounds, long marks and ou/oo collapsed, kanji/hangul left alone and spaced off the romaji. Backseat Driver: backseat::pronunciation::ForSpeech / Kana (libs/backseat/backseat_tests/spoken_kana.json). Keep both copies in sync.",
+ "cases": [
+  {
+   "input": "\"こんにちは,\" Kenji said.",
+   "language": "en",
+   "expected": "\"konnichiwa,\" Kenji said."
+  },
+  {
+   "input": "\"ありがとう!\"",
+   "language": "en",
+   "expected": "\"arigato!\""
+  },
+  {
+   "input": "A cup of コーヒー, please.",
+   "language": "en",
+   "expected": "A cup of kohi, please."
+  },
+  {
+   "input": "\"ちょっと待って\"",
+   "language": "en",
+   "expected": "\"chotto 待 tte\""
+  },
+  {
+   "input": "They ate ラーメン.",
+   "language": "en",
+   "expected": "They ate ramen."
+  },
+  {
+   "input": "\"さようなら\"",
+   "language": "en",
+   "expected": "\"sayonara\""
+  },
+  {
+   "input": "A small きって.",
+   "language": "en",
+   "expected": "A small kitte."
+  },
+  {
+   "input": "\"キャット\"",
+   "language": "en",
+   "expected": "\"kyatto\""
+  },
+  {
+   "input": "\"ヴァイオリン\"",
+   "language": "en",
+   "expected": "\"vaiorin\""
+  },
+  {
+   "input": "Call it a パーティー.",
+   "language": "en",
+   "expected": "Call it a pati."
+  },
+  {
+   "input": "\"日本語です\"",
+   "language": "en",
+   "expected": "\"日本語 desu\""
+  },
+  {
+   "input": "The 北京 office.",
+   "language": "en",
+   "expected": "The 北京 office."
+  },
+  {
+   "input": "\"안녕하세요\"",
+   "language": "en",
+   "expected": "\"안녕하세요\""
+  },
+  {
+   "input": "Plain English text stays.",
+   "language": "en",
+   "expected": "Plain English text stays."
+  },
+  {
+   "input": "Turn left onto すずらん通り.",
+   "language": "en",
+   "expected": "Turn left onto suzuran 通 ri."
+  },
+  {
+   "input": "Turn right onto さくら通り.",
+   "language": "en",
+   "expected": "Turn right onto sakura 通 ri."
+  },
+  {
+   "input": "Keep right toward ハチ公口.",
+   "language": "en",
+   "expected": "Keep right toward hachi 公口."
+  },
+  {
+   "input": "Your destination, イオンモール, is on the right.",
+   "language": "en",
+   "expected": "Your destination, ionmoru, is on the right."
+  },
+  {
+   "input": "Continue toward とうきょう.",
+   "language": "en",
+   "expected": "Continue toward tokyo."
+  },
+  {
+   "input": "Arriving at カフェ.",
+   "language": "en",
+   "expected": "Arriving at kafe."
+  },
+  {
+   "input": "Turn left at ローソン.",
+   "language": "en",
+   "expected": "Turn left at roson."
+  },
+  {
+   "input": "Continue on Main St.",
+   "language": "en",
+   "expected": "Continue on Main Street."
+  }
+ ]
+}

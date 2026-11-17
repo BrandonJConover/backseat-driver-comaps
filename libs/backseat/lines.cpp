@@ -1,14 +1,19 @@
 #include "backseat/lines.hpp"
 
 #include "backseat/debug_log.hpp"
+#include "backseat/pick_index.hpp"
 
 #include "backseat/lines_data.hpp"
+#include "backseat/persona_lines_data.hpp"
+#include "backseat/pronunciation.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <initializer_list>
 #include <string>
 #include <utility>
 #include <map>
@@ -22,6 +27,8 @@ namespace
 std::atomic<TravelMode> g_travelMode{TravelMode::Drive};
 std::atomic<Housing> g_housing{Housing::Unknown};
 std::atomic<bool> g_metric{false};
+std::atomic<bool> g_leftHand{false};
+std::atomic<bool> g_alone{false};
 
 /// `text` lowercased with every run of non-word characters turned into one space, padded with
 /// spaces, so " word " finds whole words.
@@ -37,6 +44,26 @@ std::string LineWords(std::string const & text)
   return lower;
 }
 }  // namespace
+
+bool LineClaimsHighway(std::string const & text)
+{
+  static char const * const kHighway[] = {"highway",    "highways",  "freeway",   "freeways",
+                                          "interstate", "interstates", "motorway", "motorways"};
+  std::string const lower = LineWords(text);
+  return std::any_of(std::begin(kHighway), std::end(kHighway),
+                     [&lower](char const * w) { return lower.find(" " + std::string(w) + " ") != std::string::npos; });
+}
+
+bool LineBlamesRoute(std::string const & text)
+{
+  static char const * const kBlame[] = {"{alternate}", "told you so", "told you to take", "told you not to take",
+                                        "told you to avoid", "the other road", "listened to me", "ignore me"};
+  std::string lower;
+  for (char const c : text)
+    lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return std::any_of(std::begin(kBlame), std::end(kBlame),
+                     [&lower](char const * w) { return lower.find(w) != std::string::npos; });
+}
 
 void SetLineTravelMode(TravelMode mode)
 {
@@ -83,6 +110,23 @@ bool LineFitsHousing(std::string const & text, Housing housing)
   if (std::any_of(std::begin(kHouseOwner), std::end(kHouseOwner), has))
     return false;
   return housing != Housing::Streets || std::none_of(std::begin(kHome), std::end(kHome), has);
+}
+
+void SetLineRidesAlone(bool alone)
+{
+  g_alone = alone;
+}
+
+bool LineFitsRidingAlone(std::string const & text)
+{
+  // Phrases that talk to or about someone else in the car ("passengers", plural, no solo line needs).
+  // "Somebody back there is sliding across the back seat. It's probably a water bottle." is fine alone;
+  // so is "for the people in the back" (an idiom) and "you two" (the driver and the road).
+  static char const * const kCompany[] = {" your passenger ", " passengers ", " whoever's in the back ",
+                                          " quiet down back there "};
+  std::string const lower = LineWords(text);
+  return std::none_of(std::begin(kCompany), std::end(kCompany),
+                      [&lower](char const * cue) { return lower.find(cue) != std::string::npos; });
 }
 
 char const * TravelModeName(TravelMode mode)
@@ -161,6 +205,11 @@ std::string MetricWording(std::string const & text)
       {"moved three feet", "moved one meter"},
       {"three miles an hour", "five kilometers an hour"},
       {"It's miles.", "It's kilometers."},
+      // Loop B113: the last four a word scan found (lines_test MetricDriverHearsNoImperialUnitAnywhere).
+      {"UP TO A MILE.", "UP TO A KILOMETER."},
+      {"I want MILES.", "I want KILOMETERS."},
+      {"about twenty feet ahead", "about six meters ahead"},
+      {"AT TWO MILES AN HOUR", "AT THREE KILOMETERS AN HOUR"},
   };
   std::string out = text;
   for (auto const & [from, to] : kPhrases)
@@ -174,79 +223,352 @@ std::string MetricWording(std::string const & text)
 
 namespace
 {
-/// The line table as a metric driver hears it: built once, the first time it's needed.
-LineTable const & MetricLineData()
+/// "UK_England" -> "uk", "New Zealand_North " -> "new zealand north": the country part, lower case.
+std::string CountryKey(std::string const & country)
 {
-  static LineTable const table = []
+  std::string name;
+  for (unsigned char const ch : country)
   {
-    LineTable t = LineData();
-    for (auto & [key, tiers] : t)
-      for (auto & lines : tiers)
-        for (auto & line : lines)
+    if (ch == '_' || ch == ',')  // "UK_England", "New Zealand_North"
+      break;
+    name += static_cast<char>(std::tolower(ch));
+  }
+  while (!name.empty() && name.back() == ' ')
+    name.pop_back();
+  return name;
+}
+
+bool CountryIsOneOf(std::string const & country, std::initializer_list<char const *> names)
+{
+  std::string const key = CountryKey(country);
+  return std::any_of(names.begin(), names.end(), [&](char const * n) { return key == n; });
+}
+}  // namespace
+
+bool InNorthAmerica(std::string const & country)
+{
+  return CountryIsOneOf(country, {"", "us", "usa", "united states", "united states of america", "ca", "canada"});
+}
+
+bool PlatesNameAState(std::string const & country)
+{
+  return InNorthAmerica(country) || CountryIsOneOf(country, {"mx", "mexico"});
+}
+
+bool DrivesOnLeft(std::string const & country)
+{
+  // The map files' top-level names, their usual spellings, and ISO codes.
+  static char const * const kLeft[] = {
+      "uk", "gb", "united kingdom", "great britain", "england", "scotland", "wales", "northern ireland",
+      "ireland", "ie", "isle of man", "jersey", "guernsey", "australia", "au", "new zealand", "nz", "japan",
+      "jp", "india", "in", "south africa", "za", "indonesia", "id", "thailand", "th", "malaysia", "my",
+      "singapore", "sg", "hong kong", "hk", "macau", "macao", "pakistan", "pk", "bangladesh", "bd",
+      "sri lanka", "lk", "nepal", "np", "bhutan", "kenya", "ke", "tanzania", "uganda", "zambia",
+      "zimbabwe", "botswana", "namibia", "lesotho", "eswatini", "swaziland", "mozambique", "malawi",
+      "mauritius", "cyprus", "cy", "malta", "mt", "jamaica", "jm", "bahamas", "barbados", "trinidad and tobago",
+      "guyana", "suriname", "fiji", "papua new guinea", "brunei", "east timor", "timor-leste", "maldives",
+      "seychelles", "falkland islands", "bermuda", "cayman islands"};
+  std::string const name = CountryKey(country);
+  if (name.empty())
+    return false;
+  // A map region of the country ("New Zealand North") counts; two-letter codes only match whole.
+  return std::any_of(std::begin(kLeft), std::end(kLeft),
+                     [&](char const * c)
+                     {
+                       std::string const code = c;
+                       return name == code ||
+                              (code.size() > 2 && name.rfind(code + " ", 0) == 0);
+                     });
+}
+
+void SetLineDriveSide(bool leftHand) { g_leftHand = leftHand; }
+
+LineFilters CurrentLineFilters()
+{
+  LineFilters filters;
+  filters.mode = g_travelMode;
+  filters.housing = g_housing;
+  filters.metric = g_metric;
+  filters.leftHand = g_leftHand;
+  filters.alone = g_alone;
+  return filters;
+}
+
+void SetLineFilters(LineFilters const & filters)
+{
+  g_travelMode = filters.mode;
+  g_housing = filters.housing;
+  g_metric = filters.metric;
+  g_leftHand = filters.leftHand;
+  g_alone = filters.alone;
+}
+
+std::string DescribeLineFilters(LineFilters const & filters)
+{
+  std::string const housing = HousingName(filters.housing);
+  return std::string(TravelModeName(filters.mode)) + "/" + (housing.empty() ? "unknown" : housing) + "/" +
+         (filters.metric ? "metric" : "imperial") + "/" + (filters.leftHand ? "left" : "right") +
+         (filters.alone ? "/alone" : "");
+}
+
+std::string DriveSideWording(std::string const & text)
+{
+  // Whole sentences, so a lane call ("Left lane, please.") or a turn is never touched: only the jokes
+  // that take the driver's seat or the passing lane for granted. The two seat jokes trade places, so
+  // "you turned toward yourself" stays true on the other side of the car.
+  static std::pair<char const *, char const *> const kPhrases[] = {
+      {"Left is the side with the driver. You're sitting on it right now.",
+       "Left is the side with the passenger seat. Usually. You turned toward yourself."},
+      {"Right is the side with the passenger seat. Usually. You turned toward yourself.",
+       "Right is the side with the driver. You're sitting on it right now."},
+      {"The left lane is for passing.", "The right lane is for passing."},
+      {"Like you drive in the left lane.", "Like you drive in the right lane."},
+      {"don't drive in the left lane at forty", "don't drive in the right lane at forty"},
+      // Safety advice, not a joke (loop B97): roundabout traffic comes from the right where traffic
+      // keeps left, so "look left" would point the driver at the wrong side.
+      {"Look left for traffic already going around.", "Look right for traffic already going around."},
+  };
+  for (auto const & [from, to] : kPhrases)
+  {
+    // One swap per line: the seat jokes map onto each other, so a second pass would undo the first.
+    size_t const at = text.find(from);
+    if (at == std::string::npos)
+      continue;
+    std::string out = text;
+    out.replace(at, std::char_traits<char>::length(from), to);
+    return out;
+  }
+  return text;
+}
+
+namespace
+{
+std::atomic<Persona> g_persona{Persona::Critic};
+
+/// `t` as a metric and/or left-hand-traffic driver hears it.
+LineTable Reworded(LineTable t, bool metric, bool leftHand)
+{
+  for (auto & [key, tiers] : t)
+    for (auto & lines : tiers)
+      for (auto & line : lines)
+      {
+        if (metric)
           line = MetricWording(line);
-    return t;
-  }();
+        if (leftHand)
+          line = DriveSideWording(line);
+      }
+  return t;
+}
+
+/// `base()` as a metric and/or left-hand-traffic driver hears it: each copy built once, the first time
+/// it's needed.
+template <LineTable const & (*base)()>
+LineTable const & TableFor(bool metric, bool leftHand)
+{
+  if (!metric && !leftHand)
+    return base();
+  if (metric && !leftHand)
+  {
+    static LineTable const table = Reworded(base(), true, false);
+    return table;
+  }
+  if (!metric)
+  {
+    static LineTable const table = Reworded(base(), false, true);
+    return table;
+  }
+  static LineTable const table = Reworded(base(), true, true);
   return table;
 }
 
+/// The Critic's line table as a metric and/or left-hand-traffic driver hears it.
+LineTable const & LineDataFor(bool metric, bool leftHand) { return TableFor<LineData>(metric, leftHand); }
+
+/// `persona`'s own lines, or null for the Critic, whose lines are LineData().
+LineTable const * PersonaTable(Persona persona, bool metric, bool leftHand)
+{
+  switch (persona)
+  {
+  case Persona::Critic: return nullptr;
+  case Persona::Melancholy: return &TableFor<MelancholyLineData>(metric, leftHand);
+  case Persona::Proud: return &TableFor<ProudLineData>(metric, leftHand);
+  case Persona::Santa: return &TableFor<SantaLineData>(metric, leftHand);
+  }
+  return nullptr;
+}
+
+/// A personality's tier, or the nearest one below it when it wrote none for this tier.
+std::vector<std::string> const & TierOf(std::array<std::vector<std::string>, 3> const & tiers, int tier)
+{
+  for (int t = std::clamp(tier, 0, 2); t > 0; --t)
+    if (!tiers[static_cast<size_t>(t)].empty())
+      return tiers[static_cast<size_t>(t)];
+  return tiers[0];
+}
+
+/// The key a pick is remembered under: a personality's own lines keep their own history, so its
+/// first line for a key is its option 0 even when the Critic has said that key many times.
+std::string SaidKey(std::string const & key)
+{
+  Persona const persona = g_persona;
+  if (persona == Persona::Critic || !PersonaHasLines(persona, key))
+    return key;
+  return std::string(PersonaName(persona)) + ":" + key;
+}
 }  // namespace
+
+char const * PersonaName(Persona persona)
+{
+  switch (persona)
+  {
+  case Persona::Critic: return "critic";
+  case Persona::Melancholy: return "melancholy";
+  case Persona::Proud: return "proud";
+  case Persona::Santa: return "santa";
+  }
+  return "critic";
+}
+
+Persona PersonaFrom(std::string const & name)
+{
+  for (Persona const p : {Persona::Melancholy, Persona::Proud, Persona::Santa})
+    if (name == PersonaName(p))
+      return p;
+  return Persona::Critic;
+}
+
+char const * PersonaTitle(Persona persona)
+{
+  switch (persona)
+  {
+  case Persona::Critic: return "The Critic";
+  case Persona::Melancholy: return "Melancholy";
+  case Persona::Proud: return "Proud Parent";
+  case Persona::Santa: return "Dirty Santa";
+  }
+  return "The Critic";
+}
+
+Persona PersonaForVoice(std::string const & voiceName)
+{
+  std::string name;
+  for (unsigned char const ch : voiceName)
+    if (std::isalpha(ch))
+      name += static_cast<char>(std::tolower(ch));
+  // "George (British male)" is George. The voice ids ("bm_george") come through too.
+  if (auto const paren = voiceName.find('('); paren != std::string::npos)
+    return PersonaForVoice(voiceName.substr(0, paren));
+  if (auto const underscore = voiceName.find('_'); underscore != std::string::npos)
+    return PersonaForVoice(voiceName.substr(underscore + 1));
+  static std::pair<char const *, Persona> const kVoices[] = {
+      {"george", Persona::Melancholy},
+      {"heart", Persona::Proud},
+      {"santa", Persona::Santa},
+  };
+  for (auto const & [voice, persona] : kVoices)
+    if (name == voice)
+      return persona;
+  return Persona::Critic;
+}
+
+void SetLinePersona(Persona persona) { g_persona = persona; }
+Persona LinePersona() { return g_persona; }
+
+bool PersonaHasLines(Persona persona, std::string const & key)
+{
+  LineTable const * table = PersonaTable(persona, false, false);
+  if (!table)
+    return false;
+  std::string const bare = !key.empty() && key.back() == '+' ? key.substr(0, key.size() - 1) : key;
+  return table->count(bare) > 0;
+}
 
 std::vector<std::string> const & LinesFor(std::string const & key, int tier)
 {
   bool const metric = g_metric;
-  LineTable const & table = metric ? MetricLineData() : LineData();
-  auto const & raw = table.at(key).at(static_cast<size_t>(tier));
+  bool const leftHand = g_leftHand;
+  Persona const persona = g_persona;
+  LineTable const & critic = LineDataFor(metric, leftHand);
+  LineTable const * own = PersonaTable(persona, metric, leftHand);
+  bool const personal = own && own->count(key) > 0;
+  LineTable const & table = personal ? *own : critic;
+  // A key or tier that isn't in the table (a typo, a key from a newer line bank) says nothing rather
+  // than taking the app down mid-drive; the trace shows which one.
+  static std::vector<std::string> const kNone;
+  auto const found = table.find(key);
+  if (found == table.end() || tier < 0 || static_cast<size_t>(tier) >= found->second.size())
+  {
+    Trace("lines.missing", {{"key", key}, {"tier", std::to_string(tier)}});
+    return kNone;
+  }
+  auto const & raw = personal ? TierOf(found->second, tier) : found->second[static_cast<size_t>(tier)];
   TravelMode const mode = g_travelMode;
   Housing const housing = g_housing;
+  bool const alone = g_alone;
   // Story beats are read by position, and mode and outdoors lines are written for their mode.
   bool const positional = key.rfind("speeding.story", 0) == 0;
   bool const anyMode = mode == TravelMode::Drive || positional || key.rfind("mode.", 0) == 0 ||
                        key.rfind("outdoors.", 0) == 0;
   // The first-launch script is said word for word, whoever's listening.
-  bool const anyHousing = housing == Housing::Unknown || housing == Housing::House || positional ||
-                          key.rfind("onboard.", 0) == 0 || key.rfind("setup.", 0) == 0;
-  if (anyMode && anyHousing)
+  bool const script = positional || key.rfind("onboard.", 0) == 0 || key.rfind("setup.", 0) == 0;
+  bool const anyHousing = housing == Housing::Unknown || housing == Housing::House || script;
+  bool const anyCompany = !alone || script;
+  if (anyMode && anyHousing && anyCompany)
     return raw;
   static std::mutex mutex;
   static std::map<std::string, std::vector<std::string>> cache;
   std::string const suffix = std::string(".") + TravelModeName(mode);
-  std::lock_guard lock(mutex);
-  auto const [it, added] =
-      cache.try_emplace(key + suffix + "." + HousingName(housing) + std::to_string(tier) + (metric ? "m" : ""));
-  if (!added)
-    return it->second;
-  auto & fitting = it->second;
-  auto const fitHousing = [&]
+  std::string const cacheKey = (personal ? std::string(PersonaName(persona)) + ":" : std::string()) + key + suffix +
+                               "." + HousingName(housing) + std::to_string(tier) + (metric ? "m" : "") +
+                               (leftHand ? "L" : "") + (alone ? "A" : "");
   {
-    if (anyHousing)
+    std::lock_guard lock(mutex);
+    if (auto const it = cache.find(cacheKey); it != cache.end())
+      return it->second;
+  }
+  std::vector<std::string> fitting;
+  auto const fitPeople = [&]
+  {
+    if (anyHousing && anyCompany)
       return;
     std::vector<std::string> kept;
     for (auto const & line : fitting)
-      if (LineFitsHousing(line, housing))
+      if ((anyHousing || LineFitsHousing(line, housing)) && (anyCompany || LineFitsRidingAlone(line)))
         kept.push_back(line);
-    // A pool that's all about home (the garage door line) stays: the caller decides whether to say it.
+    // A pool that's all about home (the garage door line) or all about the passengers stays: the caller
+    // decides whether to say it.
     if (!kept.empty())
       fitting = std::move(kept);
   };
   if (anyMode)
   {
     fitting = raw;
-    fitHousing();
-    return fitting;
+    fitPeople();
   }
-  auto own = table.find(key + suffix);
-  // A hike borrows the walk's lines where it has none of its own.
-  if (own == table.end() && mode == TravelMode::Hike)
-    own = table.find(key + ".walk");
-  if (own != table.end())
-    fitting = own->second.at(static_cast<size_t>(tier));
-  for (auto const & line : raw)
-    if (LineFitsMode(line, mode))
-      fitting.push_back(line);
-  if (fitting.empty())
-    fitting = table.at("mode.generic").at(static_cast<size_t>(tier));
-  fitHousing();
-  return fitting;
+  else
+  {
+    auto ownMode = table.find(key + suffix);
+    // A hike borrows the walk's lines where it has none of its own.
+    if (ownMode == table.end() && mode == TravelMode::Hike)
+      ownMode = table.find(key + ".walk");
+    if (ownMode != table.end())
+      fitting = personal ? TierOf(ownMode->second, tier) : ownMode->second.at(static_cast<size_t>(tier));
+    for (auto const & line : raw)
+      if (LineFitsMode(line, mode))
+        fitting.push_back(line);
+    if (fitting.empty() && personal)
+    {
+      // Nothing this personality wrote fits a walk: the Critic's walking lines beat a generic one.
+      SetLinePersona(Persona::Critic);
+      fitting = LinesFor(key, tier);
+      SetLinePersona(persona);
+    }
+    if (fitting.empty())
+      fitting = critic.at("mode.generic").at(static_cast<size_t>(tier));
+    fitPeople();
+  }
+  std::lock_guard lock(mutex);
+  return cache.try_emplace(cacheKey, std::move(fitting)).first->second;
 }
 
 std::string SpeakableText(std::string const & text)
@@ -288,6 +610,25 @@ std::string SpeakableText(std::string const & text)
   return out;
 }
 
+void Warm(bool metric, bool leftHand)
+{
+  LineDataFor(metric, leftHand);
+  LineDataFor(false, false);
+  // ForSpeech builds each pass's patterns the first time that pass runs, and most passes only run
+  // when their trigger (a digit, a degree sign, $, %, /, :, a dash) is in the line. These lines
+  // between them trip every pass, so none is left to build mid-drive.
+  static char const * const kProbes[] = {
+      "Turn left onto I-35 N at 5pm, then Exit 12B toward N Main St NW in 1/2 mi, 0.3 mi.",
+      "Mon-Fri 9am-5pm, 3\xE2\x80\x93""5 min, ~20 ft, \xC2\xB1""2 km, -5\xC2\xB0""F \xE2\x80\x94 50% off $1,234.99/gal & #5.",
+      "On 11/6/2026 or 2026-11-06 or Nov. 6 in the 1990s and 90s, at 10:30, 24/7, \xC2\xBD.",
+      "King George VI Ave to St. John's Svc Rd, Ave B, Mt Hood, 1600 Pennsylvania Ave, US-101, SR 71.",
+      "See www.example.com or jo@example.com about Calle Ocho, rue de la Paix and Burnet Rd, the Grey Theatre's colours.",
+      "\xD1\x83\xD0\xBB\xD0\xB8\xD1\x86\xD0\xB0 \xE3\x83\xA9\xE3\x83\xBC\xE3\x83\xA1\xE3\x83\xB3 lead the way, read it, live here.",
+  };
+  for (char const * probe : kProbes)
+    pronunciation::ForSpeech(probe);
+}
+
 std::string DropRepeatedTags(std::string text, std::set<std::string> & said)
 {
   for (std::string const tag : {"There is valuable cargo aboard this car.", "Phones don't like being wet."})
@@ -308,6 +649,23 @@ std::string DropRepeatedTags(std::string text, std::set<std::string> & said)
       text.replace(they, 20, "Phones don't like");
   }
   return text;
+}
+
+Delivery DeliveryFor(std::string const & key, std::string const & text)
+{
+  if (key.empty() || text.empty() || text.find('!') != std::string::npos)
+    return Delivery::Normal;
+  for (size_t start = 0; start <= key.size();)
+  {
+    size_t const dot = key.find('.', start);
+    size_t const end = dot == std::string::npos ? key.size() : dot;
+    if (key.compare(start, end - start, "aside") == 0)
+      return Delivery::Aside;
+    if (dot == std::string::npos)
+      break;
+    start = dot + 1;
+  }
+  return Delivery::Normal;
 }
 
 std::string Fill(std::string const & tmpl, Vars const & vars)
@@ -353,11 +711,38 @@ namespace
 /// A key's memory holds at most this many lines (and always leaves one fresh option), so a pool
 /// of up to this size is used up before anything in it comes back.
 size_t constexpr kSaidKeep = 30;
+/// A saved log is a few hundred keys of short lines; anything past these is a corrupt or
+/// hand-mangled file, dropped so it can't grow the log (and the save) without end.
+size_t constexpr kSaidKeysMax = 4096;
+size_t constexpr kSaidRowMax = 4096;
+
+/// A value with a line break (a destination name, say) would split its row in the saved file.
+std::string OneRow(std::string text)
+{
+  for (char & c : text)
+    if (c == '\n' || c == '\r')
+      c = ' ';
+  return text;
+}
 }  // namespace
 
-std::string const & SaidLog::Pick(std::string const & key, std::vector<std::string> const & options, double r)
+std::string const & SaidLog::Pick(std::string const & spokenKey, std::vector<std::string> const & options, double r)
 {
+  std::string const key = SaidKey(spokenKey);
+  // Nothing to pick from (a key missing from the line bank): say nothing, remember nothing.
+  static std::string const kNothing;
+  if (options.empty())
+  {
+    Trace("pick.empty", {{"key", key}});
+    return kNothing;
+  }
+  // r should be in [0, 1); a broken random source (NaN, negative, 1 or more) still picks a real line.
+  if (!(r >= 0))
+    r = 0;
+  else if (r >= 1)
+    r = std::nextafter(1.0, 0.0);
   auto & recent = m_recent[key];
+  m_before[key] = recent;
   // A key's first ever line is its first option, which is Brandon's line where there is one.
   if (recent.empty())
     r = 0;
@@ -368,7 +753,7 @@ std::string const & SaidLog::Pick(std::string const & key, std::vector<std::stri
   if (fresh.empty())
     for (auto const & l : options)
       fresh.push_back(&l);
-  std::string const & line = *fresh[std::min(fresh.size() - 1, static_cast<size_t>(std::floor(r * fresh.size())))];
+  std::string const & line = *fresh[PickIndex(r, fresh.size())];
   recent.erase(std::remove(recent.begin(), recent.end(), line), recent.end());
   recent.push_back(line);
   size_t const keep = std::min(kSaidKeep, options.size() - 1);
@@ -389,14 +774,31 @@ std::string SaidLog::Value(std::string const & key) const
 
 void SaidLog::SetValue(std::string const & key, std::string value)
 {
+  m_before.erase(key);
   m_recent[key] = {std::move(value)};
   m_dirty = true;
 }
 
 void SaidLog::Erase(std::string const & key)
 {
+  m_before.erase(key);
   if (m_recent.erase(key))
     m_dirty = true;
+}
+
+void SaidLog::Unpick(std::string const & spokenKey, std::string const & line)
+{
+  std::string const key = SaidKey(spokenKey);
+  auto const before = m_before.find(key);
+  auto const now = m_recent.find(key);
+  if (before == m_before.end() || now == m_recent.end() || now->second.empty() || now->second.back() != line)
+    return;
+  if (before->second.empty())
+    m_recent.erase(key);
+  else
+    m_recent[key] = std::move(before->second);
+  m_before.erase(before);
+  m_dirty = true;
 }
 
 std::string SaidLog::Serialize() const
@@ -404,7 +806,7 @@ std::string SaidLog::Serialize() const
   std::string out;
   for (auto const & [key, lines] : m_recent)
     for (auto const & l : lines)
-      out += key + "\t" + l + "\n";
+      out += OneRow(key) + "\t" + OneRow(l) + "\n";
   return out;
 }
 
@@ -415,13 +817,156 @@ SaidLog SaidLog::Parse(std::string const & text)
   std::string row;
   while (std::getline(in, row))
   {
+    if (!row.empty() && row.back() == '\r')  // saved on Windows or hand-edited
+      row.pop_back();
     auto const tab = row.find('\t');
-    if (tab == std::string::npos || tab == 0 || tab + 1 >= row.size())
+    if (tab == std::string::npos || tab == 0 || tab + 1 >= row.size() || row.size() > kSaidRowMax)
       continue;
-    auto & lines = log.m_recent[row.substr(0, tab)];
+    auto key = row.substr(0, tab);
+    if (log.m_recent.size() >= kSaidKeysMax && log.m_recent.count(key) == 0)
+      continue;
+    auto & lines = log.m_recent[std::move(key)];
     if (lines.size() < kSaidKeep)
       lines.push_back(row.substr(tab + 1));
   }
   return log;
 }
+namespace
+{
+std::vector<std::string> HandlingClauses(std::string const & line)
+{
+  std::vector<std::string> clauses;
+  std::string cur;
+  auto flush = [&] {
+    size_t const b = cur.find_first_not_of(" ,\"");
+    size_t const e = cur.find_last_not_of(" ,\"");
+    if (b != std::string::npos)
+      clauses.push_back(cur.substr(b, e - b + 1));
+    cur.clear();
+  };
+  for (char ch : line)
+  {
+    if (ch == '.' || ch == '!' || ch == '?' || ch == '|')
+      flush();
+    else
+      cur += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  flush();
+  return clauses;
+}
+
+bool HasWord(std::string const & text, std::string const & word)
+{
+  for (size_t at = text.find(word); at != std::string::npos; at = text.find(word, at + 1))
+  {
+    bool const startOk = at == 0 || !std::isalpha(static_cast<unsigned char>(text[at - 1]));
+    size_t const end = at + word.size();
+    bool const endOk = end >= text.size() || !std::isalpha(static_cast<unsigned char>(text[end]));
+    if (startOk && endOk)
+      return true;
+  }
+  return false;
+}
+}  // namespace
+
+bool AsksToHandlePhone(std::string const & line)
+{
+  static char const * const kAsks[] = {"plug me in", "hold me", "holding me", "pick me up", "find the charger",
+                                       "vent at me", "vents at me", "me over the vent", "me up to the vent",
+                                       "me to the vent"};
+  static char const * const kSoft[] = {"might want", "think about", "if you want"};
+  auto const clauses = HandlingClauses(line);
+  // "PLUG. ME. IN." is one ask, spread over three clauses.
+  std::string squashed;
+  for (auto const & c : clauses)
+    squashed += (squashed.empty() ? "" : " ") + c;
+  if (squashed.find("plug me in") != std::string::npos)
+  {
+    bool split = true;
+    for (auto const & c : clauses)
+      split = split && c.find("plug me in") == std::string::npos;
+    if (split)
+      return true;
+  }
+  bool urgent = false;
+  for (auto const & c : clauses)
+    urgent = urgent || HasWord(c, "now");
+  std::string previous;
+  for (auto const & clause : clauses)
+  {
+    bool const negatedBefore = previous == "don't" || previous == "do not" || previous == "never" || previous == "no";
+    previous = clause;
+    if (negatedBefore)
+      continue;
+    // "Charger. Now." / "CHARGER! CABLE! OUTLET!": the one-word demand.
+    if (clause == "charger" || clause.rfind("charger ", 0) == 0)
+      return true;
+    for (char const * ask : kAsks)
+    {
+      size_t const at = clause.find(ask);
+      if (at == std::string::npos)
+        continue;
+      // "Pick me up a charger while you're in there": an errand, not a hand on the phone.
+      if (clause.compare(at, 12, "pick me up a") == 0 || clause.compare(at, 15, "pick me up some") == 0)
+        continue;
+      std::string const before = " " + clause.substr(0, at);
+      bool negated = false;
+      for (char const * no : {"n't ", " not ", " never ", " no ", " without "})
+        negated = negated || before.find(no) != std::string::npos;
+      if (negated)
+        continue;
+      bool soft = false;
+      for (char const * s : kSoft)
+        soft = soft || clause.find(s) != std::string::npos;
+      if (!soft || urgent)
+        return true;
+    }
+  }
+  return false;
+}
+
+bool LooksOrPicks(std::string const & line)
+{
+  // "Look at it", "LOOK!", "Pick a voice", "Change anything you like": eyes or a finger on the screen.
+  static char const * const kLook[] = {"look at it", "look at this", "look at that", "look at all", "look at the map",
+                                       "look at the screen", "look at the route", "look closely", "look how",
+                                       "see how", "memorize it", "feel free to look", "have a look", "take a look"};
+  // Picks answered out loud ("Pick one. Say first, second, or third.") are fine.
+  static char const * const kPick[] = {"pick one", "pick a voice", "pick whichever", "choose a voice", "choose one",
+                                       "choose carefully", "choose wisely", "try them all", "try one",
+                                       "change anything", "change whatever", "change the voice"};
+  auto const clauses = HandlingClauses(line);
+  bool saidAloud = false;
+  for (auto const & c : clauses)
+    saidAloud = saidAloud || c.rfind("say ", 0) == 0 || c.find(" say ") != std::string::npos;
+  auto const found = [](std::string const & clause, char const * phrase) {
+    size_t const at = clause.find(phrase);
+    if (at == std::string::npos || (at > 0 && std::isalpha(static_cast<unsigned char>(clause[at - 1]))))
+      return false;
+    std::string const before = " " + clause.substr(0, at);
+    for (char const * no : {"n't ", " not ", " never ", " no ", " without "})
+      if (before.find(no) != std::string::npos)
+        return false;
+    return true;
+  };
+  std::string previous;
+  for (auto const & clause : clauses)
+  {
+    bool const negatedBefore = previous == "don't" || previous == "do not" || previous == "never" || previous == "no";
+    previous = clause;
+    if (negatedBefore)
+      continue;
+    if (clause == "look" || (!saidAloud && (clause == "pick" || clause == "choose")))
+      return true;
+    for (char const * phrase : kLook)
+      if (found(clause, phrase))
+        return true;
+    if (!saidAloud)
+      for (char const * phrase : kPick)
+        if (found(clause, phrase))
+          return true;
+  }
+  return false;
+}
+
 }  // namespace backseat

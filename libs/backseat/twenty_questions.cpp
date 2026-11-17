@@ -1,6 +1,8 @@
 #include "backseat/twenty_questions.hpp"
 
+#include "backseat/pick_index.hpp"
 #include "backseat/plate_game.hpp"
+#include "backseat/types.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -17,7 +19,7 @@ using T = Trait;
 std::string TqWords(std::string const & s)
 {
   std::string out = " ";
-  for (unsigned char const c : s)
+  for (unsigned char const c : StraightApostrophes(s))
   {
     if (std::isalnum(c))
       out += static_cast<char>(std::tolower(c));
@@ -34,6 +36,30 @@ bool TqHas(std::string const & words, char const * phrase) { return words.find(T
 bool TqHasAny(std::string const & words, std::vector<char const *> const & phrases)
 {
   return std::any_of(phrases.begin(), phrases.end(), [&](char const * p) { return TqHas(words, p); });
+}
+
+/// Whether the driver ended on one of `phrases`, allowing one trailing filler ("what is it then").
+bool TqEndsWithAny(std::string const & words, std::vector<char const *> const & phrases)
+{
+  for (auto const * p : phrases)
+    for (char const * tail : {"", "then", "already", "anyway", "please", "now"})
+    {
+      std::string const full = TqWords(p) + TqWords(tail).substr(1);
+      if (words.size() >= full.size() && words.compare(words.size() - full.size(), full.size(), full) == 0)
+        return true;
+    }
+  return false;
+}
+
+/// "Does it ...", "do I ...", "is it ...": a yes/no question about the thing.
+bool AsksAboutIt(std::string const & words)
+{
+  for (char const * start : {"is it", "does it", "do i", "do we", "do you", "can it", "can i", "can we", "could it",
+                             "could i", "would it", "would i", "will it", "has it", "was it", "did it", "should i",
+                             "is that", "are they", "it is", "its", "it s"})
+    if (words.rfind(TqWords(start), 0) == 0)
+      return true;
+  return false;
 }
 
 /// Where a thing is, for "I'm thinking of something {where}".
@@ -468,21 +494,42 @@ TwentyHeard ParseTwentyHeard(std::string const & spoken)
 {
   std::string const w = TqWords(spoken);
   TwentyHeard h;
-  if (TqHasAny(w, {"give up", "i give", "just tell me", "tell me what it is", "what is it", "what was it",
-                   "i surrender", "you win"}))
+  // Short cues ("what is it", "i give", "enough", "help me") only count when the driver ends on
+  // them: "what is it made of", "do I give it food", "small enough to hold" and "does it help me
+  // drive" are questions about the thing.
+  bool const aboutIt = AsksAboutIt(w);
+  if (TqHasAny(w, {"give up", "giving up", "i give in", "just tell me", "tell me what it is", "tell me what it was",
+                   "i surrender", "you win"}) ||
+      TqEndsWithAny(w, {"what is it", "what was it", "whats it", "what s it"}) ||
+      (!aboutIt && TqEndsWithAny(w, {"i give"})))
   {
     h.kind = TwentyHeard::Kind::GiveUp;
     return h;
   }
   if (TqHasAny(w, {"stop playing", "stop the game", "end the game", "quit", "im done", "i m done", "never mind",
-                   "nevermind", "no more", "enough", "dont want to play", "don t want to play", "game over"}))
+                   "nevermind", "no more questions", "no more games", "thats enough", "that s enough",
+                   "enough of this", "enough already", "had enough", "enough questions", "dont want to play",
+                   "don t want to play", "game over"}) ||
+      w == TqWords("enough") || (!aboutIt && TqEndsWithAny(w, {"no more"})))
   {
     h.kind = TwentyHeard::Kind::Quit;
     return h;
   }
-  if (TqHasAny(w, {"hint", "clue", "help me"}))
+  if (TqHasAny(w, {"hint", "clue", "help me out", "a little help", "some help", "give me help", "need help",
+                   "get help"}) ||
+      (!aboutIt && TqEndsWithAny(w, {"help me", "help"})))
   {
     h.kind = TwentyHeard::Kind::Hint;
+    return h;
+  }
+  // "How many questions left", "how many do I have left", "how many have I asked": asking the score.
+  // "How many legs does it have" is still a question about the thing.
+  if ((TqHas(w, "how many") || TqHas(w, "how much")) &&
+      TqHasAny(w, {"question", "questions", "guess", "guesses", "tries", "left", "to go", "asked", "used", "have i had",
+                   "do i get", "do i have", "remaining"}) &&
+      !TqHasAny(w, {"does it", "do they", "is it", "has it", "can it", "would it", "will it", "it have", "it got"}))
+  {
+    h.kind = TwentyHeard::Kind::Count;
     return h;
   }
   bool article = false;
@@ -494,25 +541,29 @@ TwentyHeard ParseTwentyHeard(std::string const & spoken)
       h.thing = *t;
       return h;
     }
+  // "Is it not alive?" asks whether it's dead. "Isn't it alive?" still asks whether it's alive.
+  bool const negated = TqHasAny(w, {"is it not", "does it not", "can it not", "can you not", "do you not",
+                                    "would it not", "will it not", "has it not", "was it not", "its not", "it s not",
+                                    "it isnt", "it doesnt", "it can t", "it cant", "it is not", "it does not"});
   if (auto const size = SizeQuestion(w))
   {
     h.kind = TwentyHeard::Kind::Question;
     h.trait = size->first;
-    h.flipped = size->second;
+    h.flipped = size->second != negated;
     return h;
   }
   if (TqHasAny(w, {"outside", "outdoors", "out there"}) && !TqHas(w, "in the car"))
   {
     h.kind = TwentyHeard::Kind::Question;
     h.trait = T::InCar;
-    h.flipped = true;
+    h.flipped = !negated;
     return h;
   }
   if (TqHasAny(w, {"is it safe", "safe"}))
   {
     h.kind = TwentyHeard::Kind::Question;
     h.trait = T::Dangerous;
-    h.flipped = true;
+    h.flipped = !negated;
     return h;
   }
   for (auto const & tw : kTraitWords)
@@ -520,6 +571,7 @@ TwentyHeard ParseTwentyHeard(std::string const & spoken)
     {
       h.kind = TwentyHeard::Kind::Question;
       h.trait = tw.trait;
+      h.flipped = negated;
       return h;
     }
   // "Is it a giraffe": a guess at something it was never going to be.
@@ -551,6 +603,18 @@ std::string TwentyLog::Serialize() const
   return out;
 }
 
+namespace
+{
+// A saved counter, kept in [0, 1e6]: a hand-edited "-4" would be spoken as a score, and an
+// overflowing one (stream reads clamp it to INT_MAX) would overflow on the next game's ++.
+void ReadCount(std::istream & in, int & count)
+{
+  long long n = 0;
+  in >> n;
+  count = static_cast<int>(std::clamp<long long>(n, 0, 1'000'000));
+}
+}  // namespace
+
 TwentyLog TwentyLog::Parse(std::string const & text)
 {
   TwentyLog log;
@@ -562,19 +626,21 @@ TwentyLog TwentyLog::Parse(std::string const & text)
     std::string kind;
     in >> kind;
     if (kind == "games")
-      in >> log.games;
+      ReadCount(in, log.games);
     else if (kind == "gpsWins")
-      in >> log.gpsWins;
+      ReadCount(in, log.gpsWins);
     else if (kind == "driverWins")
-      in >> log.driverWins;
+      ReadCount(in, log.driverWins);
     else if (kind == "grudges")
-      in >> log.grudges;
+      ReadCount(in, log.grudges);
     else if (kind == "recent")
     {
       std::string name;
       std::getline(in >> std::ws, name);
       if (!name.empty())
         log.recent.push_back(name);
+      if (log.recent.size() > TwentyQuestions::kRecentKeep)  // the newest are kept
+        log.recent.pop_front();
     }
   }
   return log;
@@ -626,7 +692,7 @@ void TwentyQuestions::Pick(std::set<std::string> const & nearby, bool night)
     options = pool(false, true);
   if (options.empty())
     options = pool(false, false);
-  m_thing = options[std::min(options.size() - 1, static_cast<size_t>(roll() * options.size()))];
+  m_thing = options[PickIndex(roll(), options.size())];
   m_log.recent.push_back(kThings[m_thing].name);
   while (m_log.recent.size() > kRecentKeep)
     m_log.recent.pop_front();
@@ -666,6 +732,9 @@ std::optional<TwentyQuestions::Reply> TwentyQuestions::OnDriverSaid(std::string 
   {
     bool const playing = heard.kind == TwentyHeard::Kind::Question || heard.kind == TwentyHeard::Kind::Guess ||
                          heard.kind == TwentyHeard::Kind::UnknownGuess;
+    // "How many questions do I get?" before saying yes: all twenty, and it's still waiting for a yes.
+    if (heard.kind == TwentyHeard::Kind::Count)
+      return Make("twenty.count", tier);
     if (!playing)
     {
       YesNo const yn = heard.kind == TwentyHeard::Kind::Quit ? YesNo::No : ParseYesNo(spoken);
@@ -700,6 +769,8 @@ TwentyQuestions::Reply TwentyQuestions::Answered(TwentyHeard const & heard, int 
   case TwentyHeard::Kind::Unclear: return Make("twenty.unclear", tier);
   case TwentyHeard::Kind::GiveUp: return End("twenty.giveUp", true, tier);
   case TwentyHeard::Kind::Quit: return End("twenty.quit", true, tier);
+  // Not a question: asking how many are left doesn't use one up.
+  case TwentyHeard::Kind::Count: return Make(QuestionsLeft() == 1 ? "twenty.lastOne" : "twenty.count", tier);
   case TwentyHeard::Kind::Guess: return Guessed(heard.thing, tier);
   case TwentyHeard::Kind::UnknownGuess:
     m_asked++;
@@ -720,7 +791,7 @@ TwentyQuestions::Reply TwentyQuestions::Answered(TwentyHeard const & heard, int 
     }
     if (fresh.empty())
       return Make("twenty.noHint", tier);
-    Trait const t = fresh[std::min(fresh.size() - 1, static_cast<size_t>((m_rng ? m_rng() : 0) * fresh.size()))];
+    Trait const t = fresh[PickIndex(m_rng ? m_rng() : 0, fresh.size())];
     m_askedTraits.insert(static_cast<int>(t) * 2);
     m_asked++;
     r = Make("twenty.hint", tier, {{"fact", Fact(t)}});
@@ -883,6 +954,6 @@ std::string TwentyQuestions::Line(std::string const & key, int tier)
     return m_picker(key, tier);
   auto const & options = LinesFor(key, tier);
   double const r = m_rng ? m_rng() : 0;
-  return options[std::min(options.size() - 1, static_cast<size_t>(r * options.size()))];
+  return options[PickIndex(r, options.size())];
 }
 }  // namespace backseat

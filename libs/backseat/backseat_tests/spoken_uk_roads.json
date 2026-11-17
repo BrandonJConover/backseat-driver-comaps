@@ -1,0 +1,180 @@
+{
+ "about": "British road numbers said the way UK drivers say them (loop B170, BI-151): M/A/B glued to 1-2 digits as a number (M twenty five, A forty), 3 digits route style (A three oh three), 4 digits digit by digit with 0 as 'oh' (B four oh oh nine); A1(M) is 'A one M'; J10 is 'junction ten' when a motorway is named. Only in road context (the/onto/on/via/join/take/along/leave/exit/off/follow before, or Toll/junction/motorway/-bound/(anti)clockwise after, or paired with a road ref); 'A1 sauce', 'A4 paper', 'vitamin B12', 'Seat A12', 'B2B', 'M&M' stay. Backseat Driver: backseat::pronunciation::ForSpeech / UkRoads (libs/backseat/pronunciation_uk_roads.hpp). Shared with BookLyre (CROSS).",
+ "cases": [
+  {
+   "input": "Take the M25",
+   "language": "en",
+   "expected": "Take the M twenty five"
+  },
+  {
+   "input": "Join the A40 towards Oxford",
+   "language": "en",
+   "expected": "Join the A forty towards Oxford"
+  },
+  {
+   "input": "Take the A1(M) north",
+   "language": "en",
+   "expected": "Take the A one M north"
+  },
+  {
+   "input": "Stay on the A303",
+   "language": "en",
+   "expected": "Stay on the A three oh three"
+  },
+  {
+   "input": "Turn left onto the B4009",
+   "language": "en",
+   "expected": "Turn left onto the B four oh oh nine"
+  },
+  {
+   "input": "Take the M6 Toll",
+   "language": "en",
+   "expected": "Take the M six Toll"
+  },
+  {
+   "input": "Leave the M25 at J10",
+   "language": "en",
+   "expected": "Leave the M twenty five at junction ten"
+  },
+  {
+   "input": "Leave the motorway at J4a",
+   "language": "en",
+   "expected": "Leave the motorway at junction four A"
+  },
+  {
+   "input": "Continue on M25 J10",
+   "language": "en",
+   "expected": "Continue on M twenty five junction ten"
+  },
+  {
+   "input": "Take the A1",
+   "language": "en",
+   "expected": "Take the A one"
+  },
+  {
+   "input": "Get on the M1",
+   "language": "en",
+   "expected": "Get on the M one"
+  },
+  {
+   "input": "Turn onto A40 Western Avenue",
+   "language": "en",
+   "expected": "Turn onto A forty Western Avenue"
+  },
+  {
+   "input": "Take the M60 anticlockwise",
+   "language": "en",
+   "expected": "Take the M sixty anticlockwise"
+  },
+  {
+   "input": "Take the A127 to Southend",
+   "language": "en",
+   "expected": "Take the A one twenty seven to Southend"
+  },
+  {
+   "input": "Join the M1 northbound",
+   "language": "en",
+   "expected": "Join the M one northbound"
+  },
+  {
+   "input": "Take the A1 and A2",
+   "language": "en",
+   "expected": "Take the A one and A two"
+  },
+  {
+   "input": "Take the M5, M6 or M42",
+   "language": "en",
+   "expected": "Take the M five, M six or M forty two"
+  },
+  {
+   "input": "Exit the A34 at the roundabout.",
+   "language": "en",
+   "expected": "Exit the A thirty four at the roundabout."
+  },
+  {
+   "input": "Follow the A1(M) to Leeds",
+   "language": "en",
+   "expected": "Follow the A one M to Leeds"
+  },
+  {
+   "input": "Stay on the B1234",
+   "language": "en",
+   "expected": "Stay on the B one two three four"
+  },
+  {
+   "input": "Take the M3 at junction 9",
+   "language": "en",
+   "expected": "Take the M three at junction nine"
+  },
+  {
+   "input": "Turn onto the M-25",
+   "language": "en",
+   "expected": "Turn onto the M twenty five"
+  },
+  {
+   "input": "A1 sauce",
+   "language": "en",
+   "expected": "A1 sauce"
+  },
+  {
+   "input": "M&M",
+   "language": "en",
+   "expected": "M&M"
+  },
+  {
+   "input": "B2B sales",
+   "language": "en",
+   "expected": "B2B sales"
+  },
+  {
+   "input": "A4 paper",
+   "language": "en",
+   "expected": "A4 paper"
+  },
+  {
+   "input": "Print it on the A4 paper",
+   "language": "en",
+   "expected": "Print it on the A4 paper"
+  },
+  {
+   "input": "Grade A1 beef",
+   "language": "en",
+   "expected": "Grade A1 beef"
+  },
+  {
+   "input": "Take vitamin B12",
+   "language": "en",
+   "expected": "Take vitamin B12"
+  },
+  {
+   "input": "vitamins B6 and B12",
+   "language": "en",
+   "expected": "vitamins B6 and B12"
+  },
+  {
+   "input": "Seat A12",
+   "language": "en",
+   "expected": "Seat A12"
+  },
+  {
+   "input": "Gate B22",
+   "language": "en",
+   "expected": "Gate B22"
+  },
+  {
+   "input": "J10 is my favorite",
+   "language": "en",
+   "expected": "J10 is my favorite"
+  },
+  {
+   "input": "The A1 sauce and A2 paper",
+   "language": "en",
+   "expected": "The A1 sauce and A2 paper"
+  },
+  {
+   "input": "Model M3 BMW",
+   "language": "en",
+   "expected": "Model M3 BMW"
+  }
+ ]
+}

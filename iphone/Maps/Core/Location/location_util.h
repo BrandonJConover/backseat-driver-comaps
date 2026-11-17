@@ -1,5 +1,10 @@
 #pragma once
 
+// Its own includes: MWMLocationManager.mm used to get these through MWMLocationPredictor.h.
+#include "platform/location.hpp"
+
+#include "base/math.hpp"
+
 namespace location_util {
 
 static location::GpsInfo gpsInfoFromLocation(CLLocation * l, location::TLocationSource source)

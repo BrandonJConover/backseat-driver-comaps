@@ -1,0 +1,140 @@
+{
+ "about": "Shared expectations for clock times with am/pm, said the way people say them ('5pm' five P M, '12 pm' noon, '9am-5pm' nine A M to five P M). Backseat Driver: backseat::pronunciation::ForSpeech / Clock (libs/backseat/backseat_tests/spoken_times.json); 'ayem' and 'peeem' are lexicon stand-ins for A M / P M, so a port compares after mapping them to its own spelling. EpubToM4B can port the rule (books write '5 p.m.', 'six A.M.'); keep both copies in sync.",
+ "cases": [
+  {
+   "input": "Arrive by 5pm",
+   "language": "en",
+   "expected": "Arrive by five peeem"
+  },
+  {
+   "input": "You'll arrive around 5:30 PM.",
+   "language": "en",
+   "expected": "You'll arrive around five thirty peeem."
+  },
+  {
+   "input": "You'll arrive around 5:30 PM, if you stop dawdling.",
+   "language": "en",
+   "expected": "You'll arrive around five thirty peeem, if you stop dawdling."
+  },
+  {
+   "input": "Arrive by 5 p.m.",
+   "language": "en",
+   "expected": "Arrive by five peeem."
+  },
+  {
+   "input": "Arrive by 5 p.m. Then you can rest.",
+   "language": "en",
+   "expected": "Arrive by five peeem. Then you can rest."
+  },
+  {
+   "input": "Leave at 5 p.m. and don't be late",
+   "language": "en",
+   "expected": "Leave at five peeem and don't be late"
+  },
+  {
+   "input": "The diner opens at 6am",
+   "language": "en",
+   "expected": "The diner opens at six ayem"
+  },
+  {
+   "input": "Gas station open 9am-5pm",
+   "language": "en",
+   "expected": "Gas station open nine ayem to five peeem"
+  },
+  {
+   "input": "Open 9am–5pm daily",
+   "language": "en",
+   "expected": "Open nine ayem to five peeem daily"
+  },
+  {
+   "input": "Open 9-5pm",
+   "language": "en",
+   "expected": "Open nine to five peeem"
+  },
+  {
+   "input": "Open 9:30 a.m.–noon",
+   "language": "en",
+   "expected": "Open nine thirty ayem to noon"
+  },
+  {
+   "input": "Lunch at 12 pm",
+   "language": "en",
+   "expected": "Lunch at noon"
+  },
+  {
+   "input": "Back by 12am",
+   "language": "en",
+   "expected": "Back by midnight"
+  },
+  {
+   "input": "Back by 12:30 pm",
+   "language": "en",
+   "expected": "Back by twelve thirty peeem"
+  },
+  {
+   "input": "Departing 9:05 a.m.",
+   "language": "en",
+   "expected": "Departing nine oh five ayem."
+  },
+  {
+   "input": "at 7 P.M.",
+   "language": "en",
+   "expected": "at seven peeem."
+  },
+  {
+   "input": "Up at 10 AM sharp",
+   "language": "en",
+   "expected": "Up at ten ayem sharp"
+  },
+  {
+   "input": "Your face says it's still five a.m. The clock says otherwise.",
+   "language": "en",
+   "expected": "Your face says it's still five ayem. The clock says otherwise."
+  },
+  {
+   "input": "Up at six AM sharp",
+   "language": "en",
+   "expected": "Up at six ayem sharp"
+  },
+  {
+   "input": "Meet at 11:45am",
+   "language": "en",
+   "expected": "Meet at eleven forty five ayem"
+  },
+  {
+   "input": "It's 5:30.",
+   "language": "en",
+   "expected": "It's five thirty."
+  },
+  {
+   "input": "Lane 5 ahead",
+   "language": "en",
+   "expected": "Lane five ahead"
+  },
+  {
+   "input": "I am the best GPS",
+   "language": "en",
+   "expected": "I am the best GPS"
+  },
+  {
+   "input": "No one am I",
+   "language": "en",
+   "expected": "No one am I"
+  },
+  {
+   "input": "1.5 am",
+   "language": "en",
+   "expected": "one point five am"
+  },
+  {
+   "input": "17 pm",
+   "language": "en",
+   "expected": "seventeen pm"
+  },
+  {
+   "input": "Exit 5 PMs only",
+   "language": "en",
+   "expected": "Exit five PMs only"
+  }
+ ]
+}

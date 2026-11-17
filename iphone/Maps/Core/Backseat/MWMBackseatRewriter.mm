@@ -1,4 +1,5 @@
 #import "MWMBackseatRewriter.h"
+#import "MWMBackseatLog.h"
 #import "MWMRoutePoint+CPP.h"
 #import "MWMRouter.h"
 #import "MWMRoutingOptions.h"
@@ -12,7 +13,9 @@
 
 #include <CoreApi/Framework.h>
 
+#include "backseat/lines.hpp"
 #include "backseat/onboarding.hpp"
+#include "backseat/place_search.hpp"
 #include "backseat/pronunciation.hpp"
 #include "backseat/rewriter.hpp"
 #include "backseat/voice_command.hpp"
@@ -26,6 +29,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -201,6 +205,9 @@ void Perform(backseat::AppCommand const & command)
   case AppAction::BlameGps:
   case AppAction::WhatDoYouKnow:
   case AppAction::ForgetThat:
+  case AppAction::TalkLess:
+  case AppAction::DirectionsOnly:
+  case AppAction::TalkMore:
   case AppAction::Count: break;
   }
 }
@@ -341,6 +348,13 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
                                                    subtitle:@""
                                                        type:MWMRoutePointTypeFinish
                                           intermediateIndex:0];
+  // On the CarPlay screen, CarPlay's own router drives (the phone's MWMRouter isn't listening).
+  MWMCarPlayService * carPlay = MWMCarPlayService.shared;
+  if (carPlay.isCarplayActivated && [carPlay navigateDirectlyTo:to])
+  {
+    [MWMBackseatLog event:@"carplay.route" fields:@{@"to": title ?: @""}];
+    return;
+  }
   if (![MWMRouter isRoutingActive])
   {
     [MWMRouter removePoints];
@@ -387,6 +401,51 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   if (confirm)
     *confirm = speech.confirm;
   return @(speech.line.c_str());
+}
+
++ (NSString *)searchableQuery:(NSString *)spoken
+{
+  auto const query = backseat::SearchableQuery(spoken.UTF8String ?: "");
+  return query.empty() ? spoken : @(query.c_str());
+}
+
++ (NSArray<NSString *> *)searchVariants:(NSString *)query
+{
+  NSMutableArray<NSString *> * variants = [NSMutableArray array];
+  for (auto const & v : GetFramework().GetRoutingManager().BackseatSearchVariants(query.UTF8String ?: ""))
+    [variants addObject:@(v.c_str())];
+  return variants;
+}
+
++ (NSArray<NSNumber *> *)rankSearchResults:(NSString *)query
+                                     names:(NSArray<NSString *> *)names
+                                 distances:(NSArray<NSNumber *> *)distances
+                                 latitudes:(NSArray<NSNumber *> *)latitudes
+                                longitudes:(NSArray<NSNumber *> *)longitudes
+{
+  std::vector<backseat::PlaceCandidate> candidates;
+  NSUInteger const count = MIN(MIN(names.count, distances.count), MIN(latitudes.count, longitudes.count));
+  for (NSUInteger i = 0; i < count; ++i)
+  {
+    backseat::PlaceCandidate c{names[i].UTF8String ?: "", distances[i].doubleValue, std::nullopt};
+    double const lat = latitudes[i].doubleValue;
+    double const lon = longitudes[i].doubleValue;
+    if (std::isfinite(lat) && std::isfinite(lon))
+      c.at = backseat::LatLon{lat, lon};
+    candidates.push_back(std::move(c));
+  }
+  NSMutableArray<NSNumber *> * order = [NSMutableArray array];
+  for (size_t const i : GetFramework().GetRoutingManager().BackseatRankSearchResults(query.UTF8String ?: "", candidates))
+    [order addObject:@(i)];
+  return order;
+}
+
++ (nullable NSDictionary<NSString *, id> *)pastRouteNamed:(NSString *)query
+{
+  auto const route = GetFramework().GetRoutingManager().BackseatPastRouteNamed(query.UTF8String ?: "");
+  if (!route)
+    return nil;
+  return @{@"label": @(route->label.c_str()), @"lat": @(route->lat), @"lon": @(route->lon)};
 }
 
 + (NSString *)pickSearchResult:(NSString *)answer index:(NSInteger *)index confirm:(BOOL *)confirm
@@ -440,6 +499,13 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   routing::FollowingInfo info;
   GetFramework().GetRoutingManager().GetRouteFollowingInfo(info);
   return info.IsValid() ? info.m_speedLimitMps : -1;
+}
+
++ (double)speedCameraAheadMeters
+{
+  if (![MWMRouter isOnRoute])
+    return -1;
+  return GetFramework().GetRoutingManager().BackseatCameraAheadM();
 }
 
 + (void)shareVoices
@@ -773,10 +839,17 @@ static backseat::AboutYou AboutYouQuestion(NSInteger question)
     NSString * name = i < names.count ? names[i] : voiceID;
     // "purple monkey" -> "Purple Monkey", as the line-up says it.
     NSString * phrase = [self voicePhrase:voiceID].capitalizedString;
-    [out addObject:@(GetFramework().GetRoutingManager().BackseatReply(
-                         "cmd.voice.audition", {{"voice", name.UTF8String}, {"phrase", phrase.UTF8String}}).c_str())];
+    // Each voice auditions in its own personality: George sighs, Heart gushes.
+    [out addObject:@(GetFramework().GetRoutingManager().BackseatReplyAsVoice(
+                         name.UTF8String, "cmd.voice.audition", {{"voice", name.UTF8String}, {"phrase", phrase.UTF8String}}).c_str())];
   }
   return out;
+}
+
++ (NSString *)personaTitleForVoice:(NSString *)voiceName
+{
+  auto const persona = backseat::PersonaForVoice(voiceName.UTF8String ?: "");
+  return persona == backseat::Persona::Critic ? @"" : @(backseat::PersonaTitle(persona));
 }
 
 + (BOOL)typed:(NSString *)typed matchesPhrase:(NSString *)phrase

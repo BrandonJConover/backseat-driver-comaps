@@ -107,6 +107,8 @@ struct TwentyHeard
     Hint,
     GiveUp,
     Quit,
+    /// "How many questions left", "how many have I asked": the score so far, not a question.
+    Count,
     Unclear
   };
   Kind kind = Kind::Unclear;
@@ -162,7 +164,8 @@ public:
   /// calls the game off, and nobody wins.
   static double constexpr kNudgeAfterMs = 75000;
   static int constexpr kMaxNudges = 3;
-  /// No game talk this close to a maneuver (500 ft); directions come first.
+  /// No game talk this close to a maneuver (500 ft, or 12 s at the current speed if that is farther; the
+  /// navigator scales it); directions come first.
   static double constexpr kHoldNearManeuverM = 152;
 
   /// Picks lines; the navigator passes its SaidLog so lines don't repeat across trips.

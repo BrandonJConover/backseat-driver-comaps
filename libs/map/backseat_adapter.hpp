@@ -4,8 +4,14 @@
 #include "backseat/mileage.hpp"
 #include "backseat/navigator.hpp"
 #include "backseat/onboarding.hpp"
+#include "backseat/place_search.hpp"
 #include "backseat/road_bits.hpp"
 #include "backseat/voice_command.hpp"
+
+#include "traffic/speed_groups.hpp"
+#include "traffic/traffic_info.hpp"
+
+#include "indexer/mwm_set.hpp"
 
 #include "platform/location.hpp"
 
@@ -13,6 +19,7 @@
 
 #include <chrono>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -60,6 +67,14 @@ public:
   /// A real (not extrapolated) GPS fix.
   void OnLocationUpdate(location::GpsInfo const & info, routing::RoutingSession const & session,
                         std::string const & destinationName);
+
+  /// Traffic-aware routing: puts the jam the navigator just measured (backseat::JamReport) on the
+  /// router's traffic map and rebuilds the route around it, or takes a cleared jam off. Call right
+  /// after OnLocationUpdate, on the same thread.
+  void ApplyTraffic(routing::RoutingSession & session);
+  /// A rebuilt route is in (RoutingManager's rebuild callback). When it was ApplyTraffic's, the
+  /// navigator hears whether it found a way around and how much time the jam costs.
+  void OnRouteRebuilt(routing::Route const & route, bool ok);
 
   /// Called when the platform is about to speak: catches route changes since the last fix
   /// and returns the lines to say.
@@ -210,6 +225,12 @@ public:
   /// How the route is being made, for the lines and checks that fit it.
   void SetTravelMode(backseat::TravelMode mode);
   std::string ReplyLine(std::string const & key, backseat::Vars const & vars = {}) { return m_navigator.Reply(key, vars); }
+  /// A line in the words of the personality that comes with `voiceName` ("George" is Melancholy), for a
+  /// voice that speaks before it's picked: the voice line-up.
+  std::string ReplyLineAsVoice(std::string const & voiceName, std::string const & key, backseat::Vars const & vars = {})
+  {
+    return m_navigator.ReplyAs(backseat::PersonaForVoice(voiceName), key, vars);
+  }
   std::string NicenessSlidBack() { return m_navigator.Reply("niceness.after"); }
   /// The driver dragged the map away from the car while navigating: "Put your map away. We don't
   /// live in the 90s anymore. We went digital." At most once every 20 minutes; empty otherwise.
@@ -287,6 +308,14 @@ public:
   };
   /// Previous destinations, most driven first (most recent breaks ties).
   std::vector<PastRoute> PastRoutes(size_t max) const;
+  /// Other ways to search for `query` when it found nothing ("star bucks" -> "starbucks"), in the order
+  /// to try them.
+  std::vector<std::string> SearchVariants(std::string const & query) const;
+  /// The order to offer search results in: the name asked for, then places driven to before, then nearest.
+  std::vector<size_t> RankSearchResults(std::string const & query,
+                                        std::vector<backseat::PlaceCandidate> const & candidates) const;
+  /// A place driven to before by the name asked for, for when the map search finds nothing at all.
+  std::optional<PastRoute> PastRouteNamed(std::string const & query) const;
   /// Call when AskWhereTo() got no answer (about 45 s of silence). Says "Deciding to play it safe
   /// today, huh?" if the car hasn't moved since; empty otherwise.
   std::string NoAnswerToWhereTo();
@@ -434,7 +463,13 @@ public:
     return engine ? engine->Frustration() : 0;
   }
 
+  /// Meters along the route to the next speed camera within 2 km, -1 if none (the driving screen's
+  /// camera badge). Set with each location update.
+  double CameraAheadM() const { return m_cameraAheadM; }
+
 private:
+  /// Fills the snapshot's next speed camera from the route's segments (RouteSnapshot::cameraAheadM).
+  void SetCameraAhead(routing::Route const & route, backseat::RouteSnapshot & snap) const;
   std::optional<backseat::Sight> SightAt(backseat::LatLon const & at, double bearingDeg) const;
   backseat::Bridge BridgeAt(backseat::LatLon const & at, double bearingDeg) const;
   /// Meters to the nearest mapped car road, up to kRoadSearchM; that far if none, -1 with no map.
@@ -504,6 +539,8 @@ private:
   backseat::DriveDetector m_drives;
   /// For the drive log's drive start and end marks.
   bool m_wasInTrip = false;
+  // Time of the last real fix, for the drive log's gap_ms (the map arrow stops moving after 2 s).
+  double m_lastFixMs = 0;
   std::vector<backseat::LoggedDrive> m_driveLog;
   std::vector<backseat::MileagePlace> m_taggedPlaces;
   /// Region lookups are cached until the car has moved a couple of kilometers.
@@ -551,10 +588,33 @@ private:
   mutable std::string m_currentStreet;
   double m_speedMps = 0;
   double m_speedLimitMps = -1;
+  mutable double m_cameraAheadM = -1;
   std::string m_lastCallerVoice;
   std::string m_callerVoiceToWarm;
   mutable std::mutex m_lastTripMutex;
   std::optional<LastTrip> m_lastTrip;
+  /// Traffic-aware routing. The navigator's latest jam report (an empty one: the jam cleared),
+  /// waiting for ApplyTraffic().
+  std::optional<std::optional<backseat::JamReport>> m_jamPending;
+  /// Every jam stretch reported since the car got stuck, as the router's traffic map, by map file.
+  std::map<MwmSet::MwmId, std::shared_ptr<std::map<traffic::TrafficInfo::RoadSegmentId, traffic::SpeedGroup>>>
+      m_observedJams;
+  /// A rebuild around a jam is under way: what the old route looked like, to compare the new one with.
+  struct TrafficAsk
+  {
+    double askedAtMs = 0;
+    /// The jammed road segments ahead of the car on the old route, and how long they run.
+    std::set<traffic::TrafficInfo::RoadSegmentId> jammedAhead;
+    double jamAheadM = 0;
+    /// The old route's time left, without and with the jam counted.
+    double oldLeftS = 0;
+    double jamExtraS = 0;
+    /// Names of the jammed roads, so the way around is named by a road that isn't one of them.
+    std::set<std::string> jamRoads;
+  };
+  std::optional<TrafficAsk> m_trafficAsk;
+  /// The traffic rebuild is in, and the car hasn't been matched to it yet: still "on route".
+  bool m_trafficSettling = false;
   /// The route being followed, for the road-trip lookups (set with each location update).
   std::shared_ptr<routing::Route const> m_route;
   /// Rest areas, gas, coffee and viewpoints along m_route, by distance from its start; scanned once

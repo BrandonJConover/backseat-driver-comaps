@@ -1,0 +1,109 @@
+{
+ "about": "Place-name abbreviations (BI-094, loop B108): Intl, Natl, Univ, Med, Mem, Elem, Comm, Dept inside a name (a capitalised word on either side, or 'of' then one) and Hosp, Sch, Arpt, Inc, Corp, Co ending one (a name, 'and' or a comma before) are said in full; a period inside a name goes, one that may end the sentence stays. Negatives: lowercase 'med school'/'inc', 'Co Rd' (county road), 'Weld Co Sheriff' (maybe a county), 'the Univ' (no name), all caps. Backseat Driver: backseat::pronunciation::ForSpeech / PlaceNameWords (libs/backseat/backseat_tests/spoken_place_names.json).",
+ "cases": [
+  {
+   "input": "Head to Austin-Bergstrom Intl Airport.",
+   "expected": "Head to Austin-Bergstrom International Airport."
+  },
+  {
+   "input": "Turn right toward St. Luke's Med. Ctr.",
+   "expected": "Turn right toward Saint Luke's Medical Center."
+  },
+  {
+   "input": "Arriving at Lincoln Elem.",
+   "expected": "Arriving at Lincoln Elementary."
+  },
+  {
+   "input": "Arriving at Lincoln Elem. Then park.",
+   "expected": "Arriving at Lincoln Elementary. Then park."
+  },
+  {
+   "input": "Lincoln Elem Sch is on the left",
+   "expected": "Lincoln Elementary School is on the left"
+  },
+  {
+   "input": "Yellowstone Natl Park is ahead.",
+   "expected": "Yellowstone National Park is ahead."
+  },
+  {
+   "input": "Turn left onto Univ. of Texas campus.",
+   "expected": "Turn left onto University of Texas campus."
+  },
+  {
+   "input": "Veterans Mem Park on the right.",
+   "expected": "Veterans Memorial Park on the right."
+  },
+  {
+   "input": "Turn onto Mem Dr",
+   "expected": "Turn onto Memorial Drive"
+  },
+  {
+   "input": "Dept. of Motor Vehicles in 2 miles.",
+   "expected": "Department of Motor Vehicles in two miles."
+  },
+  {
+   "input": "Arriving at Acme Inc.",
+   "expected": "Arriving at Acme Incorporated."
+  },
+  {
+   "input": "Arriving at Acme Inc., then left.",
+   "expected": "Arriving at Acme Incorporated, then left."
+  },
+  {
+   "input": "Acme, Inc. is on the right.",
+   "expected": "Acme, Incorporated is on the right."
+  },
+  {
+   "input": "Globex Corp is ahead",
+   "expected": "Globex Corporation is ahead"
+  },
+  {
+   "input": "Smith & Sons Co. is on the right.",
+   "expected": "Smith and Sons Company is on the right."
+  },
+  {
+   "input": "Methodist Hosp is on the left.",
+   "expected": "Methodist Hospital is on the left."
+  },
+  {
+   "input": "Seton Med Ctr",
+   "expected": "Seton Medical Center"
+  },
+  {
+   "input": "Northside Comm Ctr",
+   "expected": "Northside Community Center"
+  },
+  {
+   "input": "Take Exit 12 toward Intl Airport",
+   "expected": "Take Exit twelve toward International Airport"
+  },
+  {
+   "input": "Austin Arpt",
+   "expected": "Austin Airport"
+  },
+  {
+   "input": "He went to med school.",
+   "expected": "He went to med school."
+  },
+  {
+   "input": "The inc line stays.",
+   "expected": "The inc line stays."
+  },
+  {
+   "input": "Take Co Rd 12.",
+   "expected": "Take County Road twelve."
+  },
+  {
+   "input": "Weld Co Sheriff office ahead.",
+   "expected": "Weld Co Sheriff office ahead."
+  },
+  {
+   "input": "Visit the Univ today.",
+   "expected": "Visit the Univ today."
+  },
+  {
+   "input": "COMM CTR",
+   "expected": "COMM CTR"
+  }
+ ]
+}

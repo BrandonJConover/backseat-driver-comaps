@@ -7,6 +7,7 @@
 #include "map/transit/transit_reader.hpp"
 #include "map/user_mark.hpp"
 
+#include "backseat/debug_log.hpp"
 #include "backseat/route_sketch.hpp"
 
 #include "routing/absent_regions_finder.hpp"
@@ -459,11 +460,22 @@ void RoutingManager::OnBuildRouteReady(Route const & route, RouterResultCode cod
 void RoutingManager::OnRebuildRouteReady(Route const & route, RouterResultCode code)
 {
   HidePreviewSegments();
+  m_backseat.OnRouteRebuilt(route, code == RouterResultCode::NoError);
 
   if (code != RouterResultCode::NoError)
     return;
 
   auto const hasWarnings = InsertRoute(route);
+  // Backseat: off the route, the new one starts where the car was when it left. It used to wait for
+  // the next position to find the car on it, and the platform only asks what to say on a real GPS
+  // fix, so the first direction came up to a second or two after the route was ready. Find the car
+  // now; the platform asks for the direction right away (route ready callback below).
+  if (m_lastRouteCheck && m_routingSession.IsFollowing() && !m_routingSession.IsOnRoute())
+  {
+    auto const check = *m_lastRouteCheck;
+    CheckLocationForRouting(check);
+    backseat::Trace("route.rebuilt", {{"matched", m_routingSession.IsOnRoute() ? "yes" : "no"}});
+  }
   CallRouteBuilded(hasWarnings ? RouterResultCode::HasWarnings : code, storage::CountriesSet());
 }
 
@@ -507,8 +519,17 @@ void RoutingManager::OnLocationUpdate(location::GpsInfo const & info)
                                    m_currentRouterType == routing::RouterType::Ruler
                                ? backseat::TravelMode::Walk
                                : backseat::TravelMode::Drive);
+  // The route only hears about a fix once the Extrapolator's task reaches the GUI thread, after this
+  // call returns. Until the first one is matched the route has no next turn, so a trip started with
+  // one-tap Go opened with the greeting and rundown and only then gave the first direction. Match
+  // the very first fix right away; after that the Extrapolator keeps the route current between fixes.
+  if (m_routingSession.IsFollowing() && m_routingSession.IsNavigable() && !m_routingSession.IsOnRoute() &&
+      !m_routingSession.IsFinished())
+    CheckLocationForRouting(info);
   // Only real fixes go to Backseat Driver: extrapolated ones would fake hard braking.
   m_backseat.OnLocationUpdate(info, m_routingSession, GetBackseatDestinationName());
+  // A jam the navigator measured goes on the router's traffic map (and the route around it).
+  m_backseat.ApplyTraffic(m_routingSession);
 }
 
 std::string RoutingManager::GetBackseatDestinationName() const
@@ -1440,9 +1461,14 @@ void RoutingManager::CheckLocationForRouting(location::GpsInfo const & info)
   if (!IsRoutingActive())
     return;
 
+  if (m_lastRouteCheck)
+    *m_lastRouteCheck = info;
+  else
+    m_lastRouteCheck = std::make_unique<location::GpsInfo>(info);
   SessionState const state = m_routingSession.OnLocationPositionChanged(info);
   if (state == SessionState::RouteNeedsRebuild)
   {
+    backseat::Trace("route.offroute", {});
     m_routingSession.RebuildRoute(
         mercator::FromLatLon(info.m_latitude, info.m_longitude), [this](Route const & route, RouterResultCode code)
     { OnRebuildRouteReady(route, code); }, nullptr /* needMoreMapsCallback */, nullptr /* removeRouteCallback */,

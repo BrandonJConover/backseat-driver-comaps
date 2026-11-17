@@ -1,0 +1,230 @@
+{
+ "about": "Web addresses and e-mail read as words: WebAddresses(input) == expected (the first pass of ForSpeech). Cases with from=booklyre are BookLyre's tests/fixtures/web_addresses_golden.json (text/spoken_text.web_addresses, I-061) unchanged; both apps pass all of them (CROSS X-030).",
+ "cases": [
+  {
+   "input": "See https://www.gutenberg.org/ebooks/1342 for details.",
+   "expected": "See gutenberg dot org for details.",
+   "from": "booklyre"
+  },
+  {
+   "input": "Visit www.example.com.",
+   "expected": "Visit example dot com.",
+   "from": "booklyre"
+  },
+  {
+   "input": "Visit www.example.com today.",
+   "expected": "Visit example dot com today.",
+   "from": "booklyre"
+  },
+  {
+   "input": "WWW.EXAMPLE.COM!",
+   "expected": "example dot com!",
+   "from": "booklyre"
+  },
+  {
+   "input": "HTTPS://Example.ORG/x",
+   "expected": "example dot org",
+   "from": "booklyre"
+  },
+  {
+   "input": "http://www.gutenberg.org/license",
+   "expected": "gutenberg dot org",
+   "from": "booklyre"
+  },
+  {
+   "input": "https://example.com",
+   "expected": "example dot com",
+   "from": "booklyre"
+  },
+  {
+   "input": "ftp://files.example.net/pub/readme.txt",
+   "expected": "files dot example dot net",
+   "from": "booklyre"
+  },
+  {
+   "input": "http://localhost:5000/api",
+   "expected": "localhost",
+   "from": "booklyre"
+  },
+  {
+   "input": "Go to www.example.com and www.test.org.",
+   "expected": "Go to example dot com and test dot org.",
+   "from": "booklyre"
+  },
+  {
+   "input": "\"Try example.com,\" she said.",
+   "expected": "\"Try example dot com,\" she said.",
+   "from": "booklyre"
+  },
+  {
+   "input": "ends with google.com",
+   "expected": "ends with google dot com",
+   "from": "booklyre"
+  },
+  {
+   "input": "bbc.co.uk/news?id=4, then",
+   "expected": "bbc dot co dot uk, then",
+   "from": "booklyre"
+  },
+  {
+   "input": "gutenberg.org/license.",
+   "expected": "gutenberg dot org.",
+   "from": "booklyre"
+  },
+  {
+   "input": "(see en.wikipedia.org/wiki/Foo_(bar))",
+   "expected": "(see en dot wikipedia dot org)",
+   "from": "booklyre"
+  },
+  {
+   "input": "(www.example.com)",
+   "expected": "(example dot com)",
+   "from": "booklyre"
+  },
+  {
+   "input": "Mail jo@example.com today.",
+   "expected": "Mail jo at example dot com today.",
+   "from": "booklyre"
+  },
+  {
+   "input": "Write to first.last+tag@mail.example.org.",
+   "expected": "Write to first dot last plus tag at mail dot example dot org.",
+   "from": "booklyre"
+  },
+  {
+   "input": "jane_doe@example.co.uk",
+   "expected": "jane underscore doe at example dot co dot uk",
+   "from": "booklyre"
+  },
+  {
+   "input": "JO@EXAMPLE.COM",
+   "expected": "jo at example dot com",
+   "from": "booklyre"
+  },
+  {
+   "input": "Contact us at help@gutenberg.org or www.gutenberg.org.",
+   "expected": "Contact us at help at gutenberg dot org or gutenberg dot org.",
+   "from": "booklyre"
+  },
+  {
+   "input": "e.g. this",
+   "expected": "e.g. this",
+   "from": "booklyre"
+  },
+  {
+   "input": "i.e. that",
+   "expected": "i.e. that",
+   "from": "booklyre"
+  },
+  {
+   "input": "the U.S. economy",
+   "expected": "the U.S. economy",
+   "from": "booklyre"
+  },
+  {
+   "input": "Mr.Smith arrived",
+   "expected": "Mr.Smith arrived",
+   "from": "booklyre"
+  },
+  {
+   "input": "J.R.R. Tolkien",
+   "expected": "J.R.R. Tolkien",
+   "from": "booklyre"
+  },
+  {
+   "input": "pi is 3.14 today",
+   "expected": "pi is 3.14 today",
+   "from": "booklyre"
+  },
+  {
+   "input": "open file.txt now",
+   "expected": "open file.txt now",
+   "from": "booklyre"
+  },
+  {
+   "input": "node.js",
+   "expected": "node.js",
+   "from": "booklyre"
+  },
+  {
+   "input": "v1.2.3",
+   "expected": "v1.2.3",
+   "from": "booklyre"
+  },
+  {
+   "input": "a.m. or p.m.",
+   "expected": "a.m. or p.m.",
+   "from": "booklyre"
+  },
+  {
+   "input": "Ph.D.",
+   "expected": "Ph.D.",
+   "from": "booklyre"
+  },
+  {
+   "input": "No.10 Downing",
+   "expected": "No.10 Downing",
+   "from": "booklyre"
+  },
+  {
+   "input": "He said.Com on",
+   "expected": "He said.Com on",
+   "from": "booklyre"
+  },
+  {
+   "input": "Meet at 5 @ noon.",
+   "expected": "Meet at 5 @ noon.",
+   "from": "booklyre"
+  },
+  {
+   "input": "Hello.World",
+   "expected": "Hello.World",
+   "from": "booklyre"
+  },
+  {
+   "input": "Visit www.heb.com for hours.",
+   "expected": "Visit heb dot com for hours.",
+   "from": "backseat"
+  },
+  {
+   "input": "Call or visit buc-ees.com.",
+   "expected": "Call or visit buc-ees dot com.",
+   "from": "backseat"
+  },
+  {
+   "input": "Hours at whataburger.com/locations, open late.",
+   "expected": "Hours at whataburger dot com, open late.",
+   "from": "backseat"
+  },
+  {
+   "input": "Gas prices at gasbuddy.com?",
+   "expected": "Gas prices at gasbuddy dot com?",
+   "from": "backseat"
+  },
+  {
+   "input": "Turn left onto Main St.",
+   "expected": "Turn left onto Main St.",
+   "from": "backseat"
+  },
+  {
+   "input": "Exit 238B toward U.S. 183.",
+   "expected": "Exit 238B toward U.S. 183.",
+   "from": "backseat"
+  },
+  {
+   "input": "Mt.Bonnell is closed.",
+   "expected": "Mt.Bonnell is closed.",
+   "from": "backseat"
+  },
+  {
+   "input": "St.Louis or bust.",
+   "expected": "St.Louis or bust.",
+   "from": "backseat"
+  },
+  {
+   "input": "No e-mail@ here.",
+   "expected": "No e-mail@ here.",
+   "from": "backseat"
+  }
+ ]
+}

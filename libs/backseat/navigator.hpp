@@ -62,6 +62,28 @@ enum class TurnKind
   Destination
 };
 
+/// Speed camera lines, from the app's speed camera setting.
+enum class CameraAlerts
+{
+  /// Never: nothing said about cameras.
+  Off,
+  /// Auto (the default): a warning whenever the car is over the camera's limit; otherwise an easy
+  /// heads-up now and then (the first camera of the trip, then at most one every 10 minutes).
+  Speeding,
+  /// Always: every camera gets a line.
+  Always
+};
+
+/// How much the GPS says besides directions ("shut up", "talk less", "talk more").
+enum class TalkLevel
+{
+  Full,
+  /// About half the remarks; bits, games and directions as always.
+  Less,
+  /// Directions, lane calls and arrival only: no remarks, bits, games or badges.
+  DirectionsOnly
+};
+
 /// Which side of the road the lanes for the next maneuver are on, when the driver has to move over.
 enum class LaneSide
 {
@@ -70,23 +92,61 @@ enum class LaneSide
   Right
 };
 
+/// What to say about the lanes for a maneuver, from the map's lanes (left to right, true for the
+/// ones the route wants). Empty `phrase` and None side: nothing worth saying (all lanes work, none
+/// do, or the ones that do are scattered).
+struct LaneAdvice
+{
+  /// Which edge of the road the wanted lanes are on; None when they are in the middle.
+  LaneSide side = LaneSide::None;
+  /// How many lanes the route wants, and how many there are.
+  int use = 0;
+  int of = 0;
+  /// The lanes, in words: "left lane", "right two lanes", "middle lane", "second lane from the left".
+  std::string phrase;
+};
+LaneAdvice LaneAdviceFor(std::vector<bool> const & lanes);
+
+/// Which part of a roundabout the next maneuver is (the router's Enter/StayOn/LeaveRoundAbout).
+enum class RoundaboutLeg
+{
+  Enter,
+  Stay,
+  Leave
+};
+
 struct RouteSnapshot
 {
   RouteState state = RouteState::Inactive;
   /// Identifies the next maneuver; changes when the driver moves on to the next one.
   std::optional<uint32_t> turnId;
+  /// Which route `turnId` is on. A rebuilt route numbers its maneuvers afresh, so turn 3 of the new
+  /// route is not turn 3 of the old one. 0 when the host doesn't say.
+  uint64_t routeId = 0;
   TurnKind turn = TurnKind::None;
-  /// Street after the next maneuver, if known.
+  /// Street after the next maneuver, if known. At a highway exit, the road and town on the sign:
+  /// "I 35 North toward Dallas" (SpeakRoad()).
   std::string nextStreet;
+  /// The next maneuver's highway exit number from the map (OSM junction:ref, "42B"), empty when
+  /// unknown: "Take exit 42B on the right".
+  std::string nextExitRef;
   double distToTurnM = 0;
   /// What controls the next maneuver's junction, if the host can tell (stop sign, light).
   Control control = Control::None;
   /// The next maneuver needs the left or right lanes (and not the ones in the middle).
   LaneSide laneSide = LaneSide::None;
+  /// The next maneuver's lanes from the map, left to right, true for the ones to use (OSM turn:lanes).
+  /// Empty if the map has none; then `laneSide` alone decides the lane call.
+  std::vector<bool> lanes;
   /// The maneuver after the next one, and how far past it, if the host knows (-1 if not).
   TurnKind thenTurn = TurnKind::None;
   std::string thenStreet;
   double thenGapM = -1;
+  /// For a roundabout: which exit to take (1 is the first), 0 if the host doesn't know, and which
+  /// part of the roundabout the maneuver is. `thenRoundaboutExit` is the same for the maneuver after.
+  int roundaboutExit = 0;
+  RoundaboutLeg roundaboutLeg = RoundaboutLeg::Enter;
+  int thenRoundaboutExit = 0;
   /// What the router estimates for the whole trip, read when the trip starts.
   double etaSeconds = 0;
   /// The whole route's length in meters, read when the trip starts; 0 if unknown.
@@ -96,6 +156,9 @@ struct RouteSnapshot
   std::vector<TurnKind> plannedTurns;
   LatLon origin;
   LatLon destinationPoint;
+  /// The place itself (the shop's door, not the end of the route on the road), when the host knows
+  /// it: the arrival call says which side it's on (loop B119).
+  std::optional<LatLon> destinationMark;
   /// Which way the route goes from the car's spot on it, degrees clockwise from north. Negative
   /// when unknown.
   double routeBearingDeg = -1;
@@ -109,6 +172,11 @@ struct RouteSnapshot
   /// Set on the one update right after the car drives past a highway exit: how far along the route
   /// the next exit is. Negative if the trip ends before another exit.
   std::optional<double> passedExitNextM;
+  /// When the next maneuver is a highway exit: how many other exits the route passes before it
+  /// (0 none, -1 unknown), and how far before it the nearest of them is (-1 unknown). Feeds the
+  /// "skip this first exit, yours is the next one" call (loop B100).
+  int exitsBeforeTurn = -1;
+  double exitBeforeGapM = -1;
   /// The route's current stretch is a dirt track or unpaved.
   bool onDirt = false;
   /// How much of the route (by distance, 0..1) is dirt tracks and unpaved, read when the trip starts.
@@ -116,15 +184,63 @@ struct RouteSnapshot
   /// Rise over run of the route just ahead (0.1 is a 10% climb, negative downhill), when the map
   /// has altitudes for it (walking and cycling routes do).
   std::optional<double> gradeAhead;
+  /// How far along the route the next ferry leg starts, when the route takes one (BI-112). Unset
+  /// when there's no ferry ahead.
+  std::optional<double> ferryAheadM;
+  /// The car is on the route's ferry leg right now.
+  bool onFerry = false;
+  /// How far along the route the next toll stretch starts (BI-113); 0 while driving on one, unset
+  /// when the rest of the route is toll-free.
+  std::optional<double> tollAheadM;
+  /// The host read the route's toll stretches into tollAheadM. While false, "are there tolls?" gets
+  /// "I can't tell", never a made-up "no tolls" (B165).
+  bool tollsKnown = false;
+  /// The next speed camera on the route, when one is within reach: how far ahead along the route,
+  /// where it stands (the same camera keeps its spot across reroutes), and its own limit when the
+  /// map has one. Unset when there's none.
+  std::optional<double> cameraAheadM;
+  std::optional<LatLon> cameraAt;
+  std::optional<double> cameraLimitMps;
 };
 
 /// What kind of place the driver stopped at, if the host can tell. Empty when unknown.
 using PlaceLookup = std::function<std::optional<Place>(LatLon const &)>;
 /// Whether there's a traffic light (or similar reason to wait) right by a point.
 using TrafficLightLookup = std::function<bool(LatLon const &)>;
+/// Whether there's a railway level crossing right by a point (within ~60 m). Hosts answer from the
+/// map's railway=level_crossing points; no lookup, no train lines.
+using LevelCrossingLookup = std::function<bool(LatLon const &)>;
 /// The road the router would take instead, from a point on the route, avoiding the jam there
 /// (e.g. "I-25"). Empty when there's no real alternative.
 using AlternateLookup = std::function<std::optional<std::string>(LatLon const &)>;
+
+/// A jam the car is sitting in, measured from its own GPS (there's no free live traffic feed). The
+/// host marks this stretch of the route as slow on the router's traffic map and rebuilds the route,
+/// so the ETA counts the jam and a faster way around it is taken if there is one.
+struct JamReport
+{
+  /// The jammed stretch along the route, relative to the car: from `behindM` back to `aheadM` ahead.
+  /// What's behind is measured; what's ahead is a guess that grows the longer the jam lasts.
+  double behindM = 0;
+  double aheadM = 0;
+  /// The car's average speed in the jam as a share of the posted limit (0..1).
+  double speedShare = 0;
+};
+/// Gets a JamReport while the car is stuck (at most every few minutes), and nothing when the jam is
+/// over: the host then drops the jam from its traffic map, without rerouting.
+using JamReporter = std::function<void(std::optional<JamReport> const &)>;
+/// What the router made of a JamReport, once the rebuilt route is in.
+struct TrafficReroute
+{
+  /// The new route leaves the jammed road sooner than the old one did.
+  bool newRoute = false;
+  /// Seconds the new route saves over staying in the jam (0 when it saves nothing).
+  double savedS = 0;
+  /// Seconds the jam adds to the trip on the route the car is now on.
+  double delayS = 0;
+  /// The road the new route takes around the jam ("I-25"), if it has a name.
+  std::string via;
+};
 
 enum class Bridge
 {
@@ -201,19 +317,88 @@ struct Fix
   double accuracyM = -1;
 };
 
+/// The fix with junk measurements (NaN/inf speed, a bearing that isn't finite or is past 360, NaN
+/// accuracy, a bad limit) read as unknown, or nothing when it has no usable time or place, or replays a moment
+/// before `newestTMs` (within a minute of it).
+std::optional<Fix> CleanFix(Fix const & raw, double newestTMs);
+/// The router's snapshot with junk numbers read as their documented "unknown" (loop B120): a distance,
+/// ETA, gap, bearing, grade or exit number that is NaN, infinite, negative where it can't be, or longer
+/// than the planet, and a point off the globe. A junk distance to the turn keeps `lastDistToTurnM`.
+RouteSnapshot CleanRoute(RouteSnapshot route, double lastDistToTurnM);
+
 /// Distance along `ahead` (the route from the car onward) to the first sharp bend: where the heading
 /// has turned at least `minDeg` within 80 m. Negative if none starts within `maxM`.
 double CurveAheadM(std::vector<LatLon> const & ahead, double maxM, double minDeg = 50);
 
-/// "Turn left onto Elm Street" for a maneuver and the street after it.
-std::string InstructionText(TurnKind turn, std::string const & street, std::string const & destination);
+/// What the map knows about the road after a maneuver, from the router's road-name info.
+/// Multiple values are ';'-separated, as in OSM ("Dallas;Fort Worth").
+struct RoadSign
+{
+  std::string name;            // "North Colorado Boulevard"
+  std::string ref;             // "US 287"
+  std::string junctionRef;     // Exit number, "42B"
+  std::string destinationRef;  // Road the exit leads to, "I 35 North"
+  std::string destination;     // Towns on the exit sign, "Dallas;Fort Worth"
+  bool isLink = false;         // The road is a ramp.
+};
+
+/// The road as said out loud and the exit number apart. A plain street is its name, or its route
+/// number when it has none ("Elm Street", "US 287"). At an exit or ramp with a sign it's the road and
+/// the towns: "I 35 North toward Dallas and Fort Worth", or "toward Dallas" with no road number. At
+/// most two of each are read. ForSpeech() turns "I 35" and "42B" into words later.
+struct SpokenRoad
+{
+  std::string street;
+  std::string exitRef;
+};
+SpokenRoad SpeakRoad(RoadSign const & sign);
+
+/// "Turn left onto Elm Street" for a maneuver and the street after it. With a highway exit number,
+/// an exit (or a keep-left/right onto one) says it: "Take exit 42B on the right for I 35 North toward
+/// Dallas". A street that is only "toward Dallas" is said without "onto".
+std::string InstructionText(TurnKind turn, std::string const & street, std::string const & destination,
+                            std::string const & exitRef = {});
+
 
 /// The next maneuver's text, with the one after it when that comes right after: "Turn left onto
-/// Winesap Drive, then right onto Cameo Lane".
-std::string InstructionText(RouteSnapshot const & route);
+/// Winesap Drive, then right onto Cameo Lane". "Right after" is 150 m, or 10 s at `speedMps` up to 500 m
+/// (loop B86); exits and roundabouts chain too, going straight never does. A roundabout with a known
+/// exit says which one: "At the roundabout, take the second exit onto Oak Street" (loop B98).
+std::string InstructionText(RouteSnapshot const & route, double speedMps = 0);
+
+/// Which side of the road the destination is on (loop B119): "right" or "left" when `mark` is ahead
+/// of `here` along `routeBearingDeg`, at least 10 m off to the side and within 500 m; empty when the
+/// bearing is unknown, or the mark is behind, on the road itself or too far to judge. Geometry only, so
+/// it's the same in left-hand traffic.
+std::string DestinationSide(LatLon const & here, double routeBearingDeg, LatLon const & mark);
+
+/// "the second exit" for 2, "exit 12" past the eighth; empty for 0 or less (unknown).
+std::string RoundaboutExitWords(int exit);
+
+/// How close the maneuver after next must be to chain onto the next one's call, at this speed.
+double ChainWithinM(double speedMps);
+/// How close an earlier exit has to sit before the route's exit for "skip this first exit, yours is
+/// the next one" (loop B100): about 27 s of driving, 300 m to 1 km.
+double ExitSkipWithinM(double speedMps);
 
 /// Which way `to` is from `from`, as said out loud: "northwest".
 std::string CompassDirection(LatLon const & from, LatLon const & to);
+
+/// `spoken` answers quiz `q` rather than asking about the drive (see Navigator::QuizTakes).
+bool QuizAnswerTakes(QuizQuestion const & q, std::string const & spoken);
+/// The drive outranks a game: a question about the next turn or exit, or a command such as "cancel the
+/// route", "mute" or "take me to Target". A game can't swallow these, even mid-question.
+/// `aboutIt`: a 20 Questions question about "it", where "go" ("do you go there to get it?") isn't the route.
+bool DriveComesFirst(std::string const & spoken, bool aboutIt = false);
+
+/// Personal asks wait for a calm moment (loop B174, BI-087; TU Berlin: informal, personal-topic chatter
+/// is the most distracting kind). Line keys that ask the driver something personal or invite an answer:
+/// file questions, getting-to-know-you and mileage asks, "rate my directions", game and music offers.
+std::vector<std::string> const & AnswerInvitingKeys();
+bool InvitesAnswer(std::string const & key);
+/// At highway speed (~50 mph and up) with a turn or exit under a minute away, or in rain, snow, ice or
+/// fog, such an ask waits. City speed, or the next maneuver far off in clear weather: no wait.
+bool AskMustWait(double speedMps, double toTurnS, bool badWeather);
 
 class Navigator
 {
@@ -236,8 +421,13 @@ public:
   Units GetUnits() const { return m_config.units; }
   /// The country the car is in, as the map files name it ("US", "Canada", "UK"). Decides which
   /// holidays get a line: Canada gets Canada Day and its own Thanksgiving, not the Fourth of July.
-  /// Empty (unknown) is treated as the US.
-  void SetCountry(std::string country) { m_country = std::move(country); }
+  /// Empty (unknown) is treated as the US. A country that drives on the left also gets the few
+  /// drive-side jokes mirrored ("The right lane is for passing").
+  void SetCountry(std::string country)
+  {
+    SetLineDriveSide(DrivesOnLeft(country));
+    m_country = std::move(country);
+  }
   /// Lets the navigator name the place of an unplanned stop ("Why are we stopping for gas?").
   void SetPlaceLookup(PlaceLookup lookup) { m_placeLookup = std::move(lookup); }
   /// Lets the license plate game know which state the car is in ("a Colorado plate in Colorado?").
@@ -249,20 +439,52 @@ public:
   void SetBuildingLookup(BuildingLookup lookup) { m_buildingLookup = std::move(lookup); }
   /// Stops next to a traffic light are red lights, not pulling over.
   void SetTrafficLightLookup(TrafficLightLookup lookup) { m_lightLookup = std::move(lookup); }
+  /// Stopped at a railway crossing for a while gets one "wait.train" line per stop, never while
+  /// moving (BI-111); the crossing also explains the stop, so no pull-over line.
+  void SetLevelCrossingLookup(LevelCrossingLookup lookup) { m_crossingLookup = std::move(lookup); }
   /// Names the road to blame a jam on ("I told you to take I-25").
   void SetAlternateLookup(AlternateLookup lookup) { m_alternateLookup = std::move(lookup); }
+  /// Hands jams to the host for traffic-aware routing (JamReport). Nothing set: jams only get jokes.
+  void SetJamReporter(JamReporter reporter) { m_jamReporter = std::move(reporter); }
+  /// The host rebuilt the route around a reported jam. Call before the next OnFix with the new route,
+  /// so its new maneuver isn't taken for a turn the driver made. Says how it went: a way around, or
+  /// no way around and how late that makes us.
+  void OnTrafficReroute(double tMs, TrafficReroute const & result);
   void SetDriverPronouns(Pronouns p) { m_pronouns = p; }
   /// What to call the driver, from first-run setup. Empty when they never said.
   void SetDriverName(std::string name) { m_driverName = std::move(name); }
   /// The GPS's own name, i.e. the voice the driver picked ("Echo"), for "This is Echo".
-  void SetGpsName(std::string name) { m_gpsName = std::move(name); }
+  /// Picks its personality too: each voice comes with one (PersonaForVoice).
+  void SetGpsName(std::string name)
+  {
+    SetPersona(PersonaForVoice(name));
+    m_gpsName = std::move(name);
+  }
+  /// How the GPS talks: the Critic, Melancholy, Proud Parent or Dirty Santa. LinesFor() follows it.
+  void SetPersona(Persona persona)
+  {
+    m_persona = persona;
+    SetLinePersona(persona);
+  }
+  Persona GetPersona() const { return m_persona; }
   /// The driver's partner ("wife", "husband", "partner") and their pronouns, from settings.
   /// Empty turns off the "I wish your wife was driving" line.
   void SetPartner(std::string word, Pronouns pronouns)
   {
     m_partner = std::move(word);
     m_partnerPronouns = pronouns;
+    if (!m_partner.empty())
+      SetRidesAlone(false);
   }
+  /// The driver said they ride alone ("just me" to setup.askPassenger, i.e. ParsePassengerAnswer gave
+  /// an empty word): LinesFor() leaves out lines that talk to a passenger (loop B166, BI-129). Naming a
+  /// partner with SetPartner turns it back off.
+  void SetRidesAlone(bool alone)
+  {
+    m_ridesAlone = alone;
+    SetLineRidesAlone(alone);
+  }
+  bool RidesAlone() const { return m_ridesAlone; }
   /// The driver's car can drive itself; getting lost is then even less forgivable.
   void SetCarHasAutopilot(bool has) { m_carHasAutopilot = has; }
   /// Where the driver lives, from the getting-to-know-you questions. On the streets, there are no
@@ -319,10 +541,32 @@ public:
   /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate".
   /// Same thread as OnFix.
   void OnDriverSaid(double tMs, std::string const & text);
+  /// Stopped long enough to be a stop the driver chose (not a red light, not a jam), or crawling
+  /// through a parking lot. The plate game and parked-only lines go by this.
+  bool Parked() const;
   /// A line to say right now, outside the queue (e.g. the snarky reply to a voice command), picked
   /// like any other so it doesn't repeat. Works between trips too. The driver's {name} and
   /// pronouns ({theycap} {theyre} {them} {their}) are filled in unless `vars` has them.
   std::string Reply(std::string const & key, Vars const & vars = {});
+  /// The answer to "are there tolls?" (AppAction::TollsAhead) from the last route update: on one now,
+  /// the next toll stretch's distance, none left, or can't tell. Never a price (no data). Loop B165.
+  std::string TollReply();
+  /// The answer to "is there traffic?" / "why is it so slow?" (AppAction::TrafficAhead): stuck in it, moving
+  /// fine here, or can't tell. Only judges where the car is; there's no live traffic feed. Loop B165.
+  std::string TrafficReply();
+  /// Within this far of the next maneuver (or 20 s at the current speed, whichever is more),
+  /// "repeat that" only gets lines that say the direction within the first few words.
+  static double constexpr kRepeatFirstWithinM = 400;
+  /// Words a near-turn "repeat that" line may have before its {instruction}.
+  static int constexpr kRepeatFirstMaxWords = 3;
+  /// Whether a line says {instruction} within the first kRepeatFirstMaxWords words.
+  static bool InstructionComesFirst(std::string const & line);
+  /// Speed for turn timing (game holds, nav waits, seconds to the turn): the fix's speed when known, else
+  /// the last speed seen this trip (a tunnel doesn't stop the car), 0 if none yet (loop B82).
+  double TimingMps(double speedMps) const;
+  /// Reply() in another personality's words, e.g. a new voice saying hello in its own manner before
+  /// it takes over. The GPS's own personality is unchanged.
+  std::string ReplyAs(Persona persona, std::string const & key, Vars const & vars = {});
   /// On-device model that rewords roasts in real time. Without one, canned lines are spoken.
   void SetRewriter(std::shared_ptr<LineRewriter> rewriter) { m_gate.SetRewriter(std::move(rewriter)); }
 
@@ -352,6 +596,7 @@ public:
   /// Whether the question still waits for an answer (a spoken one closes it too).
   bool ModeAskOpen() const { return m_modeAskOpen; }
   /// Yes, we really are walking (or no: then it's a drive). False if there was no question open.
+  /// A "no" while the car is already moving gets "pick Driving when we're parked", not a tap prompt.
   bool AnswerModeAsk(bool walking);
   /// The next drive's start says "check the mode now and then, I may swap it on you" (it won't).
   void WarnModeOnNextDrive() { m_modeWarnNextDrive = true; }
@@ -372,6 +617,12 @@ public:
   /// line isn't late.
   std::string const & PhoneCallerVoice() const { return m_call.CallerVoice(); }
 
+  /// "Shut up" keeps the turns (DirectionsOnly); "talk less" halves the remarks. Kept across trips.
+  void SetTalkLevel(TalkLevel level);
+  /// Which speed cameras get a line (CameraAlerts). Cheap to call on every fix.
+  void SetCameraAlerts(CameraAlerts alerts) { m_cameraAlerts = alerts; }
+  TalkLevel GetTalkLevel() const { return m_talk; }
+
   /// Pop quizzes (pop_quiz.hpp) need the driver to answer out loud, so they only happen once the
   /// host says it listens after "quiz.ask" lines. Off until then.
   void SetPopQuizOn(bool on) { m_quizOn = on; }
@@ -391,14 +642,23 @@ public:
   };
   std::optional<QuizCard> PopQuizCard() const;
   /// A pop quiz is waiting and `spoken` answers it (a choice, or "I don't know"), so it goes to the
-  /// quiz before anything else: "Pull to the right and stop" isn't "stop navigation".
-  bool QuizTakes(std::string const & spoken) const
-  {
-    return QuizAsking() && ParseQuizAnswer(*m_quiz.Question(), spoken).kind != QuizHeard::Kind::Unclear;
-  }
+  /// quiz before anything else: "Pull to the right and stop" isn't "stop navigation". But the drive
+  /// comes first: "where do I turn?" or "cancel the route" isn't an answer, even when a choice shares
+  /// a word with it, unless a choice was named by its letter ("B", "option two").
+  bool QuizTakes(std::string const & spoken) const;
+  /// 20 Questions is on and `spoken` is a move in it (a question, a guess, a hint, giving up or
+  /// quitting), so it goes to the game, not the app: "Do you have to go to a gas station to get it?"
+  /// isn't "find a gas station", and "Can you use it on foot?" isn't walking directions. The drive still
+  /// comes first ("what's the next turn", "cancel the route"). Hosts ask this after QuizTakes.
+  bool TwentyTakes(std::string const & spoken) const;
+  /// "Can you repeat the question?" while a quiz waits: reads it again (once a quiz) and gives the
+  /// driver the full time to answer again. True when it did; hosts ask this before QuizTakes.
+  bool QuizReask(double tMs, std::string const & spoken);
   /// The driver tapped a choice on the card. Ignored on a drive.
   void QuizTapped(double tMs, int choice);
   int BrowniePoints() const { return m_said.Counter(kBrowniesKey); }
+  /// Correct turns in a row, carried across trips (running_bits.hpp).
+  int TurnStreak() const { return m_bits.Streak(); }
   static constexpr char const * kBrowniesKey = "_quiz.brownies";
 
   bool InTrip() const { return m_engine != nullptr; }
@@ -411,6 +671,9 @@ private:
   /// A navigation-priority line said at `t` (later than now).
   void SayNavLater(double t, std::string const & text);
   void SayNav(double tMs, std::string const & text, double voiceSpeed = 1.0);
+  /// The speed the car's progress since the last fix shows (route distance to the same turn shrinking,
+  /// or a move between two accurate fixes), or nothing when there's no evidence either way (B147).
+  std::optional<double> ProgressSpeed(Fix const & fix, RouteSnapshot const & route) const;
   void TrackStop(Fix const & fix, RouteSnapshot const & route);
   void TrackTraffic(Fix const & fix, RouteSnapshot const & route);
   void ResetTrip();
@@ -418,10 +681,16 @@ private:
   void CountLefts(double t);
   /// "In half a mile, turn left onto Elm Street." for the maneuver in route.
   void SayInstruction(double t, RouteSnapshot const & route);
-  void TrackPlateGame(double tMs, LatLon const & here, RouteSnapshot const & route);
+  /// "right"/"left" for an arrival within reach whose place the host marked; empty otherwise.
+  std::string DestinationSideNow(RouteSnapshot const & route) const;
+  void SayMissedTurn(double t, bool unseen);
+  void TrackPlateGame(double tMs, LatLon const & here, double speedMps, RouteSnapshot const & route);
   void SayPlate(double tMs, PlateGame::Reply const & reply);
   void SayLine(double tMs, Category category, std::string const & key, Vars vars = {},
                Priority priority = Priority::Roast);
+  /// `options` for `key` minus the lines claiming a highway when the map says the car is off one
+  /// (straight.later, traffic.standstill; loop B144). Unknown road or a motorway: unchanged.
+  std::vector<std::string> RoadFit(std::string const & key, std::vector<std::string> options) const;
   /// Hands a line over; "setup || punchline" is split, the punchline after an awkward pause.
   /// `setupVoice`: someone else says the setup of a "setup || punchline" line (a Kokoro voice id).
   void PushLine(Commentary c, std::string const & setupVoice = {});
@@ -431,6 +700,12 @@ private:
   /// Text for a running-bit line: picked (or its story beat), filled with the driver's details
   /// and the current speed.
   std::string BitText(BitLine const & bit);
+  /// No fix for over 30 s before `t` (m_lastFix is still the one before this OnFix): the GPS was out.
+  bool FixGapAt(double t) const;
+  /// A remark is queued, held for a turn, or a punchline is waiting out its pause.
+  bool RemarkWaiting() const;
+  /// A remark went out in the last breath, or one is waiting to (loop B51, BI-046).
+  bool RemarkJustSaid(double t) const;
   /// "You've done everything right for five minutes. I don't like it."
   void TrackClean(Fix const & fix, RouteSnapshot const & route);
   /// Straight nags and the turn reminders before the final call: fewer of them, from bigger pools
@@ -462,6 +737,7 @@ private:
   double MovingMps() const;
   /// "I probably should have told you the exit you just passed is the last one for a hundred miles."
   void TrackLastExit(double tMs, RouteSnapshot const & route);
+  void TrackExitSkip(Fix const & fix, RouteSnapshot const & route);
   void SayPolice(double tMs);
   void SayLemon(double tMs);
   void SayVenue(double tMs, RouteSnapshot const & route);
@@ -475,6 +751,9 @@ private:
   void TrackIdle(Fix const & fix, RouteSnapshot const & route);
   void SaySight(double tMs, Sight const & sight);
   double NavWaitMs(Commentary const & line) const;
+  double LastTimingMps() const;
+  /// The next instruction goes out at once after a turn when the maneuver is this close (loop B81).
+  double InstructionNowWithinM() const;
   void TrackWrongWay(Fix const & fix, RouteSnapshot const & route);
   /// "Strange, it feels as if I've been here before." after the car turns around.
   void TrackUTurn(Fix const & fix, RouteSnapshot const & route);
@@ -482,16 +761,26 @@ private:
   void TrackSlowStart(Fix const & fix);
   /// "Hey did you know there is a curve ahead? I did."
   void TrackCurveAhead(Fix const & fix, RouteSnapshot const & route);
+  void TrackFerry(Fix const & fix, RouteSnapshot const & route);
+  void HoldStopForFerry(RouteSnapshot const & route);
+  void TrackToll(Fix const & fix, RouteSnapshot const & route);
+  /// Speed cameras: a warning on the way up to one, and a word as the car passes it.
+  void TrackSpeedCamera(Fix const & fix, RouteSnapshot const & route);
   void TrackMusic(double tMs, RouteSnapshot const & route);
   /// The trip started indoors: say so, and maybe remark on it once the car gets out.
   void SayIndoorStart(double tMs, RouteSnapshot const & route);
   void TrackLeftBuilding(Fix const & fix);
+  /// "I'm back" on the first fix with a speed after a GPS dropout at road speed (loop B116).
+  void TrackSignalBack(Fix const & fix, RouteSnapshot const & route, double lostFromT, double lostAtMps);
   /// Dead stretch with nothing to say about directions: a phone call, I spy, or a useless fact.
   void TrackQuietBits(Fix const & fix, RouteSnapshot const & route);
   void StartCall(double tMs);
   /// A quiet-stretch bit is still going (a call, a game of 20 Questions), so nothing else should start one.
 public:
   /// 20 Questions or the plate game is on (or offered), so what's heard goes to the game first.
+  /// Now is a calm moment for a personal ask (AskMustWait on the last fix and route), e.g. before a host
+  /// asks a file question. No trip: always calm.
+  bool CalmForAsk() const;
   bool InGame() const
   {
     return QuizAsking() || m_twenty.Active() || m_plates.GetState() == PlateGame::State::Offered ||
@@ -499,6 +788,8 @@ public:
   }
 
 private:
+  /// AskMustWait for this fix and route.
+  bool AsksWait(double speedMps, RouteSnapshot const & route) const;
   bool QuietBitBusy() const { return m_call.Active() || m_twenty.Active() || QuizAsking(); }
   /// A pop quiz question is waiting for its answer on a trip still going.
   bool QuizAsking() const { return m_quiz.Asking() && m_engine && !m_arrived; }
@@ -540,7 +831,6 @@ private:
   /// {name}, {gps} and the driver's pronouns, for lines about the driver.
   Vars DriverVars() const;
   int Tier() const;
-  bool Parked() const;
 
   EngineConfig m_config;
   std::vector<TripRecord> m_history;
@@ -549,11 +839,20 @@ private:
   RewriteGate m_gate;
 
   double m_lastT = 0;
+  /// The newest fix timestamp OnFix took, for dropping replayed fixes.
+  double m_lastFixT = -1e18;
   double m_lastVoiceCommandT = -1e12;
   TravelMode m_travelMode = TravelMode::Drive;
   double m_lastHeadingT = -1e18;
   std::string m_lastInstructionText;
   std::optional<double> m_rerouteRoastDueAt;
+  // Off the route right at the turn: the miss is said at confirmAt unless a blip brings back the same maneuver.
+  struct PendingMiss
+  {
+    double confirmAt = 0;
+    bool unseen = false;  // the fix gap was at the moment it left the route
+  };
+  std::optional<PendingMiss> m_missPending;
   /// About when the phone is done saying everything handed to it so far.
   double m_talkingUntil = 0;
   /// The trip-time prediction, said a little after the start like a direction but held for turns.
@@ -568,6 +867,8 @@ private:
   std::vector<TurnHeld> m_turnHeld;
   RouteState m_lastState = RouteState::Inactive;
   std::optional<uint32_t> m_turnId;
+  /// The route m_turnId is on (RouteSnapshot::routeId).
+  uint64_t m_routeId = 0;
   double m_lastDistToTurnM = 0;
   bool m_rerouting = false;
   bool m_arrived = false;
@@ -579,13 +880,56 @@ private:
   LatLon m_stopAt;
   double m_stopWanderM = 0;
   bool m_stopAnnounced = false;
+  /// The navigator called it traffic at some point during this stop: a jam, not a stop the driver chose.
+  bool m_stopInTraffic = false;
+  /// When the car last pulled away from a stop of a minute or more.
+  double m_resumedT = -1e18;
   /// Pulled over at the roadside: said once per stop. The police line once per trip.
   bool m_pullOverSaid = false;
+  /// This stop has been checked for a railway crossing (once per stop, at kTrainWaitMs).
+  bool m_trainChecked = false;
+  /// The current stop began on a ferry: the boat explains it (no longStop, pull-over or resumed lines).
+  bool m_stopOnFerry = false;
+  /// Ferry lines, once per ferry (BI-112); both reset after getting off one.
+  bool m_ferryAheadSaid = false;
+  bool m_ferryAboardSaid = false;
+  bool m_wasOnFerry = false;
+  /// Toll lines (BI-113): one per toll stretch, re-armed after more than kTollFreeGapM of free road.
+  bool m_tollSaid = false;
+  /// When the current toll stretch came within range; the line is skipped if it can't go soon after.
+  std::optional<double> m_tollWindowT;
+  /// The driver said "avoid tolls" this trip: a toll anyway is the route's doing, no joke.
+  bool m_avoidTollsSaid = false;
+  /// The last route update's toll data, for TollReply().
+  std::optional<double> m_tollAheadM;
+  bool m_tollsKnown = false;
+  bool m_onRoute = false;
+  CameraAlerts m_cameraAlerts = CameraAlerts::Speeding;
+  /// The speed camera coming up, followed until the car passes it.
+  struct CameraWatch
+  {
+    std::string id;
+    double aheadM = 0;
+    std::optional<double> limitMps;
+    /// Its one chance at a warning has come (said or skipped).
+    bool warned = false;
+    /// The warning was said (not skipped), and whether it caught the driver speeding.
+    bool said = false;
+    bool warnedSpeeding = false;
+  };
+  std::optional<CameraWatch> m_camera;
+  /// The last line about any camera, and the last easy heads-up (not speeding).
+  double m_lastCameraLineT = -1e18;
+  double m_lastCameraHeadsUpT = -1e18;
+  int m_cameraHeadsUps = 0;
   bool m_policeSaid = false;
   std::optional<double> m_lastLimitMps;
   std::string m_country;
   std::optional<double> m_lastBadSpeedingT;
+  /// Since when well over the limit; m_lastBadSpeedingT counts only past the speeding sustain.
+  std::optional<double> m_badSpeedingSince;
   TrafficLightLookup m_lightLookup;
+  LevelCrossingLookup m_crossingLookup;
   Pronouns m_pronouns = Pronouns::They;
   Housing m_housing = Housing::Unknown;
   std::string m_driverName;
@@ -598,6 +942,8 @@ private:
   bool m_roundaboutSaid = false;
   /// The maneuver the last "get into the left lane" was for; once each.
   std::optional<uint32_t> m_laneSaidFor;
+  /// The arrival the destination's side ("on your right") was said for; once each (loop B119).
+  std::optional<uint32_t> m_sideSaidFor;
   double m_turnSaidAt = -1e18;
   /// Just past a turn, the next direction waits a moment (unless it's close) so it doesn't land
   /// mid-turn: when it goes out.
@@ -622,6 +968,8 @@ private:
   /// When the last line went out (TakeLines), for filling a long silence.
   double m_lastSpokeT = -1e18;
   double m_idleGapMs = 0;
+  /// When a familiar commute last let an idle remark go unsaid (the next one waits a full gap from there).
+  double m_idleSkippedT = -1e18;
   /// When the car started heading away from the route, or negative while it isn't.
   double m_wrongWaySince = -1;
   double m_lastWrongWayT = -1e18;
@@ -640,6 +988,7 @@ private:
   int m_sketchMinutesLost = 0;
   bool m_carHasAutopilot = false;
   std::string m_partner;
+  bool m_ridesAlone = false;
   Pronouns m_partnerPronouns = Pronouns::They;
   /// Fed up this trip: the driver must say "wise, omnipotent overseer GPS" from now on.
   bool m_titleDemanded = false;
@@ -691,6 +1040,8 @@ private:
   std::set<std::string> m_outdoorBitsSaid;
   double m_lastOffRoadT = -1e18;
   double m_lastExitLineT = -1e18;
+  /// The exit maneuver the "skip this first exit" call was said for (loop B100).
+  std::optional<uint32_t> m_exitSkipTurnId;
   bool m_onBridge = false;
   double m_lastBridgeYelpT = -1e18;
   double m_lastWaterYelpT = -1e18;
@@ -714,6 +1065,22 @@ private:
   bool m_inTraffic = false;
   StopGo m_stopGo;
   AlternateLookup m_alternateLookup;
+  // Traffic-aware routing: when this jam started, how far the car has crept since, and the asks
+  // made to the host (JamReporter) this trip.
+  JamReporter m_jamReporter;
+  double m_jamStartT = -1;
+  double m_jamMovedM = 0;
+  double m_jamLastFixT = -1;
+  double m_lastJamAskT = -1e18;
+  int m_jamAsks = 0;
+  /// A JamReport is out and the host hasn't dropped it yet.
+  bool m_jamReported = false;
+  /// The last traffic rebuild kept the same roads: its first maneuver is the one already called.
+  bool m_trafficSameRoute = false;
+  /// How much delay the last "no way around this" line owned up to (0: none said since the last way around).
+  double m_noWayAroundSaidS = 0;
+  /// Ask the host about the jam once it's lasted a while, then again if it keeps going.
+  void TrackJamForRouting(Fix const & fix);
 
   // License plate game.
   PlateGame m_plates;
@@ -723,6 +1090,27 @@ private:
   std::optional<Fix> m_lastFix;
   /// The last fix, trip or not: where the car is when a trip starts.
   std::optional<Fix> m_hereFix;
+  /// Last speed the GPS actually reported, and when; carried through short dropouts (see OnFix).
+  std::optional<double> m_knownSpeedMps;
+  double m_knownSpeedT = 0;
+  /// Where the last fix put the car, for reading its speed from progress when the GPS gives none (B147).
+  struct Progress
+  {
+    double t = 0;
+    LatLon pos;
+    double accuracyM = -1;
+    std::optional<uint32_t> turnId;
+    uint64_t routeId = 0;
+    double distToTurnM = 0;
+    bool onRoute = false;
+  };
+  std::optional<Progress> m_progress;
+  /// This fix's speed read from progress, when the GPS gave none (unset when it gave one).
+  std::optional<double> m_progressMps;
+  /// The route had no matched position yet when the trip would have started; when that was.
+  std::optional<double> m_startHeldSince;
+  /// Where the car was when the trip started, so a car that has clearly left counts as rolling.
+  std::optional<LatLon> m_tripStartPos;
   BuildingLookup m_buildingLookup;
   /// This trip started indoors; the "made it out" line is still to come (key, empty if not).
   std::string m_indoorOutKey;
@@ -735,6 +1123,11 @@ private:
   TurnKind m_turnKind = TurnKind::None;
   int m_leftsInARow = 0;
   int m_tripsOnRoute = 0;
+  /// This trip is a learned routine driven kFamiliarAfterTrips+ times: optional banter is thinned
+  /// until something new happens (a reroute, a jam, an unplanned stop, "talk more").
+  bool m_familiarTrip = false;
+  bool FamiliarQuiet() const;
+  void NotFamiliarAnymore(char const * why);
   double m_tripStartT = 0;
   double m_lastRegionCheckT = -1e18;
   /// Game lines held back while a maneuver is close; directions come first.
@@ -745,9 +1138,16 @@ private:
   // Pop quizzes.
   PopQuiz m_quiz;
   bool m_quizOn = false;
+  TalkLevel m_talk = TalkLevel::Full;
+  /// TalkLevel::Less: the next remark is the one let through (they alternate).
+  bool m_lessSayNext = true;
+  /// Drops what TalkLevel rules out from lines about to be spoken; `punchlines` were already let through.
+  void FilterForTalkLevel(std::vector<Commentary> & lines, std::set<std::string> const & punchlines);
   int m_quizzes = 0;
   double m_lastQuizT = -1e18;
   int m_quizUnclear = 0;
+  /// The current quiz has been read a second time.
+  bool m_quizReasked = false;
   /// The maneuver whose quiet stretch already had its roll of the dice for a quiz.
   std::optional<uint32_t> m_quizRolledFor;
   std::function<void(TwentyLog const &)> m_onTwentyLog;
@@ -759,6 +1159,7 @@ private:
 
   // Quiet-stretch bits.
   std::string m_gpsName = "Echo";
+  Persona m_persona = Persona::Critic;
   PhoneCall m_call;
   /// Everything said on this call, so the hold and resume lines don't echo the script.
   std::vector<std::string> m_callSaid;
@@ -789,6 +1190,8 @@ private:
   double m_groceryT = -1e18;
   bool m_groceriesSaid = false;
   bool m_clockChecked = false;
+  /// When "gps.back" was last said; kept across trips (once per 10 minutes).
+  double m_signalBackT = -1e18;
   /// The trip started at a bar late at night and its night-out line is still to come; whether the car has left the lot.
   bool m_fromNightlife = false;
   bool m_nightMoved = false;

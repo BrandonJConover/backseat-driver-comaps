@@ -298,7 +298,8 @@ TEST(CurvesGetJokes)
   CHECK_EQUAL(CountKey(DriveLegs(1, 6000, [](double) { return 0.0; }), "curve.bend"), 0);
 }
 
-// A cold morning: Brandon's freezing line early in the trip, the air vent one a few minutes later.
+// A cold morning: Brandon's freezing line early in the trip, the air vent one a few minutes later, at
+// the first red light (loop B74: holding the phone up to a vent waits for a stop).
 TEST(ColdMorningsWantThePocketThenTheVent)
 {
   EngineConfig c;
@@ -322,7 +323,7 @@ TEST(ColdMorningsWantThePocketThenTheVent)
     f.tMs = t;
     f.lat = 39.7;
     f.lon = -105;
-    f.speedMps = 15;
+    f.speedMps = t >= 240000 && t < 270000 ? 0 : 15;
     f.bearingDeg = 0;
     nav.OnFix(f, r);
     for (auto & l : nav.TakeLines())

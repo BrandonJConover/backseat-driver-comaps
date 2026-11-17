@@ -1,0 +1,141 @@
+{
+ "about": "Phone numbers read digit by digit in their groups, 0 as 'oh', a comma pause between groups (loop B168, BI-148). North American numbers with matching separators (or parentheses, or spaces after +1), toll-free 8x00 as 'eight hundred', vanity 1-800-LETTERS, seven-digit numbers only after a phone word, N11 codes (911, 411, 311) after call/dial/text or before call/operator, and 9-1-1. Negatives (ranges, years, scores, I-405, amounts, times, an area code starting 1, bare spaced digits, 'Porsche 911') keep Backseat's ordinary reading. Backseat Driver: backseat::pronunciation::ForSpeech / PhoneNumbers (libs/backseat/pronunciation_phones.hpp). Shared with BookLyre (CROSS).",
+ "cases": [
+  {
+   "input": "Call 512-555-0134 now.",
+   "expected": "Call five one two, five five five, oh one three four now."
+  },
+  {
+   "input": "Call (512) 555-0134.",
+   "expected": "Call five one two, five five five, oh one three four."
+  },
+  {
+   "input": "Phone (512)555-0134",
+   "expected": "Phone five one two, five five five, oh one three four"
+  },
+  {
+   "input": "+1 512 555 0134",
+   "expected": "plus one, five one two, five five five, oh one three four"
+  },
+  {
+   "input": "Text +1-512-555-0134 when you land.",
+   "expected": "Text plus one, five one two, five five five, oh one three four when you land."
+  },
+  {
+   "input": "512.555.0134",
+   "expected": "five one two, five five five, oh one three four"
+  },
+  {
+   "input": "1-800-555-0199",
+   "expected": "one eight hundred, five five five, oh one nine nine"
+  },
+  {
+   "input": "1 (800) 555-0199",
+   "expected": "one eight hundred, five five five, oh one nine nine"
+  },
+  {
+   "input": "1-888-555-0100",
+   "expected": "one eight eight eight, five five five, oh one oh oh"
+  },
+  {
+   "input": "Tel: 512-555-0134",
+   "expected": "Tel: five one two, five five five, oh one three four"
+  },
+  {
+   "input": "Text 512-555-0134 ext. 12",
+   "expected": "Text five one two, five five five, oh one three four extension twelve"
+  },
+  {
+   "input": "Call 555-0134.",
+   "expected": "Call five five five, oh one three four."
+  },
+  {
+   "input": "dial 555-0100",
+   "expected": "dial five five five, oh one oh oh"
+  },
+  {
+   "input": "call 1-800-FLOWERS",
+   "expected": "call one eight hundred FLOWERS"
+  },
+  {
+   "input": "Call 1-800-GOT-JUNK.",
+   "expected": "Call one eight hundred GOT JUNK."
+  },
+  {
+   "input": "Call 911.",
+   "expected": "Call nine one one."
+  },
+  {
+   "input": "dial 411",
+   "expected": "dial four one one"
+  },
+  {
+   "input": "Dial 9-1-1",
+   "expected": "Dial nine one one"
+  },
+  {
+   "input": "the 911 operator",
+   "expected": "the nine one one operator"
+  },
+  {
+   "input": "a 911 call",
+   "expected": "a nine one one call"
+  },
+  {
+   "input": "I could call 311 about you.",
+   "expected": "I could call three one one about you."
+  },
+  {
+   "input": "3-5 miles",
+   "expected": "three to five miles"
+  },
+  {
+   "input": "1914-1918",
+   "expected": "nineteen fourteen to nineteen eighteen"
+  },
+  {
+   "input": "I-405 North",
+   "expected": "I four oh five North"
+  },
+  {
+   "input": "won 21-14",
+   "expected": "won twenty one-fourteen"
+  },
+  {
+   "input": "$555",
+   "expected": "five hundred fifty five dollars"
+  },
+  {
+   "input": "at 5:30",
+   "expected": "at five thirty"
+  },
+  {
+   "input": "200-1000 feet",
+   "expected": "two hundred to one thousand feet"
+  },
+  {
+   "input": "about 555-1234 people",
+   "expected": "about five hundred fifty five-one thousand two hundred thirty four people"
+  },
+  {
+   "input": "Porsche 911",
+   "expected": "Porsche nine hundred eleven"
+  },
+  {
+   "input": "123-456-7890",
+   "expected": "one hundred twenty three-four hundred fifty six-seven thousand eight hundred ninety"
+  },
+  {
+   "input": "512 555 0134",
+   "expected": "five hundred twelve five hundred fifty five one hundred thirty four"
+  },
+  {
+   "input": "2026-11-15",
+   "expected": "November fifteenth, twenty twenty six"
+  },
+  {
+   "input": "Exit 238B",
+   "expected": "Exit two thirty eight B"
+  }
+ ]
+}

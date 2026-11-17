@@ -1,0 +1,120 @@
+{
+ "about": "Street types before a separator and road names on both sides of one (BI-091, loop B105): 'Main St / Elm St' is 'Main Street, Elm Street', 'Grand Ave / CA-1', 'Main St - Elm St', 'Main St (FM 1960)' and 'Pkwy Dr' say the type in full, and ' / ', '/' or ' - ' between two road names (a spelled-out type on the left, or a capitalised word or route/exit number on the left and 1-3 names plus a type on the right) is a comma pause. Negatives: '24/7', '1/2 mi', 'and/or', '3/4', 'w/ Main St', 'Pass / Fail'. Backseat Driver: backseat::pronunciation::ForSpeech / RoadSeparators (libs/backseat/backseat_tests/spoken_street_separators.json). 'yooess' is this voice's existing stand-in for US; BookLyre can port the rule (CROSS).",
+ "cases": [
+  {
+   "input": "Turn left onto Main St / Elm St",
+   "language": "en",
+   "expected": "Turn left onto Main Street, Elm Street"
+  },
+  {
+   "input": "Arrive at Main St/Elm St",
+   "language": "en",
+   "expected": "Arrive at Main Street, Elm Street"
+  },
+  {
+   "input": "Turn right onto Grand Ave / CA-1",
+   "language": "en",
+   "expected": "Turn right onto Grand Avenue, California one"
+  },
+  {
+   "input": "Keep left onto Ben White Blvd / US-290 W",
+   "language": "en",
+   "expected": "Keep left onto Ben White Boulevard, yooess two ninety West"
+  },
+  {
+   "input": "Continue on Main St (FM 1960)",
+   "language": "en",
+   "expected": "Continue on Main Street (F M nineteen sixty)"
+  },
+  {
+   "input": "Turn left onto Main St - Elm St",
+   "language": "en",
+   "expected": "Turn left onto Main Street, Elm Street"
+  },
+  {
+   "input": "Turn right onto Pkwy Dr",
+   "language": "en",
+   "expected": "Turn right onto Parkway Drive"
+  },
+  {
+   "input": "Turn left onto Oak Ln / Pine Rd.",
+   "language": "en",
+   "expected": "Turn left onto Oak Lane, Pine Road."
+  },
+  {
+   "input": "Head north on Lamar Blvd / Loop 1",
+   "language": "en",
+   "expected": "Head north on Lamar Boulevard, Loop one"
+  },
+  {
+   "input": "Exit toward Elm Dr / Downtown",
+   "language": "en",
+   "expected": "Exit toward Elm Drive, Downtown"
+  },
+  {
+   "input": "Merge onto Capital of Texas Hwy / Loop 360",
+   "language": "en",
+   "expected": "Merge onto Capital of Texas Highway, Loop three sixty"
+  },
+  {
+   "input": "Open 24/7",
+   "language": "en",
+   "expected": "Open twenty four seven"
+  },
+  {
+   "input": "In 1/2 mi, turn left",
+   "language": "en",
+   "expected": "In a half mile, turn left"
+  },
+  {
+   "input": "Stop and/or go",
+   "language": "en",
+   "expected": "Stop and/or go"
+  },
+  {
+   "input": "About 3/4 of the way",
+   "language": "en",
+   "expected": "About three quarters of the way"
+  },
+  {
+   "input": "Take the ramp to US-290 / Ben White Blvd",
+   "language": "en",
+   "expected": "Take the ramp to yooess two ninety, Ben White Boulevard"
+  },
+  {
+   "input": "Turn left at Elm St/Oak Ave.",
+   "language": "en",
+   "expected": "Turn left at Elm Street, Oak Avenue."
+  },
+  {
+   "input": "Take Exit 12B / Elm St",
+   "language": "en",
+   "expected": "Take Exit twelve B, Elm Street"
+  },
+  {
+   "input": "Coffee w/ Main St views",
+   "language": "en",
+   "expected": "Coffee w/ Main Street views"
+  },
+  {
+   "input": "Pass / Fail",
+   "language": "en",
+   "expected": "Pass / Fail"
+  },
+  {
+   "input": "Lanes 1/2 closed",
+   "language": "en",
+   "expected": "Lanes a half closed"
+  },
+  {
+   "input": "Turn right onto Elm St - then left",
+   "language": "en",
+   "expected": "Turn right onto Elm Street - then left"
+  },
+  {
+   "input": "Exit 238B - Main St",
+   "language": "en",
+   "expected": "Exit two thirty eight B, Main Street"
+  }
+ ]
+}

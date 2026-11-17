@@ -274,6 +274,10 @@ public:
     return m_backseat.SpeakSearchResults(query, std::move(results));
   }
   std::string BackseatReply(std::string const & key, backseat::Vars const & vars = {}) { return m_backseat.ReplyLine(key, vars); }
+  std::string BackseatReplyAsVoice(std::string const & voiceName, std::string const & key, backseat::Vars const & vars = {})
+  {
+    return m_backseat.ReplyLineAsVoice(voiceName, key, vars);
+  }
   BackseatAdapter::SearchPick BackseatPickSearchResult(std::string const & spoken)
   {
     return m_backseat.PickSearchResult(spoken);
@@ -289,6 +293,19 @@ public:
   }
   bool BackseatInGame() const { return m_backseat.InGame(); }
   std::vector<BackseatAdapter::PastRoute> BackseatPastRoutes(size_t max) const { return m_backseat.PastRoutes(max); }
+  std::vector<std::string> BackseatSearchVariants(std::string const & query) const
+  {
+    return m_backseat.SearchVariants(query);
+  }
+  std::vector<size_t> BackseatRankSearchResults(std::string const & query,
+                                                std::vector<backseat::PlaceCandidate> const & candidates) const
+  {
+    return m_backseat.RankSearchResults(query, candidates);
+  }
+  std::optional<BackseatAdapter::PastRoute> BackseatPastRouteNamed(std::string const & query) const
+  {
+    return m_backseat.PastRouteNamed(query);
+  }
   std::string BackseatVoiceRecovered() { return m_backseat.VoiceRecovered(); }
   bool BackseatRemember(std::string const & topic, std::string const & fact) { return m_backseat.Remember(topic, fact); }
   bool BackseatForget(std::string const & topic) { return m_backseat.Forget(topic); }
@@ -330,6 +347,8 @@ public:
   void BackseatSetBusinessOwner(std::string const & owner) { m_backseat.SetBusinessOwner(owner); }
   void BackseatSketchApplied(bool addedStop, bool trimmed) { m_backseat.SketchApplied(addedStop, trimmed); }
   int BackseatFrustration() const { return m_backseat.Frustration(); }
+  /// Meters to the next speed camera on the route, -1 if none within 2 km.
+  double BackseatCameraAheadM() const { return m_backseat.CameraAheadM(); }
   std::vector<backseat::LatLon> BackseatSnapToRoads(std::vector<backseat::LatLon> const & stroke) const
   {
     return m_backseat.SnapToRoads(stroke);
@@ -527,6 +546,9 @@ private:
   extrapolation::Extrapolator m_extrapolator;
   /// Backseat Driver: replaces the stock voice prompts with the critique engine's lines.
   BackseatAdapter m_backseat;
+  /// The newest position the route was checked against (a real fix or the Extrapolator's), so a
+  /// route rebuilt after leaving the old one can find the car the moment it arrives.
+  std::unique_ptr<location::GpsInfo> m_lastRouteCheck;
 
   std::vector<dp::DrapeID> m_drapeSubroutes;
   mutable std::mutex m_drapeSubroutesMutex;

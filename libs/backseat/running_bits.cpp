@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <utility>
 
 namespace backseat
 {
@@ -63,22 +64,37 @@ void RunningBits::SyncTurns(TripStats const & stats, std::vector<Incident> const
 {
   int const bad = stats.missedTurns + stats.wrongTurns + stats.lateTurns;
   int const onTime = stats.turnsCompleted - stats.lateTurns;
-  if (bad > m_badSeen)
+  int newBad = std::max(0, bad - m_badSeen);
+  int newOnTime = std::max(0, onTime - m_onTimeSeen);
+  m_badSeen = std::max(m_badSeen, bad);
+  m_onTimeSeen = onTime;
+  // Turns the GPS was out for: counted as seen, but they say nothing about the driver.
+  int const caught = newBad + newOnTime;
+  int const skipBad = std::min(newBad, m_unseen);
+  newBad -= skipBad;
+  m_unseen -= skipBad;
+  int const skipOnTime = std::min(newOnTime, m_unseen);
+  newOnTime -= skipOnTime;
+  m_unseen -= skipOnTime;
+  if (caught > 0)
+    m_lastUnseen = newBad + newOnTime == 0;
+  if (newBad > 0)
   {
-    m_badSeen = bad;
     m_streak = 0;
     m_milestonesSaid = 0;
     auto const street = LastBadStreet(incidents);
     m_redeem = street.value_or("");
   }
-  m_streak += std::max(0, onTime - m_onTimeSeen);
-  m_onTimeSeen = onTime;
+  m_streak += newOnTime;
 }
 
 std::optional<BitLine> RunningBits::OnTimeTurn(TripStats const & stats, std::vector<Incident> const & incidents,
                                                double r)
 {
   SyncTurns(stats, incidents);
+  // A turn it never saw gets no verdict (and doesn't use up the trip's first).
+  if (std::exchange(m_lastUnseen, false))
+    return std::nullopt;
   bool const first = m_firstVerdict;
   m_firstVerdict = false;
   // Made up for the one blown earlier: always worth saying.

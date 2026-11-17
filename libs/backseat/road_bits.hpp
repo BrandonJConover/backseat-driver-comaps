@@ -76,6 +76,8 @@ struct Weather
 {
   bool rain = false;
   bool snow = false;
+  /// Freezing rain or drizzle, sleet, ice pellets: the road may be ice (also counts as snow).
+  bool ice = false;
   bool fog = false;
   bool windy = false;
   /// Clear or sunny, nothing falling, no fog.
@@ -115,6 +117,9 @@ struct RoadTick
   double tripMs = 0;
   /// Something else is still going (a phone call, a punchline waiting): don't start anything.
   bool busy = false;
+  /// A traffic jam hasn't been called over yet: the small talk (gas, weather, viewpoints) waits, or
+  /// "No gas for 50 miles" lands seconds before "Traffic's clearing up" as the jam lets go.
+  bool jam = false;
   /// The sun is down (and the date is known).
   bool night = false;
   /// Local hour 0..23, or -1 when unknown.
@@ -137,6 +142,8 @@ public:
   void OnConnectivity(double tMs, bool online);
   /// The latest weather where the car is. Cheap to call often; the host refreshes it every 15 minutes.
   void OnWeather(double tMs, Weather const & weather);
+  /// Rain, snow, ice or fog at the last report: personal asks wait it out (loop B174, BI-087).
+  bool BadWeather() const { return m_weather && (m_weather->rain || m_weather->snow || m_weather->ice || m_weather->fog); }
 
   /// Called on every fix during a trip. `said` remembers across trips; `r` is a random number in [0, 1).
   std::vector<RoadRemark> Tick(RoadTick const & k, SaidLog & said, double r);
@@ -151,6 +158,9 @@ public:
   /// The kind of place of the current (or just-ended) stop, once known. The navigator's own stop
   /// lines leave rest areas and drive-thrus to this.
   StopSpot CurrentStopSpot() const { return m_spot; }
+  /// Whether the map put the car on a motorway at the last surroundings check; unknown (nullopt)
+  /// with no lookup set or before the first check this trip (loop B144).
+  std::optional<bool> OnMotorway() const { return m_motorwayKnown ? std::optional<bool>(m_motorwaySince >= 0) : std::nullopt; }
 
   void Reset();
 
@@ -188,6 +198,7 @@ private:
   std::optional<LatLon> m_lastHere;
   double m_lastSurroundT = -1e18;
   double m_motorwaySince = -1;
+  bool m_motorwayKnown = false;
   double m_unpavedSince = -1;
   double m_wildSince = -1;
   double m_villageEnteredT = -1e18;

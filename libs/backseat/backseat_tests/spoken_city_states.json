@@ -1,0 +1,125 @@
+{
+ "about": "A two-letter US state code after 'City, ' read as the state's name (DC/D.C. as 'D C'), and a ZIP or ZIP+4 after the state (code or spelled out) digit by digit, 0 as 'oh', a comma pause before the +4 (loop B169, BI-149). Codes that are also words (OR IN ME OK HI OH LA DE AL CO ID MA NE PA) stay when the context is conversational: after Yes/Fine/So/Hey and similar, before ? or !, after a word with no lowercase letter (a list of codes); OK/OH/HI/ME also need a ZIP, a period or the end, after a name of 4+ letters. Backseat Driver: backseat::pronunciation::ForSpeech / CityStates (libs/backseat/pronunciation_states.hpp). Shared with BookLyre (CROSS).",
+ "cases": [
+  {
+   "input": "Arriving at Austin, TX.",
+   "expected": "Arriving at Austin, Texas."
+  },
+  {
+   "input": "Springfield, IL is ahead.",
+   "expected": "Springfield, Illinois is ahead."
+  },
+  {
+   "input": "Austin, TX 78701",
+   "expected": "Austin, Texas seven eight seven oh one"
+  },
+  {
+   "input": "Austin, TX 78701-1234.",
+   "expected": "Austin, Texas seven eight seven oh one, one two three four."
+  },
+  {
+   "input": "Portland, OR now",
+   "expected": "Portland, Oregon now"
+  },
+  {
+   "input": "Portland, OR.",
+   "expected": "Portland, Oregon."
+  },
+  {
+   "input": "Portland, ME.",
+   "expected": "Portland, Maine."
+  },
+  {
+   "input": "Tulsa, OK.",
+   "expected": "Tulsa, Oklahoma."
+  },
+  {
+   "input": "Honolulu, HI 96813",
+   "expected": "Honolulu, Hawaii nine six eight one three"
+  },
+  {
+   "input": "Columbus, OH 43215",
+   "expected": "Columbus, Ohio four three two one five"
+  },
+  {
+   "input": "Boulder, CO",
+   "expected": "Boulder, Colorado"
+  },
+  {
+   "input": "New Orleans, LA, then home.",
+   "expected": "New Orleans, Louisiana, then home."
+  },
+  {
+   "input": "Salt Lake City, UT 84101.",
+   "expected": "Salt Lake City, Utah eight four one oh one."
+  },
+  {
+   "input": "Washington, DC 20500",
+   "expected": "Washington, D C two oh five oh oh"
+  },
+  {
+   "input": "Washington, D.C. 20500",
+   "expected": "Washington, D C two oh five oh oh"
+  },
+  {
+   "input": "Washington, D.C. Next stop: nowhere.",
+   "expected": "Washington, D C. Next stop: nowhere."
+  },
+  {
+   "input": "Washington, DC.",
+   "expected": "Washington, D C."
+  },
+  {
+   "input": "Austin, Texas 78701",
+   "expected": "Austin, Texas seven eight seven oh one"
+  },
+  {
+   "input": "Raleigh, North Carolina 27601",
+   "expected": "Raleigh, North Carolina two seven six oh one"
+  },
+  {
+   "input": "1600 Pennsylvania Ave NW, Washington, DC 20500",
+   "expected": "sixteen hundred Pennsylvania Avenue Northwest, Washington, D C two oh five oh oh"
+  },
+  {
+   "input": "St. Paul, MN 55102",
+   "expected": "Saint Paul, Minnesota five five one oh two"
+  },
+  {
+   "input": "Yes, OK.",
+   "expected": "Yes, OK."
+  },
+  {
+   "input": "Fine, OK?",
+   "expected": "Fine, OK?"
+  },
+  {
+   "input": "So, IN the car",
+   "expected": "So, IN the car"
+  },
+  {
+   "input": "Hey, ME?",
+   "expected": "Hey, ME?"
+  },
+  {
+   "input": "Jo, OK.",
+   "expected": "Jo, OK."
+  },
+  {
+   "input": "Tulsa, OK?",
+   "expected": "Tulsa, OK?"
+  },
+  {
+   "input": "We saw TX, CA, NY plates.",
+   "expected": "We saw TX, CA, NY plates."
+  },
+  {
+   "input": "Bob, OR Main St",
+   "expected": "Bob, OR Main Street"
+  },
+  {
+   "input": "Austin, TX-71 East",
+   "expected": "Austin, Texas seventy one East"
+  }
+ ]
+}

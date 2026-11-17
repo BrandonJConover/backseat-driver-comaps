@@ -171,6 +171,21 @@ public class NavigationService extends Service implements LocationListener
     Logger.i(TAG);
 
     mPlayer = new MediaPlayerWrapper(getApplicationContext());
+    RoutingController.get().addRouteChangedListener(mRouteChangedListener);
+  }
+
+  // Backseat: a route rebuilt mid-drive (off the old one) says its first direction now, not at the
+  // next GPS fix. The core has already found the car on it.
+  private final RoutingController.RouteChangedListener mRouteChangedListener = this::speakTurnNotifications;
+
+  private void speakTurnNotifications()
+  {
+    if (!RoutingController.get().isNavigating())
+      return;
+    final String[] turnNotifications = Framework.nativeGenerateNotifications(Config.TTS.getAnnounceStreets());
+    if (turnNotifications != null)
+      TtsPlayer.INSTANCE.playTurnNotifications(turnNotifications, Framework.nativeLastNotificationsAreNav(),
+                                               Framework.nativeLastNotificationSpeeds());
   }
 
   @Override
@@ -181,6 +196,7 @@ public class NavigationService extends Service implements LocationListener
     mNotificationBuilder = null;
     mCarNotificationExtender = null;
     MwmApplication.from(this).getLocationHelper().removeListener(this);
+    RoutingController.get().removeRouteChangedListener(mRouteChangedListener);
     TtsPlayer.INSTANCE.stop();
 
     // The notification is cancelled automatically by the system.
@@ -277,10 +293,7 @@ public class NavigationService extends Service implements LocationListener
       return;
 
     // Voice the turn notification first.
-    final String[] turnNotifications = Framework.nativeGenerateNotifications(Config.TTS.getAnnounceStreets());
-    if (turnNotifications != null)
-      TtsPlayer.INSTANCE.playTurnNotifications(turnNotifications, Framework.nativeLastNotificationsAreNav(),
-                                               Framework.nativeLastNotificationSpeeds());
+    speakTurnNotifications();
 
     // TODO: consider to create callback mechanism to transfer 'ROUTE_IS_FINISHED' event from
     // the core to the platform code (https://github.com/organicmaps/organicmaps/issues/3589),

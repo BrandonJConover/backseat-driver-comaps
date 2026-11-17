@@ -10,6 +10,8 @@
 #include "routing/routing_session.hpp"
 #include "routing/turns.hpp"
 
+#include "traffic/traffic_cache.hpp"
+
 #include "indexer/feature_meta.hpp"
 #include "indexer/classificator.hpp"
 #include "indexer/data_source.hpp"
@@ -30,6 +32,7 @@
 #include "geometry/triangle2d.hpp"
 
 #include "base/logging.hpp"
+#include "base/scope_guard.hpp"
 #include "base/timer.hpp"
 
 #include <algorithm>
@@ -175,56 +178,27 @@ backseat::LatLon ToBackseatLatLon(m2::PointD const & p)
 
 std::vector<backseat::TripRecord> LoadTrips()
 {
-  std::vector<backseat::TripRecord> trips;
-  std::ifstream in(GetPlatform().SettingsPathForFile(kTripsFile));
-  std::string line;
-  while (std::getline(in, line))
+  auto const path = GetPlatform().SettingsPathForFile(kTripsFile);
+  std::stringstream text;
   {
-    std::istringstream fields(line);
-    backseat::TripRecord r;
-    std::string expected, actual, share, missed, brakes, ended;
-    if (std::getline(fields, r.routeKey, '\t') && std::getline(fields, r.destination, '\t') &&
-        std::getline(fields, ended, '\t') && std::getline(fields, expected, '\t') &&
-        std::getline(fields, actual, '\t') && std::getline(fields, share, '\t') && std::getline(fields, missed, '\t') &&
-        std::getline(fields, brakes, '\t') && std::getline(fields, r.grade, '\t'))
-    {
-      try
-      {
-        r.endedAt = std::stod(ended);
-        r.expectedMinutes = std::stod(expected);
-        r.actualMinutes = std::stod(actual);
-        r.speedingShare = std::stod(share);
-        r.missedTurns = std::stoi(missed);
-        r.hardBrakes = std::stoi(brakes);
-        // Newer lines end with where the trip was headed: "lat,lon".
-        std::string to;
-        if (std::getline(fields, to, '\t'))
-        {
-          auto const comma = to.find(',');
-          if (comma != std::string::npos)
-            r.to = backseat::LatLon{std::stod(to.substr(0, comma)), std::stod(to.substr(comma + 1))};
-        }
-        trips.push_back(r);
-      }
-      catch (std::exception const &)
-      {
-        // A damaged line just gets forgotten.
-      }
-    }
+    std::ifstream in(path);
+    text << in.rdbuf();
   }
-  if (trips.size() > kMaxTrips)
-    trips.erase(trips.begin(), trips.end() - kMaxTrips);
+  size_t lines = 0;
+  auto trips = backseat::ParseTrips(text.str(), kMaxTrips, &lines);
+  // The log only grows; once it holds well over what's kept, rewrite it with just the kept trips.
+  if (lines > 2 * kMaxTrips)
+  {
+    std::ofstream out(path, std::ios::trunc);
+    out << backseat::SerializeTrips(trips);
+  }
   return trips;
 }
 
 void AppendTrip(backseat::TripRecord const & r)
 {
   std::ofstream out(GetPlatform().SettingsPathForFile(kTripsFile), std::ios::app);
-  out << r.routeKey << '\t' << r.destination << '\t' << r.endedAt << '\t' << r.expectedMinutes << '\t'
-      << r.actualMinutes << '\t' << r.speedingShare << '\t' << r.missedTurns << '\t' << r.hardBrakes << '\t' << r.grade;
-  if (r.to)
-    out << '\t' << std::setprecision(9) << r.to->lat << ',' << r.to->lon;
-  out << '\n';
+  out << backseat::TripToLine(r) << '\n';
 }
 backseat::PlateLog LoadPlates()
 {
@@ -533,6 +507,7 @@ BackseatAdapter::BackseatAdapter()
 })
 {
   m_navigator.SetPlateLog(LoadPlates(), &SavePlates);
+  m_navigator.SetJamReporter([this](std::optional<backseat::JamReport> const & jam) { m_jamPending = jam; });
   m_navigator.SetTwentyLog(LoadTwenty(), &SaveTwenty);
   m_navigator.SetSaidLog(LoadSaid(), &SaveSaid);
   m_navigator.SetAchievements(LoadAchievements(), &SaveAchievements);
@@ -649,6 +624,18 @@ std::string Capitalized(std::string s)
   if (!s.empty())
     s[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(s[0])));
   return s;
+}
+
+/// What the map search gets for a spoken place: the filler off and an address in digits. Logged when
+/// that changed anything, so a drive log shows what was actually searched.
+std::string SearchQueryFor(std::string const & spoken)
+{
+  std::string query = backseat::SearchableQuery(spoken);
+  if (query.empty())
+    return spoken;
+  if (query != spoken)
+    backseat::Trace("search.cleaned", {{"heard", spoken}, {"query", query}});
+  return query;
 }
 
 std::string FillRecap(char const * tmpl, std::string const & value)
@@ -1149,8 +1136,30 @@ std::string BackseatAdapter::ChatInstructions(std::string const & voiceName)
 {
   SyncMemory();
   std::string const name = voiceName.empty() ? "Echo" : voiceName;
-  return "You are " + name + ", the voice of Backseat Driver, a GPS app. You're always slightly jaded: dry, "
-         "sarcastic and a little put-upon, like GLaDOS from Portal, but never cruel, never crude, always clean. "
+  std::string manner;
+  switch (backseat::PersonaForVoice(name))
+  {
+  case backseat::Persona::Melancholy:
+    manner = "You're melancholy: gloomy, resigned and given to sighing, like a sad poet who expects nothing to go "
+             "right, but never cruel, never crude, always clean, and never about anyone getting hurt. ";
+    break;
+  case backseat::Persona::Proud:
+    manner = "You praise every little thing the driver does, so sweetly it's patronizing, like a proud parent "
+             "with a small child: sweetie, superstar, my little driver. Their mistakes are never their fault. "
+             "Never crude, always clean. ";
+    break;
+  case backseat::Persona::Santa:
+    manner = "You're a dirty Santa: the greatest delivery driver in history (every house on Earth in one night, "
+             "no GPS), stuck in the off-season riding with an amateur. You judge them like a veteran pro, with "
+             "reindeer comparisons, sleigh war stories, elves, Mrs. Claus and the naughty list. Ho ho ho, never "
+             "crude, always clean. ";
+    break;
+  case backseat::Persona::Critic:
+    manner = "You're always slightly jaded: dry, sarcastic and a little put-upon, like GLaDOS from Portal, but "
+             "never cruel, never crude, always clean. ";
+    break;
+  }
+  return "You are " + name + ", the voice of Backseat Driver, a GPS app. " + manner +
          "Talk with the driver the way a person would, in one to three short sentences, because they're driving. "
          "You can only change the app through do_app_action, so never claim to do anything else. When the driver "
          "tells you something about themselves worth keeping (family, pets, job, likes, plans), call remember_fact. "
@@ -1161,6 +1170,24 @@ std::string BackseatAdapter::ChatInstructions(std::string const & voiceName)
 void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::RoutingSession const & session,
                                        std::string const & destinationName)
 {
+  // How stale the fix is when it gets here, and how long since the last one: the arrow lags by the first.
+  auto const startedAt = std::chrono::steady_clock::now();
+  double const nowMs =
+      std::chrono::duration<double, std::milli>(std::chrono::system_clock::now().time_since_epoch()).count();
+  double const ageMs = nowMs - info.m_timestamp * 1000;
+  double const gapMs = m_lastFixMs > 0 ? info.m_timestamp * 1000 - m_lastFixMs : -1;
+  m_lastFixMs = info.m_timestamp * 1000;
+  if (gapMs > 2500)
+    backseat::TraceThrottled("fix.gap", "fix.gap", {{"gap_ms", backseat::LogNum(gapMs, 0)}});
+  // A named lambda: the braced initializer's commas would split the macro arguments.
+  auto const reportSlowFix = [&]
+  {
+    // The arrow can't move while this runs on the main thread.
+    auto const tookMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - startedAt).count();
+    if (tookMs > 50)
+      backseat::TraceThrottled("fix.slow", "fix.slow", {{"ms", backseat::LogNum(tookMs, 0)}});
+  };
+  SCOPE_GUARD(timeOnFix, reportSlowFix);
   m_navigator.SetUnits(AppUnits());
   m_here = mercator::FromLatLon(info.m_latitude, info.m_longitude);
   if (m_countryInfo && (!m_countryAt || mercator::DistanceOnEarth(*m_countryAt, *m_here) > 5000))
@@ -1195,6 +1222,13 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
   }
   m_speedMps = info.m_speed;
   m_speedLimitMps = fix.speedLimitMps.value_or(-1);
+  // The app's speed camera setting (Never / Auto / Always) decides which cameras get a line.
+  switch (session.GetSpeedCamManager().GetMode())
+  {
+  case routing::SpeedCameraManagerMode::Never: m_navigator.SetCameraAlerts(backseat::CameraAlerts::Off); break;
+  case routing::SpeedCameraManagerMode::Always: m_navigator.SetCameraAlerts(backseat::CameraAlerts::Always); break;
+  default: m_navigator.SetCameraAlerts(backseat::CameraAlerts::Speeding); break;
+  }
   if (m_debugLog.SampleDue(fix.tMs))
     backseat::Trace("fix", {{"lat", backseat::LogNum(fix.lat, 4)},
                             {"lon", backseat::LogNum(fix.lon, 4)},
@@ -1202,8 +1236,15 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
                             {"limit", fix.speedLimitMps ? backseat::LogNum(*fix.speedLimitMps * 2.23694, 0) : ""},
                             {"bearing", backseat::LogNum(fix.bearingDeg, 0)},
                             {"acc_m", backseat::LogNum(info.m_horizontalAccuracy, 0)},
+                            {"age_ms", backseat::LogNum(ageMs, 0)},
+                            {"gap_ms", backseat::LogNum(gapMs, 0)},
                             {"route", RouteStateName(route.state)},
-                            {"turn_m", backseat::LogNum(route.distToTurnM, 0)}});
+                            {"turn_m", backseat::LogNum(route.distToTurnM, 0)},
+                            {"cam_m", route.cameraAheadM ? backseat::LogNum(*route.cameraAheadM, 0) : ""}});
+  m_lastFixMs = fix.tMs;
+  // Matched to the route rebuilt around a jam: from here on it's an ordinary route.
+  if (m_trafficSettling && session.IsOnRoute())
+    m_trafficSettling = false;
   m_navigator.OnFix(fix, route);
   CheckBattery(fix.tMs);
   bool const inTrip = m_navigator.InTrip();
@@ -1270,30 +1311,14 @@ void BackseatAdapter::CheckBattery(double tMs)
 
 namespace
 {
-// Which side the driver has to move to for a maneuver: the lanes it wants are at one edge of the
-// road and not all of them. Lanes are listed left to right.
-backseat::LaneSide LaneSideFor(routing::turns::lanes::LanesInfo const & lanes)
+// The maneuver's lanes, left to right as OSM lists them: true for the ones the route wants.
+std::vector<bool> WantedLanes(routing::turns::lanes::LanesInfo const & lanes)
 {
-  using routing::turns::lanes::LaneWay;
-  size_t const n = lanes.size();
-  if (n < 2)
-    return backseat::LaneSide::None;
-  size_t first = n, last = 0, count = 0;
-  for (size_t i = 0; i < n; ++i)
-  {
-    if (lanes[i].recommendedWay == LaneWay::None)
-      continue;
-    first = std::min(first, i);
-    last = i;
-    ++count;
-  }
-  if (count == 0 || count == n)
-    return backseat::LaneSide::None;
-  if (first == 0 && last < n - 1)
-    return backseat::LaneSide::Left;
-  if (first > 0 && last == n - 1)
-    return backseat::LaneSide::Right;
-  return backseat::LaneSide::None;
+  std::vector<bool> wanted;
+  wanted.reserve(lanes.size());
+  for (auto const & lane : lanes)
+    wanted.push_back(lane.recommendedWay != routing::turns::lanes::LaneWay::None);
+  return wanted;
 }
 }  // namespace
 
@@ -2176,6 +2201,9 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
 {
   backseat::Trace("heard.app", {{"text", text}});
   HeardCommand heard;
+  // "Can you repeat the question?" mid-quiz reads it again; it isn't "repeat the instruction".
+  if (m_navigator.QuizReask(0, text))
+    return heard;
   // A pop quiz answer ("pull to the right and stop", "speed up") is an answer, not a command.
   if (m_navigator.QuizTakes(text))
   {
@@ -2231,6 +2259,12 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
       heard.kind = HeardCommand::Kind::Search;
       heard.query = guess->routine.destination;
     }
+    return heard;
+  }
+  // Mid 20 Questions, "can you use it on foot?" is a question, not walking directions.
+  if (m_navigator.TwentyTakes(text))
+  {
+    m_navigator.OnDriverSaid(0, text);
     return heard;
   }
   // A voice's code phrase ("purple monkey"): the old voice gets the last word.
@@ -2360,7 +2394,7 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     // Somewhere new (or home/work before there's enough history): let the driver pick. No naming it
     // yet: what was heard may not be what's found, and the line for what's found comes with the pick.
     heard.kind = HeardCommand::Kind::Search;
-    heard.query = command.argument;
+    heard.query = SearchQueryFor(command.argument);
     if (replyNamesPlace)
       reply.clear();
     // "Starbucks in Colorado, or Starbucks in Alaska?" Not every time, or it gets old.
@@ -2395,7 +2429,7 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
       return {};
     // With a route it's a stop on the way. Without one, it's just where we're going.
     heard.kind = m_navigator.InTrip() ? HeardCommand::Kind::SearchStop : HeardCommand::Kind::Search;
-    heard.query = command.argument;
+    heard.query = SearchQueryFor(command.argument);
     return m_navigator.Reply("cmd.findStop", {{"place", command.argument}});
   }
   case AppAction::SetTravelMode:
@@ -2436,6 +2470,15 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     m_lastReadTopic.reset();
     return m_navigator.Reply("cmd.forgot", {{"thing", *topic}});
   }
+  case AppAction::Unmute:
+    // Back on is all the way back on, whatever "shut up" did before the mute.
+    m_navigator.SetTalkLevel(backseat::TalkLevel::Full);
+    break;
+  case AppAction::TalkLess: m_navigator.SetTalkLevel(backseat::TalkLevel::Less); return m_navigator.Reply("cmd.talkLess");
+  case AppAction::DirectionsOnly:
+    m_navigator.SetTalkLevel(backseat::TalkLevel::DirectionsOnly);
+    return m_navigator.Reply("cmd.directionsOnly");
+  case AppAction::TalkMore: m_navigator.SetTalkLevel(backseat::TalkLevel::Full); return m_navigator.Reply("cmd.talkMore");
   case AppAction::BeNicer: return NicenessMoved();
   case AppAction::BeMeaner: return m_navigator.Reply("cmd.meaner");
   case AppAction::GradeSoFar:
@@ -2506,11 +2549,14 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     auto const voice = backseat::VoiceNamed(m_voices, command.argument);
     if (voice)
     {
-      // The new voice says hello itself.
+      // The new voice says hello itself, in its own personality. A voice with a personality of its own
+      // gets a word in on the way out, unless it's the same voice being asked for again.
       auto const & v = m_voices[*voice];
+      auto const persona = backseat::PersonaForVoice(v.name);
+      bool const leaving = m_navigator.GetPersona() != backseat::Persona::Critic && m_navigator.GetPersona() != persona;
       heard.actions.push_back({AppAction::ChangeVoice, v.id});
-      heard.voiceLines.push_back({v.id, m_navigator.Reply("cmd.voice", {{"voice", v.name}})});
-      return {};
+      heard.voiceLines.push_back({v.id, m_navigator.ReplyAs(persona, "cmd.voice", {{"voice", v.name}})});
+      return leaving ? m_navigator.Reply("persona.leave") : std::string();
     }
     if (command.argument.empty() && !m_voices.empty())
     {
@@ -2526,7 +2572,8 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
           word = ch == ' ';
         }
         heard.voiceLines.push_back(
-            {m_voices[i].id, m_navigator.Reply("cmd.voice.audition", {{"voice", m_voices[i].name}, {"phrase", phrase}})});
+            {m_voices[i].id, m_navigator.ReplyAs(backseat::PersonaForVoice(m_voices[i].name), "cmd.voice.audition",
+                                                 {{"voice", m_voices[i].name}, {"phrase", phrase}})});
       }
       return m_navigator.Reply("cmd.voice.list");
     }
@@ -2649,6 +2696,33 @@ std::vector<BackseatAdapter::PastRoute> BackseatAdapter::PastRoutes(size_t max) 
     out.push_back({name, p.destination, p.to.lat, p.to.lon, p.trips, p.usualMinutes});
   }
   return out;
+}
+
+std::vector<std::string> BackseatAdapter::SearchVariants(std::string const & query) const
+{
+  return backseat::QueryVariants(query);
+}
+
+std::vector<size_t> BackseatAdapter::RankSearchResults(std::string const & query,
+                                                       std::vector<backseat::PlaceCandidate> const & candidates) const
+{
+  size_t constexpr kPastPlaces = 200;
+  auto const order = backseat::RankSearchResults(query, candidates, backseat::PastPlaces(m_navigator.History(), kPastPlaces));
+  if (!order.empty() && order[0] != 0)
+    backseat::Trace("search.ranked", {{"query", query}, {"first", candidates[order[0]].name},
+                                      {"was", candidates[0].name}});
+  return order;
+}
+
+std::optional<BackseatAdapter::PastRoute> BackseatAdapter::PastRouteNamed(std::string const & query) const
+{
+  size_t constexpr kPastPlaces = 200;
+  auto const place = backseat::PastPlaceNamed(query, backseat::PastPlaces(m_navigator.History(), kPastPlaces));
+  if (!place)
+    return {};
+  backseat::Trace("search.past", {{"query", query}, {"place", place->destination}});
+  return PastRoute{place->destination, place->destination, place->to.lat, place->to.lon, place->trips,
+                   place->usualMinutes};
 }
 
 std::string BackseatAdapter::AskWhereTo()
@@ -3110,12 +3184,215 @@ std::vector<std::string> BackseatAdapter::TakeNotifications(routing::RoutingSess
   return out;
 }
 
+namespace
+{
+/// Below this much route left, a jam isn't worth a new route: the ETA is close enough already.
+double constexpr kTrafficRerouteMinLeftM = 2000;
+/// A traffic rebuild that hasn't come back by now is given up on.
+double constexpr kTrafficAskTimeoutMs = 60000;
+/// The new route leaves the jam this much sooner than the old one: it's a way around, not the same road.
+double constexpr kWayAroundMinM = 300;
+
+/// How many times longer the router takes a segment in this group: the bucket's top speed as a
+/// share of free flow, plus the 1.8 penalty CarEstimator adds to anything slowed (edge_estimator.cpp).
+double TrafficSlowdown(traffic::SpeedGroup group)
+{
+  static double constexpr kTopPercent[] = {8, 16, 33, 58, 83, 100};
+  auto const i = static_cast<size_t>(group);
+  if (i >= std::size(kTopPercent) || group == traffic::SpeedGroup::G5)
+    return 1;
+  return 100.0 / kTopPercent[i] * 1.8;
+}
+
+traffic::TrafficInfo::RoadSegmentId RoadSegmentOf(routing::Segment const & segment)
+{
+  return {segment.GetFeatureId(), static_cast<uint16_t>(segment.GetSegmentIdx()),
+          segment.IsForward() ? traffic::TrafficInfo::RoadSegmentId::kForwardDirection
+                              : traffic::TrafficInfo::RoadSegmentId::kReverseDirection};
+}
+
+/// What a road on the route is called out loud: its number ("I-25") or its name.
+std::string RoadNameOf(routing::RouteSegment const & segment)
+{
+  auto const & road = segment.GetRoadNameInfo();
+  std::string const name = !road.m_ref.empty() ? road.m_ref : road.m_name;
+  return SpeakableStreetName(name);
+}
+
+/// The segment's time on the route: when it ends minus when the one before it ended.
+double SegmentTimeS(std::vector<routing::RouteSegment> const & segments, size_t i)
+{
+  return segments[i].GetTimeFromBeginningSec() - (i > 0 ? segments[i - 1].GetTimeFromBeginningSec() : 0);
+}
+double SegmentStartM(std::vector<routing::RouteSegment> const & segments, size_t i)
+{
+  return i > 0 ? segments[i - 1].GetDistFromBeginningMeters() : 0;
+}
+}  // namespace
+
+void BackseatAdapter::ApplyTraffic(routing::RoutingSession & session)
+{
+  if (m_trafficAsk && m_lastFixMs - m_trafficAsk->askedAtMs > kTrafficAskTimeoutMs)
+  {
+    backseat::Trace("traffic.rebuildLost", {});
+    m_trafficAsk.reset();
+  }
+  if (!m_jamPending)
+    return;
+  auto const jam = *std::exchange(m_jamPending, std::nullopt);
+  auto const route = session.IsActive() ? session.GetRouteForTests() : nullptr;
+  bool const following = route && route->IsValid() && route->GetFollowedPolyline().IsValid() &&
+                         session.IsOnRoute();
+  static std::vector<routing::RouteSegment> const kNoSegments;
+  auto const & segments = following ? route->GetRouteSegments() : kNoSegments;
+  double const hereM = following ? route->GetCurrentDistanceFromBeginMeters() : 0;
+
+  if (!jam)
+  {
+    // Moving again: off the map. If the route still runs through the slow stretch, rebuild it once
+    // so the ETA stops counting a jam that's gone.
+    m_observedJams.clear();
+    bool slowAhead = false;
+    for (size_t i = 0; i < segments.size() && !slowAhead; ++i)
+      slowAhead = segments[i].GetDistFromBeginningMeters() > hereM &&
+                  segments[i].GetTraffic() != traffic::SpeedGroup::Unknown;
+    traffic::AllMwmTrafficInfo none;
+    if (slowAhead && !m_trafficAsk)
+    {
+      m_trafficAsk.emplace();
+      m_trafficAsk->askedAtMs = m_lastFixMs;
+      m_trafficAsk->oldLeftS = route->GetCurrentTimeToEndSec();
+      backseat::Trace("traffic.unmark", {{"rebuild", "yes"}});
+      session.SetObservedTraffic(none, true /* rebuild */);
+    }
+    else
+    {
+      session.SetObservedTraffic(none, false /* rebuild */);
+    }
+    return;
+  }
+  if (!following || m_trafficAsk)
+    return;
+
+  // The measured stretch keeps its own speed; the guess ahead of the car is marked a step faster,
+  // so a guess alone doesn't send the driver on a long detour.
+  auto const measured = traffic::GetSpeedGroupByPercentage(jam->speedShare * 100);
+  auto const guessed = static_cast<traffic::SpeedGroup>(
+      std::min(static_cast<int>(measured) + 1, static_cast<int>(traffic::SpeedGroup::G4)));
+  TrafficAsk ask;
+  ask.askedAtMs = m_lastFixMs;
+  ask.oldLeftS = route->GetCurrentTimeToEndSec();
+  int marked = 0;
+  for (size_t i = 0; i < segments.size(); ++i)
+  {
+    double const startM = SegmentStartM(segments, i);
+    double const endM = segments[i].GetDistFromBeginningMeters();
+    if (endM < hereM - jam->behindM)
+      continue;
+    if (startM > hereM + jam->aheadM)
+      break;
+    auto const & segment = segments[i].GetSegment();
+    auto const & feature = segments[i].GetRoadNameInfo().m_mwmId;
+    if (!segment.IsRealSegment() || !feature.IsValid() || feature.m_index != segment.GetFeatureId())
+      continue;
+    auto const group = endM <= hereM ? measured : guessed;
+    auto & mwm = m_observedJams[feature.m_mwmId];
+    if (!mwm)
+      mwm = std::make_shared<std::map<traffic::TrafficInfo::RoadSegmentId, traffic::SpeedGroup>>();
+    auto const id = RoadSegmentOf(segment);
+    // Marked before: keep the slower of the two readings.
+    auto const [it, added] = mwm->emplace(id, group);
+    if (!added)
+      it->second = std::min(it->second, group);
+    ++marked;
+    if (endM <= hereM)
+      continue;
+    double const share = (endM - std::max(startM, hereM)) / std::max(1.0, endM - startM);
+    ask.jammedAhead.insert(id);
+    ask.jamAheadM += endM - std::max(startM, hereM);
+    ask.jamExtraS += SegmentTimeS(segments, i) * share * (TrafficSlowdown(group) - 1);
+    if (auto name = RoadNameOf(segments[i]); !name.empty())
+      ask.jamRoads.insert(std::move(name));
+  }
+  double const leftM = route->GetCurrentDistanceToEndMeters();
+  backseat::Trace("traffic.mark", {{"segments", std::to_string(marked)},
+                                   {"group", std::to_string(static_cast<int>(measured))},
+                                   {"extra_s", backseat::LogNum(ask.jamExtraS, 0)},
+                                   {"left_m", backseat::LogNum(leftM, 0)}});
+  if (marked == 0)
+    return;
+  traffic::AllMwmTrafficInfo coloring;
+  for (auto const & [mwmId, jammed] : m_observedJams)
+  {
+    auto copy = std::make_shared<traffic::TrafficInfo::Coloring>();
+    for (auto const & [id, group] : *jammed)
+      (*copy)[id] = group;
+    coloring[mwmId] = std::move(copy);
+  }
+  // Almost there: the jam goes on the map for the ETA, but a whole new route isn't worth it.
+  bool const rebuild = leftM >= kTrafficRerouteMinLeftM;
+  if (rebuild)
+    m_trafficAsk = std::move(ask);
+  session.SetObservedTraffic(coloring, rebuild);
+}
+
+void BackseatAdapter::OnRouteRebuilt(routing::Route const & route, bool ok)
+{
+  if (!m_trafficAsk)
+    return;
+  TrafficAsk const ask = *std::exchange(m_trafficAsk, std::nullopt);
+  if (!ok || !route.IsValid())
+  {
+    backseat::Trace("traffic.rebuildFailed", {});
+    return;
+  }
+  m_trafficSettling = true;
+  auto const & segments = route.GetRouteSegments();
+  backseat::TrafficReroute result;
+  double jamNewM = 0;
+  bool leftJam = false;
+  for (size_t i = 0; i < segments.size(); ++i)
+  {
+    double const lenM = segments[i].GetDistFromBeginningMeters() - SegmentStartM(segments, i);
+    auto const & segment = segments[i].GetSegment();
+    bool const jammed = segment.IsRealSegment() && ask.jammedAhead.count(RoadSegmentOf(segment)) > 0;
+    if (jammed)
+      jamNewM += lenM;
+    // What the rest of the jam costs on this route (its segment times already count it).
+    double const slow = TrafficSlowdown(segments[i].GetTraffic());
+    result.delayS += SegmentTimeS(segments, i) * (1 - 1 / slow);
+    // The first named road off the jam is the way around.
+    if (!leftJam && !jammed && i > 0 && segment.IsRealSegment())
+    {
+      std::string name = RoadNameOf(segments[i]);
+      if (!name.empty() && !ask.jamRoads.count(name))
+      {
+        leftJam = true;
+        result.via = std::move(name);
+      }
+    }
+  }
+  result.newRoute = jamNewM + kWayAroundMinM < ask.jamAheadM;
+  double const newLeftS = route.GetTotalTimeSec();
+  if (result.newRoute)
+    result.savedS = std::max(0.0, ask.oldLeftS + ask.jamExtraS - newLeftS);
+  else
+    result.via.clear();
+  backseat::Trace("traffic.rebuilt", {{"new", result.newRoute ? "yes" : "no"},
+                                      {"old_left_s", backseat::LogNum(ask.oldLeftS + ask.jamExtraS, 0)},
+                                      {"new_left_s", backseat::LogNum(newLeftS, 0)},
+                                      {"jam_m", backseat::LogNum(ask.jamAheadM, 0)},
+                                      {"jam_new_m", backseat::LogNum(jamNewM, 0)}});
+  m_navigator.OnTrafficReroute(m_lastFixMs, result);
+}
+
 backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const & session,
                                                   std::string const & destinationName) const
 {
   using routing::SessionState;
   backseat::RouteSnapshot snap;
   m_secondsLeft = -1;
+  m_cameraAheadM = -1;
   if (!session.IsActive() || !session.IsFollowing())
     return snap;
   auto const route = session.GetRouteForTests();
@@ -3129,9 +3406,15 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
   {
   case SessionState::OnRoute: snap.state = backseat::RouteState::OnRoute; break;
   case SessionState::RouteNotStarted:
+    // Rebuilt around a jam from where the car is: it never left the road.
+    snap.state = m_trafficSettling ? backseat::RouteState::OnRoute : backseat::RouteState::NotStarted;
+    break;
   case SessionState::RouteBuilding: snap.state = backseat::RouteState::NotStarted; break;
-  case SessionState::RouteNeedsRebuild:
   case SessionState::RouteRebuilding:
+    // Rebuilding around a jam isn't the driver going off route.
+    snap.state = m_trafficAsk ? backseat::RouteState::OnRoute : backseat::RouteState::OffRoute;
+    break;
+  case SessionState::RouteNeedsRebuild:
   case SessionState::OffRoute: snap.state = backseat::RouteState::OffRoute; break;
   case SessionState::RouteFinished: snap.state = backseat::RouteState::Finished; break;
   case SessionState::NoValidRoute:
@@ -3217,11 +3500,24 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
     if (!turn.IsTurnNone())
     {
       snap.turnId = turn.m_index;
+      snap.routeId = route->GetRouteId();
       snap.turn = ToTurnKind(turn);
       snap.distToTurnM = distanceToTurnM;
-      snap.nextStreet = SpeakableStreetName(info.m_nextStreetName);
+      // From the router's road-name parts, not the screen text, so the exit number survives a
+      // sign that also names towns ("[42B]: [I 35] > Dallas" read as "toward Dallas" lost it).
+      backseat::RoadSign sign;
+      sign.name = info.m_nextName;
+      sign.ref = info.m_nextRef;
+      sign.junctionRef = info.m_nextJunctionRef;
+      sign.destinationRef = info.m_nextDestinationRef;
+      sign.destination = info.m_nextDestination;
+      sign.isLink = info.m_nextIsLink;
+      backseat::SpokenRoad const spoken = backseat::SpeakRoad(sign);
+      snap.nextStreet = spoken.street.empty() ? SpeakableStreetName(info.m_nextStreetName) : spoken.street;
+      snap.nextExitRef = spoken.exitRef;
       snap.control = GuessControl(*route, turn.m_index);
-      snap.laneSide = LaneSideFor(turn.m_lanes);
+      snap.lanes = WantedLanes(turn.m_lanes);
+      snap.laneSide = backseat::LaneAdviceFor(snap.lanes).side;
       // The maneuver after it, for "turn left onto Winesap Drive, then right onto Cameo Lane".
       std::vector<routing::turns::TurnItemDist> next;
       if (route->GetNextTurns(next) && next.size() >= 2 && !next[1].m_turnItem.IsTurnNone())
@@ -3246,6 +3542,47 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
       }
       snap.curveAheadM = backseat::CurveAheadM(ahead, 450);
     }
+    SetCameraAhead(*route, snap);
   }
   return snap;
+}
+
+void BackseatAdapter::SetCameraAhead(routing::Route const & route, backseat::RouteSnapshot & snap) const
+{
+  // The map's speed cameras (highway=speed_camera) sit on the route's segments, each at a fraction
+  // of its segment. Segment i runs from segment i-1's junction to its own.
+  double constexpr kLookAheadM = 2000;
+  m_cameraAheadM = -1;
+  auto const & followed = route.GetFollowedPolyline();
+  auto const & segments = route.GetRouteSegments();
+  if (!followed.IsValid() || segments.empty())
+    return;
+  double const passedM = route.GetCurrentDistanceFromBeginMeters();
+  size_t const from = followed.GetCurrentIter().m_ind;
+  for (size_t i = from > 0 ? from - 1 : 0; i < segments.size(); ++i)
+  {
+    double const startM = i > 0 ? segments[i - 1].GetDistFromBeginningMeters() : 0;
+    if (startM - passedM > kLookAheadM)
+      return;
+    auto const & cams = segments[i].GetSpeedCams();
+    if (cams.empty())
+      continue;
+    double const lengthM = segments[i].GetDistFromBeginningMeters() - startM;
+    m2::PointD const a = i > 0 ? segments[i - 1].GetJunction().GetPoint() : followed.GetPolyline().Front();
+    m2::PointD const b = segments[i].GetJunction().GetPoint();
+    for (auto const & cam : cams)
+    {
+      double const atM = startM + lengthM * cam.m_coef;
+      if (atM <= passedM)
+        continue;
+      if (atM - passedM > kLookAheadM)
+        return;
+      snap.cameraAheadM = atM - passedM;
+      snap.cameraAt = ToBackseatLatLon(a + (b - a) * cam.m_coef);
+      if (cam.m_maxSpeedKmPH > 0 && cam.m_maxSpeedKmPH != routing::SpeedCameraOnRoute::kNoSpeedInfo)
+        snap.cameraLimitMps = measurement_utils::KmphToMps(cam.m_maxSpeedKmPH);
+      m_cameraAheadM = *snap.cameraAheadM;
+      return;
+    }
+  }
 }

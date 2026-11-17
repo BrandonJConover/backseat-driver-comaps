@@ -49,6 +49,18 @@ struct EngineConfig
   double hardBrakeMps2 = 3.5;
   /// Acceleration (m/s²) that counts as a jackrabbit start.
   double hardAccelMps2 = 3.0;
+  /// A one-second speed change past this (m/s²) is a GPS glitch, not driving: no car brakes or launches
+  /// much past 1.2 g, and a real emergency stop is about 9. Such a step isn't judged, and the next one is
+  /// measured from the last believable sample, so a 25 -> 8 -> 25 m/s blip is neither a hard brake nor a
+  /// launch while 25 -> 8 -> 8 still counts (as 8.5 m/s² over two seconds). 0: off (the TS engine's behavior).
+  double implausibleMps2 = 0;
+  /// Hold a hard-brake / hard-launch roast until the car has settled: |accel| under jerkSettleMps2 (or
+  /// stopped) for this long, not in a bend and not near a turn call. The stats and incident log still
+  /// count it at the onset. Dropped after jerkSettleGiveUpMs or once a turn is completed. A roast in the
+  /// middle of an emergency stop is the last thing a driver needs. 0: off (the TS engine's behavior).
+  double jerkSettleMs = 0;
+  double jerkSettleMps2 = 1.0;
+  double jerkSettleGiveUpMs = 20000;
   /// Display units under the limit, sustained for tooSlowAfterMs, to get called slow.
   double tooSlowMargin = 15;
   double tooSlowAfterMs = 20000;
@@ -66,6 +78,13 @@ struct EngineConfig
   /// 0 keeps the plain speedingRenagMs (the TS engine's behavior).
   double speedingRenagMaxMs = 0;
   double speedingResetMs = 30000;
+  /// Over the limit (past the tolerance) this long before it counts: no speeding line or incident
+  /// for a one-fix limit glitch (a frontage road snapped for a second). 0: at once (the TS engine).
+  double speedingSustainMs = 0;
+  /// After the posted limit drops by 10 mph / 15 km/h or more, this long a car that's slowing down
+  /// (or still within the old limit) is judged against the old limit, so braking into a 35 zone
+  /// isn't speeding. 0: the new limit at once (the TS engine).
+  double speedingDropGraceMs = 0;
   /// Distances for the "you are turning left in 500 feet / 50 feet" nags.
   double countdownFarM = 152;  // 500 ft
   double countdownNearM = 15;  // 50 ft
@@ -74,8 +93,9 @@ struct EngineConfig
   /// Speed that counts as rolling along (heading checks, "how long until the turn"). A walker
   /// rolls at 1 m/s; a car at 3.
   double rollingMps = 3;
-  /// A turn announced this long ago and still not reached is forgotten (heading checks, countdown).
-  /// Three minutes in a car; on foot the next turn can be ten minutes away.
+  /// A turn with no progress toward it for this long is stale: heading checks ignore it until the
+  /// car gets closer again (loop B146; was: this long since it was announced, which dropped the
+  /// countdown on any approach over three minutes). Three minutes in a car; on foot ten or more.
   double pendingTurnForgetMs = 180000;
   /// A stretch at least this long to the next maneuver gets "Please continue straight." nags,
   /// one every straightNagEveryMs of driving, three at most.
@@ -95,6 +115,15 @@ struct EngineConfig
   /// tacked onto a direction for a turn that's seconds away. The Navigator turns it on; off by
   /// default so the TS engine's parity trace still holds.
   bool speechAware = false;
+  /// A heading swing the wrong way near a turn is only a wrong turn once the route agrees: the car left
+  /// it (LeftRoute) or the router called the turn missed. Still on the route and closing in on the turn,
+  /// it was a bend in the road and nothing is said. The Navigator turns it on; off keeps TS parity.
+  bool confirmWrongTurns = false;
+  /// Jam lines that blame the driver's route ("Why did you go this way? I told you to take I-25.") only
+  /// when the driver went their own way first (NoteDetour); a jam on the route as given gets
+  /// traffic.start.onRoute / traffic.onRoute, which blame the traffic instead. The Navigator turns it
+  /// on; off by default so the TS engine's parity trace still holds.
+  bool trafficBlameNeedsDetour = false;
   Rng rng;
   LineSource * lineSource = nullptr;
   /// Lines said on earlier trips, so picks avoid them too. Not owned; null keeps it per trip.
@@ -123,6 +152,23 @@ TurnShape TurnShapeOf(std::string const & text);
 /// "Turn left onto Elm Street, then right onto Oak Lane" -> "Turn left onto Elm Street".
 std::string FirstManeuver(std::string const & text);
 
+/// The plain call a few seconds before the maneuver: "Now, turn left onto Elm Street." At an exit
+/// it stops at the number, since the sign was read already: "Now, take exit 42B on the right."
+std::string FinalCallText(std::string const & instruction);
+
+/// Which roundabout exit an instruction names: "At the roundabout, take the third exit onto Oak
+/// Street" -> "third", "take exit 12" -> "12", anything else -> "" (loop B99).
+std::string RoundaboutExitOf(std::string const & instruction);
+
+/// The roundabout countdown's exit sentence, from the line's "exit" var: "Third exit.", "Exit 12.";
+/// tier 2 shouts it ("THIRD EXIT!"). Empty when the var is missing or empty (loop B99).
+std::string ExitCallFor(Vars const & vars, int tier);
+
+/// The final roundabout call with its exit sentence right after the first sentence that names the
+/// maneuver: ("Roundabout. Now. Smoothly.", "Third exit.") -> "Roundabout. Third exit. Now. Smoothly.".
+/// No such sentence: the call goes at the end. Empty call: the text unchanged (loop B172).
+std::string WithExitCallAfterManeuver(std::string const & text, std::string const & call);
+
 /// The spoken direction: "In 500 feet, turn left onto Elm Street.", "In a quarter mile, at the light,
 /// turn right onto Oak Lane.", "Your destination, Sundance Lane, is 400 feet ahead."
 std::string DirectionText(std::string const & text, double distanceM, Units units, Control control = Control::None);
@@ -137,19 +183,52 @@ public:
 
   std::vector<Commentary> OnTelemetry(TelemetrySample const & s);
   std::vector<Commentary> OnNav(NavEvent const & e);
+  /// The router took the car off the route: a wrong-way swing waiting for that is said now
+  /// (confirmWrongTurns only; nothing otherwise).
+  std::vector<Commentary> LeftRoute(double t);
+  /// A wrong-way swing is waiting for the route to confirm it (confirmWrongTurns only).
+  bool WrongTurnPending() const { return m_wrongPending.has_value(); }
+  /// Hold the parked-mid-route longStop remark until `untilMs` (0 = no hold). The navigator sets this
+  /// when a stop starts on a road fast enough to judge traffic on: until its traffic window has seen
+  /// the stop, the stop may be a jam about to be called, and "We've been stopped for a while" eight
+  /// seconds before "Traffic. Great." is one remark too many (BI-056).
+  void HoldLongStop(double untilMs) { m_longStopHoldUntil = untilMs; }
+  /// The driver went against the directions: left the route and got rerouted, or drew their own,
+  /// slower route (`wholeTrip`). A jam called within kDetourBlamesJamMs of it (or any time, for a drawn
+  /// route) may blame the route they chose (trafficBlameNeedsDetour). A missed turn and a reroute
+  /// roast count on their own; the Navigator calls this for the reroutes it keeps quiet about.
+  void NoteDetour(double t, bool wholeTrip = false);
+  /// The jam being called is one the driver's own route choice can take the blame for.
+  bool JamBlamesRoute() const { return m_jamBlamesRoute; }
+  /// How long after a detour a new jam still counts as the detour's fault.
+  static constexpr double kDetourBlamesJamMs = 20 * 60000;
+  /// No speeding lines until `untilMs` (a speed camera line just covered it). Speeding is still
+  /// timed and logged, and the band it reached counts as said.
+  void HushSpeeding(double untilMs) { m_speedingHushUntil = std::max(m_speedingHushUntil, untilMs); }
+  /// `speedMps` is over `limitMps` by more than the speeding tolerance for that limit.
+  bool Over(double speedMps, double limitMps) const;
 
   int Frustration() const;
   TripStats const & Stats() const { return m_stats; }
+  /// Stops counted this trip (each dead stop once, however long).
+  int StopCount() const { return m_stopCount; }
   /// Everything the driver did wrong, in order, with positions. Persist this per trip.
   std::vector<Incident> const & Incidents() const { return m_incidents; }
-  /// Grade + heat map. Valid mid-trip too.
+  /// Grade + heat map. Valid mid-trip too. Built once and reused until an incident or a stat changes
+  /// (arrival asks for it 3-4 times; each build rounds every heat-map cell).
   TripReport Report() const;
+  /// How many times Report() actually rebuilt (tests and traces; cached calls don't count).
+  int ReportBuilds() const { return m_reportBuilds; }
   EngineConfig const & Config() const { return m_config; }
   /// The driver changed units mid-trip: speeds, distances and thresholds follow from the next sample.
   void SetUnits(Units units) { m_config = ForUnits(m_config, units); }
 
   /// The phone is busy saying what it was handed until about `t` (speechAware only).
   void SetTalkingUntil(double t) { m_talkingUntil = std::max(m_talkingUntil, t); }
+  /// The road is curving or the car is swinging round (Navigator::Bending): a held brake roast waits.
+  void SetBending(bool bending) { m_bending = bending; }
+  /// A hard brake/launch roast is waiting for the car to settle (jerkSettleMs).
+  bool JerkRoastWaiting() const { return m_pendingJerk.has_value(); }
   /// A line that takes `speakMs` to say would get in the way of the next turn: it would still be
   /// playing when the final call is due, or the final call is out and the turn isn't done yet.
   /// Always false unless speechAware.
@@ -184,6 +263,14 @@ private:
     bool turned = false;
     /// "Your other left" was already said for this maneuver.
     bool wrongSaid = false;
+    /// Last time the car got 20 m+ closer to the maneuver, and the distance then (loop B146). A turn
+    /// counts as stale for heading checks only after pendingTurnForgetMs with no such progress, so a
+    /// long approach (an exit 15 km out) keeps its countdown.
+    std::optional<double> aliveAt = std::nullopt;
+    double aliveDistM = 0;
+    /// When the last progress update for this maneuver came, so the countdown knows how far the
+    /// next one will jump (loop B148: sparse fixes stepped over the final call).
+    std::optional<double> lastProgressAt = std::nullopt;
   };
 
   /// "Please continue straight." ... "You should still be going straight." ... "I'm serious."
@@ -202,6 +289,7 @@ private:
   };
 
   void CheckSpeeding(TelemetrySample const & s, TelemetrySample const * prev, std::vector<Commentary> & out);
+  void SpeedCameraAhead(std::vector<Commentary> & out, NavEvent const & e);
   void CheckTooSlow(TelemetrySample const & s, std::vector<Commentary> & out);
   void CheckStopped(TelemetrySample const & s, std::vector<Commentary> & out);
   void CheckTurnDirection(TelemetrySample const & s, std::vector<Commentary> & out);
@@ -226,7 +314,10 @@ private:
   EngineConfig m_config;
   double m_frustration = 0;
   std::optional<TelemetrySample> m_lastSample;
+  /// The sample before an implausible speed jump: the next step's acceleration is measured from it.
+  std::optional<TelemetrySample> m_beforeGlitch;
   double FarM() const;
+  double SayDistanceM(double triggerM, double distanceM) const;
   double FinalM() const;
   /// Where the final call goes with speechAware: FinalM(), or farther out when the call is long or
   /// the phone is still talking, so it's over before the car gets to the turn.
@@ -245,19 +336,58 @@ private:
   std::optional<SpeedBand> m_speedingBand;
   double m_lastSpeedingLineAt;
   double m_lastBarelyLineAt = -1e18;
+  /// See HushSpeeding.
+  double m_speedingHushUntil = -1e18;
+  int ToleranceFor(double limitMps) const;
   /// "Still speeding" nags since the driver was last under the limit for a while.
   int m_speedingRenags = 0;
   std::optional<double> m_underLimitSince;
+  /// Since when the car has been over the posted limit (speedingSustainMs).
+  std::optional<double> m_overLimitSince;
+  /// The last known posted limit, and the limit before a big drop with when it dropped
+  /// (speedingDropGraceMs).
+  std::optional<double> m_prevLimitMps;
+  std::optional<double> m_dropFromLimitMps;
+  double m_limitDroppedAt = -1e18;
   std::optional<double> m_slowSince;
   std::optional<double> m_stoppedSince;
   int m_stopCount = 0;
+  /// longStop remarks during the current stop; each waits twice as long as the last, then they stop.
+  int m_longStopRemarks = 0;
+  static constexpr int kLongStopRemarksPerStop = 3;
+  /// When an unplannedStop remark last spoke, so longStop doesn't land in the same breath.
+  double m_lastUnplannedStopAt = -1e18;
+  /// See HoldLongStop.
+  double m_longStopHoldUntil = 0;
   bool m_braking = false;
   bool m_accelerating = false;
+  /// A hard brake/launch roast held until the car settles (jerkSettleMs).
+  struct PendingJerk
+  {
+    Category category;
+    std::string key;
+    double since;
+    int turnsDone;
+  };
+  std::optional<PendingJerk> m_pendingJerk;
+  /// Since when |accel| has stayed under jerkSettleMps2.
+  std::optional<double> m_steadySince;
+  bool m_bending = false;
+  void JerkRoast(std::vector<Commentary> & out, double t, Category category, std::string const & key);
+  void ReleaseJerk(std::vector<Commentary> & out, double t);
   double m_lastSpeedingLogAt;
   std::optional<std::string> m_lastInstructionText;
   std::optional<double> m_lastInstructionDistanceM;
   std::optional<LatLon> m_position;
   std::optional<std::string> m_trafficAlternate;  // set while stuck in heavy traffic
+  /// The last time the driver went their own way (NoteDetour), and whether it lasts the trip.
+  std::optional<double> m_lastDetourAt;
+  bool m_detourWholeTrip = false;
+  /// Decided when a jam is called: may its lines blame the driver's route?
+  bool m_jamBlamesRoute = true;
+  bool DetourBlamesJam(double t) const;
+  /// "traffic" when the jam may blame the route, "traffic.onRoute" when it may not.
+  char const * TrafficKey() const { return m_jamBlamesRoute ? "traffic" : "traffic.onRoute"; }
   /// The left/right turn we're waiting for, so a turn the other way can be caught.
   std::optional<PendingTurn> m_pendingTurn;
   std::optional<StraightNag> m_straight;
@@ -268,6 +398,18 @@ private:
   bool m_nascarSaid = false;
   std::vector<Heading> m_headings;
   double m_lastWrongTurnAt;
+  /// A wrong-way heading swing waiting for the route to back it up (confirmWrongTurns).
+  struct WrongPending
+  {
+    double t = 0;
+    TurnDirection expected = TurnDirection::Left;
+    TurnDirection turned = TurnDirection::Right;
+    double distM = 0;
+  };
+  std::optional<WrongPending> m_wrongPending;
+  /// When the router last took the car off the route (LeftRoute); a swing right after is confirmed.
+  std::optional<double> m_leftRouteAt;
+  void SayWrongPending(std::vector<Commentary> & out, double t);
   bool m_hasDestination = false;
   std::optional<double> m_movingWithoutDestinationSince;
   double m_lastNoDestinationAt;
@@ -284,5 +426,11 @@ private:
   std::vector<Incident> m_incidents;
   bool m_arrived = false;
   TripStats m_stats;
+  /// Report() cache: the report plus the incident count and stats it was built from. Incidents are only
+  /// ever appended, so a count and a stats match mean nothing it reads has changed.
+  mutable std::optional<TripReport> m_report;
+  mutable size_t m_reportIncidents = 0;
+  mutable TripStats m_reportStats;
+  mutable int m_reportBuilds = 0;
 };
 }  // namespace backseat

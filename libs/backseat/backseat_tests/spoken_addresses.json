@@ -1,0 +1,210 @@
+{
+ "about": "Shared expectations for house numbers said in pairs, the way people read an address. Backseat Driver: backseat::pronunciation::ForSpeech / HouseNumbers (libs/backseat/backseat_tests/spoken_addresses.json). EpubToM4B can port the rule (books quote '221B Baker Street', '1600 Pennsylvania Avenue'); keep both copies in sync.",
+ "cases": [
+  {
+   "input": "Arriving at 1600 Pennsylvania Ave NW",
+   "language": "en",
+   "expected": "Arriving at sixteen hundred Pennsylvania Avenue Northwest"
+  },
+  {
+   "input": "Your destination, 4521 Oak St, is on the right.",
+   "language": "en",
+   "expected": "Your destination, forty five twenty one Oak Street, is on the right."
+  },
+  {
+   "input": "Arrive at 105 N Main St",
+   "language": "en",
+   "expected": "Arrive at one oh five North Main Street"
+  },
+  {
+   "input": "Arrive at 350 5th Ave",
+   "language": "en",
+   "expected": "Arrive at three fifty fifth Avenue"
+  },
+  {
+   "input": "Arrive at 1005 Elm Dr.",
+   "language": "en",
+   "expected": "Arrive at ten oh five Elm Drive."
+  },
+  {
+   "input": "Arrive at 2000 Lake Shore Dr",
+   "language": "en",
+   "expected": "Arrive at two thousand Lake Shore Drive"
+  },
+  {
+   "input": "Arrive at 100 Main St",
+   "language": "en",
+   "expected": "Arrive at one hundred Main Street"
+  },
+  {
+   "input": "Arrive at 1400 Martin Luther King Jr Blvd",
+   "language": "en",
+   "expected": "Arrive at fourteen hundred Martin Luther King Junior Boulevard"
+  },
+  {
+   "input": "Arrive at 3502 St. Johns Rd",
+   "language": "en",
+   "expected": "Arrive at thirty five oh two Saint Johns Road"
+  },
+  {
+   "input": "Arrive at 742 Evergreen Terrace",
+   "language": "en",
+   "expected": "Arrive at seven forty two Evergreen Terrace"
+  },
+  {
+   "input": "Arrive at 221 Baker Street",
+   "language": "en",
+   "expected": "Arrive at two twenty one Baker Street"
+  },
+  {
+   "input": "Arrive at 1 Infinite Loop",
+   "language": "en",
+   "expected": "Arrive at one Infinite Loop"
+  },
+  {
+   "input": "Arrive at 1060 W Addison St",
+   "language": "en",
+   "expected": "Arrive at ten sixty West Addison Street"
+  },
+  {
+   "input": "Arrive at 900 Ocean Way",
+   "language": "en",
+   "expected": "Arrive at nine hundred Ocean Way"
+  },
+  {
+   "input": "Arrive at 0450 Pine Ct",
+   "language": "en",
+   "expected": "Arrive at zero four five zero Pine Court"
+  },
+  {
+   "input": "In 500 ft, turn left onto Oak St",
+   "language": "en",
+   "expected": "In five hundred feet, turn left onto Oak Street"
+  },
+  {
+   "input": "In 1,600 feet, keep right",
+   "language": "en",
+   "expected": "In one thousand six hundred feet, keep right"
+  },
+  {
+   "input": "Drive 1600 miles to Main St",
+   "language": "en",
+   "expected": "Drive one thousand six hundred miles to Main Street"
+  },
+  {
+   "input": "Arrive at 12345 Main St",
+   "language": "en",
+   "expected": "Arrive at twelve thousand three hundred forty five Main Street"
+  },
+  {
+   "input": "Arrive at 42 Wallaby Way",
+   "language": "en",
+   "expected": "Arrive at forty two Wallaby Way"
+  },
+  {
+   "input": "Arrive at 1600 Pennsylvania",
+   "language": "en",
+   "expected": "Arrive at one thousand six hundred Pennsylvania"
+  },
+  {
+   "input": "It is 1600 Pennsylvania voters",
+   "language": "en",
+   "expected": "It is one thousand six hundred Pennsylvania voters"
+  },
+  {
+   "input": "Take I-405 to 1600 Main St",
+   "language": "en",
+   "expected": "Take I four oh five to sixteen hundred Main Street"
+  },
+  {
+   "input": "Suite A1234 Main St",
+   "language": "en",
+   "expected": "Suite A1234 Main Street"
+  },
+  {
+   "input": "Arrive at 2200 S Lamar Blvd Ste 200",
+   "language": "en",
+   "expected": "Arrive at twenty two hundred South Lamar Boulevard Suite two hundred"
+  },
+  {
+   "input": "Arrive at 500 W 2nd St Bldg 4",
+   "language": "en",
+   "expected": "Arrive at five hundred West second Street Building four"
+  },
+  {
+   "input": "Arrive at 12 Elm Ct Apt B",
+   "language": "en",
+   "expected": "Arrive at twelve Elm Court Apartment B"
+  },
+  {
+   "input": "Arrive at 301 W 2nd St Unit 5",
+   "language": "en",
+   "expected": "Arrive at three oh one West second Street Unit five"
+  },
+  {
+   "input": "Arrive at 4521 Oak St, Ste 110",
+   "language": "en",
+   "expected": "Arrive at forty five twenty one Oak Street, Suite one hundred ten"
+  },
+  {
+   "input": "Arrive at 900 Main St Ste #300",
+   "language": "en",
+   "expected": "Arrive at nine hundred Main Street Suite three hundred"
+  },
+  {
+   "input": "Arrive at 100 Main St #200",
+   "language": "en",
+   "expected": "Arrive at one hundred Main Street number two hundred"
+  },
+  {
+   "input": "Arrive at 700 Pine Ave Fl 3",
+   "language": "en",
+   "expected": "Arrive at seven hundred Pine Avenue Floor three"
+  },
+  {
+   "input": "Arrive at 40 Oak Ln Unit E",
+   "language": "en",
+   "expected": "Arrive at forty Oak Lane Unit E"
+  },
+  {
+   "input": "Arrive at 100 Congress Ave Bldg 2 Ste 300",
+   "language": "en",
+   "expected": "Arrive at one hundred Congress Avenue Building two Suite three hundred"
+  },
+  {
+   "input": "Arrive at 1005 Elm Dr. Ste 4",
+   "language": "en",
+   "expected": "Arrive at ten oh five Elm Drive Suite four"
+  },
+  {
+   "input": "Arrive at 88 Airport Rd Hngr 7",
+   "language": "en",
+   "expected": "Arrive at eighty eight Airport Road Hangar seven"
+  },
+  {
+   "input": "Arrive at 105 N Main St NW Apt C",
+   "language": "en",
+   "expected": "Arrive at one oh five North Main Street Northwest Apartment C"
+  },
+  {
+   "input": "Arriving in Miami, Fl",
+   "language": "en",
+   "expected": "Arriving in Miami, Fl"
+  },
+  {
+   "input": "That is an apt name for Main St",
+   "language": "en",
+   "expected": "That is an apt name for Main Street"
+  },
+  {
+   "input": "Lake Rm 5 is booked",
+   "language": "en",
+   "expected": "Lake Rm five is booked"
+  },
+  {
+   "input": "Arrive at Ste. Genevieve Ave",
+   "language": "en",
+   "expected": "Arrive at Saint Genevieve Avenue"
+  }
+ ]
+}

@@ -23,10 +23,19 @@ import CoreLocation
     let savedRoute: BackseatSavedRoutes.Route?
   }
 
+  private static var rememberedThisTrip = false
+
   static func install() {
     NotificationCenter.default.addObserver(forName: BackseatTalkButton.navigationVisibilityChanged, object: nil,
                                            queue: .main) { note in
-      if (note.object as? Bool) ?? false { remember() }
+      // Once per trip: handing a trip from the car screen to the phone says "navigating" again,
+      // and that mustn't move the way home to wherever the hand-off happened.
+      if (note.object as? Bool) ?? false {
+        if !rememberedThisTrip { remember() }
+        rememberedThisTrip = true
+      } else {
+        rememberedThisTrip = false
+      }
     }
   }
 

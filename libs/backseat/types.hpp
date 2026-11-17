@@ -26,6 +26,12 @@ struct TelemetrySample
 {
   double t = 0;
   double speedMps = 0;
+  /// False when the GPS gave no speed and `speedMps` is a stand-in (the last known speed carried
+  /// through a tunnel, or 0). The engine doesn't judge braking or acceleration across such samples.
+  bool speedKnown = true;
+  /// False when nothing backs the stand-in either (no carried speed, no progress between fixes): the
+  /// stopped and too-slow timers leave such a sample alone instead of reading it as parked (B147).
+  bool speedEvidence = true;
   /// Posted limit for the current road, if the map knows it.
   std::optional<double> speedLimitMps;
   std::optional<double> lat;
@@ -60,7 +66,9 @@ enum class HazardKind
   Construction,
   Debris,
   Crash,
-  StalledCar
+  StalledCar,
+  /// A fixed speed camera on the route (the map's highway=speed_camera points).
+  SpeedCamera
 };
 
 /// Places the GPS itself wants to visit.
@@ -147,6 +155,8 @@ struct NavEvent
   // HazardAhead
   HazardKind hazard = HazardKind::Police;
   std::optional<std::string> id;
+  /// A speed camera's own limit, when the map has one (else the posted limit counts).
+  std::optional<double> limitMps;
   // PoiAhead, DestinationSet
   std::string name;
   StopWish wish = StopWish::Other;
@@ -294,6 +304,16 @@ enum class Priority
   Roast
 };
 
+/// How a line is delivered, so the host can shape the voice (loop B90, BI-001 core half, CROSS X-005).
+/// Only Aside exists so far: BookLyre's locked whisper preset (Kokoro effort 10, inflect 0.85), for
+/// the GPS muttering to itself. The other emotion styles wait for Brandon's picks. Directions are
+/// always Normal.
+enum class Delivery
+{
+  Normal,
+  Aside
+};
+
 /// What the engine wants spoken.
 struct Commentary
 {
@@ -317,6 +337,8 @@ struct Commentary
   std::string key;
   /// What the line's placeholders were filled with, so it can be re-picked from a bigger pool.
   std::map<std::string, std::string> vars;
+  /// How to say it (set by Navigator::TakeLines() from the key and text; see DeliveryFor()).
+  Delivery delivery = Delivery::Normal;
 };
 
 struct TripStats
@@ -334,9 +356,18 @@ struct TripStats
   int reroutes = 0;
   int turnsCompleted = 0;
   int roastsDelivered = 0;
+
+  /// Field-wise; the engine's cached report is reused only while the stats it was built from still match.
+  bool operator==(TripStats const &) const = default;
 };
 
 char const * ToString(Category c);
 char const * ToString(IncidentKind k);
 char const * ToString(Priority p);
+/// "normal" or "aside": the names the hosts and BookLyre's style presets use.
+char const * ToString(Delivery d);
+
+/// Dictation and keyboards send curly apostrophes: "What’s the next turn", "I‘m walking", "youʼre wrong".
+/// Every word matcher compares against straight-apostrophe cues, so turn ’ ‘ ʼ (UTF-8) into '.
+std::string StraightApostrophes(std::string const & text);
 }  // namespace backseat

@@ -122,4 +122,45 @@ UNIT_TEST(FollowedPolylineGetDistanceFromBeginM)
   double const masterDistance = mercator::DistanceOnEarth(kTestDirectedPolyline1.Front(), point);
   TEST_ALMOST_EQUAL_ULPS(distance, masterDistance, ());
 }
+
+// Backseat: a fix 40 m off the street (multipath; it claimed 10 m) is outside the matching box of the
+// street the car is on, but 8 m from where the route comes back the other way 48 m over. The far search
+// jumped there and every turn in between was skipped. With a filter for the way the car is heading,
+// that stretch isn't taken and the position stays put until a good fix.
+UNIT_TEST(FollowedPolylineFarMatchKeepsToTheCarsHeading)
+{
+  auto const at = [](double eastM, double northM) { return mercator::FromLatLon(36.39 + northM / 111320.0, -94.29 + eastM / 89600.0); };
+  // Real route geometry is dense: a point every 10 m, so the stretch coming back is far down the list.
+  std::vector<m2::PointD> pts;
+  for (int x = 0; x < 500; x += 10)
+    pts.push_back(at(x, 0));  // segments 0..49 run east
+  for (int y = 0; y < 40; y += 10)
+    pts.push_back(at(500, y * 1.2));
+  for (int x = 500; x > 0; x -= 10)
+    pts.push_back(at(x, 48));  // then back west
+  pts.push_back(at(0, 48));
+  pts.push_back(at(0, 300));
+  m2::RectD const offStreet = mercator::RectByCenterXYAndSizeInMeters(at(300, 40), 30.0);
+  m2::RectD const onStreet = mercator::RectByCenterXYAndSizeInMeters(at(320, 2), 30.0);
+  {
+    // Unfiltered (upstream): jumps to the stretch coming back.
+    FollowedPolyline poly(pts.begin(), pts.end());
+    TEST(poly.UpdateMatchingProjection(mercator::RectByCenterXYAndSizeInMeters(at(100, 0), 30.0)), ());
+    TEST(poly.UpdateMatchingProjection(offStreet), ());
+    TEST_GREATER(poly.GetCurrentIter().m_ind, 53, ());
+  }
+  {
+    FollowedPolyline poly(pts.begin(), pts.end());
+    TEST(poly.UpdateMatchingProjection(mercator::RectByCenterXYAndSizeInMeters(at(100, 0), 30.0)), ());
+    size_t const before = poly.GetCurrentIter().m_ind;
+    // Heading east: only the eastbound first street would do, and it's too far from this fix.
+    auto const eastbound = [&](size_t i) { return i < 50; };
+    TEST(!poly.UpdateMatchingProjection(offStreet, eastbound), ());
+    TEST_EQUAL(poly.GetCurrentIter().m_ind, before, ());
+    // A good fix further along the street the car is really on is matched as usual.
+    TEST(poly.UpdateMatchingProjection(onStreet, eastbound), ());
+    TEST_GREATER(poly.GetCurrentIter().m_ind, 29, ());
+    TEST_LESS(poly.GetCurrentIter().m_ind, 50, ());
+  }
+}
 }  // namespace routing_test

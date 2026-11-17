@@ -1,0 +1,387 @@
+{
+ "about": "Street types abroad said in their own language for map turn instructions (BI-008): 'Calle Ocho' KAH-yeh, 'Paseo de la Reforma' with a Spanish 'de la', 'Rue du Bac' French 'du', 'Via della Spiga' Italian, 'Rua do Ouro' Portuguese, 'Hauptstraße' Haupt SHTRAH-seh, as fx dictionary stand-ins (Lexicon() holds their phonemes). Only before a capitalised word, number or name particle (German types after a name), so 'via I-35' and 'rue the day' stay English; the name itself is left to the voice. Backseat Driver: backseat::pronunciation::ForSpeech / ForeignStreets (libs/backseat/backseat_tests/spoken_street_types.json). BookLyre can take the street-type rows (CROSS). Also (CROSS X-039, BookLyre spoken_titles.json last 9 cases): 'St.' after a capitalised word is Saint when 1-3 name words and a street type follow ('Down St. James Street', 'Slight right St. Clair Ave'); 'Main St. Mary was there' and 'Baker St. Then he left' stay Street. Loop B141 (BI-124): a street type right after a route number ends the name too: 'FM 1960 Rd W' is '... nineteen sixty Road West', 'Hwy 6 Rd', 'SR 7 Ave', 'County Rd 12 St', 'Exit 12 St', 'I-35 Dr'; a bare house number ('Arrive at 1960 Rd W') and a Saint after the number ('Hwy 6 St. Louis') stay as they were.",
+ "cases": [
+  {
+   "input": "Turn left onto Calle Ocho.",
+   "expected": "Turn left onto fxkahyeh Ocho."
+  },
+  {
+   "input": "Turn right onto Paseo de la Reforma.",
+   "expected": "Turn right onto fxpahsehoh fxdeh fxlah Reforma."
+  },
+  {
+   "input": "Continue on Avenida de los Insurgentes Sur.",
+   "expected": "Continue on fxahvehneedah fxdeh fxlohs Insurgentes Sur."
+  },
+  {
+   "input": "Turn left onto Rue de Rivoli.",
+   "expected": "Turn left onto fxroo fxduh Rivoli."
+  },
+  {
+   "input": "Turn right onto Rue du Faubourg Saint-Honoré.",
+   "expected": "Turn right onto fxroo fxdew Faubourg Saint-Honoré."
+  },
+  {
+   "input": "Keep left onto Via della Spiga.",
+   "expected": "Keep left onto fxveeah fxdellah Spiga."
+  },
+  {
+   "input": "Turn onto Viale Monza.",
+   "expected": "Turn onto fxveeahleh Monza."
+  },
+  {
+   "input": "Arriving at Piazza Navona.",
+   "expected": "Arriving at fxpeeahtsah Navona."
+  },
+  {
+   "input": "Turn left onto Rua do Ouro.",
+   "expected": "Turn left onto fxhooah fxdoo Ouro."
+  },
+  {
+   "input": "Continue on Avenida dos Aliados.",
+   "expected": "Continue on fxahvehneedah fxdoos Aliados."
+  },
+  {
+   "input": "Turn right onto Hauptstraße.",
+   "expected": "Turn right onto Haupt fxshtrahseh."
+  },
+  {
+   "input": "Turn left onto Bahnhofstrasse.",
+   "expected": "Turn left onto Bahnhof fxshtrahseh."
+  },
+  {
+   "input": "Arriving at Potsdamer Platz.",
+   "expected": "Arriving at Potsdamer fxplahts."
+  },
+  {
+   "input": "Turn onto Berliner Straße.",
+   "expected": "Turn onto Berliner fxshtrahseh."
+  },
+  {
+   "input": "Turn left onto Chemin de la Côte-des-Neiges.",
+   "expected": "Turn left onto fxshehman fxduh fxlah Côte-des-Neiges."
+  },
+  {
+   "input": "Turn left onto Calle 8.",
+   "expected": "Turn left onto fxkahyeh eight."
+  },
+  {
+   "input": "Turn right onto Rue d'Alésia.",
+   "expected": "Turn right onto fxroo d'Alésia."
+  },
+  {
+   "input": "Take El Camino Real.",
+   "expected": "Take El Camino Real."
+  },
+  {
+   "input": "Head south via I-35.",
+   "expected": "Head south via I thirty five."
+  },
+  {
+   "input": "You'll rue the day.",
+   "expected": "You'll rue the day."
+  },
+  {
+   "input": "Rue the day you met me.",
+   "expected": "Rue the day you met me."
+  },
+  {
+   "input": "Calle is a word.",
+   "expected": "Calle is a word."
+  },
+  {
+   "input": "Turn left onto Allée des Cygnes.",
+   "expected": "Turn left onto fxahlay fxday Cygnes."
+  },
+  {
+   "input": "Keep right onto Quai de la Tournelle.",
+   "expected": "Keep right onto fxkay fxduh fxlah Tournelle."
+  },
+  {
+   "input": "Turn onto Travessa da Glória.",
+   "expected": "Turn onto fxtrahvehsah fxdah Glória."
+  },
+  {
+   "input": "Turn left onto Praça da Sé.",
+   "expected": "Turn left onto fxprahsah fxdah Sé."
+  },
+  {
+   "input": "Turn onto Carrera 7.",
+   "expected": "Turn onto fxkahrehrah seven."
+  },
+  {
+   "input": "Turn onto Glorieta de Insurgentes.",
+   "expected": "Turn onto fxglohryehtah fxdeh Insurgentes."
+  },
+  {
+   "input": "Turn onto Callejón del Beso.",
+   "expected": "Turn onto fxkahyehhohn fxdehl Beso."
+  },
+  {
+   "input": "The platz is closed.",
+   "expected": "The platz is closed."
+  },
+  {
+   "input": "Via Veneto, then left.",
+   "expected": "fxveeah Veneto, then left."
+  },
+  {
+   "input": "Turn right onto Shady Crk",
+   "language": "en",
+   "expected": "Turn right onto Shady Creek"
+  },
+  {
+   "input": "Turn left onto Forest Hts Dr",
+   "language": "en",
+   "expected": "Turn left onto Forest Heights Drive"
+  },
+  {
+   "input": "Continue on Oak Hl.",
+   "language": "en",
+   "expected": "Continue on Oak Hill."
+  },
+  {
+   "input": "Turn right onto Lake Vw, then left",
+   "language": "en",
+   "expected": "Turn right onto Lake View, then left"
+  },
+  {
+   "input": "Take Pt Reyes Rd",
+   "language": "en",
+   "expected": "Take Point Reyes Road"
+  },
+  {
+   "input": "Turn right onto Pt. Loma Blvd",
+   "language": "en",
+   "expected": "Turn right onto Point Loma Boulevard"
+  },
+  {
+   "input": "Turn onto Ocean Pt Rd",
+   "language": "en",
+   "expected": "Turn onto Ocean Point Road"
+  },
+  {
+   "input": "Turn onto Mesa Ctr Ste 100",
+   "language": "en",
+   "expected": "Turn onto Mesa Center Suite one hundred"
+  },
+  {
+   "input": "Arrive at Pine Bnd NW",
+   "language": "en",
+   "expected": "Arrive at Pine Bend Northwest"
+  },
+  {
+   "input": "Stay on Lone Star Tpke",
+   "language": "en",
+   "expected": "Stay on Lone Star Turnpike"
+  },
+  {
+   "input": "Elm Crk., then left",
+   "language": "en",
+   "expected": "Elm Creek, then left"
+  },
+  {
+   "input": "Oak Hl. Then right",
+   "language": "en",
+   "expected": "Oak Hill. Then right"
+  },
+  {
+   "input": "Turn onto 5th Sta",
+   "language": "en",
+   "expected": "Turn onto fifth Station"
+  },
+  {
+   "input": "Willow Crk Apt 4",
+   "language": "en",
+   "expected": "Willow Creek Apartment four"
+  },
+  {
+   "input": "Turn onto Bear Crk Pass",
+   "language": "en",
+   "expected": "Turn onto Bear Creek Pass"
+  },
+  {
+   "input": "Turn onto Cedar Rdg Ln",
+   "language": "en",
+   "expected": "Turn onto Cedar Ridge Lane"
+  },
+  {
+   "input": "Turn onto Mill Vly Rd",
+   "language": "en",
+   "expected": "Turn onto Mill Valley Road"
+  },
+  {
+   "input": "Arrive at Bella Vis",
+   "language": "en",
+   "expected": "Arrive at Bella Vista"
+  },
+  {
+   "input": "Turn onto Rio Rnch Rd",
+   "language": "en",
+   "expected": "Turn onto Rio Ranch Road"
+  },
+  {
+   "input": "Turn onto Sunset Gdns Dr",
+   "language": "en",
+   "expected": "Turn onto Sunset Gardens Drive"
+  },
+  {
+   "input": "Sta 4 is closed",
+   "language": "en",
+   "expected": "Sta four is closed"
+  },
+  {
+   "input": "Head to the Lk now",
+   "language": "en",
+   "expected": "Head to the Lk now"
+  },
+  {
+   "input": "go to a Lk mid-text",
+   "language": "en",
+   "expected": "go to a Lk mid-text"
+  },
+  {
+   "input": "the hl is steep",
+   "language": "en",
+   "expected": "the hl is steep"
+  },
+  {
+   "input": "Pine Crk Mall is closed",
+   "language": "en",
+   "expected": "Pine Crk Mall is closed"
+  },
+  {
+   "input": "NB: see below",
+   "language": "en",
+   "expected": "NB: see below"
+  },
+  {
+   "input": "Take St. Johns Rd. to the bridge.",
+   "expected": "Take Saint Johns Road to the bridge."
+  },
+  {
+   "input": "Find St. Mary Street.",
+   "expected": "Find Saint Mary Street."
+  },
+  {
+   "input": "Down St. James Street we went.",
+   "expected": "Down Saint James Street we went."
+  },
+  {
+   "input": "Across St. Peter Square.",
+   "expected": "Across Saint Peter Square."
+  },
+  {
+   "input": "Wander St. Johns Road at dusk.",
+   "expected": "Wander Saint Johns Road at dusk."
+  },
+  {
+   "input": "The shop on Cross St. was shut.",
+   "expected": "The shop on Cross Street was shut."
+  },
+  {
+   "input": "Turn left at Church St. and stop.",
+   "expected": "Turn left at Church Street and stop."
+  },
+  {
+   "input": "He lived on Baker St. Then he left.",
+   "expected": "He lived on Baker Street. Then he left."
+  },
+  {
+   "input": "Walk past Main St. Mary was there.",
+   "expected": "Walk past Main Street. Mary was there."
+  },
+  {
+   "input": "Turn onto St. Charles Ave",
+   "expected": "Turn onto Saint Charles Avenue"
+  },
+  {
+   "input": "Turn right onto St Charles Ave.",
+   "expected": "Turn right onto Saint Charles Avenue."
+  },
+  {
+   "input": "Keep left at the fork. Stay on St. Johns Rd",
+   "expected": "Keep left at the fork. Stay on Saint Johns Road"
+  },
+  {
+   "input": "Slight right St. Clair Ave",
+   "expected": "Slight right Saint Clair Avenue"
+  },
+  {
+   "input": "Sharp left St. Paul Blvd",
+   "expected": "Sharp left Saint Paul Boulevard"
+  },
+  {
+   "input": "Make a U-turn at St Augustine Rd",
+   "expected": "Make a U-turn at Saint Augustine Road"
+  },
+  {
+   "input": "Right turn St. Andrews Way, then left",
+   "expected": "Right turn Saint Andrews Way, then left"
+  },
+  {
+   "input": "Exit 12B St. Johns Bluff Rd",
+   "expected": "Exit twelve B Saint Johns Bluff Road"
+  },
+  {
+   "input": "Main St. Then left",
+   "expected": "Main Street. Then left"
+  },
+  {
+   "input": "Turn right on Elm St. Mary is waiting",
+   "expected": "Turn right on Elm Street. Mary is waiting"
+  },
+  {
+   "input": "Turn right onto FM 1960 Rd W.",
+   "expected": "Turn right onto F M nineteen sixty Road West."
+  },
+  {
+   "input": "Continue on Old Rte 9 Rd.",
+   "expected": "Continue on Old Route nine Road."
+  },
+  {
+   "input": "Turn left onto Hwy 6 Rd.",
+   "expected": "Turn left onto Highway six Road."
+  },
+  {
+   "input": "Keep right onto SR 7 Ave",
+   "expected": "Keep right onto State Route seven Avenue"
+  },
+  {
+   "input": "Turn left onto County Rd 12 St, then right.",
+   "expected": "Turn left onto County Road twelve Street, then right."
+  },
+  {
+   "input": "Take Exit 12 St.",
+   "expected": "Take Exit twelve Street."
+  },
+  {
+   "input": "Turn right onto I-35 Dr.",
+   "expected": "Turn right onto I thirty five Drive."
+  },
+  {
+   "input": "Turn right onto SR-7 Ave NE",
+   "expected": "Turn right onto State Route seven Avenue Northeast"
+  },
+  {
+   "input": "Turn left onto FM 1960 Rd W and keep going",
+   "expected": "Turn left onto F M nineteen sixty Road West and keep going"
+  },
+  {
+   "input": "Take Hwy 6 St. Louis exit",
+   "expected": "Take Highway six Saint Louis exit"
+  },
+  {
+   "input": "Arrive at 1960 Rd W.",
+   "expected": "Arrive at one thousand nine hundred sixty Rd West."
+  },
+  {
+   "input": "Go to 3502 St. Johns Rd",
+   "expected": "Go to thirty five oh two Saint Johns Road"
+  },
+  {
+   "input": "Take Hwy 6 Dr Smith said",
+   "expected": "Take Highway six Doctor Smith said"
+  }
+ ]
+}

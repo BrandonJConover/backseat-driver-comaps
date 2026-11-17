@@ -1,0 +1,96 @@
+{
+ "about": "Store and restaurant destination names Kokoro's Misaki dictionary lacks (BI-093, loop B107). ForSpeech leaves names alone except Buc-ee's (one word, Buckees) and HEB/H-E-B (capitals only: letters H E B); the 'words' list must each be in the app's pronunciation dictionary with phonemes (Kroger KROH-gur, Meijer MY-ur, Publix PUB-liks, Wegmans WEG-munz, Lidl LEE-dul, Aldi AHL-dee, Costco KOST-koh, Qdoba kyoo-DOH-buh, Whataburger WUT-uh-bur-gur, Panera puh-NAIR-uh, Popeyes POP-yz, Zaxby ZAKS-bee, Culver KUL-vur, Bojangles boh-JANG-gulz, Bruegger BROO-gur, Hardee HAR-dee, Applebee AP-ul-bee, Krispy KRIS-pee, Dunkin DUN-kin, Arby AR-bee, Pei PAY, Wawa WAH-wah, Sheetz SHEETS, Buckees BUK-eez, Valero vuh-LAIR-oh, Exxon EK-sahn, RaceTrac RAYS-trak, Ulta UL-tuh, Sephora suh-FOR-uh). Shared with BookLyre (CROSS). Keys are letters only: the tokenizer splits \"Arby's\" into the name and 's.",
+ "cases": [
+  {
+   "input": "Arrive at HEB",
+   "expected": "Arrive at H E B"
+  },
+  {
+   "input": "Your destination, H-E-B, is on the right.",
+   "expected": "Your destination, H E B, is on the right."
+  },
+  {
+   "input": "Turn right into the HEB parking lot",
+   "expected": "Turn right into the H E B parking lot"
+  },
+  {
+   "input": "Arrive at Buc-ee's",
+   "expected": "Arrive at Buckees"
+  },
+  {
+   "input": "Arrive at Buc-ee’s on the left",
+   "expected": "Arrive at Buckees on the left"
+  },
+  {
+   "input": "Next stop: BUC-EE'S, 40 miles",
+   "expected": "Next stop: Buckees, forty miles"
+  },
+  {
+   "input": "Arrive at Bucees",
+   "expected": "Arrive at Buckees"
+  },
+  {
+   "input": "Arrive at Kroger",
+   "expected": "Arrive at Kroger"
+  },
+  {
+   "input": "Arrive at Arby's",
+   "expected": "Arrive at Arby's"
+  },
+  {
+   "input": "Hebrews 11",
+   "expected": "Hebrews eleven"
+  },
+  {
+   "input": "Visit www.heb.com",
+   "expected": "Visit heb dot com"
+  },
+  {
+   "input": "Arrive at HEBRON",
+   "expected": "Arrive at HEBRON"
+  },
+  {
+   "input": "THE BEST",
+   "expected": "THE BEST"
+  },
+  {
+   "input": "Arrive at H-E-B Plus!",
+   "expected": "Arrive at H E B Plus!"
+  },
+  {
+   "input": "buc-ee",
+   "expected": "buc-ee"
+  }
+ ],
+ "words": [
+  "kroger",
+  "meijer",
+  "publix",
+  "wegmans",
+  "lidl",
+  "aldi",
+  "costco",
+  "qdoba",
+  "whataburger",
+  "panera",
+  "popeyes",
+  "zaxby",
+  "culver",
+  "bojangles",
+  "bruegger",
+  "hardee",
+  "applebee",
+  "krispy",
+  "dunkin",
+  "arby",
+  "pei",
+  "wawa",
+  "sheetz",
+  "buckees",
+  "valero",
+  "exxon",
+  "racetrac",
+  "ulta",
+  "sephora"
+ ]
+}

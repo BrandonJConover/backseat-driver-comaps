@@ -61,6 +61,8 @@ typedef void (^MWMBackseatToolHandler)(NSString * spoken, void (^done)(BOOL used
 @property(class, nonatomic, readonly) double metersToNextTurn;
 /// The speed limit here while following a route, m/s: -1 unknown, 0 unlimited.
 @property(class, nonatomic, readonly) double speedLimitMps;
+/// Meters to the next speed camera on the route, -1 when none is within 2 km.
+@property(class, nonatomic, readonly) double speedCameraAheadMeters;
 
 /// Who's in the car, for the roasts. Pronouns are "they", "he" or "she". Setting any of these
 /// reloads the navigator's personality at once.
@@ -199,6 +201,21 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
                             pick:(NSInteger * _Nullable)pick
                             none:(BOOL * _Nullable)none
                          confirm:(BOOL * _Nullable)confirm;
+/// A spoken place as the map search wants it: "um, a place called Joe's please" -> "joe's", "one
+/// twenty three main street" -> "123 main street".
++ (NSString *)searchableQuery:(NSString *)spoken;
+/// Other ways to search for `query` when it found nothing ("star bucks" -> "starbucks"), in order.
++ (NSArray<NSString *> *)searchVariants:(NSString *)query;
+/// The order to offer search results in (indices into the arrays): the name asked for first, then
+/// places driven to before, then the nearest. NaN latitude means the spot isn't known.
++ (NSArray<NSNumber *> *)rankSearchResults:(NSString *)query
+                                     names:(NSArray<NSString *> *)names
+                                 distances:(NSArray<NSNumber *> *)distances
+                                 latitudes:(NSArray<NSNumber *> *)latitudes
+                                longitudes:(NSArray<NSNumber *> *)longitudes;
+/// A place driven to before by the name asked for, with "label", "lat" and "lon", for when the map
+/// search finds nothing. nil when there isn't one.
++ (nullable NSDictionary<NSString *, id> *)pastRouteNamed:(NSString *)query;
 /// "The second one": the result picked (-1 when not understood) and the line to say.
 + (NSString *)pickSearchResult:(NSString *)answer index:(NSInteger *)index confirm:(BOOL *)confirm;
 /// The answer to "Latheron Place? Say yes." Empty when nobody answered. Route only when confirmed.
@@ -226,6 +243,9 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 + (NSString *)aboutYouAnswer:(NSInteger)question;
 /// Each voice's audition for the voice line-up ("Hi, I'm Echo. ...say Purple Monkey."), in order.
 + (NSArray<NSString *> *)voiceAuditions:(NSArray<NSString *> *)voiceIDs;
+/// The personality a voice comes with, by its spoken name ("George" -> "Melancholy"), or "" for the
+/// usual Critic. Picking the voice picks it.
++ (NSString *)personaTitleForVoice:(NSString *)voiceName;
 /// Whether `typed` is the code phrase, ignoring case, spaces and punctuation.
 + (BOOL)typed:(NSString *)typed matchesPhrase:(NSString *)phrase;
 

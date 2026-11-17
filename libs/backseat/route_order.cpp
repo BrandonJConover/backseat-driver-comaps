@@ -3,6 +3,7 @@
 #include "backseat/route_sketch.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <numeric>
 
@@ -13,9 +14,18 @@ namespace
 /// Up to this many stops, every order is tried (6! = 720).
 std::size_t constexpr kExhaustiveStops = 6;
 
+/// What a leg the host's cost can't price (NaN, infinite or negative, e.g. a router that found no
+/// road, or a point with no real coordinates) counts as: far worse than any real leg, but finite, so orders can still be compared and
+/// every stop is still visited.
+double constexpr kUnreachableLeg = 1e12;
+
 LegCost OrStraightLine(LegCost const & cost)
 {
-  return cost ? cost : LegCost([](LatLon const & a, LatLon const & b) { return SketchDistanceM(a, b); });
+  return LegCost([cost](LatLon const & a, LatLon const & b)
+  {
+    double const c = cost ? cost(a, b) : SketchDistanceM(a, b);
+    return std::isfinite(c) && c >= 0 ? c : kUnreachableLeg;
+  });
 }
 }  // namespace
 
@@ -24,7 +34,11 @@ double OrderCost(std::vector<LatLon> const & points, std::vector<std::size_t> co
   LegCost const leg = OrStraightLine(cost);
   double total = 0;
   for (std::size_t i = 0; i + 1 < order.size(); ++i)
+  {
+    if (order[i] >= points.size() || order[i + 1] >= points.size())
+      return std::numeric_limits<double>::infinity();
     total += leg(points[order[i]], points[order[i + 1]]);
+  }
   return total;
 }
 

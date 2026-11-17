@@ -9,6 +9,11 @@ import UIKit
   static var bottomInset: CGFloat = 132
 
   private static var view: BackseatCaptionView?
+  /// The same face on the CarPlay map. Its bubble only opens while the car is stopped, so the line
+  /// can be read at a light and never pulls the driver's eyes to the dash while moving.
+  private static weak var carView: BackseatCaptionView?
+  /// Slower than this (m/s), the car counts as stopped.
+  private static let carStoppedMps = 2.0
   private static var lastLine = ""
   private static var patience = 10
 
@@ -35,6 +40,43 @@ import UIKit
     }
   }
 
+  /// Puts the face and Patience meter on the CarPlay map, at the driver's side bottom corner. The
+  /// car screen's own view controller calls this when it loads; a new one replaces the old.
+  @objc static func installOnCar(in parent: UIView) {
+    carView?.removeFromSuperview()
+    let caption = BackseatCaptionView()
+    caption.isQuiet = true
+    caption.translatesAutoresizingMaskIntoConstraints = false
+    caption.isHidden = !BackseatCarTrip.isNavigating
+    parent.addSubview(caption)
+    NSLayoutConstraint.activate([
+      caption.leadingAnchor.constraint(equalTo: parent.safeAreaLayoutGuide.leadingAnchor, constant: 8),
+      caption.trailingAnchor.constraint(lessThanOrEqualTo: parent.safeAreaLayoutGuide.trailingAnchor, constant: -96),
+      caption.bottomAnchor.constraint(equalTo: parent.safeAreaLayoutGuide.bottomAnchor, constant: -8),
+    ])
+    caption.onFaceTap = { if !lastLine.isEmpty && carStopped { caption.show(lastLine) } }
+    caption.setPatience(patience)
+    carView = caption
+    if !carObserverInstalled {
+      carObserverInstalled = true
+      NotificationCenter.default.addObserver(forName: BackseatTalkButton.navigationVisibilityChanged, object: nil,
+                                             queue: .main) { note in
+        let navigating = (note.object as? Bool) ?? false
+        carView?.isHidden = !navigating
+        if !navigating { carView?.hideBubble(animated: false) }
+      }
+    }
+  }
+
+  private static var carObserverInstalled = false
+
+  /// A fix with no speed (-1, from Wi-Fi or a weak GPS) counts as moving: better a shut bubble than
+  /// one that opens at 60 mph.
+  private static var carStopped: Bool {
+    guard let speed = LocationManager.lastLocation()?.speed, speed >= 0 else { return false }
+    return speed < carStoppedMps
+  }
+
   /// Posted on the main thread when a line starts playing; the object is the line. The first-launch
   /// disclaimer follows it to know which paragraph is being read.
   static let lineStarted = Notification.Name("BackseatLineStarted")
@@ -46,6 +88,7 @@ import UIKit
     DispatchQueue.main.async {
       lastLine = text
       view?.show(text)
+      if carStopped { carView?.show(text) } else { carView?.nudge() }
       NotificationCenter.default.post(name: lineStarted, object: text)
     }
   }
@@ -55,12 +98,15 @@ import UIKit
     DispatchQueue.main.async {
       patience = min(max(left, 0), 10)
       view?.setPatience(patience)
+      carView?.setPatience(patience)
     }
   }
 }
 
 final class BackseatCaptionView: UIView {
   var onFaceTap: (() -> Void)?
+  /// No haptics: the car screen's copy of the face, while the phone's buzzes.
+  var isQuiet = false
 
   private let face = BackseatFaceView()
   private let meter = BackseatPatienceMeter()
@@ -165,8 +211,15 @@ final class BackseatCaptionView: UIView {
     face.setMood(left)
     if dropped && !isHidden {
       BackseatMotion.shake(face)
-      BackseatHaptics.sigh()
+      if !isQuiet { BackseatHaptics.sigh() }
     }
+  }
+
+  /// A line played while the bubble stays shut: the face reacts so the car screen feels alive.
+  func nudge() {
+    guard !isHidden else { return }
+    hideBubble(animated: true)
+    BackseatMotion.pop(face)
   }
 
   @objc private func faceTapped() {

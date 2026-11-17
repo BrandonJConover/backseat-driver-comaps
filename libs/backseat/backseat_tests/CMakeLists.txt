@@ -4,30 +4,143 @@ project(backseat_tests)
 # standalone build of libs/backseat without the CoMaps testing framework.
 add_executable(${PROJECT_NAME}
   check.hpp
+  timing.hpp
   engine_test.cpp
+  jam_blame_test.cpp
+  jerk_settle_test.cpp
+  countdown_distance_test.cpp
+  highway_claims_test.cpp
+  long_approach_test.cpp
+  start_movement_test.cpp
+  wrong_turn_confirm_test.cpp
+  final_call_soak_test.cpp
+  exit_after_merge_test.cpp
+  exit_skip_test.cpp
+  destination_side_test.cpp
+  lane_guidance_test.cpp
+  hostile_route_test.cpp
+  offroute_blip_test.cpp
+  reroute_test.cpp
+  then_chaining_test.cpp
+  street_names_test.cpp
+  roundabout_exit_test.cpp
+  roundabout_exit_countdown_test.cpp
+  countdown_now_leads_test.cpp
+  delivery_test.cpp
+  history_test.cpp
+  trip_log_test.cpp
+  corrupt_state_test.cpp
+  hostile_games_test.cpp
+  hostile_text_test.cpp
   indoors_test.cpp
   main.cpp
+  timing_test.cpp
   mileage_test.cpp
   navigator_test.cpp
   onboarding_test.cpp
   parity_test.cpp
   plate_game_test.cpp
+  place_search_test.cpp
   pop_quiz_test.cpp
+  quiz_country_test.cpp
+  pronunciation_backup_test.cpp
+  persona_test.cpp
   pronunciation_test.cpp
+  ask_moment_test.cpp
   quiet_bits_test.cpp
+  report_test.cpp
+  report_speed_test.cpp
+  report_cache_test.cpp
+  rng_pick_test.cpp
+  listen_speed_test.cpp
+  achievements_test.cpp
+  rundown_test.cpp
   road_bits_test.cpp
   voice_command_test.cpp
+  yes_no_test.cpp
+  warm_test.cpp
+  phone_handling_test.cpp
+  eyes_on_road_test.cpp
   rewriter_test.cpp
   route_order_test.cpp
   running_bits_test.cpp
   route_sketch_test.cpp
   sim_drive.hpp
   soak_test.cpp
+  soak_gaps_test.cpp
+  long_stop_test.cpp
+  train_crossing_test.cpp
+  ferry_test.cpp
+  toll_test.cpp
+  toll_traffic_question_test.cpp
+  speed_camera_test.cpp
+  resume_after_stop_test.cpp
+  jam_stop_test.cpp
   debug_log_test.cpp
   lines_test.cpp
   stop_go_test.cpp
   twenty_questions_test.cpp
+  units_test.cpp
+  pronunciation_scripts_test.cpp
+  speech_fast_path_test.cpp
+  word_screen_test.cpp
+  turn_words_test.cpp
+  drive_side_test.cpp
+  line_filters_test.cpp
+  riding_alone_test.cpp
+  unseen_turns_test.cpp
+  repeat_near_turn_test.cpp
+  commute_soak_test.cpp
+  familiar_commute_test.cpp
+  clip_pacing_test.cpp
+  brandon_lines_test.cpp
+  persona_doc_lines_test.cpp
+  persona_doc_lines_b_test.cpp
+  signal_back_test.cpp
+  unknown_speed_test.cpp
+  phantom_direction_test.cpp
+  traffic_reroute_test.cpp
 )
+
+# Each test file keeps its own small helpers (Drive, Config, Route...) in an anonymous namespace, so the
+# files must not be glued together: a unity build of the app still covers the library itself.
+set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD OFF)
 target_link_libraries(${PROJECT_NAME} PRIVATE backseat)
-target_compile_definitions(${PROJECT_NAME} PRIVATE BACKSEAT_TRACE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/parity_trace.txt")
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+  BACKSEAT_TRACE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/parity_trace.txt"
+  BACKSEAT_SPOKEN_RANGES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_ranges.json"
+  BACKSEAT_SPOKEN_ROADS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_roads.json"
+  BACKSEAT_SPOKEN_ADDRESSES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_addresses.json"
+  BACKSEAT_SPOKEN_TIMES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_times.json"
+  BACKSEAT_SPOKEN_YEARS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_years.json"
+  BACKSEAT_SPOKEN_CYRILLIC_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_cyrillic.json"
+  BACKSEAT_SPOKEN_KANA_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_kana.json"
+  BACKSEAT_PRONUNCIATION_BACKUP_PATH="${CMAKE_CURRENT_SOURCE_DIR}/pronunciation_backup.json"
+  BACKSEAT_SPOKEN_STREET_TYPES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_street_types.json"
+  BACKSEAT_SPOKEN_STREET_SEPARATORS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_street_separators.json"
+  BACKSEAT_SPOKEN_HETERONYMS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_heteronyms.json"
+  BACKSEAT_SPOKEN_REGNAL_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_regnal.json"
+  BACKSEAT_SPOKEN_PLACES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_places.json"
+  BACKSEAT_SPOKEN_BRANDS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_brands.json"
+  BACKSEAT_SPOKEN_PLACE_NAMES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_place_names.json"
+  BACKSEAT_SPOKEN_SYMBOLS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_symbols.json"
+  BACKSEAT_SPOKEN_WEB_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_web.json"
+  BACKSEAT_SPOKEN_NUMBERS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_numbers.json"
+  BACKSEAT_SPOKEN_DATES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_dates.json"
+  BACKSEAT_SPOKEN_DISTANCES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_distances.json"
+  BACKSEAT_SPOKEN_DURATIONS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_durations.json"
+  BACKSEAT_SPOKEN_CURRENCY_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_currency.json"
+  BACKSEAT_SPOKEN_MILITARY_TIMES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_military_times.json"
+  BACKSEAT_SPOKEN_FEET_INCHES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_feet_inches.json"
+  BACKSEAT_SPOKEN_FRACTION_UNITS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_fraction_units.json"
+  BACKSEAT_SPOKEN_DOTTED_TITLES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_dotted_titles.json"
+  BACKSEAT_SPOKEN_INTERJECTIONS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_interjections.json"
+  BACKSEAT_SPOKEN_RATIOS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_ratios.json"
+  BACKSEAT_SPOKEN_PHONE_NUMBERS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_phone_numbers.json"
+  BACKSEAT_SPOKEN_CITY_STATES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_city_states.json"
+  BACKSEAT_SPOKEN_UK_ROADS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_uk_roads.json"
+  BACKSEAT_SPOKEN_SPELLING_VARIANTS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spoken_spelling_variants.json"
+  BACKSEAT_SPELLING_VARIANTS_TABLE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/spelling_variants.json"
+  BACKSEAT_YES_NO_PATH="${CMAKE_CURRENT_SOURCE_DIR}/yes_no.json"
+  BACKSEAT_CLIP_PACING_PATH="${CMAKE_CURRENT_SOURCE_DIR}/clip_pacing_boundaries.json")
 add_test(NAME ${PROJECT_NAME} COMMAND ${PROJECT_NAME})

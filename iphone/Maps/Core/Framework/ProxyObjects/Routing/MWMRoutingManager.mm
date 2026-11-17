@@ -273,6 +273,12 @@
 #pragma mark - MWMLocationObserver implementation
 
 - (void)onLocationUpdate:(CLLocation *)location {
+  // Backseat Driver: GenerateNotifications() hands out each Backseat line once. This object keeps
+  // observing location after the first CarPlay session, so with nobody listening (CarPlay gone and
+  // the phone's MWMRouter saying the lines again) it would take every other line and drop it.
+  NSArray<id<MWMRoutingManagerListener>> * listeners = self.listeners.allObjects;
+  if (listeners.count == 0)
+    return;
   NSMutableArray<NSString *> * routeNotifications = [NSMutableArray array];
   std::vector<std::string> notifications;
   if ([MWMTextToSpeech tts].allowsTurnInstructions) {
@@ -285,8 +291,7 @@
   for (auto const & text : notifications) {
     [routeNotifications addObject:@(text.c_str())];
   }
-  NSArray<id<MWMRoutingManagerListener>> * objects = self.listeners.allObjects;
-  for (id<MWMRoutingManagerListener> object in objects) {
+  for (id<MWMRoutingManagerListener> object in listeners) {
     [object didLocationUpdate:routeNotifications];
   }
 }

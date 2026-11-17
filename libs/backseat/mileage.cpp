@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <climits>
 #include <cstdio>
+#include <cstdlib>
 #include <sstream>
 
 namespace backseat
@@ -27,6 +29,7 @@ double constexpr kMinDriveMeters = 805;     // half a mile
 double constexpr kPathStepMeters = 500;
 double constexpr kSameSpotMeters = 250;
 double constexpr kFarFromHomeMeters = 80'467;  // 50 miles
+double constexpr kMaxDriveMeters = 40.075e6;  // once round the equator; a saved drive longer than that is corrupt
 
 double Distance(LatLon a, LatLon b)
 {
@@ -96,12 +99,29 @@ std::string Format(char const * fmt, double v)
 
 std::string LatLonText(LatLon p) { return Format("%.6f", p.lat) + "," + Format("%.6f", p.lon); }
 
+// A whole finite number, or nothing: a saved "nan"/"inf" (std::stod takes both) would reach
+// std::sort, local-time math and the mileage CSV.
+std::optional<double> FiniteNumber(std::string const & s)
+{
+  if (s.empty())
+    return {};
+  char * end = nullptr;
+  double const x = std::strtod(s.c_str(), &end);
+  if (end != s.c_str() + s.size() || !std::isfinite(x))
+    return {};
+  return x;
+}
+
 std::optional<LatLon> ParseLatLon(std::string const & s)
 {
   auto const parts = Split(s, ',');
   if (parts.size() != 2)
     return {};
-  return LatLon{std::stod(parts[0]), std::stod(parts[1])};
+  auto const lat = FiniteNumber(parts[0]);
+  auto const lon = FiniteNumber(parts[1]);
+  if (!lat || !lon || std::abs(*lat) > 90 || std::abs(*lon) > 180)
+    return {};
+  return LatLon{*lat, *lon};
 }
 
 int Year(LocalTime const & localTime, double t) { return localTime(t).tm_year + 1900; }
@@ -641,43 +661,43 @@ std::string SerializeDrive(LoggedDrive const & d)
 
 std::optional<LoggedDrive> ParseDrive(std::string const & line)
 {
+  // A damaged line (half-written file, hand edit) is dropped, never half-loaded.
   auto const f = Split(line, '\t');
   if (f.size() < 12)
     return {};
-  try
-  {
-    LoggedDrive d;
-    d.drive.startedAt = std::stod(f[0]);
-    d.drive.endedAt = std::stod(f[1]);
-    auto const from = ParseLatLon(f[2]);
-    auto const to = ParseLatLon(f[3]);
-    if (!from || !to)
-      return {};
-    d.drive.from = *from;
-    d.drive.to = *to;
-    d.drive.meters = std::stod(f[4]);
-    if (!f[5].empty())
-      d.drive.regions = Split(f[5], ';');
-    d.fromName = f[6];
-    d.toName = f[7];
-    for (Bucket b : {Bucket::Unknown, Bucket::Business, Bucket::Personal})
-    {
-      if (f[8] == BucketName(b))
-        d.bucket = b;
-    }
-    for (Why w : {Why::NoClue, Why::DriverSaid, Why::Learned, Why::Commute, Why::BetweenWorkplaces, Why::ToClient,
-                  Why::PersonalPlace, Why::DayOff})
-    {
-      if (f[9] == WhyName(w))
-        d.why = w;
-    }
-    d.flags = static_cast<unsigned>(std::stoul(f[10]));
-    d.purpose = f[11];
-    return d;
-  }
-  catch (std::exception const &)
-  {
+  auto const started = FiniteNumber(f[0]);
+  auto const ended = FiniteNumber(f[1]);
+  auto const from = ParseLatLon(f[2]);
+  auto const to = ParseLatLon(f[3]);
+  auto const meters = FiniteNumber(f[4]);
+  auto const flags = FiniteNumber(f[10]);
+  // No one drive is longer than ~a lap of the planet; a negative "-1" flags would wrap to 4294967295.
+  if (!started || !ended || !from || !to || !meters || *meters < 0 || *meters > kMaxDriveMeters || !flags ||
+      *flags < 0 || *flags > UINT_MAX || *flags != std::floor(*flags))
     return {};
+  LoggedDrive d;
+  d.drive.startedAt = *started;
+  d.drive.endedAt = *ended;
+  d.drive.from = *from;
+  d.drive.to = *to;
+  d.drive.meters = *meters;
+  if (!f[5].empty())
+    d.drive.regions = Split(f[5], ';');
+  d.fromName = f[6];
+  d.toName = f[7];
+  for (Bucket b : {Bucket::Unknown, Bucket::Business, Bucket::Personal})
+  {
+    if (f[8] == BucketName(b))
+      d.bucket = b;
   }
+  for (Why w : {Why::NoClue, Why::DriverSaid, Why::Learned, Why::Commute, Why::BetweenWorkplaces, Why::ToClient,
+                Why::PersonalPlace, Why::DayOff})
+  {
+    if (f[9] == WhyName(w))
+      d.why = w;
+  }
+  d.flags = static_cast<unsigned>(*flags);
+  d.purpose = f[11];
+  return d;
 }
 }  // namespace backseat
