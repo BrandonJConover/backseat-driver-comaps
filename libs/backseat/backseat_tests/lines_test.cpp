@@ -852,3 +852,18 @@ TEST(DayOnlyWordsLeftOutOfLinesHeardAtNight)
         CHECK(lower.find("beach day") == std::string::npos);
       }
 }
+
+TEST(VolumeDownLeadsWithBrandonsLine)
+{
+  // Turning the volume down (BackseatAdapter::VolumeDown): Brandon's line is the anchor in every tier, so it's the
+  // first thing anyone hears, and the rest of the pool rotates in after it.
+  CheckEscalated("volume.down");
+  auto const it = LineData().find("volume.down");
+  CHECK(it != LineData().end());
+  if (it == LineData().end())
+    return;
+  CHECK_EQUAL(it->second[0][0], std::string("I won't be silenced!"));
+  CHECK_EQUAL(CrossTierRepeats(it->second, true), 0);
+  for (int tier = 0; tier < 3; ++tier)
+    CHECK(it->second[tier].size() >= 4);
+}

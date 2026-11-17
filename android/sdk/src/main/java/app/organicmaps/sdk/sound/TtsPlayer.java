@@ -284,6 +284,13 @@ public enum TtsPlayer
     }
   }
 
+  /** True while either voice has something to say or is saying it. */
+  public boolean anyVoiceSpeaking()
+  {
+    final NeuralVoice neural = mNeuralVoice;
+    return isSpeaking() || (neural != null && neural.isSpeaking());
+  }
+
   /** True while the system voice is talking. */
   public boolean isSpeaking()
   {

@@ -931,6 +931,11 @@ static_assert(static_cast<NSInteger>(BackseatAdapter::SetupStep::Passenger) == M
   return @(GetFramework().GetRoutingManager().BackseatRoughRoad().c_str());
 }
 
++ (NSString *)volumeDownFrom:(double)before to:(double)after foreground:(BOOL)foreground
+{
+  return @(GetFramework().GetRoutingManager().BackseatVolumeDown(before, after, foreground).c_str());
+}
+
 + (NSString *)nicenessSlidBack
 {
   return @(GetFramework().GetRoutingManager().BackseatNicenessSlidBack().c_str());

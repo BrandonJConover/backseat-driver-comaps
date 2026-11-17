@@ -242,6 +242,10 @@ public:
   /// seconds): "You know there is an expression about taking the road less traveled... I don't
   /// think it mentions pot holes." Once a trip at most, and only while navigating.
   std::string RoughRoad();
+  /// The driver turned the phone's volume down (one burst of presses, `before` -> `after`, 0..1):
+  /// "I won't be silenced!" Only while navigating or with the app on screen, never when they went
+  /// all the way to mute, and at most once every 3 minutes. Empty otherwise.
+  std::string VolumeDown(double before, double after, bool foreground);
   /// After the arrival line, at most once every 20 hours: "Test 47 complete. On a scale of one to
   /// ten, how satisfied were you?" Empty otherwise. Listen once, then pass the answer to
   /// SurveyAnswer(), which says it was recorded (and ignored) and keeps it in memory.
@@ -534,6 +538,7 @@ private:
   double m_mapBrowsedAt = -1e18;
   double m_typingSaidAt = -1e18;
   double m_roughSaidAt = -1e18;
+  double m_volumeSaidAt = -1e18;
   /// Waiting for a rating after ArrivalSurvey().
   bool m_surveyAsked = false;
   backseat::DriveDetector m_drives;

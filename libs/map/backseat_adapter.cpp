@@ -717,6 +717,21 @@ std::string BackseatAdapter::RoughRoad()
   return m_navigator.Reply(m_routeSketched ? "road.rough.sketched" : "road.rough");
 }
 
+std::string BackseatAdapter::VolumeDown(double before, double after, bool foreground)
+{
+  double constexpr kEveryMs = 3 * 60000.0;
+  double const now = NowMs();
+  bool const trip = m_navigator.InTrip();
+  bool const say = after > 0.001 && after < before && (trip || foreground) && now - m_volumeSaidAt >= kEveryMs;
+  backseat::Trace("volume.down", {{"before", std::to_string(before)},
+                                  {"after", std::to_string(after)},
+                                  {"said", say ? "yes" : "no"}});
+  if (!say)
+    return {};
+  m_volumeSaidAt = now;
+  return m_navigator.Reply("volume.down");
+}
+
 std::string BackseatAdapter::ArrivalSurvey()
 {
   double constexpr kSurveyEveryMs = 20 * 3600 * 1000.0;

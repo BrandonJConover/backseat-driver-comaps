@@ -1,11 +1,18 @@
 package app.organicmaps.sdk.backseat;
 
+import android.app.ActivityManager;
 import android.content.Context;
+import android.database.ContentObserver;
 import android.media.AudioManager;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
+import android.provider.Settings;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
+import app.organicmaps.sdk.sound.TtsPlayer;
 
 /// Backseat Driver hooks that aren't about rewording lines.
 @androidx.annotation.Keep
@@ -23,6 +30,125 @@ public final class Backseat
   {
     sAudio = (AudioManager) context.getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
     nativeEnableMusicCheck();
+    watchVolume(context);
+  }
+
+  // "I won't be silenced!": turning the media volume down gets a comeback, said at the volume it
+  // was before the presses, and then the phone goes back to the level the driver picked.
+
+  /// Presses this close together are one turn-down.
+  private static final long BURST_MS = 800;
+  /// Never wait longer than this for the line to finish before handing the volume back.
+  private static final long GIVE_BACK_MAX_MS = 15_000;
+  /// Synthesis takes a moment; don't take "not speaking yet" for "done".
+  private static final long GIVE_BACK_MIN_MS = 1_500;
+
+  private static final Handler sMain = new Handler(Looper.getMainLooper());
+  private static boolean sWatching;
+  private static int sLastVolume = -1;
+  /// The level before the first press of the current burst, or -1 when there's no burst.
+  private static int sBurstFrom = -1;
+  /// A level this class set itself; the change it causes isn't the driver's.
+  private static int sSelfSet = -1;
+  /// Where to put the volume back after the line; -1 when not in the middle of the bit.
+  private static int sGiveBackTo = -1;
+
+  private static void watchVolume(@NonNull Context context)
+  {
+    if (sWatching || sAudio == null)
+      return;
+    sWatching = true;
+    sLastVolume = sAudio.getStreamVolume(AudioManager.STREAM_MUSIC);
+    context.getApplicationContext().getContentResolver().registerContentObserver(
+        Settings.System.CONTENT_URI, true, new ContentObserver(sMain) {
+          @Override
+          public void onChange(boolean selfChange)
+          {
+            onVolumeMaybeChanged();
+          }
+        });
+  }
+
+  private static final Runnable sBurstOver = Backseat::onBurstOver;
+
+  private static void onVolumeMaybeChanged()
+  {
+    final int now = sAudio.getStreamVolume(AudioManager.STREAM_MUSIC);
+    final int before = sLastVolume;
+    if (now == before)
+      return;
+    sLastVolume = now;
+    if (now == sSelfSet)
+    {
+      sSelfSet = -1;
+      return;
+    }
+    // The driver touched the volume mid-bit: their level wins, and it stays.
+    sGiveBackTo = -1;
+    if (now < before && sBurstFrom < 0)
+      sBurstFrom = before;
+    if (sBurstFrom >= 0)
+    {
+      sMain.removeCallbacks(sBurstOver);
+      sMain.postDelayed(sBurstOver, BURST_MS);
+    }
+  }
+
+  private static void onBurstOver()
+  {
+    final int from = sBurstFrom;
+    sBurstFrom = -1;
+    final int to = sAudio.getStreamVolume(AudioManager.STREAM_MUSIC);
+    if (from < 0 || to >= from || !TtsPlayer.isEnabled())
+      return;
+    final double max = Math.max(1, sAudio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+    final String line = nativeVolumeDown(from / max, to / max, inForeground());
+    if (line.isEmpty())
+      return;
+    // Back up to where it was, with the system slider showing it jump.
+    setVolume(from, AudioManager.FLAG_SHOW_UI);
+    sGiveBackTo = to;
+    TtsPlayer.INSTANCE.playTurnNotifications(new String[] {line}, new boolean[] {false}, new float[] {1.0f});
+    final long started = SystemClock.elapsedRealtime();
+    sMain.postDelayed(new Runnable() {
+      @Override
+      public void run()
+      {
+        if (sGiveBackTo < 0)
+          return;
+        if (TtsPlayer.INSTANCE.anyVoiceSpeaking() && SystemClock.elapsedRealtime() - started < GIVE_BACK_MAX_MS)
+        {
+          sMain.postDelayed(this, 300);
+          return;
+        }
+        // Fine. The driver's level.
+        setVolume(sGiveBackTo, 0);
+        sGiveBackTo = -1;
+      }
+    }, GIVE_BACK_MIN_MS);
+  }
+
+  private static void setVolume(int level, int flags)
+  {
+    if (sAudio.getStreamVolume(AudioManager.STREAM_MUSIC) == level)
+      return;
+    try
+    {
+      sSelfSet = level;
+      sAudio.setStreamVolume(AudioManager.STREAM_MUSIC, level, flags);
+    }
+    catch (SecurityException e)
+    {
+      // Do Not Disturb can refuse it; the line still plays at the lower level.
+      sSelfSet = -1;
+    }
+  }
+
+  private static boolean inForeground()
+  {
+    final ActivityManager.RunningAppProcessInfo info = new ActivityManager.RunningAppProcessInfo();
+    ActivityManager.getMyMemoryState(info);
+    return info.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND;
   }
 
   // Called from the core.
@@ -122,6 +248,9 @@ public final class Backseat
   }
 
   private static native void nativeEnableMusicCheck();
+
+  @NonNull
+  private static native String nativeVolumeDown(double before, double after, boolean foreground);
 
   private static native void nativeSetUserPronunciations(@NonNull String lines);
 
