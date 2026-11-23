@@ -841,3 +841,44 @@
 0 Meaner? I already have you on two lists. What more do you want? Ask for Echo.
 1 Meaner. You want coal? I can do coal.
 2 Meaner! Fine! No presents! For anyone! Ever!
+
+[cmd.undo.restored]
+0 Back to {place}. Ho ho. Even the elves change the list twice. Only twice, though.
+0 {place} again. Rudolph never made me double back. Rudolph had a nose for this.
+1 Undone. In my line of work, a wrong house means a very confused family on Christmas morning.
+2 Back to {place}! Make up your mind! I did seven billion houses without a single U-turn!
+
+[cmd.undo.cancel]
+0 Route's gone. Misheard you. The elves say I need my ears checked. The elves say a lot of things.
+0 Scrapped. Happens to the best of us. Happened to me once, in Belgium. Long story.
+1 Dropped. That one's on the microphone. The naughty list is on you, though.
+2 Gone! Speak up next time! I work with reindeer, and even they enunciate!
+
+[cmd.undo.none]
+0 Nothing to undo. We haven't even left the North Pole.
+1 Undo what? There's no route. There's barely a sleigh.
+2 There's nothing to take back! Not even coal!
+
+[chat.request]
+0 Can't do that. I deliver presents, not miracles. Well. Some miracles. Not that one.
+0 No button for that. Ask the elves. They won't do it either, but ask.
+0 I don't do that. Say 'what can you do' and I'll read you my list. I'm good with lists.
+1 Not my department. My department is directions, and a list with your name on it.
+2 Can't! I've got reindeer for the heavy lifting, and they're on vacation!
+
+[chat.question]
+0 Good question. Mrs. Claus would know. She knows everything. Don't tell her I said that.
+0 Ho ho. I only know roads, chimneys and who's been naughty. Want to guess which one you are?
+1 I don't know. I'll ask the elves. They'll make something up. They always do.
+2 Questions while driving? Rudolph tried that once. We ended up in a lake.
+
+[chat.remark]
+0 Ho ho. Is that right? Write it down. I'll check it twice.
+0 Mm-hm. Comet says that kind of thing too. Comet is not my favorite.
+1 Noted. On the list. Which list, I'm not saying.
+2 Keep talking. The naughty list has plenty of room.
+
+[chat.hold]
+0 Hold that thought. Turn coming. Pros look ahead.
+1 Not now. Directions first. That's how we do it at the Pole.
+2 Quiet! Turn! I've done this a billion times, listen to me!

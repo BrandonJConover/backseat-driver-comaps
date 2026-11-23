@@ -995,6 +995,8 @@ void RoutingManager::CloseRouting(bool removeRoutePoints)
 
   if (m_routingSession.IsBuilt())
     m_routingSession.EmitCloseRoutingEvent();
+  // Backseat: "go back to the old route" can bring this one back for a while.
+  m_backseat.OnRouteClosed();
   m_routingSession.Reset();
   RemoveRoute(true /* deactivateFollowing */);
 

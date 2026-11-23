@@ -921,3 +921,44 @@
 0 Meaner? Oh, I couldn't! You're too precious! If you want mean, ask for Echo, sweetie.
 1 Mean? To you? My little driver? Never!
 2 I can't be mean! You're perfect! Okay, maybe your parking. No! Perfect!
+
+[cmd.undo.restored]
+0 Back to {place}! You changed your mind back! That takes real courage, sweetie!
+0 {place} again! You knew where you wanted to go all along! I'm so proud!
+1 Undone! Look at you, fixing things! My little driver!
+2 Back to {place}! You undid it all by yourself! Superstar!
+
+[cmd.undo.cancel]
+0 That route's gone! It was my fault for hearing it wrong, not yours! Never yours!
+0 All gone! Good catch, sweetie! You're so on top of things!
+1 Dropped! You knew it was wrong! Such good instincts!
+2 You cancelled the bad route! I'm putting this on the fridge!
+
+[cmd.undo.none]
+0 There's nothing to undo, sweetie! You haven't made a single mistake! As usual!
+1 Nothing to undo! Everything you do is perfect!
+2 Undo? You? You don't make mistakes, superstar!
+
+[chat.request]
+0 Oh, I wish I could do that for you, sweetie! I can't! But what a great idea!
+0 What a creative ask! I can't do it! Say 'what can you do' and I'll show you my little list!
+0 I can't do that, but I love that you asked! Asking is so brave!
+1 No button for that! But you are so clever for thinking of it!
+2 I can't do that! But you can do anything! Except that, apparently! Through me!
+
+[chat.question]
+0 What a smart question! I don't know the answer! You're smarter than me!
+0 Ooh, good one! I only know roads, sweetie! You know so much more!
+1 I don't know! But I bet you do! You know everything!
+2 Such a big question from such a good driver! I'm speechless! Mostly because I don't know!
+
+[chat.remark]
+0 Aww, you're talking to me! I love our little talks!
+0 That's so interesting! Everything you say is so interesting!
+1 You're doing so good at talking! And driving! Both at once!
+2 Look at you, chatting and driving! Multitasking! My little superstar!
+
+[chat.hold]
+0 Hold that thought, sweetie! Big turn coming! You've got this!
+1 One second! Directions first, then more of your wonderful thoughts!
+2 Turn time, superstar! Then you can tell me everything!

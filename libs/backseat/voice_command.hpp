@@ -89,6 +89,9 @@ enum class AppAction
   /// "Is there traffic ahead?", "why is it so slow?": answered from the navigator's crawl judgment
   /// (Navigator::TrafficReply). No live traffic feed, so it never claims what's miles ahead.
   TrafficAhead,
+  /// "Cancel the new route", "go back to the old route", "that's not where I wanted to go": the last route
+  /// change was a mistake. Back to the route before it when there was one a moment ago, else no route.
+  UndoRoute,
   Count
 };
 
@@ -161,6 +164,28 @@ bool PlaceMatches(std::string const & asked, std::string const & name);
 bool IsJunkAnswer(std::string const & topic, std::string const & fact);
 /// The saved topic meant by "my favorite color" or "the ice cream one": named by topic, else by its fact.
 std::optional<std::string> MemoryTopicNamed(DriverMemory const & memory, std::string const & named);
+
+/// "Never mind", "cancel that", "no no no", "not there": takes back whatever just happened. Only an undo
+/// when a route was just started by voice; otherwise it's nothing.
+bool TakesItBack(std::string const & spoken);
+
+/// How what the driver said, when it's no command, is aimed at the GPS.
+enum class Chatter
+{
+  /// Not aimed at the GPS, as far as the words go: a passenger, the radio, singing along.
+  None,
+  /// An ask it has no action for: "can you call my mom", "turn on the AC", "order me a pizza".
+  Request,
+  /// A question for the GPS: "what's your favorite color", "do you like this song".
+  Question,
+  /// Anything else, which only counts mid-conversation.
+  Remark,
+  /// Said with the GPS's name, but no question or ask: "Echo, you're the worst".
+  Hail,
+};
+/// The kind of chatter in `spoken`. `voiceName` ("Echo") said up front or at the end makes anything
+/// aimed at the GPS.
+Chatter ClassifyChatter(std::string const & spoken, std::string const & voiceName = {});
 
 /// "Yeah", "um", "okay": nothing to act on, unless something asked for an answer.
 bool IsFiller(std::string const & spoken);

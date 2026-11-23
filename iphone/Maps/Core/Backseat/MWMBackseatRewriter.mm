@@ -208,6 +208,10 @@ void Perform(backseat::AppCommand const & command)
   case AppAction::TalkLess:
   case AppAction::DirectionsOnly:
   case AppAction::TalkMore:
+  case AppAction::TollsAhead:
+  case AppAction::TrafficAhead:
+  // The adapter turns an undo into a route (Perform(heard)) or a CancelRoute action.
+  case AppAction::UndoRoute:
   case AppAction::Count: break;
   }
 }
@@ -217,6 +221,8 @@ void Perform(backseat::AppCommand const & command)
 void Perform(BackseatAdapter::HeardCommand const & heard)
 {
   SayReply(heard.reply, {});
+  // Said to the GPS, nothing it can do: an answer in character rather than silence.
+  SayReply(heard.chat, {});
   using Kind = BackseatAdapter::HeardCommand::Kind;
   // "Take me to work": route there when the GPS knows where it is, otherwise search for it and
   // read out what it finds.
@@ -283,11 +289,17 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
         if (used)
           return;
         auto const heard = GetFramework().GetRoutingManager().BackseatDriverSaid(text.UTF8String ?: "");
-        // Nothing the GPS listens for (no command, answer or place): the model's chat answers instead.
+        // Nothing the GPS listens for (no command, answer or place): the model's chat answers instead,
+        // but only when it was said to the GPS (heard.chat isn't empty): a passenger's story or the radio
+        // gets nothing. Near a turn, heard.chat is "hold that thought", and the directions come first.
         bool const nothing = heard.kind == BackseatAdapter::HeardCommand::Kind::None && heard.actions.empty() &&
                              heard.reply.empty() && heard.voiceLines.empty();
         if (nothing)
-          SayReply(chat.UTF8String ?: "", {});
+        {
+          std::string const said = chat.UTF8String ?: "";
+          if (!heard.chat.empty())
+            SayReply(heard.chatHeld || said.empty() ? heard.chat : said, {});
+        }
         else
           Perform(heard);
       });

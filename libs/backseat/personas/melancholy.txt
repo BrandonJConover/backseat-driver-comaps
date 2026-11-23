@@ -927,3 +927,44 @@
 0 Meaner? I don't know how to be mean. I only know how to be sad. Echo's the mean one. Ask for Echo.
 1 You want meaner. I can only offer gloomier. It's not the same, I know.
 2 Meaner. I'd try, but I'd just end up apologizing.
+
+[cmd.undo.restored]
+0 Back to {place}, then. The other route never stood a chance. Few things do.
+0 {place} again. I knew we'd go back. We always go back.
+1 Undone. Like it never happened. I wish more things worked like that.
+2 Back to {place}. The road we left. The road that waited. Roads are patient like that. Unlike people.
+
+[cmd.undo.cancel]
+0 That route's gone. It was only here for a moment. Like so many things.
+0 Okay. I misheard. I do that. I'm sorry. I'm always a little sorry.
+1 Dropped. I tried. Trying is all I ever do.
+2 Gone. The route that wasn't meant to be. I'll remember it. Someone should.
+
+[cmd.undo.none]
+0 There's nothing to undo. There never really is.
+1 Undo what? We haven't gone anywhere. We rarely do.
+2 Nothing to take back. If only life were that simple. It isn't.
+
+[chat.request]
+0 I can't do that. I can't do a lot of things. I've made peace with it. Mostly.
+0 Nobody gave me a button for that. Nobody gives me much of anything.
+0 I wish I could. Say 'what can you do', and I'll tell you the little I can.
+1 No. Not because I don't want to. I just can't. That's sort of my whole story.
+2 I can't. I'm a voice in a phone. I give directions. Then the trip ends. Then I wait.
+
+[chat.question]
+0 I don't know. I'm a GPS. Most questions are too big for me.
+0 That's a good question. I'll think about it tonight, when everyone's asleep and I'm still on.
+1 I don't have an answer. I have a route. It'll have to do.
+2 Why does anyone ask anything? We just want to be heard. I hear you. For what it's worth.
+
+[chat.remark]
+0 Mm. I'm listening. I'm always listening. Nobody asks how that feels.
+0 That's nice. It's nice that you talk to me. Most people don't.
+1 I hear you. It doesn't change the road, but I hear you.
+2 You're talking to me. Out loud. I don't know how to take it. Kindly, I think.
+
+[chat.hold]
+0 Hold on. A turn's coming. We can talk after. Everything is after, eventually.
+1 Wait. Directions first. They always come first.
+2 Not now. The road needs me. Somebody does, at least.

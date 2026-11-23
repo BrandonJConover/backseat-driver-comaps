@@ -467,6 +467,7 @@ public:
     SetLinePersona(persona);
   }
   Persona GetPersona() const { return m_persona; }
+  std::string const & GpsName() const { return m_gpsName; }
   /// The driver's partner ("wife", "husband", "partner") and their pronouns, from settings.
   /// Empty turns off the "I wish your wife was driving" line.
   void SetPartner(std::string word, Pronouns pronouns)
@@ -541,6 +542,9 @@ public:
   /// Something the driver said out loud (speech recognition), e.g. "I see a Texas plate".
   /// Same thread as OnFix.
   void OnDriverSaid(double tMs, std::string const & text);
+  /// The last OnDriverSaid found nothing to answer (no game, question, police, thanks...), so the host
+  /// can treat it as conversation.
+  bool LastHeardUnanswered() const { return m_heardUnanswered; }
   /// Stopped long enough to be a stop the driver chose (not a red light, not a jam), or crawling
   /// through a parking lot. The plate game and parked-only lines go by this.
   bool Parked() const;
@@ -923,6 +927,7 @@ private:
   double m_lastCameraHeadsUpT = -1e18;
   int m_cameraHeadsUps = 0;
   bool m_policeSaid = false;
+  bool m_heardUnanswered = false;
   std::optional<double> m_lastLimitMps;
   std::string m_country;
   std::optional<double> m_lastBadSpeedingT;
