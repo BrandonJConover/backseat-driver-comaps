@@ -222,6 +222,8 @@ typedef NS_ENUM(NSInteger, MWMBackseatSetupStep) {
 + (NSString *)confirmSearchResult:(NSString *)answer confirmed:(BOOL *)confirmed;
 /// Builds a route to a place by voice.
 + (void)routeTo:(CLLocationCoordinate2D)coordinate title:(NSString *)title;
+/// Walking directions to a spot (the parked car): ends any drive, switches to walking, and goes.
++ (void)walkTo:(CLLocationCoordinate2D)coordinate title:(NSString *)title;
 /// What the GPS has worked out about the driver, as label / value pairs ("Works at", "Acme Corp").
 @property(class, nonatomic, readonly) NSArray<NSArray<NSString *> *> * learnedFacts;
 

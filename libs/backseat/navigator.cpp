@@ -16,6 +16,10 @@
 #include <ctime>
 #include <limits>
 #include <random>
+#include <regex>
+#include <iomanip>
+#include <sstream>
+#include <cstdlib>
 
 namespace backseat
 {
@@ -743,6 +747,154 @@ double ChainWithinM(double speedMps)
   return std::max(kChainWithinM, std::min(kChainMaxM, kChainWithinS * mps));
 }
 
+int LightNumberAt(std::vector<double> lightsAlongM, double turnAlongM, double clusterM, double atTurnM)
+{
+  if (!std::isfinite(turnAlongM) || turnAlongM < 0)
+    return 0;
+  std::sort(lightsAlongM.begin(), lightsAlongM.end());
+  // One junction per run of lights close together; a junction is where its first light is.
+  std::vector<std::pair<double, double>> junctions;  // first, last
+  for (double const at : lightsAlongM)
+  {
+    if (!std::isfinite(at) || at > turnAlongM + atTurnM)
+      continue;
+    if (!junctions.empty() && at - junctions.back().second <= clusterM)
+      junctions.back().second = at;
+    else
+      junctions.push_back({at, at});
+  }
+  if (junctions.empty())
+    return 0;
+  // The turn's own light: the last junction, reaching the turn.
+  if (junctions.back().second < turnAlongM - atTurnM)
+    return 0;
+  // Sitting at a light (or just past one) makes "the next light" ambiguous: say nothing extra.
+  for (auto const & j : junctions)
+    if (j.first <= 15 && j.second >= -15)
+      return 0;
+  int n = 0;
+  for (auto const & j : junctions)
+    if (j.first > 15)
+      ++n;
+  return n >= 1 && n <= 3 ? n : 0;
+}
+
+std::string LandmarkPhrase(std::string const & name, std::string const & kind, bool chain)
+{
+  std::string lower;
+  for (unsigned char const c : name)
+    lower += static_cast<char>(std::tolower(c));
+  if (name.empty() || name.size() > 32)
+    return {};
+  // Words that would read as part of the direction, or turn a turn into an exit or roundabout.
+  static std::regex const confusing(
+      R"(\b(left|right|exit|ramp|roundabout|rotary|circle|u-?turn|then|straight|turn|lane|north|south|east|west)\b)");
+  if (std::regex_search(lower, confusing))
+    return {};
+  int words = 1;
+  for (char const c : name)
+    if (c == ' ')
+      ++words;
+  if (words > 5)
+    return {};
+  if (!chain)
+    return name;
+  std::string phrase = lower.rfind("the ", 0) == 0 ? "the " + name.substr(4) : "the " + name;
+  if (kind == "gas" && lower.find("gas") == std::string::npos && lower.find("station") == std::string::npos &&
+      lower.find("fuel") == std::string::npos)
+    phrase += " station";
+  return phrase;
+}
+
+std::string ParkedCarLine(ParkedCar const & car)
+{
+  std::ostringstream out;
+  out.precision(10);
+  out << car.at.lat << ',' << car.at.lon << ',' << std::fixed << std::setprecision(0) << car.tMs << ','
+      << (car.saved ? 1 : 0);
+  return out.str();
+}
+
+std::optional<ParkedCar> ParkedCarFromLine(std::string const & line)
+{
+  double v[4];
+  std::istringstream in(line);
+  for (int i = 0; i < 4; ++i)
+  {
+    std::string field;
+    if (!std::getline(in, field, ','))
+      return std::nullopt;
+    char * end = nullptr;
+    v[i] = std::strtod(field.c_str(), &end);
+    if (field.empty() || end != field.c_str() + field.size() || !std::isfinite(v[i]))
+      return std::nullopt;
+  }
+  if (std::abs(v[0]) > 90 || std::abs(v[1]) > 180 || v[2] < 0)
+    return std::nullopt;
+  return ParkedCar{{v[0], v[1]}, v[2], v[3] != 0};
+}
+
+std::string ParkedAgoWords(double agoMs)
+{
+  if (!std::isfinite(agoMs) || agoMs < -60000)
+    return {};
+  double const minutes = std::max(0.0, agoMs) / 60000;
+  if (minutes < 8)
+    return "for a few minutes";
+  if (minutes < 55)
+    return "for about " + std::to_string(static_cast<int>(std::lround(minutes / 5) * 5)) + " minutes";
+  double const hours = minutes / 60;
+  if (hours < 1.5)
+    return "for about an hour";
+  if (hours < 20)
+    return "for about " + std::to_string(static_cast<int>(std::lround(hours))) + " hours";
+  if (hours < 36)
+    return "since yesterday";
+  return "for " + std::to_string(static_cast<int>(std::lround(hours / 24))) + " days";
+}
+
+CarAnswer FindCarAnswer(std::optional<ParkedCar> const & car, std::optional<LatLon> const & here, double nowMs,
+                        Units units, bool driving)
+{
+  // Close enough to see it; farther than a long walk isn't a walk.
+  double constexpr kRightHereM = 40;
+  double constexpr kWalkableM = 8000;
+  CarAnswer a;
+  if (driving)
+  {
+    a.key = "car.driving";
+    return a;
+  }
+  if (!car)
+  {
+    a.key = "car.unknown";
+    return a;
+  }
+  a.vars["ago"] = ParkedAgoWords(nowMs - car->tMs);
+  if (!here)
+  {
+    // No fix: still send the walker there; the router starts from wherever the phone is.
+    a.key = "car.find";
+    a.vars["distance"] = "a ways";
+    a.vars["direction"] = "that way";
+    a.walkTo = car->at;
+    return a;
+  }
+  double const m = DistanceM(*here, car->at);
+  a.vars["distance"] = FormatDistance(m, units);
+  a.vars["direction"] = CompassDirection(*here, car->at);
+  if (m <= kRightHereM)
+    a.key = "car.here";
+  else if (m > kWalkableM)
+    a.key = "car.far";
+  else
+  {
+    a.key = "car.find";
+    a.walkTo = car->at;
+  }
+  return a;
+}
+
 std::string RoundaboutExitWords(int exit)
 {
   static char const * const kOrdinals[] = {"first", "second", "third", "fourth",
@@ -785,6 +937,18 @@ std::string InstructionText(RouteSnapshot const & route, double speedMps)
   std::string text = route.turn == TurnKind::Roundabout
                          ? RoundaboutText(route)
                          : InstructionText(route.turn, route.nextStreet, route.destination, route.nextExitRef);
+  // "Turn left at the Walgreens onto Elm Street": a corner to look for, the way people give
+  // directions. Plain turns only; exits and roundabouts have their own signs.
+  bool const plainTurn = route.turn == TurnKind::Left || route.turn == TurnKind::Right ||
+                         route.turn == TurnKind::SharpLeft || route.turn == TurnKind::SharpRight ||
+                         ((route.turn == TurnKind::SlightLeft || route.turn == TurnKind::SlightRight) &&
+                          route.nextExitRef.empty());
+  if (plainTurn && !route.turnLandmark.empty())
+  {
+    text = InstructionText(route.turn, {}, route.destination) + " at " + route.turnLandmark;
+    if (!route.nextStreet.empty())
+      text += (StartsWithToward(route.nextStreet) ? " " : " onto ") + route.nextStreet;
+  }
   if (route.thenGapM < 0 || route.thenGapM > ChainWithinM(speedMps))
     return text;
   switch (route.turn)
@@ -897,6 +1061,8 @@ RouteSnapshot CleanRoute(RouteSnapshot route, double lastDistToTurnM)
     route.gradeAhead.reset();
   if (!sane(route.dirtShare, 1))
     route.dirtShare = 0;
+  if (route.lightNumber < 0 || route.lightNumber > 3 || route.control != Control::TrafficLight)
+    route.lightNumber = 0;
   for (int * exit : {&route.roundaboutExit, &route.thenRoundaboutExit})
     if (*exit < 0 || *exit > 20)
       *exit = 0;
@@ -2203,10 +2369,13 @@ void Navigator::SayInstruction(double t, RouteSnapshot const & route)
                      {"text", text},
                      {"dist_m", LogNum(route.distToTurnM, 0)},
                      {"control", std::to_string(static_cast<int>(route.control))},
+                     {"light", std::to_string(route.lightNumber)},
+                     {"landmark", route.turnLandmark},
                      {"lane", route.laneSide == LaneSide::Left    ? "left"
                               : route.laneSide == LaneSide::Right ? "right"
                                                                   : ""}});
-  Say(m_engine->OnNav(NavEvent::Instruction(t, text, route.distToTurnM, ManeuverOf(route.turn), route.control)));
+  Say(m_engine->OnNav(
+      NavEvent::Instruction(t, text, route.distToTurnM, ManeuverOf(route.turn), route.control, route.lightNumber)));
   // A roundabout with the music on: a hint about the other round thing in the car. Once a trip.
   if (route.turn == TurnKind::Roundabout && !m_roundaboutSaid && m_musicLookup && m_musicLookup())
   {

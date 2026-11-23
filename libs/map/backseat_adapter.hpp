@@ -99,7 +99,9 @@ public:
       /// Search for `query` and let the driver pick.
       Search,
       /// The same, adding what's picked as a stop on the current route.
-      SearchStop
+      SearchStop,
+      /// Walking directions to `lat`/`lon` (the parked car), titled `name`.
+      WalkTo
     };
     Kind kind = Kind::None;
     /// RunTool: the words didn't support that tool, so nothing ran.
@@ -433,6 +435,10 @@ public:
 private:
   backseat::RouteSnapshot Snapshot(routing::RoutingSession const & session, std::string const & destinationName) const;
   backseat::Control GuessControl(routing::Route const & route, uint32_t turnIndex) const;
+  /// Which light along the route the turn's light is (backseat::LightNumberAt), 0 when unknown.
+  int LightNumberTo(routing::Route const & route, double distToTurnM) const;
+  /// A named place on the corner of the turn, as said ("the Walgreens"), cached per turn.
+  std::string TurnLandmark(routing::Route const & route, uint32_t turnIndex) const;
   std::optional<backseat::Place> PlaceAt(backseat::LatLon const & at) const;
   bool InParkingLot(backseat::LatLon const & at) const;
   /// The building whose footprint covers `at`, deepest first. Nothing in a parking garage, carport,
@@ -589,6 +595,12 @@ private:
   double m_speedMps = 0;
   double m_speedLimitMps = -1;
   mutable double m_cameraAheadM = -1;
+  /// Where the car was left (settings key kParkedCarKey).
+  std::optional<backseat::ParkedCar> m_parkedCar;
+  void SaveParkedCar(backseat::ParkedCar const & car);
+  /// The corner landmark for one turn of one route (looked up once per turn).
+  mutable std::optional<std::pair<uint64_t, uint32_t>> m_landmarkFor;
+  mutable std::string m_landmark;
   std::string m_lastCallerVoice;
   std::string m_callerVoiceToWarm;
   mutable std::mutex m_lastTripMutex;

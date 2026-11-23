@@ -136,7 +136,8 @@ JNIEXPORT jstring JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeDrive
   auto const heard = frm()->GetRoutingManager().BackseatDriverSaid(jni::ToNativeString(env, text));
   using Kind = BackseatAdapter::HeardCommand::Kind;
   std::string out;
-  if (heard.kind == Kind::RouteTo)
+  // The walk back to the parked car is a route like any other here (Android has no walking switch yet).
+  if (heard.kind == Kind::RouteTo || heard.kind == Kind::WalkTo)
   {
     std::ostringstream s;
     s << std::setprecision(9) << "route\t" << heard.lat << '\t' << heard.lon << '\t' << heard.name;

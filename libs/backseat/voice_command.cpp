@@ -333,6 +333,8 @@ std::vector<AppTool> const & AppTools()
       {AppAction::TalkMore, "talk_more", "Go back to the full commentary after talking less.", nullptr},
       {AppAction::TollsAhead, "tolls_ahead", "Say whether the route has tolls: on one now, how far to the next, or none.", nullptr},
       {AppAction::TrafficAhead, "traffic_ahead", "Say whether the car is stuck in traffic right now.", nullptr},
+      {AppAction::FindMyCar, "find_my_car", "Say where the car is parked and give walking directions back to it.", nullptr},
+      {AppAction::SaveParking, "save_parking", "Remember the spot where the car is parked right now.", nullptr},
   };
   return tools;
 }
@@ -735,6 +737,18 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                                  " why arent we moving ", " what's the holdup ", " whats the holdup ",
                                  " what's the hold up ", " whats the hold up ", " are we in a jam ", " is this a jam ",
                                  " are we stuck in traffic ", " is it a traffic jam "}},
+      {AppAction::FindMyCar, {" where did i park ", " where'd i park ", " whered i park ", " where did we park ",
+                              " where'd we park ", " whered we park ", " where is my car ", " where's my car ",
+                              " wheres my car ", " where is the car ", " where's the car ", " wheres the car ",
+                              " find my car ", " find the car ", " back to my car ", " back to the car ",
+                              " take me to my car ", " take me to the car ", " walk me to my car ",
+                              " walk me to the car ", " where i parked ", " where we parked ", " lost my car ",
+                              " can't find my car ", " cant find my car ", " can't find the car ", " cant find the car "}},
+      {AppAction::SaveParking, {" remember where i parked ", " remember where we parked ", " remember where i park ",
+                                " i parked here ", " we parked here ", " save my parking ", " save parking ",
+                                " save my parking spot ", " save the parking spot ", " save where i parked ",
+                                " save where we parked ", " mark my car ", " mark where i parked ",
+                                " remember this spot ", " remember my parking spot ", " remember where the car is "}},
   };
   std::vector<std::pair<size_t, AppCommand>> found;
   bool const voiceNamed = words.find(" voice ") != std::string::npos;
@@ -934,6 +948,14 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
     if (opposite(found[i].second.action) != AppAction::Count)
       found.erase(std::remove_if(found.begin() + i + 1, found.end(), [&](auto const & f)
       { return f.second.action == found[i].second.action; }), found.end());
+  // "Remember where I parked" also says "where I parked"; "take me back to my car" is the car, not the
+  // trip's start, a search for "my car", or the road under it.
+  if (heardAction(AppAction::SaveParking))
+    drop(AppAction::FindMyCar);
+  if (heardAction(AppAction::FindMyCar) || heardAction(AppAction::SaveParking))
+    for (AppAction other : {AppAction::NavigateTo, AppAction::TakeMeBack, AppAction::FindAlongRoute,
+                            AppAction::CurrentRoad, AppAction::Recenter, AppAction::RepeatInstruction})
+      drop(other);
   std::stable_sort(found.begin(), found.end(), [](auto const & a, auto const & b) { return a.first < b.first; });
   std::vector<AppCommand> out;
   for (auto & f : found)
@@ -1175,6 +1197,8 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::TalkMore: return saidAny({"more", "chatty", "whatever"});
   case AppAction::TollsAhead: return saidAny({"toll", "tolls"});
   case AppAction::TrafficAhead: return saidAny({"traffic", "slow", "jam", "crawling", "moving", "holdup", "hold"});
+  case AppAction::FindMyCar: return saidAny({"car", "park", "parked", "truck", "vehicle"});
+  case AppAction::SaveParking: return saidAny({"park", "parked", "parking", "spot", "car"});
   case AppAction::Count: break;
   }
   return false;
