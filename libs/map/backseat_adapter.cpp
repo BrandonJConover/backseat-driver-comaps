@@ -2365,6 +2365,9 @@ BackseatAdapter::HeardCommand BackseatAdapter::RunTool(std::string const & name,
     return heard;
   }
   heard.reply = Run({*action, argument}, backseat::SaidPolitely(spoken), heard);
+  // The model ran it: what's said next is still the same conversation.
+  m_lastAnsweredMs =
+      std::chrono::duration<double, std::milli>(std::chrono::system_clock::now().time_since_epoch()).count();
   return heard;
 }
 

@@ -24,6 +24,16 @@ void RouteUndo::Built(double tMs, LatLon finish)
 {
   if (m_now && DistanceM(m_now->at, finish) < kSameM)
     return;
+  // Rebuilding a route closes it first (a stop added, tolls avoided): the same place again right after
+  // is the same trip, with its start time and name, not a short new one.
+  if (!m_now && !m_before.empty() && tMs - m_before.back().endedMs <= kRebuildMs &&
+      DistanceM(m_before.back().at, finish) < kSameM)
+  {
+    m_now = m_before.back();
+    m_now->endedMs = 0;
+    m_before.pop_back();
+    return;
+  }
   if (m_now)
   {
     m_now->endedMs = tMs;

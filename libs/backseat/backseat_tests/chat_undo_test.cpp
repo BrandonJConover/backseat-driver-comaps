@@ -163,3 +163,25 @@ TEST(UndoIgnoresReroutesAndOldHistory)
   undo.Built(67 * kMin, kStore);
   CHECK(undo.Undo(68 * kMin).kind == RouteUndo::Plan::Kind::Cancel);
 }
+
+TEST(RebuildsKeepTheTripWhole)
+{
+  RouteUndo undo;
+  undo.Built(0, kWork);
+  undo.Named("Work");
+  undo.Closed(5 * kMin);
+  undo.Built(5 * kMin, kStore);
+  undo.Named("Store");
+  // Rebuilt every two minutes (a stop added, tolls avoided): each closes, then builds the same place.
+  for (double t = 7 * kMin; t <= 11 * kMin; t += 2 * kMin)
+  {
+    undo.Closed(t);
+    undo.Built(t, kStore);
+  }
+  // Then a misheard route.
+  undo.Closed(12 * kMin);
+  undo.Built(12 * kMin, kMelissaDrive);
+  auto const plan = undo.Undo(13 * kMin);
+  CHECK(plan.kind == RouteUndo::Plan::Kind::Restore);
+  CHECK(plan.to.name == "Store");
+}

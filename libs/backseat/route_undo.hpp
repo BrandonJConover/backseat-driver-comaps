@@ -20,6 +20,8 @@ public:
   /// A route that lasted less than this was likely the mistake, so going back skips it when there's
   /// an older one.
   static double constexpr kMistakeMs = 3 * 60 * 1000;
+  /// A route closed and built again to the same place within this is a rebuild of the same trip.
+  static double constexpr kRebuildMs = 2 * 60 * 1000;
 
   struct Destination
   {
