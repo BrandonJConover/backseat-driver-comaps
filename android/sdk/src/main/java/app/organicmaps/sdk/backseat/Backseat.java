@@ -41,10 +41,22 @@ public final class Backseat
     @NonNull
     public final String name;
 
+    /// Lines to say out loud, in order: the GPS's reply, or its in-character answer to chat.
+    @NonNull
+    public final java.util.List<String> say = new java.util.ArrayList<>();
+    /// Stop navigating ("cancel the new route").
+    public boolean cancel;
+
     Command(@Nullable double[] latLon, @NonNull String name)
     {
       this.latLon = latLon;
       this.name = name;
+    }
+
+    /// Nowhere to go: just something to say or do.
+    public boolean hasDestination()
+    {
+      return latLon != null || !name.isEmpty();
     }
   }
 
@@ -54,20 +66,30 @@ public final class Backseat
   @Nullable
   public static Command driverSaid(@NonNull String text)
   {
-    final String heard = nativeDriverSaid(text);
-    final String[] parts = heard.split("\t", -1);
+    final String[] lines = nativeDriverSaid(text).split("\n", -1);
+    final String[] parts = lines[0].split("\t", -1);
+    Command command = new Command(null, "");
     try
     {
       if (parts.length == 4 && parts[0].equals("route"))
-        return new Command(new double[] {Double.parseDouble(parts[1]), Double.parseDouble(parts[2])}, parts[3]);
+        command = new Command(new double[] {Double.parseDouble(parts[1]), Double.parseDouble(parts[2])}, parts[3]);
     }
     catch (NumberFormatException ignored)
     {
-      return null;
+      // No destination, but what to say still counts.
     }
     if (parts.length == 2 && parts[0].equals("search"))
-      return new Command(null, parts[1]);
-    return null;
+      command = new Command(null, parts[1]);
+    for (int i = 1; i < lines.length; i++)
+    {
+      if (lines[i].startsWith("say\t"))
+        command.say.add(lines[i].substring(4));
+      else if (lines[i].equals("cancel"))
+        command.cancel = true;
+    }
+    if (!command.hasDestination() && command.say.isEmpty() && !command.cancel)
+      return null;
+    return command;
   }
 
   /// A line as Kokoro should read it (libs/backseat/pronunciation.hpp, shared with iOS): streets,

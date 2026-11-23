@@ -3435,8 +3435,12 @@ char const * BridgeLinesKey(Bridge bridge)
 void Navigator::OnDriverSaid(double tMs, std::string const & text)
 {
   Trace("heard", {{"text", text}, {"parked", m_engine && !m_arrived && Parked() ? "yes" : "no"}});
+  m_heardUnanswered = false;
   if (!m_engine || m_arrived)
+  {
+    m_heardUnanswered = true;
     return;
+  }
   m_lastT = std::max(m_lastT, tMs);
   // "Avoid tolls": the host reroutes; a toll stretch after that is no joke (BI-113).
   for (auto const & command : ParseAppCommands(text))
@@ -3575,7 +3579,11 @@ void Navigator::OnDriverSaid(double tMs, std::string const & text)
   }
   auto const reply = m_plates.OnDriverSaid(text, Tier(), Parked(), m_lastT);
   if (!reply)
+  {
+    // Nothing here listens for it: the host may answer it as conversation.
+    m_heardUnanswered = true;
     return;
+  }
   if (m_plates.GetState() == PlateGame::State::Playing)
     m_plates.MarkPlayed(m_lastT);
   SayPlate(m_lastT, *reply);

@@ -6,6 +6,7 @@
 #include "backseat/onboarding.hpp"
 #include "backseat/place_search.hpp"
 #include "backseat/road_bits.hpp"
+#include "backseat/route_undo.hpp"
 #include "backseat/voice_command.hpp"
 
 #include "traffic/speed_groups.hpp"
@@ -121,6 +122,12 @@ public:
       std::string text;
     };
     std::vector<VoiceLine> voiceLines;
+    /// Nothing the GPS listens for, but said to it ("can you call my mom", "do you like this song"): an
+    /// answer in character. A platform with a chat model says the model's answer instead; one without says
+    /// this. Empty when it wasn't aimed at the GPS (a passenger, the radio), so the model stays quiet too.
+    std::string chat;
+    /// `chat` is "hold that thought": a turn is close, so no conversation now, not even the model's.
+    bool chatHeld = false;
   };
   /// The voices the platform can speak in, for "what voice options do you have?" and picking one
   /// by name or code phrase. Without them, asking for the voices just opens the list.
@@ -286,6 +293,9 @@ public:
   /// Draw-your-own route (RoutingManager::ApplyRouteSketch). RoutingManager reports every newly
   /// built route; one without a drawing is remembered as the fastest way to its finish.
   void OnRouteBuilt(double totalSeconds, m2::PointD const & finish, bool sketched);
+  /// The route was closed: cancelled, finished, or about to be replaced. "Go back to the old route" can
+  /// bring it back for a while (backseat::RouteUndo).
+  void OnRouteClosed();
   /// Call after ApplyRouteSketch() and before BuildRoute(). Once the drawn route is built,
   /// TakeSketchVerdict() has the GPS's opinion of it.
   void SketchApplied(bool addedStop, bool trimmed) { m_pendingSketch = {addedStop, trimmed}; }
@@ -507,6 +517,18 @@ private:
   bool m_askStateNext = false;
   int m_searches = 0;
   backseat::CommandRepeats m_commandRepeats;
+  /// Destinations lately, for "cancel the new route" / "go back to the old one".
+  backseat::RouteUndo m_routeUndo;
+  /// When a route was last asked for out loud: "never mind" soon after takes it back.
+  double m_voiceRouteMs = -1e12;
+  /// When the GPS last answered the driver (a command's reply or chat): a reply within the next while
+  /// is conversation, even without a question in it.
+  double m_lastAnsweredMs = -1e12;
+  /// When the last chat line and the last "hold that thought" were said, so neither piles up.
+  double m_lastChatMs = -1e12;
+  double m_lastHoldMs = -1e12;
+  /// The in-character answer to `text` when it's said to the GPS and nothing else took it; sets chatHeld.
+  void ChatFallback(std::string const & text, double nowMs, HeardCommand & heard);
   std::optional<std::string> m_lastReadTopic;
   void ChoseSearchPlace(std::string const & place);
   std::string m_searchQuery;

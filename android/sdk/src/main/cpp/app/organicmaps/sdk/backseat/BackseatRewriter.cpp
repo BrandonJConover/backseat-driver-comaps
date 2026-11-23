@@ -132,7 +132,7 @@ JNIEXPORT void JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeEnableMu
 
 JNIEXPORT jstring JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeDriverSaid(JNIEnv * env, jclass, jstring text)
 {
-  // "" when the navigator took it, "route\tlat\tlon\tname" or "search\tquery" for a destination.
+  // First line: "" when the navigator took it, "route\tlat\tlon\tname" or "search\tquery" for a destination.
   auto const heard = frm()->GetRoutingManager().BackseatDriverSaid(jni::ToNativeString(env, text));
   using Kind = BackseatAdapter::HeardCommand::Kind;
   std::string out;
@@ -144,6 +144,22 @@ JNIEXPORT jstring JNICALL Java_app_organicmaps_sdk_backseat_Backseat_nativeDrive
   }
   else if (heard.kind == Kind::Search)
     out = "search\t" + heard.query;
+  // Then, one per line: what to say (the reply, or the chat answer when nothing else took it) and
+  // "cancel" when the route should go ("cancel the new route", an undo with nothing to go back to).
+  auto const oneLine = [](std::string text)
+  {
+    for (auto & ch : text)
+      if (ch == '\n' || ch == '\t')
+        ch = ' ';
+    return text;
+  };
+  if (!heard.reply.empty())
+    out += "\nsay\t" + oneLine(heard.reply);
+  if (!heard.chat.empty())
+    out += "\nsay\t" + oneLine(heard.chat);
+  for (auto const & action : heard.actions)
+    if (action.action == backseat::AppAction::CancelRoute)
+      out += "\ncancel";
   return jni::ToJavaString(env, out);
 }
 }  // extern "C"

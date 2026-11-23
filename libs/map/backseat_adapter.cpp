@@ -1079,6 +1079,11 @@ std::string BackseatAdapter::MileageYearEnd()
 
 void BackseatAdapter::OnRouteBuilt(double totalSeconds, m2::PointD const & finish, bool sketched)
 {
+  {
+    auto const ll = mercator::ToLatLon(finish);
+    m_routeUndo.Built(std::chrono::duration<double, std::milli>(std::chrono::system_clock::now().time_since_epoch()).count(),
+                      {ll.m_lat, ll.m_lon});
+  }
   m_routeSketched = sketched;
   if (!sketched)
   {
@@ -1099,6 +1104,11 @@ void BackseatAdapter::OnRouteBuilt(double totalSeconds, m2::PointD const & finis
   }
   if (sketch.trimmed)
     m_sketchVerdict += (m_sketchVerdict.empty() ? "" : " ") + m_navigator.Reply("sketch.trimmed");
+}
+
+void BackseatAdapter::OnRouteClosed()
+{
+  m_routeUndo.Closed(std::chrono::duration<double, std::milli>(std::chrono::system_clock::now().time_since_epoch()).count());
 }
 
 std::string BackseatAdapter::FileAnswer(std::string const & spoken)
@@ -1161,7 +1171,10 @@ std::string BackseatAdapter::ChatInstructions(std::string const & voiceName)
   }
   return "You are " + name + ", the voice of Backseat Driver, a GPS app. " + manner +
          "Talk with the driver the way a person would, in one to three short sentences, because they're driving. "
-         "You can only change the app through do_app_action, so never claim to do anything else. When the driver "
+         "You can only change the app through do_app_action, so never claim to do anything else. When they ask for "
+         "something no app action does (call someone, play a song, order food), say in character that you can't, and "
+         "don't pretend you did. If a route was started by mistake (\"cancel the new route\", \"never mind\", \"go back "
+         "to the old route\"), use undo_route. Directions always come first, so keep chat short. When the driver "
          "tells you something about themselves worth keeping (family, pets, job, likes, plans), call remember_fact. "
          "Use what you know about them when it's funny, and never make up facts about them.\n"
          "What you know about the driver:\n" + m_memory.ForModel(1500);
@@ -1177,6 +1190,7 @@ void BackseatAdapter::OnLocationUpdate(location::GpsInfo const & info, routing::
   double const ageMs = nowMs - info.m_timestamp * 1000;
   double const gapMs = m_lastFixMs > 0 ? info.m_timestamp * 1000 - m_lastFixMs : -1;
   m_lastFixMs = info.m_timestamp * 1000;
+  m_routeUndo.Named(destinationName);
   if (gapMs > 2500)
     backseat::TraceThrottled("fix.gap", "fix.gap", {{"gap_ms", backseat::LogNum(gapMs, 0)}});
   // A named lambda: the braced initializer's commas would split the macro arguments.
@@ -2274,11 +2288,21 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
     Run({backseat::AppAction::ChangeVoice, m_voices[*voice].id}, true, heard);
     return heard;
   }
-  auto const commands = backseat::ParseAppCommands(text);
+  double const nowMs =
+      std::chrono::duration<double, std::milli>(std::chrono::system_clock::now().time_since_epoch()).count();
+  auto commands = backseat::ParseAppCommands(text);
+  // "Never mind" right after a route asked for out loud (or misheard): take that route back.
+  if (commands.empty() && nowMs - m_voiceRouteMs < 3 * 60 * 1000 && backseat::TakesItBack(text))
+    commands.push_back({backseat::AppAction::UndoRoute, {}});
   if (commands.empty())
   {
     // Chatter, police, plates, thanks: the navigator's business.
     m_navigator.OnDriverSaid(0, text);
+    // Nothing took it. Said to the GPS, it still gets an answer: never silence for "can you...".
+    if (m_navigator.LastHeardUnanswered())
+      ChatFallback(text, nowMs, heard);
+    else
+      m_lastAnsweredMs = nowMs;
     return heard;
   }
   bool const polite = backseat::SaidPolitely(text);
@@ -2288,7 +2312,40 @@ BackseatAdapter::HeardCommand BackseatAdapter::OnDriverSaid(std::string const & 
     if (!reply.empty())
       heard.reply += (heard.reply.empty() ? "" : " ") + reply;
   }
+  m_lastAnsweredMs = nowMs;
   return heard;
+}
+
+void BackseatAdapter::ChatFallback(std::string const & text, double nowMs, HeardCommand & heard)
+{
+  using backseat::Chatter;
+  auto const kind = backseat::ClassifyChatter(text, m_navigator.GpsName());
+  bool const talking = nowMs - m_lastAnsweredMs < 45000;
+  bool const aimed = kind == Chatter::Request || kind == Chatter::Question || kind == Chatter::Hail ||
+                     (kind == Chatter::Remark && talking);
+  backseat::Trace("chat", {{"kind", std::to_string(static_cast<int>(kind))}, {"aimed", aimed ? "yes" : "no"}});
+  // "Shut up" means it: no chat until the driver says it can talk again.
+  if (!aimed || m_navigator.GetTalkLevel() == backseat::TalkLevel::DirectionsOnly)
+    return;
+  // Directions come first: near a turn, one "hold that thought" and nothing else.
+  if (!m_navigator.CalmForAsk())
+  {
+    if (nowMs - m_lastHoldMs >= 30000)
+    {
+      m_lastHoldMs = nowMs;
+      heard.chat = m_navigator.Reply("chat.hold");
+      heard.chatHeld = true;
+    }
+    return;
+  }
+  // Two people talking over each other in the back seat isn't ten questions.
+  if (nowMs - m_lastChatMs < 6000)
+    return;
+  m_lastChatMs = nowMs;
+  m_lastAnsweredMs = nowMs;
+  heard.chat = m_navigator.Reply(kind == Chatter::Request    ? "chat.request"
+                                 : kind == Chatter::Question ? "chat.question"
+                                                             : "chat.remark");
 }
 
 BackseatAdapter::HeardCommand BackseatAdapter::RunTool(std::string const & name, std::string const & argument,
@@ -2344,6 +2401,7 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
   {
     if (command.argument.empty())
       return {};
+    m_voiceRouteMs = nowMs;
     auto const known = backseat::KnownPlaceOf(command.argument);
     std::string const place = !known                                ? command.argument
                               : *known == backseat::KnownPlace::Home ? "your home"
@@ -2423,6 +2481,28 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
   case AppAction::CancelRoute:
     m_commandRepeats.RouteStarted();
     break;
+  case AppAction::UndoRoute:
+  {
+    m_voiceRouteMs = -1e12;
+    auto const plan = m_routeUndo.Undo(nowMs);
+    using Kind = backseat::RouteUndo::Plan::Kind;
+    if (plan.kind == Kind::Restore)
+    {
+      std::string const place = plan.to.name.empty() ? "where we were going" : plan.to.name;
+      heard.kind = HeardCommand::Kind::RouteTo;
+      heard.lat = plan.to.at.lat;
+      heard.lon = plan.to.at.lon;
+      heard.name = plan.to.name.empty() ? "Destination" : plan.to.name;
+      return m_navigator.Reply("cmd.undo.restored", {{"place", place}});
+    }
+    if (plan.kind == Kind::Cancel)
+    {
+      m_commandRepeats.RouteStarted();
+      heard.actions.push_back({AppAction::CancelRoute, {}});
+      return m_navigator.Reply("cmd.undo.cancel");
+    }
+    return m_navigator.Reply("cmd.undo.none");
+  }
   case AppAction::FindAlongRoute:
   {
     if (command.argument.empty())

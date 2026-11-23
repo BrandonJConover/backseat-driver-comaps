@@ -944,6 +944,19 @@ public class MwmActivity extends BaseMwmFragmentActivity
   {
     if (command == null)
       return;
+    // The reply first (or the chat answer), then the cancel, then any destination.
+    if (!command.say.isEmpty())
+    {
+      final String[] lines = command.say.toArray(new String[0]);
+      final boolean[] nav = new boolean[lines.length];
+      final float[] speeds = new float[lines.length];
+      java.util.Arrays.fill(speeds, 1f);
+      TtsPlayer.INSTANCE.playTurnNotifications(lines, nav, speeds);
+    }
+    if (command.cancel)
+      RoutingController.get().cancel();
+    if (!command.hasDestination())
+      return;
     if (command.latLon == null)
     {
       showSearch(command.name);

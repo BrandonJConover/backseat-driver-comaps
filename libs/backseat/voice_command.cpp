@@ -333,6 +333,7 @@ std::vector<AppTool> const & AppTools()
       {AppAction::TalkMore, "talk_more", "Go back to the full commentary after talking less.", nullptr},
       {AppAction::TollsAhead, "tolls_ahead", "Say whether the route has tolls: on one now, how far to the next, or none.", nullptr},
       {AppAction::TrafficAhead, "traffic_ahead", "Say whether the car is stuck in traffic right now.", nullptr},
+      {AppAction::UndoRoute, "undo_route", "The last route was a mistake: go back to the route before it, or drop it if there wasn't one.", nullptr},
   };
   return tools;
 }
@@ -597,6 +598,46 @@ bool PastRoadTalk(std::string const & words, std::vector<size_t> const & starts,
       return true;
   return false;
 }
+/// Where "cancel the new route" and the like start in `words` (CommandWords), else npos.
+size_t LooseCancelAt(std::string const & words)
+{
+  static char const * const kVerbs[] = {" cancel ", " stop ", " clear ", " kill ", " scrap ", " ditch ", " drop ",
+                                        " delete ", " remove ", " get rid of ", " forget ", " abort ", " quit ",
+                                        " end ", " turn off ", " shut off "};
+  static char const * const kBetween[] = {"the", "this", "that", "my", "our", "new", "current", "wrong", "whole",
+                                          "stupid", "dumb", "silly", "last", "latest", "these", "those", "all",
+                                          "your", "its", "it's", "damn", "darn", "dang", "freaking", "frickin"};
+  static char const * const kNouns[] = {"route", "routes", "navigation", "directions", "trip", "guidance", "nav",
+                                        "gps"};
+  auto const in = [](auto const & list, std::string const & w)
+  { return std::find_if(std::begin(list), std::end(list), [&w](char const * x) { return w == x; }) != std::end(list); };
+  size_t best = std::string::npos;
+  for (char const * verb : kVerbs)
+  {
+    for (size_t at = words.find(verb); at != std::string::npos; at = words.find(verb, at + 1))
+    {
+      // Up to three small words, then the noun.
+      size_t pos = at + std::strlen(verb);
+      for (int n = 0; n <= 3 && pos < words.size(); ++n)
+      {
+        size_t const end = words.find(' ', pos);
+        if (end == std::string::npos)
+          break;
+        std::string const w = words.substr(pos, end - pos);
+        if (in(kNouns, w))
+        {
+          best = std::min(best, at);
+          break;
+        }
+        if (!in(kBetween, w))
+          break;
+        pos = end + 1;
+      }
+    }
+  }
+  return best;
+}
+
 }  // namespace
 
 std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
@@ -735,8 +776,19 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                                  " why arent we moving ", " what's the holdup ", " whats the holdup ",
                                  " what's the hold up ", " whats the hold up ", " are we in a jam ", " is this a jam ",
                                  " are we stuck in traffic ", " is it a traffic jam "}},
+      {AppAction::UndoRoute, {" undo ", " undo that ", " the old route ", " the original route ", " the previous route ",
+                              " the route we had ", " the route i had ", " the last route ",
+                              " where we were going ", " where i was going ", " the first route ",
+                              " not where i want to go ", " not where i wanted to go ", " not where i'm going ",
+                              " not where im going ", " not where we're going ", " not where were going ",
+                              " wrong destination ", " i didn't ask for that ", " i didnt ask for that ",
+                              " i didn't say that ", " i didnt say that ", " that's not what i said ",
+                              " thats not what i said ", " you misheard ", " you heard me wrong ",
+                              " i didn't want to go there ", " i didnt want to go there ", " i don't want to go there ",
+                              " i dont want to go there "}},
   };
   std::vector<std::pair<size_t, AppCommand>> found;
+  bool undone = false;
   bool const voiceNamed = words.find(" voice ") != std::string::npos;
   for (auto const & c : cues)
   {
@@ -755,6 +807,15 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
       break;
     }
   }
+  // "Cancel the new route", "get rid of this stupid route", "stop the directions": the verb and the noun with
+  // a word or two between. Only those small words, so "stop on the route" (a stop to add) and "the end of the
+  // route" aren't a cancel.
+  if (std::none_of(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::CancelRoute; }))
+    if (auto const at = LooseCancelAt(words); at != std::string::npos)
+      found.push_back({at, AppCommand{AppAction::CancelRoute, {}}});
+  // "Go back to the old route" undoes; it isn't heading back to the start or a place called "the old route".
+  if (std::any_of(found.begin(), found.end(), [](auto const & f) { return f.second.action == AppAction::UndoRoute; }))
+    undone = true;
   // "Sorry?", "pardon me?", "one more time": a whole utterance asking for the direction again. Only the whole
   // thing counts, so "sorry I missed the exit" or "excuse me while I sneeze" stay chatter, and a bare "huh" or
   // "what" (said at the radio as often as at the app) is left alone.
@@ -900,6 +961,12 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
         found.push_back({at, AppCommand{AppAction::FindAlongRoute, stopFor}});
     }
   }
+  if (undone)
+    found.erase(std::remove_if(found.begin(), found.end(), [](auto const & f)
+    {
+      return f.second.action == AppAction::NavigateTo || f.second.action == AppAction::TakeMeBack ||
+             f.second.action == AppAction::CancelRoute || f.second.action == AppAction::DifferentRoute;
+    }), found.end());
   // "Don't take the highway" asks to avoid it and "don't avoid tolls" to allow them: a negated road
   // preference is the opposite preference, not nothing.
   auto const opposite = [](AppAction action)
@@ -1078,6 +1145,75 @@ bool IsFiller(std::string const & spoken)
   { return std::find_if(std::begin(kFiller), std::end(kFiller), [&word](char const * f) { return word == f; }) != std::end(kFiller); });
 }
 
+bool TakesItBack(std::string const & spoken)
+{
+  auto const words = WordsOf(spoken);
+  if (words.empty() || words.size() > 7)
+    return false;
+  std::string const said = CommandWords(spoken);
+  for (char const * back : {" never mind ", " nevermind ", " cancel that ", " cancel it ", " scratch that ",
+                            " forget it ", " forget that ", " no no ", " not there ", " not that one ", " wrong one ",
+                            " that's wrong ", " thats wrong ", " that's not it ", " thats not it ", " undo that ",
+                            " stop stop ", " no not that ", " wait no ", " oops ", " my bad "})
+    if (said.find(back) != std::string::npos)
+      return true;
+  return false;
+}
+
+Chatter ClassifyChatter(std::string const & spoken, std::string const & voiceName)
+{
+  auto words = WordsOf(spoken);
+  if (words.empty() || IsFiller(spoken))
+    return Chatter::None;
+  std::string name;
+  for (unsigned char const ch : voiceName)
+    if (std::isalpha(ch))
+      name += static_cast<char>(std::tolower(ch));
+  bool named = false;
+  auto const isName = [&name](std::string const & w) { return !name.empty() && w == name; };
+  // "Hey Echo, ..." / "..., Echo": the name up front (after a hey) or at the very end.
+  static char const * const kLead[] = {"hey", "hi", "yo", "okay", "ok", "so", "um", "uh", "alright", "and", "now",
+                                       "well", "oh", "listen", "excuse", "me"};
+  auto const isLead = [](std::string const & w)
+  { return std::find_if(std::begin(kLead), std::end(kLead), [&w](char const * l) { return w == l; }) != std::end(kLead); };
+  size_t first = 0;
+  while (first < words.size() && (isLead(words[first]) || isName(words[first])))
+  {
+    named = named || isName(words[first]);
+    ++first;
+  }
+  if (!words.empty() && isName(words.back()) && words.size() > first)
+  {
+    named = true;
+    words.pop_back();
+  }
+  if (first >= words.size())
+    return named ? Chatter::Hail : Chatter::None;
+  std::string const said = CommandWords(spoken);
+  auto const has = [&said](std::initializer_list<char const *> cues)
+  {
+    return std::any_of(cues.begin(), cues.end(), [&said](char const * c) { return said.find(c) != std::string::npos; });
+  };
+  auto const oneOf = [](std::string const & w, std::initializer_list<char const *> list)
+  { return std::any_of(list.begin(), list.end(), [&w](char const * x) { return w == x; }); };
+  std::string const & lead = words[first];
+  if (has({" can you ", " could you ", " would you ", " will you ", " can u ", " could u ", " i need you to ",
+           " i want you to ", " i'd like you to ", " id like you to ", " you need to ", " you should ", " please ",
+           " go ahead and ", " i'd like to ", " id like to ", " i wanna ", " i want to ", " let me "}) ||
+      oneOf(lead, {"call", "text", "message", "send", "play", "open", "close", "show", "find", "set", "order", "book",
+                   "remind", "read", "tell", "give", "change", "switch", "start", "put", "add", "check", "search",
+                   "google", "buy", "skip", "pause", "resume", "raise", "lower", "sing", "say", "help", "wake",
+                   "make", "take", "bring", "text", "dial", "email", "record", "save", "share", "turn", "lock",
+                   "unlock", "honk", "lower", "crank", "shuffle", "rewind"}))
+    return Chatter::Request;
+  bool const aboutYou = has({" you ", " your ", " you're ", " youre ", " yours ", " u ", " ya ", " yourself "});
+  if (oneOf(lead, {"what", "what's", "whats", "where", "where's", "wheres", "when", "why", "who", "who's", "whos",
+                   "how", "how's", "hows", "which", "is", "are", "do", "does", "did", "can", "could", "will",
+                   "would", "should", "have", "has", "was", "were", "am", "you", "you're", "youre"}))
+    return aboutYou || named ? Chatter::Question : Chatter::Remark;
+  return named ? Chatter::Hail : Chatter::Remark;
+}
+
 bool UrgentPlace(std::string const & place)
 {
   std::string const words = CommandWords(place);
@@ -1175,6 +1311,9 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::TalkMore: return saidAny({"more", "chatty", "whatever"});
   case AppAction::TollsAhead: return saidAny({"toll", "tolls"});
   case AppAction::TrafficAhead: return saidAny({"traffic", "slow", "jam", "crawling", "moving", "holdup", "hold"});
+  case AppAction::UndoRoute:
+    return saidAny({"undo", "old", "original", "previous", "before", "wrong", "mind", "meant", "mean", "misheard",
+                    "didn't", "didnt", "not", "first", "other", "were", "had", "that"});
   case AppAction::Count: break;
   }
   return false;
