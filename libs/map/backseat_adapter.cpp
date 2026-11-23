@@ -383,6 +383,10 @@ backseat::Units AppUnits()
 }
 
 char const * const kDebugLogKey = "BackseatDebugLog";
+/// Slower than this is parked (or parking), for "where did I park?" and "remember where I parked".
+double constexpr kParkedMps = 3;
+/// Where the car was left: backseat::ParkedCarLine.
+char const * const kParkedCarKey = "BackseatParkedCar";
 
 /// CoMaps warnings and errors go into the drive log too (while it's on), throttled per message.
 base::LogMessageFn g_previousLogMessage = nullptr;
@@ -504,8 +508,13 @@ BackseatAdapter::BackseatAdapter()
     m_lastTrip = LastTrip{NowMs() / 1000, r, report, previous};
   }
   AppendTrip(r);
+  // Arrived by car: that's where it's parked, until the mileage log sees it park for real.
+  if (m_here && backseat::InCar(m_navigator.GetTravelMode()))
+    SaveParkedCar({ToBackseatLatLon(*m_here), NowMs(), false});
 })
 {
+  if (std::string line; settings::Get(kParkedCarKey, line))
+    m_parkedCar = backseat::ParkedCarFromLine(line);
   m_navigator.SetPlateLog(LoadPlates(), &SavePlates);
   m_navigator.SetJamReporter([this](std::optional<backseat::JamReport> const & jam) { m_jamPending = jam; });
   m_navigator.SetTwentyLog(LoadTwenty(), &SaveTwenty);
@@ -847,9 +856,22 @@ std::string BackseatAdapter::MileageFinish()
   return {};
 }
 
+void BackseatAdapter::SaveParkedCar(backseat::ParkedCar const & car)
+{
+  // A spot the driver saved by hand outranks an older guess, never a newer drive.
+  if (m_parkedCar && m_parkedCar->saved && !car.saved && m_parkedCar->tMs > car.tMs)
+    return;
+  m_parkedCar = car;
+  settings::Set(kParkedCarKey, backseat::ParkedCarLine(car));
+  backseat::Trace("car.parked", {{"lat", backseat::LogNum(car.at.lat, 4)},
+                                 {"lon", backseat::LogNum(car.at.lon, 4)},
+                                 {"saved", car.saved ? "yes" : "no"}});
+}
+
 std::string BackseatAdapter::OnDriveEnded(backseat::Drive const & drive)
 {
   m_saidOutOfState = false;
+  SaveParkedCar({drive.to, drive.endedAt, false});
   auto logged = backseat::Classify(drive, MileagePlaces(), m_driveLog, MileageSettingsNow(), &LocalTm);
   // Unnamed ends get the name from previous trips ("Starbucks").
   auto const past = PastRoutes(50);
@@ -1343,6 +1365,145 @@ backseat::Control BackseatAdapter::GuessControl(routing::Route const & route, ui
   if (from >= RoadRank(ftypes::HighwayClass::Tertiary) && to >= 0 && to < from)
     return backseat::Control::StopSign;
   return backseat::Control::None;
+}
+
+int BackseatAdapter::LightNumberTo(routing::Route const & route, double distToTurnM) const
+{
+  // Counting further out than this means nothing to a driver, and the count would change a lot.
+  double constexpr kCountWithinM = 2000;
+  double constexpr kOnRouteM = 25;
+  auto const & followed = route.GetFollowedPolyline();
+  if (!followed.IsValid() || distToTurnM > kCountWithinM)
+    return 0;
+  auto const & poly = followed.GetPolyline();
+  auto const iter = followed.GetCurrentIter();
+  // The route ahead of the car as (start, end, meters from the car to start), up to just past the turn.
+  struct Piece
+  {
+    m2::PointD a, b;
+    double fromM;
+  };
+  std::vector<Piece> pieces;
+  m2::RectD rect;
+  double along = 0;
+  m2::PointD prev = iter.m_pt;
+  rect.Add(prev);
+  for (size_t i = iter.m_ind + 1; i < poly.GetSize() && along < distToTurnM + 60; ++i)
+  {
+    m2::PointD const p = poly.GetPoint(i);
+    pieces.push_back({prev, p, along});
+    along += mercator::DistanceOnEarth(prev, p);
+    rect.Add(p);
+    prev = p;
+  }
+  if (pieces.empty())
+    return 0;
+  rect.Inflate(mercator::MetersToMercator(kOnRouteM), mercator::MetersToMercator(kOnRouteM));
+  std::vector<double> lightsAlong;
+  {
+    std::lock_guard lock(m_lightsMutex);
+    for (auto const & light : m_trafficLights)
+    {
+      if (!rect.IsPointInside(light))
+        continue;
+      for (auto const & piece : pieces)
+      {
+        m2::ParametrizedSegment<m2::PointD> const seg(piece.a, piece.b);
+        m2::PointD const closest = seg.ClosestPointTo(light);
+        if (mercator::DistanceOnEarth(closest, light) <= kOnRouteM)
+        {
+          lightsAlong.push_back(piece.fromM + mercator::DistanceOnEarth(piece.a, closest));
+          break;
+        }
+      }
+    }
+  }
+  return backseat::LightNumberAt(std::move(lightsAlong), distToTurnM);
+}
+
+std::string BackseatAdapter::TurnLandmark(routing::Route const & route, uint32_t turnIndex) const
+{
+  auto const key = std::make_pair(route.GetRouteId(), turnIndex);
+  if (m_landmarkFor && *m_landmarkFor == key)
+    return m_landmark;
+  m_landmarkFor = key;
+  m_landmark.clear();
+  auto const & segments = route.GetRouteSegments();
+  if (!m_dataSource || turnIndex == 0 || turnIndex >= segments.size())
+    return m_landmark;
+  m2::PointD const junction = segments[turnIndex - 1].GetJunction().GetPoint();
+  // On the corner: close enough to the junction that "at the X" points at the right street.
+  double constexpr kCornerM = 35;
+  auto const & c = classif();
+  // Places people actually steer by. Branded or not: gas, food, coffee, churches, schools.
+  // Shops, banks and pharmacies only when they're a chain (a sign you'd recognize).
+  struct Kind
+  {
+    uint32_t type;
+    char const * kind;
+    bool chainOnly;
+  };
+  static std::vector<Kind> const kKinds = {
+      {c.GetTypeByPath({"amenity", "fuel"}), "gas", false},
+      {c.GetTypeByPath({"amenity", "fast_food"}), "food", false},
+      {c.GetTypeByPath({"amenity", "restaurant"}), "food", false},
+      {c.GetTypeByPath({"amenity", "cafe"}), "coffee", false},
+      {c.GetTypeByPath({"amenity", "place_of_worship"}), "worship", false},
+      {c.GetTypeByPath({"amenity", "school"}), "school", false},
+      {c.GetTypeByPath({"amenity", "hospital"}), "hospital", false},
+      {c.GetTypeByPath({"amenity", "pharmacy"}), "store", true},
+      {c.GetTypeByPath({"amenity", "bank"}), "store", true},
+      {c.GetTypeByPath({"shop"}), "store", true}};
+  struct Best
+  {
+    std::string phrase;
+    bool chain = false;
+    double distM = 0;
+  };
+  std::optional<Best> best;
+  m_dataSource().ForEachInRect([&](FeatureType & ft)
+  {
+    if (ft.GetGeomType() == feature::GeomType::Line)
+      return;
+    feature::TypesHolder const types(ft);
+    Kind const * kind = nullptr;
+    for (uint32_t type : types)
+    {
+      uint32_t two = type;
+      ftype::TruncValue(two, 2);
+      uint32_t one = type;
+      ftype::TruncValue(one, 1);
+      for (auto const & k : kKinds)
+        if (k.type == two || k.type == one)
+        {
+          kind = &k;
+          break;
+        }
+      if (kind)
+        break;
+    }
+    if (!kind)
+      return;
+    bool const chain = !ft.GetMetadata(feature::Metadata::FMD_BRAND).empty();
+    if (kind->chainOnly && !chain)
+      return;
+    auto const primary = ft.GetTranslatedName().m_primary;
+    if (!primary || primary->empty())
+      return;
+    double const distM = mercator::DistanceOnEarth(junction, feature::GetCenter(ft));
+    if (distM > kCornerM)
+      return;
+    // A chain beats a local name (more people know the sign); then the nearer one.
+    if (best && (best->chain > chain || (best->chain == chain && best->distM <= distM)))
+      return;
+    std::string phrase = backseat::LandmarkPhrase(*primary, kind->kind, chain);
+    if (phrase.empty())
+      return;
+    best = Best{std::move(phrase), chain, distM};
+  }, mercator::RectByCenterXYAndSizeInMeters(junction, 2 * kCornerM), scales::GetUpperScale());
+  if (best)
+    m_landmark = best->phrase;
+  return m_landmark;
 }
 
 std::optional<backseat::Building> BackseatAdapter::BuildingAt(backseat::LatLon const & p) const
@@ -2432,6 +2593,31 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     heard.query = SearchQueryFor(command.argument);
     return m_navigator.Reply("cmd.findStop", {{"place", command.argument}});
   }
+  case AppAction::FindMyCar:
+  {
+    std::optional<backseat::LatLon> here;
+    if (m_here)
+      here = ToBackseatLatLon(*m_here);
+    bool const driving =
+        m_navigator.InTrip() && backseat::InCar(m_navigator.GetTravelMode()) && m_speedMps > kParkedMps;
+    auto const answer = backseat::FindCarAnswer(m_parkedCar, here, nowMs, m_navigator.GetUnits(), driving);
+    backseat::Trace("car.find", {{"answer", answer.key}});
+    if (answer.walkTo)
+    {
+      heard.kind = HeardCommand::Kind::WalkTo;
+      heard.lat = answer.walkTo->lat;
+      heard.lon = answer.walkTo->lon;
+      heard.name = "Your car";
+    }
+    return m_navigator.Reply(answer.key, answer.vars);
+  }
+  case AppAction::SaveParking:
+    if (m_navigator.InTrip() && m_speedMps > kParkedMps)
+      return m_navigator.Reply("car.saveMoving");
+    if (!m_here)
+      return {};
+    SaveParkedCar({ToBackseatLatLon(*m_here), nowMs, true});
+    return m_navigator.Reply("car.saved");
   case AppAction::SetTravelMode:
     settings::Set(kOffRoadKey, command.argument == "offroad");
     m_navigator.DriverSetTravelMode(command.argument == "walk"      ? backseat::TravelMode::Walk
@@ -3516,6 +3702,10 @@ backseat::RouteSnapshot BackseatAdapter::Snapshot(routing::RoutingSession const 
       snap.nextStreet = spoken.street.empty() ? SpeakableStreetName(info.m_nextStreetName) : spoken.street;
       snap.nextExitRef = spoken.exitRef;
       snap.control = GuessControl(*route, turn.m_index);
+      // "At the second light, turn left at the Walgreens": what the driver can see, not just how far.
+      if (snap.control == backseat::Control::TrafficLight)
+        snap.lightNumber = LightNumberTo(*route, distanceToTurnM);
+      snap.turnLandmark = TurnLandmark(*route, turn.m_index);
       snap.lanes = WantedLanes(turn.m_lanes);
       snap.laneSide = backseat::LaneAdviceFor(snap.lanes).side;
       // The maneuver after it, for "turn left onto Winesap Drive, then right onto Cameo Lane".

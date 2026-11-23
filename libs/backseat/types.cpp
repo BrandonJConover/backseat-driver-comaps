@@ -13,9 +13,11 @@ NavEvent Make(NavEvent::Type type, double t)
 }
 }  // namespace
 
-NavEvent NavEvent::Instruction(double t, std::string text, double distanceM, std::optional<Maneuver> maneuver, Control control)
+NavEvent NavEvent::Instruction(double t, std::string text, double distanceM, std::optional<Maneuver> maneuver, Control control,
+                               int lightNumber)
 {
   auto e = Make(Type::Instruction, t);
+  e.lightNumber = control == Control::TrafficLight ? lightNumber : 0;
   e.text = std::move(text);
   e.distanceM = distanceM;
   e.maneuver = maneuver;

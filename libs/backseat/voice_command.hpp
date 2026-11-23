@@ -89,6 +89,10 @@ enum class AppAction
   /// "Is there traffic ahead?", "why is it so slow?": answered from the navigator's crawl judgment
   /// (Navigator::TrafficReply). No live traffic feed, so it never claims what's miles ahead.
   TrafficAhead,
+  /// "Where did I park?", "walk me back to my car": where the car was left, and a walk there.
+  FindMyCar,
+  /// "Remember where I parked", "I parked here": keep this spot as where the car is.
+  SaveParking,
   Count
 };
 

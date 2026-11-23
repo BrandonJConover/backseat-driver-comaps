@@ -253,7 +253,8 @@ double SpeakingMs(std::string const & text, double speed)
   return words / 2.7 * 1000 / std::max(0.5, speed);
 }
 
-std::string DirectionText(std::string const & text, double distanceM, Units units, Control control)
+std::string DirectionText(std::string const & text, double distanceM, Units units, Control control,
+                          int lightNumber)
 {
   static std::regex const arriveAt(R"(^arrive at (.+)$)", std::regex::icase);
   static std::regex const arrive(R"(^arrive\b)", std::regex::icase);
@@ -265,7 +266,9 @@ std::string DirectionText(std::string const & text, double distanceM, Units unit
     return "Your destination is " + distance + " ahead.";
   // Lights come from the map; stop signs are only a guess (side street onto a bigger road), so
   // they aren't named.
-  char const * at = control == Control::TrafficLight ? "at the light, " : "";
+  std::string at;
+  if (control == Control::TrafficLight)
+    at = lightNumber == 2 ? "at the second light, " : lightNumber == 3 ? "at the third light, " : "at the light, ";
   return "In " + distance + ", " + at + LowerFirst(text) + ".";
 }
 
@@ -537,7 +540,8 @@ std::vector<Commentary> CritiqueEngine::OnNav(NavEvent const & e)
     bool const turnIsClose = m_config.speechAware && mps >= m_config.rollingMps && e.distanceM / mps < kSuffixMinS;
     std::string const suffix = n == 2 && !turnIsClose ? Pick("instruction.suffix", tier) : std::string();
     std::string const text =
-        DirectionText(e.text, e.distanceM, units, dir == Maneuver::Other ? Control::None : e.control) + suffix;
+        DirectionText(e.text, e.distanceM, units, dir == Maneuver::Other ? Control::None : e.control, e.lightNumber) +
+        suffix;
     out.push_back(Make(e.t, Category::Instruction, text, Priority::Nav));
     if (m_straight && m_straight->longHaul)
     {

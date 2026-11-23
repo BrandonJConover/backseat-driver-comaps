@@ -208,6 +208,10 @@ void Perform(backseat::AppCommand const & command)
   case AppAction::TalkLess:
   case AppAction::DirectionsOnly:
   case AppAction::TalkMore:
+  case AppAction::TollsAhead:
+  case AppAction::TrafficAhead:
+  case AppAction::FindMyCar:
+  case AppAction::SaveParking:
   case AppAction::Count: break;
   }
 }
@@ -222,6 +226,8 @@ void Perform(BackseatAdapter::HeardCommand const & heard)
   // read out what it finds.
   if (heard.kind == Kind::RouteTo)
     [MWMBackseatRewriter routeTo:CLLocationCoordinate2DMake(heard.lat, heard.lon) title:@(heard.name.c_str())];
+  else if (heard.kind == Kind::WalkTo)
+    [MWMBackseatRewriter walkTo:CLLocationCoordinate2DMake(heard.lat, heard.lon) title:@(heard.name.c_str())];
   else if (heard.kind == Kind::Search || heard.kind == Kind::SearchStop)
     [BackseatVoiceSearch start:@(heard.query.c_str()) asStop:heard.kind == Kind::SearchStop];
   for (auto const & command : heard.actions)
@@ -614,6 +620,23 @@ static m2::PointD gWalkConfirmedTo{1e9, 1e9};
   // Tapped: the drive starts by itself once it's built, with "check the mode now and then".
   GetFramework().GetRoutingManager().GetBackseat().WarnModeOnNextDrive();
   [MWMRouter startWhenReady];
+}
+
++ (void)walkTo:(CLLocationCoordinate2D)coordinate title:(NSString *)title
+{
+  MWMRoutePoint * to = [[MWMRoutePoint alloc] initWithPoint:mercator::FromLatLon(coordinate.latitude, coordinate.longitude)
+                                                      title:title
+                                                   subtitle:@""
+                                                       type:MWMRoutePointTypeFinish
+                                          intermediateIndex:0];
+  [MWMBackseatLog event:@"car.walk" fields:@{@"to": title ?: @""}];
+  // A walk, from wherever the phone is: whatever was planned before is over.
+  if ([MWMRouter isRoutingActive])
+    [MWMRouter stopRouting];
+  [MWMRouter removePoints];
+  [MWMRouter setType:MWMRouterTypePedestrian];
+  [MWMRouter startWhenReady];
+  [MWMRouter buildToPoint:to bestRouter:NO];
 }
 
 + (void)switchTravelMode:(NSString *)mode

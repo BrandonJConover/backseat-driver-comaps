@@ -171,7 +171,10 @@ std::string WithExitCallAfterManeuver(std::string const & text, std::string cons
 
 /// The spoken direction: "In 500 feet, turn left onto Elm Street.", "In a quarter mile, at the light,
 /// turn right onto Oak Lane.", "Your destination, Sundance Lane, is 400 feet ahead."
-std::string DirectionText(std::string const & text, double distanceM, Units units, Control control = Control::None);
+/// "In 500 feet, at the light, turn left." With `lightNumber` 2 or 3 the light is counted: "at the
+/// second light" (the lights before it are ones to drive through).
+std::string DirectionText(std::string const & text, double distanceM, Units units, Control control = Control::None,
+                          int lightNumber = 0);
 
 /// Roughly how long a line takes to say: ~2.7 words a second at normal speed.
 double SpeakingMs(std::string const & text, double speed = 1);

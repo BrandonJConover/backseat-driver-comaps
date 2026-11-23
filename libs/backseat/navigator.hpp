@@ -133,6 +133,12 @@ struct RouteSnapshot
   double distToTurnM = 0;
   /// What controls the next maneuver's junction, if the host can tell (stop sign, light).
   Control control = Control::None;
+  /// With a light at the next maneuver: which light it is counting from the car (1 the next light,
+  /// 2 the one after), 0 when unknown or too many to count (LightNumberAt()).
+  int lightNumber = 0;
+  /// Something to see on the corner of the next turn, as said: "the Shell station", "the Walgreens",
+  /// "First Baptist Church" (LandmarkPhrase()). Empty when there's nothing worth naming.
+  std::string turnLandmark;
   /// The next maneuver needs the left or right lanes (and not the ones in the middle).
   LaneSide laneSide = LaneSide::None;
   /// The next maneuver's lanes from the map, left to right, true for the ones to use (OSM turn:lanes).
@@ -371,6 +377,49 @@ std::string InstructionText(RouteSnapshot const & route, double speedMps = 0);
 /// bearing is unknown, or the mark is behind, on the road itself or too far to judge. Geometry only, so
 /// it's the same in left-hand traffic.
 std::string DestinationSide(LatLon const & here, double routeBearingDeg, LatLon const & mark);
+
+/// Which light along the way the turn's light is, from how far along the route each mapped light is
+/// (meters from the car, any order) and how far the turn is. Lights within `clusterM` of each other
+/// are one junction (OSM often maps a signal per approach), and the turn's own junction is anything
+/// within `atTurnM` of it. 1 when the turn's light is the next one, 2 or 3 for the second or third;
+/// 0 when the turn has no light, there are more than three, or a light is under the car right now.
+int LightNumberAt(std::vector<double> lightsAlongM, double turnAlongM, double clusterM = 50, double atTurnM = 30);
+
+/// A corner landmark as said in a direction ("Turn left at the Shell station"), from the map's name
+/// for it, what kind of place it is (gas, food, coffee, store, worship, school...) and whether it's a
+/// chain. Chains get "the": "the Walgreens", gas chains "the Shell station". Names that would confuse
+/// the direction ("Right Way Auto", "Exit 9 Diner", "Left Bank Cafe") or are too long to say quickly
+/// come back empty.
+std::string LandmarkPhrase(std::string const & name, std::string const & kind, bool chain);
+
+/// Where the car was left, like Google's and Apple's parked-car pin. Saved when a drive ends (arrival,
+/// or the mileage log seeing the car park), or when the driver says "remember where I parked".
+struct ParkedCar
+{
+  LatLon at;
+  /// When it was parked, ms since the epoch.
+  double tMs = 0;
+  /// The driver asked for this spot to be saved (it outranks a guess).
+  bool saved = false;
+};
+/// "lat,lon,tMs,saved" for the settings file, and back. Nothing for a damaged or off-globe line.
+std::string ParkedCarLine(ParkedCar const & car);
+std::optional<ParkedCar> ParkedCarFromLine(std::string const & line);
+/// How long it's been parked, to follow "It's been there": "for a few minutes", "for about 20 minutes",
+/// "for about 3 hours", "since yesterday", "for 4 days". Empty for a time well in the future.
+std::string ParkedAgoWords(double agoMs);
+/// What to say to "where did I park?", and where to walk.
+struct CarAnswer
+{
+  /// Line key: car.find (with {distance}, {direction}, {ago}), car.far (too far to walk), car.here
+  /// (it's right there), car.unknown (nothing saved), car.driving (the driver is in it).
+  std::string key;
+  Vars vars;
+  /// Set for car.find: walking directions go here.
+  std::optional<LatLon> walkTo;
+};
+CarAnswer FindCarAnswer(std::optional<ParkedCar> const & car, std::optional<LatLon> const & here, double nowMs,
+                        Units units, bool driving);
 
 /// "the second exit" for 2, "exit 12" past the eighth; empty for 0 or less (unknown).
 std::string RoundaboutExitWords(int exit);

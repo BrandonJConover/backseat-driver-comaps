@@ -147,6 +147,9 @@ struct NavEvent
   double distanceM = 0;  // also Progress, HazardAhead
   std::optional<Maneuver> maneuver;
   Control control = Control::None;
+  /// With a light at the turn: which light along the way it is (1 the next one, 2 the one after),
+  /// 0 when unknown. "At the second light, turn left."
+  int lightNumber = 0;
   // TurnCompleted
   bool onTime = true;
   // WrongTurn
@@ -179,7 +182,8 @@ struct NavEvent
   std::optional<std::string> alternate;
 
   static NavEvent Instruction(double t, std::string text, double distanceM,
-                              std::optional<Maneuver> maneuver = {}, Control control = Control::None);
+                              std::optional<Maneuver> maneuver = {}, Control control = Control::None,
+                              int lightNumber = 0);
   static NavEvent TurnCompleted(double t, bool onTime);
   static NavEvent Progress(double t, double distanceM);
   static NavEvent MissedTurn(double t);
