@@ -60,11 +60,11 @@ std::string Expanded(std::string const & w)
 /// Words that say what kind of road it is, not which one.
 bool KindWord(std::string const & w)
 {
-  static char const * const kKinds[] = {"street", "road", "avenue", "boulevard", "drive", "lane", "highway",
+  static char const * const kRoadKindWords[] = {"street", "road", "avenue", "boulevard", "drive", "lane", "highway",
                                         "parkway", "freeway", "expressway", "court", "place", "circle", "turnpike",
                                         "pike", "trail", "way", "route", "bypass", "loop", "the", "state", "county",
                                         "north", "south", "east", "west", "jr"};
-  return std::any_of(std::begin(kKinds), std::end(kKinds), [&w](char const * k) { return w == k; });
+  return std::any_of(std::begin(kRoadKindWords), std::end(kRoadKindWords), [&w](char const * k) { return w == k; });
 }
 
 bool Number(std::string const & w) { return !w.empty() && std::all_of(w.begin(), w.end(), ::isdigit); }
