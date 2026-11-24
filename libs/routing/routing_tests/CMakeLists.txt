@@ -32,6 +32,7 @@ set(SRC
   road_graph_builder.cpp
   road_graph_builder.hpp
   road_graph_nearest_edges_test.cpp
+  route_guard_test.cpp
   route_tests.cpp
   routing_algorithm.cpp
   routing_algorithm.hpp

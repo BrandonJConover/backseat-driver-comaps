@@ -512,6 +512,8 @@ void RoutingManager::OnRoutePointPassed(RouteMarkType type, size_t intermediateI
 
 void RoutingManager::OnLocationUpdate(location::GpsInfo const & info)
 {
+  // Counted before the Extrapolator passes the fix on, so the route knows real fixes from guesses.
+  m_routingSession.OnRealFix();
   m_extrapolator.OnLocationUpdate(info);
   m_backseat.SetTravelMode(m_currentRouterType == routing::RouterType::Bicycle ? backseat::TravelMode::Bike
                            : m_currentRouterType == routing::RouterType::Pedestrian ||
@@ -615,6 +617,7 @@ void RoutingManager::SetRouterImpl(RouterType type)
         numMwmIds, MakeNumMwmTree(*numMwmIds, m_callbacks.m_countryInfoGetter()), m_routingSession, dataSource);
 
   m_routingSession.SetRoutingSettings(GetRoutingSettings(vehicleType));
+  m_routingSession.SetArriveNearStops(vehicleType == VehicleType::Car);
   m_routingSession.SetRouter(std::move(router), std::move(regionsFinder));
   m_currentRouterType = type;
 }

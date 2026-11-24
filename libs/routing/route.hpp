@@ -446,6 +446,8 @@ public:
   SubrouteSettings const GetSubrouteSettings(size_t segmentIdx) const;
 
   bool IsSubroutePassed(size_t subrouteIdx) const;
+  /// Backseat: along the route from the car's current spot on it to the end of |subrouteIdx|.
+  double GetDistanceToSubrouteEndMeters(size_t subrouteIdx) const;
 
   /// \brief Sets subroute unique id (|subrouteUid|) by |segmentIdx|.
   /// \note |subrouteUid| is a permanent id of a subroute. This id can be used to address to a subroute

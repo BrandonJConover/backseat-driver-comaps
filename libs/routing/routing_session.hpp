@@ -3,6 +3,7 @@
 #include "routing/async_router.hpp"
 #include "routing/checkpoints.hpp"
 #include "routing/position_accumulator.hpp"
+#include "routing/route_guard.hpp"
 #include "routing/router.hpp"
 #include "routing/routing_callbacks.hpp"
 #include "routing/routing_settings.hpp"
@@ -132,6 +133,13 @@ public:
   void SetChangeSessionStateCallback(ChangeSessionStateCallback const & changeSessionStateCallback);
   void SetOnNewTurnCallback(OnNewTurn const & onNewTurn);
 
+  /// Backseat: a real GPS fix reached the app (the Extrapolator's guesses don't count). Leaving the
+  /// route then takes two of them, so one bad fix can't reroute the car.
+  void OnRealFix() { m_offRouteGate.OnRealFix(); }
+  /// Backseat: arrive at a stop when the car parks near it or passes right by it, not only when the
+  /// route's own end is reached; and don't rebuild the route around a parking lot. Cars only.
+  void SetArriveNearStops(bool enabled) { m_arriveNearStops = enabled; }
+
   // Whether to recalculate the route when the user strays
   void SetAutoReroute(bool autoReroute);
   bool AutoReroute();
@@ -170,6 +178,7 @@ public:
   void SetObservedTraffic(traffic::AllMwmTrafficInfo const & coloring, bool rebuild);
 
   void AssignRouteForTesting(std::shared_ptr<Route> route, RouterResultCode e) { AssignRoute(route, e); }
+  void SetCheckpointsForTesting(Checkpoints const & checkpoints) { m_checkpoints = checkpoints; }
 
   bool IsSpeedCamLimitExceeded() const { return m_speedCameraManager.IsSpeedLimitExceeded(); }
   SpeedCameraManager & GetSpeedCamManager() { return m_speedCameraManager; }
@@ -200,6 +209,10 @@ private:
   void RebuildRouteOnTrafficUpdate();
 
   void PassCheckpoints();
+  /// Backseat: the next stop's NearStopArrival reading for the car at |info|.
+  NearStopArrival::Position NearStopPosition(location::GpsInfo const & info, bool onRoute) const;
+  /// Backseat: passes the next stop if the car arrived near it. True if it did.
+  bool PassCheckpointNearCar(location::GpsInfo const & info, bool onRoute);
 
 private:
   std::unique_ptr<AsyncRouter> m_router;
@@ -217,6 +230,11 @@ private:
   int m_moveAwayCounterSinceLastAnnounce = 0;
   m2::PointD m_lastGoodPosition;
   bool m_autoReroute = true;
+  OffRouteFixGate m_offRouteGate;
+  NearStopArrival m_nearStop;
+  bool m_arriveNearStops = false;
+  /// Route rebuilds that failed in a row (the old route kept).
+  int m_failedRebuilds = 0;
 
   m2::PointD m_userCurrentPosition;
   bool m_userCurrentPositionValid = false;
