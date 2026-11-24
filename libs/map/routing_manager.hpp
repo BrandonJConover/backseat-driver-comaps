@@ -39,6 +39,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -243,6 +244,12 @@ public:
   void SetBackseatRewriter(std::shared_ptr<backseat::LineRewriter> rewriter) { m_backseat.SetRewriter(std::move(rewriter)); }
   /// What the driver said out loud (speech recognition), for the license plate game. GUI thread.
   void SetBackseatMusicCheck(std::function<bool()> check) { m_backseat.SetMusicCheck(std::move(check)); }
+  /// Backseat: "avoid Main Street" / "get me off this road" (empty `road`). Reroutes keeping off
+  /// that road for the rest of the trip; returns its name as the map has it, or nothing when it
+  /// isn't ahead on a car route.
+  std::optional<std::string> AvoidRoadOnRoute(std::string const & road);
+  /// Backseat: "fewer left turns" on or off, kept across trips; reroutes a car route in progress.
+  void SetFewerLeftTurns(bool fewer);
   BackseatAdapter::HeardCommand BackseatDriverSaid(std::string const & text) { return m_backseat.OnDriverSaid(text); }
   /// Call after the Settings screen writes one of BackseatAdapter's personality keys.
   void ReloadBackseatPersonality() { m_backseat.ReloadPersonality(); }
@@ -549,6 +556,8 @@ private:
   /// The newest position the route was checked against (a real fix or the Extrapolator's), so a
   /// route rebuilt after leaving the old one can find the car the moment it arrives.
   std::unique_ptr<location::GpsInfo> m_lastRouteCheck;
+  /// Backseat: the destination the driver's avoided roads were picked for.
+  std::optional<m2::PointD> m_avoidedFor;
 
   std::vector<dp::DrapeID> m_drapeSubroutes;
   mutable std::mutex m_drapeSubroutesMutex;

@@ -185,6 +185,16 @@ void RoutingSession::RebuildRouteOnTrafficUpdate()
                false /* adjustToPrevRoute */);
 }
 
+bool RoutingSession::RebuildForPreferences()
+{
+  CHECK_THREAD_CHECKER(m_threadChecker, ());
+  if (!m_router || !m_route->IsValid() || m_state == SessionState::NoValidRoute ||
+      m_state == SessionState::RouteFinished || m_state == SessionState::RouteBuilding)
+    return false;
+  RebuildRouteOnTrafficUpdate();
+  return true;
+}
+
 bool RoutingSession::IsActive() const
 {
   CHECK_THREAD_CHECKER(m_threadChecker, ());

@@ -208,6 +208,10 @@ void Perform(backseat::AppCommand const & command)
   case AppAction::TalkLess:
   case AppAction::DirectionsOnly:
   case AppAction::TalkMore:
+  // The core reroutes for these itself (RoutingManager::AvoidRoadOnRoute / SetFewerLeftTurns).
+  case AppAction::AvoidRoad:
+  case AppAction::FewerLefts:
+  case AppAction::AllowLefts:
   case AppAction::Count: break;
   }
 }

@@ -49,6 +49,8 @@ set(SRC
   directions_engine_helpers.cpp
   directions_engine_helpers.hpp
   dummy_world_graph.hpp
+  drive_preferences.cpp
+  drive_preferences.hpp
   edge_estimator.cpp
   edge_estimator.hpp
   fake_edges_container.hpp

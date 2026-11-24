@@ -1129,7 +1129,7 @@ TEST(RoadClosedReportsReroute)
                             "Road closed ahead", "road closed!", "this road's blocked", "this road\xE2\x80\x99s blocked",
                             "the road is blocked up here", "the bridge is out", "the exit is closed", "the exit's closed",
                             "the ramp is closed", "we can't go this way", "we can\xE2\x80\x99t go this way",
-                            "avoid this road", "there's a detour", "there\xE2\x80\x99s a detour", "ugh there's a detour",
+                            "there's a detour", "there\xE2\x80\x99s a detour", "ugh there's a detour",
                             "detour", "road closure up ahead"})
   {
     auto const c = ParseAppCommands(said);
@@ -1226,7 +1226,8 @@ TEST(LaneExitAndWhichWayQuestionsSayTheNextTurn)
     CHECK(ok);
   }
   CHECK(!WordsSupportTool(AppAction::NextTurn, "", "I left my phone at home"));
-  CHECK(Heard("avoid this road", AppAction::DifferentRoute));
+  // "Avoid this road" keeps off the road the car is on (a reroute that knows which road).
+  CHECK(Heard("avoid this road", AppAction::AvoidRoad));
   CHECK(Heard("how long until we get there", AppAction::TimeLeft));
 }
 

@@ -136,6 +136,9 @@ public:
   /// Backseat: a real GPS fix reached the app (the Extrapolator's guesses don't count). Leaving the
   /// route then takes two of them, so one bad fix can't reroute the car.
   void OnRealFix() { m_offRouteGate.OnRealFix(); }
+  /// Backseat: work the route out again from where the car is, to the same stops, after the driver
+  /// changed what it should avoid. False when there's no route being followed to rebuild.
+  bool RebuildForPreferences();
   /// Backseat: arrive at a stop when the car parks near it or passes right by it, not only when the
   /// route's own end is reached; and don't rebuild the route around a parking lot. Cars only.
   void SetArriveNearStops(bool enabled) { m_arriveNearStops = enabled; }

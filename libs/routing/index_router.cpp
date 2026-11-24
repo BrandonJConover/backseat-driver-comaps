@@ -1,5 +1,7 @@
 #include "routing/index_router.hpp"
 
+#include "routing/drive_preferences.hpp"
+
 #include "routing/base/astar_progress.hpp"
 #include "routing/car_directions.hpp"
 #include "routing/checkpoints.hpp"
@@ -352,6 +354,8 @@ RouterResultCode IndexRouter::CalculateRoute(Checkpoints const & checkpoints, m2
 {
   auto const & startPoint = checkpoints.GetStart();
   auto const & finalPoint = checkpoints.GetFinish();
+  // Backseat: the driver's avoided roads and fewer lefts, as they are when this route starts.
+  m_estimator->SetDrivePreferences(DrivePreferences::Instance().Get());
 
   try
   {

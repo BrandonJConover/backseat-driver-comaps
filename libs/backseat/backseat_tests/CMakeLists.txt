@@ -57,6 +57,7 @@ add_executable(${PROJECT_NAME}
   rundown_test.cpp
   road_bits_test.cpp
   voice_command_test.cpp
+  road_match_test.cpp
   yes_no_test.cpp
   warm_test.cpp
   phone_handling_test.cpp
