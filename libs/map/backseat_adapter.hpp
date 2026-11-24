@@ -133,6 +133,15 @@ public:
   /// Traffic lights on the route just built (mercator points). A left turn off a side street
   /// with no light there is treated as a stop sign, since stop signs aren't in the map data.
   void SetTrafficLights(std::vector<m2::PointD> points);
+  /// Backseat route preferences, carried out by RoutingManager. `avoidRoad` gets the road as said
+  /// (empty: the one the car is on) and returns the road's name as the map has it, or nothing when
+  /// that road isn't ahead on the route. `fewerLefts` turns the fewer-left-turns choice on or off.
+  void SetRoutePreferences(std::function<std::optional<std::string>(std::string const &)> avoidRoad,
+                           std::function<void(bool)> fewerLefts)
+  {
+    m_avoidRoad = std::move(avoidRoad);
+    m_fewerLefts = std::move(fewerLefts);
+  }
   /// Whether other audio is playing (the platform's audio session), so the GPS can ask for music.
   void SetMusicCheck(std::function<bool()> check) { m_navigator.SetMusicLookup(std::move(check)); }
   /// The platform's on-device language model, for rewording roasts in real time.
@@ -488,6 +497,8 @@ private:
   backseat::DebugLog m_debugLog;
   backseat::Navigator m_navigator;
   std::function<DataSource &()> m_dataSource;
+  std::function<std::optional<std::string>(std::string const &)> m_avoidRoad;
+  std::function<void(bool)> m_fewerLefts;
   std::function<storage::CountryInfoGetter const &()> m_countryInfo;
   mutable std::mutex m_lightsMutex;
   std::vector<m2::PointD> m_trafficLights;

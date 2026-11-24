@@ -63,3 +63,76 @@ UNIT_TEST(ClimbPenalty_HighAboveSeaLevel)
   }
 }
 }  // namespace
+
+// Backseat: the driver's avoided roads and fewer lefts change which route is picked, not its ETA.
+namespace backseat_prefs
+{
+using namespace routing;
+
+std::shared_ptr<EdgeEstimator> Car()
+{
+  return EdgeEstimator::Create(VehicleType::Car, 90.0 /* maxWeighSpeedKMpH */, SpeedKMpH(10.0, 10.0),
+                               nullptr /* trafficStash */, nullptr /* dataSource */, nullptr /* numMwmIds */);
+}
+
+UNIT_TEST(DrivePreferences_AvoidedRoadCostsMoreOnlyWhenPicking)
+{
+  auto car = Car();
+  RoadGeometry const road(false /* oneWay */, 50.0, 50.0, {{0.0, 0.0}, {0.0, 0.01}});
+  Segment const avoided(1 /* mwm */, 7 /* feature */, 0 /* segment */, true /* forward */);
+  Segment const other(1, 8, 0, true);
+  double const plainWeight = car->CalcSegmentWeight(avoided, road, EdgeEstimator::Purpose::Weight);
+  double const plainEta = car->CalcSegmentWeight(avoided, road, EdgeEstimator::Purpose::ETA);
+
+  DrivePreferences::Snapshot prefs;
+  prefs.m_avoided.insert({1, 7});
+  car->SetDrivePreferences(std::make_shared<DrivePreferences::Snapshot const>(prefs));
+  TEST_ALMOST_EQUAL_ABS(car->CalcSegmentWeight(avoided, road, EdgeEstimator::Purpose::Weight),
+                        plainWeight * DrivePreferences::kAvoidedRoadFactor, 1e-6, ());
+  TEST_ALMOST_EQUAL_ABS(car->CalcSegmentWeight(avoided, road, EdgeEstimator::Purpose::ETA), plainEta, 1e-9, ());
+  TEST_ALMOST_EQUAL_ABS(car->CalcSegmentWeight(other, road, EdgeEstimator::Purpose::Weight), plainWeight, 1e-9, ());
+}
+
+UNIT_TEST(DrivePreferences_FewerLeftsCostsLeftsAcrossTraffic)
+{
+  auto car = Car();
+  RoadGeometry const road;
+  auto const weight = [&](double angle, bool leftHand)
+  { return car->GetTurnPenalty(EdgeEstimator::Purpose::Weight, angle, road, road, leftHand); };
+  double const left = weight(90.0, false);
+  double const right = weight(-90.0, false);
+  double const slightLeft = weight(20.0, false);
+
+  DrivePreferences::Snapshot prefs;
+  prefs.m_fewerLefts = true;
+  car->SetDrivePreferences(std::make_shared<DrivePreferences::Snapshot const>(prefs));
+  TEST_ALMOST_EQUAL_ABS(weight(90.0, false), left + DrivePreferences::kLeftTurnPenaltyS, 1e-9, ());
+  TEST_ALMOST_EQUAL_ABS(weight(-90.0, false), right, 1e-9, ("a right turn costs the same"));
+  TEST_ALMOST_EQUAL_ABS(weight(20.0, false), slightLeft, 1e-9, ("a slight bend isn't a turn"));
+  // Where they drive on the left, the turn across traffic is the right.
+  TEST_ALMOST_EQUAL_ABS(weight(-90.0, true), car->GetTurnPenalty(EdgeEstimator::Purpose::Weight, -90.0, road, road, true), 1e-9, ());
+  TEST_GREATER(weight(-90.0, true), weight(90.0, true), ());
+  // The ETA is real driving time.
+  TEST_ALMOST_EQUAL_ABS(car->GetTurnPenalty(EdgeEstimator::Purpose::ETA, 90.0, road, road, false),
+                        Car()->GetTurnPenalty(EdgeEstimator::Purpose::ETA, 90.0, road, road, false), 1e-9, ());
+}
+
+UNIT_TEST(DrivePreferences_Snapshots)
+{
+  auto & prefs = DrivePreferences::Instance();
+  prefs.ClearAvoided();
+  prefs.SetFewerLefts(false);
+  auto const before = prefs.Get();
+  prefs.Avoid({{2, 11}, {2, 12}});
+  prefs.SetFewerLefts(true);
+  TEST(before->Empty(), ("a route already being worked out keeps what it started with"));
+  TEST_EQUAL(prefs.Get()->m_avoided.size(), 2, ());
+  TEST(prefs.Get()->Avoids(Segment(2, 11, 3, false)), ());
+  TEST(!prefs.Get()->Avoids(Segment(3, 11, 3, false)), ());
+  TEST(prefs.FewerLefts(), ());
+  prefs.ClearAvoided();
+  TEST(prefs.Get()->m_avoided.empty(), ());
+  TEST(prefs.FewerLefts(), ("fewer lefts outlasts the trip"));
+  prefs.SetFewerLefts(false);
+}
+}  // namespace backseat_prefs

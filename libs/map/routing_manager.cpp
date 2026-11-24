@@ -44,6 +44,9 @@
 #include "platform/platform.hpp"
 #include "platform/settings.hpp"
 
+#include "routing/drive_preferences.hpp"
+#include "backseat/road_match.hpp"
+
 #include "geometry/mercator.hpp"  // kPointEqualityEps
 #include "geometry/polyline2d.hpp"
 #include "geometry/simplification.hpp"
@@ -62,6 +65,7 @@
 #include <algorithm>
 #include <ios>
 #include <map>
+#include <set>
 
 #include "cppjansson/cppjansson.hpp"
 
@@ -73,6 +77,9 @@ namespace
 char constexpr kRouterTypeKey[] = "router";
 // Backseat Driver: set once walking has been made the starting mode on this install.
 char constexpr kBackseatWalkDefaultKey[] = "BackseatWalkDefault";
+char constexpr kBackseatFewerLeftsKey[] = "BackseatFewerLefts";
+// Backseat: a route redone to within this of the old destination is the same trip.
+double constexpr kSameDestinationM = 100.0;
 
 double constexpr kRouteScaleMultiplier = 1.5;
 
@@ -343,6 +350,13 @@ RoutingManager::RoutingManager(Callbacks && callbacks, Delegate & delegate)
 {
   m_extrapolator.Enable(true);  // Keeps smooth arrow movement whether routing or not
   m_backseat.SetDataSource(m_callbacks.m_dataSourceGetter);
+  m_backseat.SetRoutePreferences([this](std::string const & road) { return AvoidRoadOnRoute(road); },
+                                 [this](bool fewer) { SetFewerLeftTurns(fewer); });
+  {
+    bool fewerLefts = false;
+    if (settings::Get(kBackseatFewerLeftsKey, fewerLefts))
+      routing::DrivePreferences::Instance().SetFewerLefts(fewerLefts);
+  }
   m_backseat.SetCountryInfoGetter(m_callbacks.m_countryInfoGetter);
   m_routingSession.Init(
 #ifdef SHOW_ROUTE_DEBUG_MARKS
@@ -512,6 +526,8 @@ void RoutingManager::OnRoutePointPassed(RouteMarkType type, size_t intermediateI
 
 void RoutingManager::OnLocationUpdate(location::GpsInfo const & info)
 {
+  // Counted before the Extrapolator passes the fix on, so the route knows real fixes from guesses.
+  m_routingSession.OnRealFix();
   m_extrapolator.OnLocationUpdate(info);
   m_backseat.SetTravelMode(m_currentRouterType == routing::RouterType::Bicycle ? backseat::TravelMode::Bike
                            : m_currentRouterType == routing::RouterType::Pedestrian ||
@@ -615,6 +631,7 @@ void RoutingManager::SetRouterImpl(RouterType type)
         numMwmIds, MakeNumMwmTree(*numMwmIds, m_callbacks.m_countryInfoGetter()), m_routingSession, dataSource);
 
   m_routingSession.SetRoutingSettings(GetRoutingSettings(vehicleType));
+  m_routingSession.SetArriveNearStops(vehicleType == VehicleType::Car);
   m_routingSession.SetRouter(std::move(router), std::move(regionsFinder));
   m_currentRouterType = type;
 }
@@ -988,6 +1005,65 @@ void RoutingManager::FollowRoute()
   CancelRecommendation(Recommendation::RebuildAfterPointsLoading);
 }
 
+std::optional<std::string> RoutingManager::AvoidRoadOnRoute(std::string const & road)
+{
+  if (m_currentRouterType != RouterType::Vehicle || !IsRoutingActive())
+    return std::nullopt;
+  auto const route = m_routingSession.GetRouteForTests();
+  if (!route || !route->IsValid() || route->GetRouteSegments().empty())
+    return std::nullopt;
+  auto const & segments = route->GetRouteSegments();
+  auto const & iter = route->GetFollowedPolyline().GetCurrentIter();
+  // Polyline point i starts route segment i.
+  size_t const here = iter.IsValid() ? std::min(iter.m_ind, segments.size() - 1) : 0;
+
+  // "This road": the named road the car is on (or about to be on, past a nameless link).
+  std::optional<RouteSegment::RoadNameInfo> current;
+  if (road.empty())
+    for (size_t i = here; i < segments.size() && i < here + 5 && !current; ++i)
+      if (auto const & info = segments[i].GetRoadNameInfo(); !info.m_name.empty() || !info.m_ref.empty())
+        current = info;
+  if (road.empty() && !current)
+    return std::nullopt;
+
+  std::set<routing::DrivePreferences::Road> avoid;
+  for (size_t i = here; i < segments.size(); ++i)
+  {
+    auto const & info = segments[i].GetRoadNameInfo();
+    bool const match = current ? (info.m_name == current->m_name && info.m_ref == current->m_ref)
+                               : backseat::RoadNameMatches(road, info.m_name, info.m_ref);
+    auto const & segment = segments[i].GetSegment();
+    if (match && segment.IsRealSegment())
+      avoid.insert({segment.GetMwmId(), segment.GetFeatureId()});
+  }
+  if (avoid.empty())
+    return std::nullopt;
+
+  std::string name;
+  for (size_t i = here; i < segments.size() && name.empty(); ++i)
+  {
+    auto const & segment = segments[i].GetSegment();
+    if (segment.IsRealSegment() && avoid.count({segment.GetMwmId(), segment.GetFeatureId()}))
+    {
+      auto const & info = segments[i].GetRoadNameInfo();
+      name = !info.m_name.empty() ? info.m_name : info.m_ref;
+    }
+  }
+  routing::DrivePreferences::Instance().Avoid(avoid);
+  m_avoidedFor = m_routingSession.GetEndPoint();
+  LOG(LINFO, ("Backseat: avoiding", name, avoid.size(), "road pieces"));
+  m_routingSession.RebuildForPreferences();
+  return name.empty() ? road : name;
+}
+
+void RoutingManager::SetFewerLeftTurns(bool fewer)
+{
+  routing::DrivePreferences::Instance().SetFewerLefts(fewer);
+  settings::Set(kBackseatFewerLeftsKey, fewer);
+  if (m_currentRouterType == RouterType::Vehicle && IsRoutingActive())
+    m_routingSession.RebuildForPreferences();
+}
+
 void RoutingManager::CloseRouting(bool removeRoutePoints)
 {
   // Hide preview.
@@ -1345,6 +1421,14 @@ void RoutingManager::BuildRoute(uint32_t timeoutSec)
     CallRouteBuilded(RouterResultCode::Cancelled, storage::CountriesSet());
     CloseRouting(false /* remove route points */);
     return;
+  }
+
+  // Backseat: roads avoided on the way somewhere stay avoided while the route is redone for that
+  // place (tolls switched off, a stop added), and are forgotten for a new destination.
+  if (!m_avoidedFor || mercator::DistanceOnEarth(*m_avoidedFor, routePoints.back().m_position) > kSameDestinationM)
+  {
+    routing::DrivePreferences::Instance().ClearAvoided();
+    m_avoidedFor.reset();
   }
 
   // Update my position.

@@ -784,7 +784,12 @@ double CarEstimator::GetTurnPenalty(Purpose purpose, double angle, RoadGeometry 
 
   // Twice as long to turn across traffic than not to
   auto const extra_penalty = turn_crosses_traffic ? 2.0 : 1.0;
-  auto const result = fabs(angle) * penalty * extra_penalty;
+  auto result = fabs(angle) * penalty * extra_penalty;
+
+  // Backseat: "fewer left turns" makes each one cost a minute more when picking the route.
+  if (purpose == Purpose::Weight && turn_crosses_traffic && m_prefs && m_prefs->m_fewerLefts &&
+      fabs(angle) >= DrivePreferences::kLeftTurnMinAngleDeg)
+    result += DrivePreferences::kLeftTurnPenaltyS;
 
   return result;
 }
@@ -808,6 +813,10 @@ double CarEstimator::CalcSegmentWeight(Segment const & segment, RoadGeometry con
       result *= 1.8;
     }
   }
+
+  // Backseat: a road the driver asked to avoid, used only when there's no reasonable way around.
+  if (purpose == Purpose::Weight && m_prefs && m_prefs->Avoids(segment))
+    result *= DrivePreferences::kAvoidedRoadFactor;
 
   return result;
 }

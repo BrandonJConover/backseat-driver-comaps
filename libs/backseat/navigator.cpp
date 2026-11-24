@@ -5013,6 +5013,7 @@ bool DriveComesFirst(std::string const & spoken, bool aboutIt)
     case AppAction::DifferentRoute:
     case AppAction::TakeMeBack:
     case AppAction::TollsAhead:
+    case AppAction::AvoidRoad:
     case AppAction::TrafficAhead: return true;
     default: break;
     }

@@ -89,6 +89,13 @@ enum class AppAction
   /// "Is there traffic ahead?", "why is it so slow?": answered from the navigator's crawl judgment
   /// (Navigator::TrafficReply). No live traffic feed, so it never claims what's miles ahead.
   TrafficAhead,
+  /// "Avoid Main Street", "get me off this road": reroute keeping off that road (argument: the road as
+  /// said, empty for the one the car is on). Handled in the core (RoutingManager), not the platform.
+  AvoidRoad,
+  /// "Fewer left turns": prefer routes with fewer lefts across traffic, from now on. Core-handled.
+  FewerLefts,
+  /// "Left turns are fine": back to the plain fastest route. Core-handled.
+  AllowLefts,
   Count
 };
 
@@ -114,6 +121,7 @@ struct AppCommand
   /// NavigateTo: the place. ChangeVoice: the voice, or empty to just open the voice list.
   /// SetTravelMode: "walk", "bike", "drive" or "offroad".
   /// FindAlongRoute: what to find. ForgetThat: what to forget, or empty for the last thing read out.
+  /// AvoidRoad: the road as said ("main street", "highway 71"), or empty for the road the car is on.
   std::string argument;
 };
 

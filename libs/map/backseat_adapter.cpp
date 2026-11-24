@@ -2329,12 +2329,16 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
   // Tolls, highways and gas don't come up on a walk, and only the gas does in the dirt.
   bool const roadOnly = command.action == AppAction::AvoidTolls || command.action == AppAction::AllowTolls ||
                         command.action == AppAction::AvoidHighways || command.action == AppAction::AllowHighways ||
+                        command.action == AppAction::AvoidRoad || command.action == AppAction::FewerLefts ||
+                        command.action == AppAction::AllowLefts ||
                         command.action == AppAction::SpeedLimit || command.action == AppAction::DifferentRoute;
   if (m_navigator.GetTravelMode() == backseat::TravelMode::OffRoad && roadOnly)
     return m_navigator.Reply("mode.noRoads");
   if (!backseat::InCar(m_navigator.GetTravelMode()) &&
       (command.action == AppAction::AvoidTolls || command.action == AppAction::AllowTolls ||
        command.action == AppAction::AvoidHighways || command.action == AppAction::AllowHighways ||
+       command.action == AppAction::AvoidRoad || command.action == AppAction::FewerLefts ||
+       command.action == AppAction::AllowLefts ||
        command.action == AppAction::SpeedLimit || command.action == AppAction::DifferentRoute ||
        (command.action == AppAction::FindAlongRoute && command.argument == "gas station")))
     return m_navigator.Reply("mode.carOnly");
@@ -2528,6 +2532,27 @@ std::string BackseatAdapter::Run(backseat::AppCommand const & command, bool poli
     char clock[16] = {};
     std::strftime(clock, sizeof(clock), "%I:%M %p", std::localtime(&at));
     return m_navigator.Reply("cmd.arrival", {{"clock", clock[0] == '0' ? clock + 1 : clock}});
+  }
+  // Avoided roads and fewer lefts are worked out in the core, so both platforms get them.
+  case AppAction::AvoidRoad:
+  {
+    if (!m_navigator.InTrip())
+      return m_navigator.Reply("cmd.avoidRoad.none");
+    auto const road = m_avoidRoad ? m_avoidRoad(command.argument) : std::nullopt;
+    backseat::Trace("route.avoidRoad", {{"asked", command.argument}, {"road", road ? *road : ""}});
+    if (!road)
+      return command.argument.empty() ? m_navigator.Reply("cmd.avoidRoad.unknown")
+                                      : m_navigator.Reply("cmd.avoidRoad.notOnRoute", {{"road", Capitalized(command.argument)}});
+    return m_navigator.Reply("cmd.avoidRoad", {{"road", *road}});
+  }
+  case AppAction::FewerLefts:
+  case AppAction::AllowLefts:
+  {
+    bool const fewer = command.action == AppAction::FewerLefts;
+    if (m_fewerLefts)
+      m_fewerLefts(fewer);
+    backseat::Trace("route.fewerLefts", {{"on", fewer ? "yes" : "no"}});
+    return m_navigator.Reply(fewer ? "cmd.fewerLefts" : "cmd.allowLefts");
   }
   case AppAction::DifferentRoute:
     if (!m_navigator.InTrip())

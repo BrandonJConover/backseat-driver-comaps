@@ -1,5 +1,7 @@
 #include "backseat/voice_command.hpp"
 
+#include "backseat/road_match.hpp"
+
 #include "backseat/place_search.hpp"
 
 #include <algorithm>
@@ -168,7 +170,8 @@ bool DeferredAt(std::string const & words, std::vector<size_t> const & starts, s
 bool DeferrableAction(AppAction action)
 {
   return action == AppAction::AvoidTolls || action == AppAction::AllowTolls || action == AppAction::AvoidHighways ||
-         action == AppAction::AllowHighways || action == AppAction::ZoomIn || action == AppAction::ZoomOut;
+         action == AppAction::AllowHighways || action == AppAction::ZoomIn || action == AppAction::ZoomOut ||
+         action == AppAction::AvoidRoad || action == AppAction::FewerLefts || action == AppAction::AllowLefts;
 }
 
 /// A bare "go to"/"go home" is an order only at the start of a clause or after a word that asks:
@@ -333,6 +336,9 @@ std::vector<AppTool> const & AppTools()
       {AppAction::TalkMore, "talk_more", "Go back to the full commentary after talking less.", nullptr},
       {AppAction::TollsAhead, "tolls_ahead", "Say whether the route has tolls: on one now, how far to the next, or none.", nullptr},
       {AppAction::TrafficAhead, "traffic_ahead", "Say whether the car is stuck in traffic right now.", nullptr},
+      {AppAction::AvoidRoad, "avoid_road", "Reroute to keep off one road the driver named, or the road the car is on now.", "The road as said, like Main Street or highway 71; empty for the road the car is on."},
+      {AppAction::FewerLefts, "fewer_left_turns", "Prefer routes with fewer left turns across traffic, from now on.", nullptr},
+      {AppAction::AllowLefts, "allow_left_turns", "Go back to the fastest route, left turns and all.", nullptr},
   };
   return tools;
 }
@@ -679,7 +685,7 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                                    " the exit is closed ", " the exit's closed ", " the ramp is closed ",
                                    " the ramp's closed ", " exit is closed ", " ramp is closed ", " we can't go this way ",
                                    " we cant go this way ", " can't go this way ", " cant go this way ",
-                                   " avoid this road ", " there's a detour ", " theres a detour ", " there is a detour "}},
+                                   " there's a detour ", " theres a detour ", " there is a detour "}},
       {AppAction::TakeMeBack, {" take me back ", " take us back ", " go back to where ", " head back ",
                                " back where we started ", " back to the start "}},
       {AppAction::TimeLeft, {" how long ", " how much longer ", " are we there yet ", " time left ", " when will we get ",
@@ -728,6 +734,14 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                                " do we have tolls ", " do we pay tolls ", " do we have to pay a toll ",
                                " do i have to pay a toll ", " will we pay tolls ", " will there be tolls ",
                                " is there a toll road ", " is there a toll ahead ", " any toll roads "}},
+      {AppAction::FewerLefts, {" fewer left turns ", " less left turns ", " avoid left turns ", " avoid lefts ",
+                               " fewer lefts ", " less lefts ", " minimize left turns ", " skip the left turns ",
+                               " stop making me turn left ", " stop making me make left turns ", " i hate left turns ",
+                               " no more left turns ", " without left turns ", " avoid left hand turns ",
+                               " fewer left hand turns ", " right turns only ", " only right turns "}},
+      {AppAction::AllowLefts, {" left turns are fine ", " left turns are okay ", " left turns are ok ", " lefts are fine ",
+                               " lefts are okay ", " allow left turns ", " left turns are allowed ", " i don't mind left turns ",
+                               " i dont mind left turns ", " use left turns ", " left turns again "}},
       {AppAction::TrafficAhead, {" is there traffic ", " is there any traffic ", " any traffic ", " how's the traffic ",
                                  " hows the traffic ", " how is the traffic ", " how's traffic ", " hows traffic ",
                                  " how is traffic ", " traffic ahead ", " why is it so slow ", " why are we so slow ",
@@ -860,6 +874,14 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
                             {" switch to driving ", "drive"}})
     if (auto const at = words.find(mode.first); at != std::string::npos && !heardAction(AppAction::SetTravelMode))
       found.push_back({at, AppCommand{AppAction::SetTravelMode, mode.second}});
+  // "Avoid Main Street", "get me off this road". A numbered highway is that one road, not every highway.
+  if (auto const road = AvoidRoadAsk(words))
+  {
+    if (!road->second.empty())
+      drop(AppAction::AvoidHighways);
+    drop(AppAction::DifferentRoute);
+    found.push_back({road->first, AppCommand{AppAction::AvoidRoad, road->second}});
+  }
   auto const starts = ClauseStarts(spoken);
   auto const stop = StopSearch(words, starts);
   if (!stop.second.empty())
@@ -910,6 +932,8 @@ std::vector<AppCommand> ParseAppCommands(std::string const & spoken)
     case AppAction::AvoidTolls: return AppAction::AllowTolls;
     case AppAction::AllowHighways: return AppAction::AvoidHighways;
     case AppAction::AvoidHighways: return AppAction::AllowHighways;
+    case AppAction::FewerLefts: return AppAction::AllowLefts;
+    case AppAction::AllowLefts: return AppAction::FewerLefts;
     default: return AppAction::Count;
     }
   };
@@ -1175,6 +1199,16 @@ bool WordsSupportTool(AppAction action, std::string const & argument, std::strin
   case AppAction::TalkMore: return saidAny({"more", "chatty", "whatever"});
   case AppAction::TollsAhead: return saidAny({"toll", "tolls"});
   case AppAction::TrafficAhead: return saidAny({"traffic", "slow", "jam", "crawling", "moving", "holdup", "hold"});
+  case AppAction::AvoidRoad:
+  {
+    if (argument.empty())
+      return saidAny({"avoid", "off", "skip", "away", "hate"});
+    // The road the model picked has to be the one said: "Main Street" isn't "Elm Street".
+    auto const ask = AvoidRoadAsk(CommandWords(spoken));
+    return ask && RoadNameMatches(argument, ask->second, "");
+  }
+  case AppAction::FewerLefts:
+  case AppAction::AllowLefts: return saidAny({"left", "lefts"});
   case AppAction::Count: break;
   }
   return false;

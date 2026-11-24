@@ -23,11 +23,14 @@
 #include "base/logging.hpp"
 #include "base/math.hpp"
 
+#include <algorithm>
 #include <utility>
 
 namespace
 {
 int constexpr kOnRouteMissedCount = 10;
+// Backseat: after failed rebuilds in a row, the off-route count needed doubles, up to 16 times.
+int constexpr kMaxRebuildBackoffSteps = 4;
 int constexpr kAnnounceRouteMissedCount = 20;
 
 // Backseat Driver: lanes show as far out as the voice calls them ("Use the right two lanes", up to
@@ -86,6 +89,7 @@ void RoutingSession::BuildRoute(Checkpoints const & checkpoints, uint32_t timeou
   m_router->ClearState();
 
   m_isFollowing = false;
+  m_failedRebuilds = 0;
   m_routingRebuildCount = -1;  // -1 for the first rebuild.
   m_routingRebuildAnnounceCount = 0;
 
@@ -140,6 +144,8 @@ void RoutingSession::RemoveRoute()
   m_lastDistance = 0.0;
   m_moveAwayCounter = 0;
   m_moveAwayCounterSinceLastAnnounce = 0;
+  m_offRouteGate.OnRoute();
+  m_nearStop.Reset();
   m_turnNotificationsMgr.Reset();
 
   m_route = std::make_shared<Route>(std::string{} /* router */, 0 /* route id */);
@@ -177,6 +183,16 @@ void RoutingSession::RebuildRouteOnTrafficUpdate()
   RebuildRoute(startPoint, m_rebuildReadyCallback, nullptr /* needMoreMapsCallback */,
                nullptr /* removeRouteCallback */, RouterDelegate::kNoTimeout, SessionState::RouteRebuilding,
                false /* adjustToPrevRoute */);
+}
+
+bool RoutingSession::RebuildForPreferences()
+{
+  CHECK_THREAD_CHECKER(m_threadChecker, ());
+  if (!m_router || !m_route->IsValid() || m_state == SessionState::NoValidRoute ||
+      m_state == SessionState::RouteFinished || m_state == SessionState::RouteBuilding)
+    return false;
+  RebuildRouteOnTrafficUpdate();
+  return true;
 }
 
 bool RoutingSession::IsActive() const
@@ -294,8 +310,10 @@ SessionState RoutingSession::OnLocationPositionChanged(GpsInfo const & info)
     m_moveAwayCounter = 0;
     m_moveAwayCounterSinceLastAnnounce = 0;
     m_lastDistance = 0.0;
+    m_offRouteGate.OnRoute();
 
     PassCheckpoints();
+    PassCheckpointNearCar(info, true /* onRoute */);
 
     if (m_checkpoints.IsFinished())
     {
@@ -322,6 +340,17 @@ SessionState RoutingSession::OnLocationPositionChanged(GpsInfo const & info)
 
   if (m_state != SessionState::RouteNeedsRebuild && m_state != SessionState::RouteRebuilding)
   {
+    // Backseat: parked in the lot next to the stop, or across the street from it: that's arriving.
+    if (PassCheckpointNearCar(info, false /* onRoute */))
+    {
+      if (m_checkpoints.IsFinished())
+      {
+        m_passedDistanceOnRouteMeters += m_route->GetTotalDistanceMeters();
+        SetState(SessionState::RouteFinished);
+        return m_state;
+      }
+    }
+
     // Distance from the last known projection on route
     // (check if we are moving far from the last known projection).
     auto const & lastGoodPoint = m_route->GetFollowedPolyline().GetCurrentIter().m_pt;
@@ -343,7 +372,15 @@ SessionState RoutingSession::OnLocationPositionChanged(GpsInfo const & info)
 
     m_lastDistance = dist;
 
-    if (m_moveAwayCounter > kOnRouteMissedCount)
+    // Backseat: every off-route check notes the real fix it came from, so the gate can count them.
+    bool const confirmed = m_offRouteGate.ConfirmsOffRoute();
+    // Backseat: crawling around a parking lot by the stop isn't leaving the route; the arrival above
+    // ends the trip once the car parks.
+    bool const holds = m_arriveNearStops && !m_checkpoints.IsFinished() &&
+                       m_nearStop.HoldsRebuild(NearStopPosition(info, false /* onRoute */));
+
+    int const missedCount = kOnRouteMissedCount << std::min(m_failedRebuilds, kMaxRebuildBackoffSteps);
+    if (m_moveAwayCounter > missedCount && confirmed && !holds)
     {
       if (m_autoReroute)
       {
@@ -616,6 +653,33 @@ void RoutingSession::PassCheckpoints()
   }
 }
 
+NearStopArrival::Position RoutingSession::NearStopPosition(location::GpsInfo const & info, bool onRoute) const
+{
+  NearStopArrival::Position p;
+  p.m_toStopM = mercator::DistanceOnEarth(m_checkpoints.GetPointTo(), mercator::FromLatLon(info.m_latitude, info.m_longitude));
+  p.m_routeLeftM = m_route->GetDistanceToSubrouteEndMeters(m_checkpoints.GetPassedIdx());
+  p.m_onRoute = onRoute;
+  p.m_speedMps = info.HasSpeed() ? info.m_speed : -1.0;
+  p.m_timeS = info.m_timestamp;
+  return p;
+}
+
+bool RoutingSession::PassCheckpointNearCar(location::GpsInfo const & info, bool onRoute)
+{
+  CHECK_THREAD_CHECKER(m_threadChecker, ());
+  if (!m_arriveNearStops || m_checkpoints.IsFinished() || !m_route->IsValid())
+    return false;
+  if (!m_nearStop.Arrived(NearStopPosition(info, onRoute)))
+    return false;
+  m_route->PassNextSubroute();
+  m_checkpoints.PassNextPoint();
+  m_nearStop.Reset();
+  LOG(LINFO, ("Arrived near checkpoint,", m_checkpoints));
+  if (m_checkpointCallback)
+    m_checkpointCallback(m_checkpoints.GetPassedIdx());
+  return true;
+}
+
 void RoutingSession::GenerateNotifications(std::vector<std::string> & notifications, bool announceStreets)
 {
   CHECK_THREAD_CHECKER(m_threadChecker, ());
@@ -702,11 +766,25 @@ void RoutingSession::AssignRoute(std::shared_ptr<Route> const & route, RouterRes
     // Route building was not success. If the former route is valid let's continue moving along it.
     // If not, let's set corresponding state.
     if (m_route->IsValid())
+    {
       SetState(SessionState::OnRoute);
+      // Backseat: the off-route count was still past the line, so the very next position check
+      // asked for another rebuild, and a rebuild that keeps failing (no map here, no road near the
+      // car) ran back to back for as long as the car stayed off the route, heating the phone. Start
+      // the count over, and wait longer after each failure in a row (about 1, 2, 5, 10, 20 s).
+      m_moveAwayCounter = 0;
+      m_moveAwayCounterSinceLastAnnounce = 0;
+      m_lastDistance = 0.0;
+      ++m_failedRebuilds;
+    }
     else
+    {
       SetState(SessionState::NoValidRoute);
+    }
     return;
   }
+
+  m_failedRebuilds = 0;
 
   RemoveRoute();
   SetState(SessionState::RouteNotStarted);

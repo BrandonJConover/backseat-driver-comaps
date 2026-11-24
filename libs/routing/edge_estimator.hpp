@@ -1,5 +1,6 @@
 #pragma once
 
+#include "routing/drive_preferences.hpp"
 #include "routing/vehicle_mask.hpp"
 
 #include "routing_common/num_mwm_id.hpp"
@@ -53,6 +54,10 @@ public:
                                 RoadGeometry const & to_road, bool is_left_hand_traffic = false) const = 0;
   virtual double GetFerryLandingPenalty(Purpose purpose) const = 0;
 
+  /// Backseat: the driver's avoided roads and fewer-lefts choice for the route being worked out.
+  /// The router sets it before each route; only the car estimator reads it.
+  void SetDrivePreferences(std::shared_ptr<DrivePreferences::Snapshot const> prefs) { m_prefs = std::move(prefs); }
+
   static std::shared_ptr<EdgeEstimator> Create(VehicleType vehicleType, double maxWeighSpeedKMpH,
                                                SpeedKMpH const & offroadSpeedKMpH,
                                                std::shared_ptr<TrafficStash> trafficStash, DataSource * dataSourcePtr,
@@ -66,6 +71,7 @@ protected:
   VehicleType const m_vehicleType;
   double m_defaultPenalty = 0.0;
   ankerl::unordered_dense::map<int, double> m_turnPenaltyMap;
+  std::shared_ptr<DrivePreferences::Snapshot const> m_prefs;
 
 private:
   double const m_maxWeightSpeedMpS;
