@@ -178,7 +178,20 @@ void Extrapolator::ExtrapolatedLocationUpdate(uint64_t locationUpdateCounter)
   }
 
   if (gpsInfo.IsValid())
-    GetPlatform().RunTask(Platform::Thread::Gui, [this, gpsInfo]() { m_extrapolatedLocationUpdate(gpsInfo); });
+  {
+    GetPlatform().RunTask(Platform::Thread::Gui, [this, gpsInfo, locationUpdateCounter]()
+    {
+      // Backseat: a real fix may have arrived while this guess waited for the GUI thread. A guess
+      // from the fix before it is stale, and the route counts real fixes as they arrive, so a stale
+      // guess would count as off-route evidence from the new fix.
+      {
+        lock_guard<mutex> guard(m_mutex);
+        if (locationUpdateCounter < m_locationUpdateMinValid)
+          return;
+      }
+      m_extrapolatedLocationUpdate(gpsInfo);
+    });
+  }
 
   {
     lock_guard<mutex> guard(m_mutex);
