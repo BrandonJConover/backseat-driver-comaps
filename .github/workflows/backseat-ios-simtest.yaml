@@ -14,10 +14,10 @@ permissions:
 jobs:
   drive:
     name: Simulated drive in the iOS simulator
-    runs-on: macos-26
+    # GitHub keys its macOS images by Xcode major version; this one runs macOS 27 on Apple Silicon.
+    runs-on: xcode-27
     timeout-minutes: 120
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
       LANG: en_US.UTF-8
       LANGUAGE: en_US.UTF-8
       LC_ALL: en_US.UTF-8
@@ -34,6 +34,22 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
+      # The xcode-27 image ships Xcode 27 but its exact point release moves, so pick the newest one
+      # and stop if the iOS SDK isn't 27 (App Store Connect requires the iOS 27 SDK from April 2027).
+      - name: Select Xcode 27
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE" ]; then
+            XCODE=$(dirname "$(dirname "$(xcode-select -p)")")
+          fi
+          echo "DEVELOPER_DIR=$XCODE/Contents/Developer" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR="$XCODE/Contents/Developer"
+          ls -d /Applications/Xcode*.app
+          xcodebuild -version
+          SDK=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "::notice title=Xcode::$(xcodebuild -version | head -1), iOS SDK $SDK, at $XCODE"
+          case "$SDK" in 27*) ;; *) echo "::error title=Wrong iOS SDK::Expected iOS 27 SDK, got $SDK"; exit 1;; esac
+
       - name: Install dependencies
         run: |
           brew install qt optipng
