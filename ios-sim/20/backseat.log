@@ -1,0 +1,18 @@
+2026-11-28 15:13:39.121 Db CoMaps (Debug)[45010:4e8ed] [com.apple.defaults:User Defaults] setting new value 39.74600,-104.94075 for key BackseatTestDestination in CFPrefsSource<0x101a51700> (Domain: Volatile, User: , ByHost: No, Container: , Contents Need Refresh: No (Sentinel)
+2026-11-28 15:13:41.319 Db CoMaps (Debug)[45010:4e8ed] [com.apple.defaults:User Defaults] found no value for key Backseat3dDefault in CFPrefsSearchListSource<0x1021601e0> (Domain: com.brandonjconover.backseatdriver.debug, Container: (null) Non-launch persona: 0)
+    Backseat3dDefault = 1;
+2026-11-28 15:13:41.361 Db CoMaps (Debug)[45010:4e8ed] [com.apple.defaults:User Defaults] found no value for key BackseatDebugLogMigrated in CFPrefsSearchListSource<0x1021601e0> (Domain: com.brandonjconover.backseatdriver.debug, Container: (null) Non-launch persona: 0)
+    BackseatDebugLogMigrated = 1;
+2026-11-28 15:13:41.520 Db CoMaps (Debug)[45010:4e8ed] [com.apple.defaults:User Defaults] looked up value 39.74600,-104.94075 for key BackseatTestDestination in CFPrefsSource<0x101a51700> (Domain: Volatile, User: , ByHost: No, Container: , Contents Need Refresh: No (Sentinel) via CFPrefsSearchListSource<0x1021601e0> (Domain: com.brandonjconover.backseatdriver.debug, Container: (null) Non-launch persona: 0)
+2026-11-28 15:14:09.663 Db CoMaps (Debug)[45010:4ea78] [com.apple.defaults:User Defaults] found no value for key BackseatUserPronunciations in CFPrefsSearchListSource<0x1021601e0> (Domain: com.brandonjconover.backseatdriver.debug, Container: (null) Non-launch persona: 0)
+2026-11-28 15:17:48.792 Db CoMaps (Debug)[45010:4e8ed] [com.apple.defaults:User Defaults] found no value for key BackseatReturnAt in CFPrefsSearchListSource<0x1021601e0> (Domain: com.brandonjconover.backseatdriver.debug, Container: (null) Non-launch persona: 0)
+2026-11-28 15:18:07.663 Df CoMaps (Debug)[45010:4e8ed] (CoMaps (Debug).debug.dylib) Backseat test drive: building a route to 39.746000,-104.940750
+2026-11-28 15:18:17.523 Df CoMaps (Debug)[45010:4e8ed] (CoMaps (Debug).debug.dylib) Backseat test drive: no route yet (active=0 built=0), retry 2
+2026-11-28 15:18:17.527 Df CoMaps (Debug)[45010:4e8ed] (CoMaps (Debug).debug.dylib) Backseat test drive: building a route to 39.746000,-104.940750
+2026-11-28 15:18:27.522 Df CoMaps (Debug)[45010:4e8ed] (CoMaps (Debug).debug.dylib) Backseat test drive: no route yet (active=1 built=0), retry 3
+2026-11-28 15:18:27.523 Df CoMaps (Debug)[45010:4e8ed] (CoMaps (Debug).debug.dylib) Backseat test drive: building a route to 39.746000,-104.940750
+2026-11-28 15:18:37.522 Df CoMaps (Debug)[45010:4e8ed] (CoMaps (Debug).debug.dylib) Backseat test drive: no route yet (active=1 built=0), retry 4
+2026-11-28 15:18:37.522 Df CoMaps (Debug)[45010:4e8ed] (CoMaps (Debug).debug.dylib) Backseat test drive: building a route to 39.746000,-104.940750
+2026-11-28 15:18:47.523 Df CoMaps (Debug)[45010:4e8ed] (CoMaps (Debug).debug.dylib) Backseat test drive: no route yet (active=1 built=0), retry 5
+2026-11-28 15:18:47.524 Df CoMaps (Debug)[45010:4e8ed] (CoMaps (Debug).debug.dylib) Backseat test drive: building a route to 39.746000,-104.940750
+2026-11-28 15:18:57.522 Df CoMaps (Debug)[45010:4e8ed] (CoMaps (Debug).debug.dylib) Backseat test drive: giving up, no route after 5 attempts (active=1 built=0)
