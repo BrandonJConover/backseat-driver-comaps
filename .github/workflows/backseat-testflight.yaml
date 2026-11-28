@@ -92,10 +92,13 @@ jobs:
           security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
           # Without a certificate, Xcode cloud signing (via the API key) makes one if the key allows it.
+          # Xcode 27 saves that identity in the default keychain, so codesign must not be pinned to ours
+          # (it failed with "no identity found"); pin it only when we import the certificate ourselves.
           if [ -n "$BUILD_CERTIFICATE_BASE64" ]; then
             echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
             security import "$RUNNER_TEMP/cert.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+            echo "CODE_SIGN_KEYCHAIN_FLAGS=--keychain $KEYCHAIN_PATH" >> "$GITHUB_ENV"
           fi
           security find-identity -v -p codesigning
 
@@ -128,7 +131,7 @@ jobs:
             -authenticationKeyIssuerID "$ISSUER" \
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="$TEAM" \
-            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH" \
+            OTHER_CODE_SIGN_FLAGS="${CODE_SIGN_KEYCHAIN_FLAGS:-}" \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             MARKETING_VERSION=1.0 \
             2>&1 | tee "$RUNNER_TEMP/build.log" | grep -E "error:|warning: .*(signing|provisioning)|BUILD|ARCHIVE" || true
